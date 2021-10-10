@@ -10,7 +10,7 @@ from logging import basicConfig
 
 from models import hash_code
 
-parser = argparse.ArgumentParser(description="Process some integers.")
+parser = argparse.ArgumentParser(description="Hash text to database format")
 parser.add_argument("input", help="Input string to hash")
 
 args = parser.parse_args()

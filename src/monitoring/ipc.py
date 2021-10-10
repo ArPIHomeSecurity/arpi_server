@@ -8,6 +8,8 @@ import json
 import logging
 import socket
 from os import chmod, chown, environ, makedirs, path, remove
+from pwd import getpwnam
+from grp import getgrnam
 from threading import Thread
 
 from monitoring import storage
@@ -50,6 +52,7 @@ class IPCServer(Thread):
         self._initialize_socket()
         self._logger.info("IPC server created")
 
+
     def _initialize_socket(self):
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(1.0)
@@ -65,16 +68,22 @@ class IPCServer(Thread):
 
         try:
             chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
-            chown(MONITOR_INPUT_SOCKET, int(environ["USER_ID"]), int(environ["GROUP_ID"]))
+            chown(MONITOR_INPUT_SOCKET, getpwnam(environ["USERNAME"]).pw_uid, getgrnam(environ["GROUPNAME"]).gr_gid)
             self._logger.info("Socket permissions fixed")
-        except KeyError:
-            self._logger.info("No permission or owner defined")
+        except KeyError as error:
+            self._logger.error("Failed to fix permission and/or owner!")
+            self._logger.debug("Error: %s", error)
+
 
     def create_socket_file(self):
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
-            self._logger.info("Create socket file: %s", MONITOR_INPUT_SOCKET)
+            self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(path.dirname(filename))
+            with open(MONITOR_INPUT_SOCKET, "w"):
+                pass
+            self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
+
 
     def handle_actions(self, message):
         """
@@ -127,6 +136,7 @@ class IPCServer(Thread):
 
         return return_value
 
+
     def run(self):
         self._logger.info("IPC server started")
         # read all the messages
@@ -155,5 +165,10 @@ class IPCServer(Thread):
 
             if connection:
                 connection.close()
+
+        try:
+            remove(MONITOR_INPUT_SOCKET)
+        except FileNotFoundError:
+            pass
 
         self._logger.info("IPC server stopped")

@@ -7,10 +7,8 @@ Type=simple
 User=root
 PIDFile=/run/argus/argus_monitor.pid
 WorkingDirectory=/home/argus/server
-ExecStart=/home/argus/server/scripts/start_monitor.sh prod
-ExecStop=/home/argus/server/scripts/stop_monitor.sh prod
+ExecStart=/usr/local/bin/pipenv run python -u -s -m monitoring
 Restart=on-failure
-KillMode=none
 
 [Install]
 WantedBy=multi-user.target

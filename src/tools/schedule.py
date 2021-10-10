@@ -13,19 +13,13 @@ from monitoring.constants import LOG_IPC
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
     "bash -c 'cd /home/argus/server/; "
-    "source /home/argus/server/etc/common.prod.env; "
-    "source /home/argus/server/etc/server.prod.env; "
-    "source /home/argus/server/etc/secrets.env; "
-    "pipenv run python /home/argus/server/src/tools/dyndns.py'"
+    "/usr/local/bin/pipenv run python /home/argus/server/src/tools/dyndns.py'"
 )
 
 certbot_job = (
     "systemd-cat -t 'argus_certbot' "
     "bash -c 'cd /home/argus/server/; "
-    "source /home/argus/server/etc/common.prod.env; "
-    "source /home/argus/server/etc/server.prod.env; "
-    "source /home/argus/server/etc/secrets.env; "
-    "pipenv run python /home/argus/server/src/tools/certbot.py'"
+    "/usr/local/bin/pipenv run python /home/argus/server/src/tools/certbot.py'"
 )
 
 

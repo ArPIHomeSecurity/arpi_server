@@ -4,7 +4,7 @@
 # @Last Modified by:   Gábor Kovács
 # @Last Modified time: 2021-02-25 20:07:58
 
-from logging import INFO
+from logging import INFO, DEBUG
 
 
 # Threads and logging

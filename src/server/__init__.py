@@ -13,6 +13,7 @@ import jose.exceptions
 from dateutil.tz import tzlocal
 from flask import Flask, jsonify, request, send_from_directory
 from flask.helpers import make_response
+from flask_migrate import Migrate
 from jose import jwt
 
 from models import Alert, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone, hash_code
@@ -50,6 +51,7 @@ app.use_reloader = False
 
 # avoid reloading records from database after session commit
 db.init_app(app)
+migrate = Migrate(app, db)
 
 
 @app.route("/")

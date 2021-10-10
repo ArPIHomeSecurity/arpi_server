@@ -76,8 +76,7 @@ def start():
     ipc_server.start()
 
     # start the socket IO server in he main thread
-    socketio_server = Thread(target=start_socketio, name=THREAD_SOCKETIO, daemon=True)
-    socketio_server.start()
+    start_socketio()
 
     def stop_service():
         logger.info("Stopping service...")
@@ -109,7 +108,7 @@ def start():
     """
     while True:
         try:
-            for thread in (monitor, ipc_server, notifier, keypad, socketio_server):
+            for thread in (monitor, ipc_server, notifier, keypad):
                 if not thread.is_alive():
                     logger.error("Thread crashed: %s", thread.name)
                     stop_service()

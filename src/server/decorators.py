@@ -2,7 +2,7 @@
 # @Author: Gábor Kovács
 # @Date:   2021-02-25 20:06:00
 # @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:06:02
+# @Last Modified time: 2021-02-26 09:43:09
 import functools
 import json
 import logging
@@ -87,7 +87,7 @@ def authenticated(role=ROLE_ADMIN):
                 try:
                     token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
                     logger.info("Token: %s", token)
-                    if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
+                    if int(token.get("timestamp", 0)) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
                     # HTTP_ORIGIN is not always sent

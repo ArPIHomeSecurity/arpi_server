@@ -134,6 +134,16 @@ def env_test_01():
     session.commit()
 
 
+def env_admin_registration():
+    admin_user = session.query(User).filter(User.role==ROLE_ADMIN).first()
+    code = admin_user.add_registration_code("ABCD")
+    print("Code: ", code)
+    admin_user.update({"access_code": "1234"})
+    print("Password: ", "1234")
+    session.commit()
+    print("Admin registration added and password changed")
+
+
 def main():
     environments = []
     for attribute, value in globals().items():
@@ -141,19 +151,18 @@ def main():
             environments.append(attribute.replace("env_", ""))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--create", action="store_true", help="Create database content")
     parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")
-    parser.add_argument("-e", "--environment", required=True, help="/".join(environments), metavar="environment")
+    parser.add_argument("-c", "--create", metavar="environment", help="Create database content (environments: {})".format(", ".join(environments)))
     args = parser.parse_args()
 
     if args.delete:
         cleanup()
 
     if args.create:
-        create_method = globals()["env_" + args.environment]
-        print("Creating '%s' environment..." % args.environment)
+        create_method = globals()["env_" + args.create]
+        print("Creating '%s' environment..." % args.create)
         create_method()
-        print("Environment create")
+        print("Environment created")
 
 
 if __name__ == "__main__":

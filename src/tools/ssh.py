@@ -26,7 +26,7 @@ class SSH:
         if ssh_config:
             ssh_config = json.loads(ssh_config.value)
         else:
-            self._logger.error("Missing access settings!")
+            self._logger.error("Missing ssh settings!")
             return
 
         if ssh_config.get("ssh", True):
