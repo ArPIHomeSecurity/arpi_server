@@ -1,28 +1,33 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:10:13
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:10:18
+from abc import ABC, abstractmethod
 
 
-class KeypadBase:
-    def __init__(self, clock_pin, data_pin):
-        self._clock = clock_pin
-        self._data = data_pin
-        self.pressed = None
+class KeypadBase(ABC):
+    def __init__(self):
         self.enabled = True
+        self._keys = []
 
+    def get_last_key(self):
+        if self._keys:
+            return self._keys.pop(0)
+        else:
+            return None
+
+    @abstractmethod
     def initialise(self):
         pass
 
+    @abstractmethod
     def set_error(self, state: bool):
         pass
 
+    @abstractmethod
     def set_ready(self, state: bool):
         pass
 
+    @abstractmethod
     def set_armed(self, state: bool):
         pass
 
-    def invalid_code(self):
+    @abstractmethod
+    def communicate(self):
         pass

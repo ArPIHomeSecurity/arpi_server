@@ -74,7 +74,7 @@ class DynDns:
     def save_ip(self, noip_config):
         """
         Save IP to the DNS provider
-        :param noip_config: dictonary of settings (provider, username, passowrd, hostname, ip)
+        :param noip_config: dictonary of settings (provider, username, password, hostname, ip)
         """
 
         class Arguments:
@@ -82,12 +82,18 @@ class DynDns:
 
         args = Arguments()
         args.store = False
-        args.provider = noip_config["provider"]
-        args.usertoken = noip_config["username"]
-        args.password = noip_config["password"]
-        args.hostname = noip_config["hostname"]
-        args.ip = noip_config["ip"]
-        return execute_update(args)
+        try:
+            args.provider = noip_config["provider"]
+            args.usertoken = noip_config["username"]
+            args.password = noip_config["password"]
+            args.hostname = noip_config["hostname"]
+            args.ip = noip_config["ip"]
+            return execute_update(args)
+        except KeyError as error:
+            self._logger.error("Failed to update NOIP provider! (%s)", error)
+            self._logger.debug("NOIP settings: %s", noip_config)
+
+        return {}
 
 
 if __name__ == "__main__":

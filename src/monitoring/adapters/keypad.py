@@ -16,6 +16,7 @@ from sqlalchemy.orm.session import sessionmaker
 
 import models
 from monitoring.adapters.keypads.base import KeypadBase
+from monitoring.adapters.keypads.wiegand import WiegandKeypad
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (
     LOG_ADKEYPAD,
@@ -35,8 +36,9 @@ COMMUNICATION_PERIOD = 0.5  # sec
 
 class Keypad(Process):
     # pins
-    CLOCK_PIN = 5
-    DATA_PIN = 0
+    DATA_PIN0 = 0
+    DATA_PIN1 = 5
+    DATA_PIN2 = 6
 
     def __init__(self, commands, responses):
         super(Keypad, self).__init__(name=THREAD_KEYPAD)
@@ -49,10 +51,12 @@ class Keypad(Process):
     def set_type(self, type):
         # check if running on Raspberry
         if os.uname()[4][:3] != "arm":
-            self._keypad = MockKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
+            self._keypad = MockKeypad(Keypad.DATA_PIN1, Keypad.DATA_PIN0)
             type = "MOCK"
         elif type == "DSC":
-            self._keypad = DSCKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
+            self._keypad = DSCKeypad(Keypad.DATA_PIN1, Keypad.DATA_PIN0)
+        elif type == "WIEGAND":
+            self._keypad = WiegandKeypad(Keypad.DATA_PIN2, Keypad.DATA_PIN1, Keypad.DATA_PIN0)
         elif type is None:
             self._logger.debug("Keypad removed")
             self._keypad = None
@@ -134,33 +138,36 @@ class Keypad(Process):
             if self._keypad and self._keypad.enabled:
                 self._keypad.communicate()
 
-                if int(time()) - last_press > 3 and presses:
+                if int(time()) - last_press > 10 and presses:
                     presses = ""
                     self._logger.info("Cleared presses after 3 secs")
 
-                if self._keypad.pressed in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
-                    presses += self._keypad.pressed
+                key_pressed = self._keypad.get_last_key()
+                if key_pressed in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"):
+                    presses += key_pressed
                     last_press = time()
-                elif self._keypad.pressed in ("away", "stay"):
+                elif key_pressed in ("away", "stay"):
                     last_press = time()
                     pass
                 else:
                     # remove unknow codes from the list
                     try:
-                        self._keypad.pressed = ""
+                        key_pressed = ""
                     except IndexError:
                         pass
 
                 if presses:
                     self._logger.debug("Presses: %s", presses)
-                self._keypad.pressed = None
+                key_pressed = None
 
                 if models.hash_code(presses) in self._codes:
                     self._logger.debug("Code: %s", presses)
                     self._logger.info("Accepted code => disarming")
                     self._responses.put(MONITOR_DISARM)
-                    self._keypad.set_armed(False)
+                    # loopback action
+                    self._commands.put(MONITOR_DISARM)
                     presses = ""
                 elif len(presses) == 4:
                     self._logger.info("Invalid code")
+                    self._keypad.set_error(True)
                     presses = ""

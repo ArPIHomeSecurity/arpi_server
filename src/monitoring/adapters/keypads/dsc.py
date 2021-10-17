@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:10:08
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:10:08
-
 import logging
 from datetime import datetime
 from time import sleep, time
@@ -153,7 +147,7 @@ class DSCKeypad(KeypadBase):
     BEEP = 0x64
 
     def __init__(self, clock_pin, data_pin):
-        super(DSCKeypad, self).__init__(clock_pin, data_pin)
+        super(DSCKeypad, self).__init__()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._lights = Lights()
         self._line = Line(clock=clock_pin, data=data_pin)
@@ -176,9 +170,6 @@ class DSCKeypad(KeypadBase):
 
     def set_ready(self, state):
         self._lights.ready = state
-
-    def invalid_code(self):
-        self.send_command(self.send_beep, 2)
 
     def communicate(self):
         self._logger.debug("Start communication DSC...")
@@ -205,7 +196,7 @@ class DSCKeypad(KeypadBase):
 
         while period > safe_communication_time:
             # clear pressed button
-            self.pressed = None
+            self._keys = []
             self._logger.debug("RETRY: %.3f > %.3f", period, safe_communication_time)
             start_time = time()
             sent_bytes = self.send_command(method, param)
@@ -224,7 +215,7 @@ class DSCKeypad(KeypadBase):
             pass
 
         if self._line.conversation[2]["received"] != VOID:
-            self.pressed = Buttons.get_button(self._line.conversation[2]["received"])
+            self._keys.append(Buttons.get_button(self._line.conversation[2]["received"]))
 
         sent_bytes = len(self._line.conversation) - 1  # remove 9. bit
         self.print_communication()

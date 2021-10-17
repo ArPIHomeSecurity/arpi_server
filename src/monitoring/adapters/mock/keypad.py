@@ -39,9 +39,6 @@ class MockKeypad(KeypadBase):
         self._ready = state
         self._logger.debug("Ready: %s", state)
 
-    def invalid_code(self):
-        self.send_command(self.send_beep, 2)
-
     def communicate(self):
         self._logger.debug("Start communication MOCK...")
 

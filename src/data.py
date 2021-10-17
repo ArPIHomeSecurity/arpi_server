@@ -47,7 +47,8 @@ def env_prod():
     print(" - Created sensor types")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-    session.add_all([kt1])
+    kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
+    session.add_all([kt1, kt2])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
