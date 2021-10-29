@@ -86,7 +86,7 @@ def authenticated(role=ROLE_ADMIN):
             if raw_token:
                 try:
                     token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    logger.info("Token: %s", token)
+                    logger.debug("Token: %s", token)
                     if int(token.get("timestamp", 0)) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 

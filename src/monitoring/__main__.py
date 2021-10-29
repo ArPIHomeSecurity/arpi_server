@@ -12,7 +12,7 @@ from signal import SIGTERM, signal
 from threading import Event, Thread
 from time import sleep
 
-from monitoring.adapters.keypad import Keypad
+from monitoring.adapters.keypad import KeypadHandler
 from monitoring.constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP, THREAD_SOCKETIO
 from monitoring.ipc import IPCServer
 from monitoring.monitor import Monitor
@@ -66,7 +66,7 @@ def start():
     notifier.start()
 
     keypad_actions = Queue()
-    keypad = Keypad(keypad_actions, monitor_actions)
+    keypad = KeypadHandler(keypad_actions, monitor_actions)
     keypad.start()
 
     broadcaster = Broadcaster([monitor_actions, notifier_actions, keypad_actions])

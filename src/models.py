@@ -266,6 +266,7 @@ class User(BaseModel):
     registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
     fourkey_code = Column(String(64), nullable=False)
+    card = Column(String(64), nullable=False)
     comment = Column(String, nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
@@ -293,6 +294,9 @@ class User(BaseModel):
                 "access_code",
                 "fourkey_code",
             )
+
+        if data.get("card", ""):
+            self.card = hash_code(data["card"])
 
         return self.update_record(fields, data)
 

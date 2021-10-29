@@ -13,10 +13,10 @@ from time import time
 from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy.sql.sqltypes import Boolean
 
 import models
-from monitoring.adapters.keypads.base import KeypadBase
-from monitoring.adapters.keypads.wiegand import WiegandKeypad
+from monitoring.adapters.keypads.base import Action, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (
     LOG_ADKEYPAD,
@@ -30,18 +30,19 @@ from monitoring.constants import (
 
 if os.uname()[4][:3] == "arm":
     from monitoring.adapters.keypads.dsc import DSCKeypad
+    from monitoring.adapters.keypads.wiegand import WiegandKeypad
 
 COMMUNICATION_PERIOD = 0.5  # sec
 
 
-class Keypad(Process):
+class KeypadHandler(Process):
     # pins
     DATA_PIN0 = 0
     DATA_PIN1 = 5
     DATA_PIN2 = 6
 
     def __init__(self, commands, responses):
-        super(Keypad, self).__init__(name=THREAD_KEYPAD)
+        super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
         self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._commands = commands
         self._responses = responses
@@ -51,12 +52,12 @@ class Keypad(Process):
     def set_type(self, type):
         # check if running on Raspberry
         if os.uname()[4][:3] != "arm":
-            self._keypad = MockKeypad(Keypad.DATA_PIN1, Keypad.DATA_PIN0)
+            self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
             type = "MOCK"
         elif type == "DSC":
-            self._keypad = DSCKeypad(Keypad.DATA_PIN1, Keypad.DATA_PIN0)
+            self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
         elif type == "WIEGAND":
-            self._keypad = WiegandKeypad(Keypad.DATA_PIN2, Keypad.DATA_PIN1, Keypad.DATA_PIN0)
+            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN2, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
         elif type is None:
             self._logger.debug("Keypad removed")
             self._keypad = None
@@ -64,8 +65,7 @@ class Keypad(Process):
             self._logger.error("Unknown keypad type: %s", type)
         self._logger.debug("Keypad created type: %s", type)
 
-    def configure(self):
-        # load from db
+    def get_database_session(self):
         uri = None
         try:
             uri = URL(
@@ -82,11 +82,10 @@ class Keypad(Process):
 
         engine = create_engine(uri)
         Session = sessionmaker(bind=engine)
-        db_session = Session()
+        return Session()
 
-        users = db_session.query(models.User).all()
-        self._codes = [user.fourkey_code for user in users]
-
+    def configure(self):
+        db_session = self.get_database_session()
         keypad_settings = db_session.query(models.Keypad).first()
         if keypad_settings:
             self.set_type(keypad_settings.type.name)
@@ -131,43 +130,67 @@ class Keypad(Process):
                     self._keypad.set_armed(False)
                 elif message == MONITOR_STOP:
                     break
-
             except Empty:
                 pass
 
             if self._keypad and self._keypad.enabled:
                 self._keypad.communicate()
 
+                # delete pressed keys after 10 secs
                 if int(time()) - last_press > 10 and presses:
                     presses = ""
-                    self._logger.info("Cleared presses after 3 secs")
+                    self._logger.info("Cleared presses after 10 secs")
 
-                key_pressed = self._keypad.get_last_key()
-                if key_pressed in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"):
-                    presses += key_pressed
+                # check the action from the keypad
+                action = self._keypad.last_action()
+                if action == Action.KEY:
+                    presses += self._keypad.get_last_key()
+                    self._logger.debug("Presses: '%s'", presses)
                     last_press = time()
-                elif key_pressed in ("away", "stay"):
-                    last_press = time()
-                    pass
-                else:
-                    # remove unknow codes from the list
-                    try:
-                        key_pressed = ""
-                    except IndexError:
-                        pass
+                    if len(presses) == 4:
+                        self.handle_code(presses)
+                        presses = ""
+                elif action == Action.CARD:
+                    self.handle_card(self._keypad.get_card())
+                elif action == Action.FUNCTION:
+                    function = self._keypad.get_function()
+                elif action is not None:
+                    self._logger.error("Uknown keypad action: %s", action)
 
-                if presses:
-                    self._logger.debug("Presses: %s", presses)
-                key_pressed = None
+    def handle_code(self, presses):
+        if self.check_code(presses):
+            self._logger.debug("Code: %s", presses)
+            self._logger.info("Accepted code => disarming")
+            self._responses.put(MONITOR_DISARM)
+            # loopback action
+            self._commands.put(MONITOR_DISARM)
+        else:
+            self._logger.info("Invalid code")
+            self._keypad.set_error(True)
 
-                if models.hash_code(presses) in self._codes:
-                    self._logger.debug("Code: %s", presses)
-                    self._logger.info("Accepted code => disarming")
-                    self._responses.put(MONITOR_DISARM)
-                    # loopback action
-                    self._commands.put(MONITOR_DISARM)
-                    presses = ""
-                elif len(presses) == 4:
-                    self._logger.info("Invalid code")
-                    self._keypad.set_error(True)
-                    presses = ""
+    def handle_card(self, card):
+        self._logger.debug("Card: %s", card)
+        if self.check_card(card):
+            self._logger.info("Accepted card => disarming")
+            self._responses.put(MONITOR_DISARM)
+            # loopback action
+            self._commands.put(MONITOR_DISARM)
+        else:
+            self._logger.info("Unknown card")
+            self._keypad.set_error(True)
+
+    def check_code(self, code) -> Boolean:
+        db_session = self.get_database_session()
+        users = db_session.query(models.User).all()
+        access_codes = [user.fourkey_code for user in users]
+        db_session.close()
+
+        return models.hash_code(code) in access_codes
+
+    def check_card(self, card) -> Boolean:
+        db_session = self.get_database_session()
+        users = db_session.query(models.User).all()
+        cards = [user.card for user in users]
+        db_session.close()
+
+        return models.hash_code(card) in cards
