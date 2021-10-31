@@ -1,24 +1,18 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:08:09
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:08:10
-
 import logging
 import os
 import sys
 from multiprocessing import Queue
 from signal import SIGTERM, signal
-from threading import Event, Thread
+from threading import Event
 from time import sleep
 
 from monitoring.adapters.keypad import KeypadHandler
-from monitoring.constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP, THREAD_SOCKETIO
+from monitoring.broadcast import Broadcaster
+from monitoring.constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP
 from monitoring.ipc import IPCServer
 from monitoring.monitor import Monitor
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import start_socketio
-from server.broadcast import Broadcaster
 from tools.ssh import SSH
 
 
@@ -45,9 +39,8 @@ def initialize_logging():
 
 def createPidFile():
     pid = str(os.getpid())
-    f = open(os.environ["MONITOR_PID_FILE"], "w")
-    f.write(pid + "\n")
-    f.close()
+    with open(os.environ["MONITOR_PID_FILE"], "w") as f:
+        f.write(pid + "\n")
 
 
 def start():

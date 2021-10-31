@@ -13,6 +13,7 @@ from monitoring.constants import (
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DISARM,
+    MONITOR_REGISTER_CARD,
     POWER_GET_STATE,
     MONITOR_SET_CLOCK,
     MONITOR_SYNC_CLOCK,
@@ -65,6 +66,9 @@ class IPCClient(object):
 
     def update_keypad(self):
         return self._send_message({"action": MONITOR_UPDATE_KEYPAD})
+
+    def register_card(self):
+        return self._send_message({"action": MONITOR_REGISTER_CARD})
 
     def update_dyndns(self):
         return self._send_message({"action": UPDATE_SECURE_CONNECTION})

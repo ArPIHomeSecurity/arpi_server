@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:07:57
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:07:58
-
 from logging import INFO, DEBUG
 
 
@@ -61,6 +55,7 @@ MONITOR_GET_STATE = "monitor_get_state"
 MONITOR_GET_ARM = "monitor_get_arm"
 MONITOR_UPDATE_CONFIG = "monitor_update_config"
 MONITOR_UPDATE_KEYPAD = "monitor_update_keypad"
+MONITOR_REGISTER_CARD = "monitor_register_card"
 MONITOR_STOP = "monitor_stop"
 MONITOR_SYNC_CLOCK = "monitor_sync_clock"
 MONITOR_SET_CLOCK = "monitor_set_clock"

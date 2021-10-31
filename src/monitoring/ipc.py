@@ -18,6 +18,7 @@ from monitoring.constants import (
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DISARM,
+    MONITOR_REGISTER_CARD,
     POWER_GET_STATE,
     MONITOR_SET_CLOCK,
     MONITOR_SYNC_CLOCK,
@@ -41,6 +42,15 @@ class IPCServer(Thread):
     Class for handling the actions from the server and executing them on monitoring.
     """
 
+    BROADCASTED_ACTIONS = [
+        MONITOR_ARM_AWAY,
+        MONITOR_ARM_STAY,
+        MONITOR_DISARM,
+        MONITOR_UPDATE_CONFIG,
+        MONITOR_UPDATE_KEYPAD,
+        MONITOR_REGISTER_CARD
+    ]
+
     def __init__(self, stop_event, broadcaster):
         """
         Constructor
@@ -51,7 +61,6 @@ class IPCServer(Thread):
         self._broadcaster = broadcaster
         self._initialize_socket()
         self._logger.info("IPC server created")
-
 
     def _initialize_socket(self):
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -74,7 +83,6 @@ class IPCServer(Thread):
             self._logger.error("Failed to fix permission and/or owner!")
             self._logger.debug("Error: %s", error)
 
-
     def create_socket_file(self):
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
@@ -83,7 +91,6 @@ class IPCServer(Thread):
             with open(MONITOR_INPUT_SOCKET, "w"):
                 pass
             self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
-
 
     def handle_actions(self, message):
         """
@@ -95,25 +102,16 @@ class IPCServer(Thread):
         }
         """
         return_value = {"result": True}
-        if message["action"] == MONITOR_ARM_AWAY:
-            self._logger.info("Action: arm AWAY")
-            self._broadcaster.send_message(MONITOR_ARM_AWAY)
-        if message["action"] == MONITOR_ARM_STAY:
-            self._logger.info("Action: arm STAY")
-            self._broadcaster.send_message(MONITOR_ARM_STAY)
-        elif message["action"] == MONITOR_DISARM:
-            self._logger.info("Action: disarm")
-            self._broadcaster.send_message(MONITOR_DISARM)
+        if message["action"] in self.BROADCASTED_ACTIONS:
+            # broadcast message
+            self._logger.info("IPC action received: %s", message["action"])
+            self._broadcaster.send_message(message["action"])
         elif message["action"] == MONITOR_GET_ARM:
             return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
         elif message["action"] == MONITOR_GET_STATE:
             return_value["value"] = {"state": storage.get(storage.MONITORING_STATE)}
-        elif message["action"] == MONITOR_UPDATE_CONFIG:
-            self._logger.info("Update configuration...")
-            self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
-        elif message["action"] == MONITOR_UPDATE_KEYPAD:
-            self._logger.info("Update keypad...")
-            self._broadcaster.send_message(MONITOR_UPDATE_KEYPAD)
+        elif message["action"] == POWER_GET_STATE:
+            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
         elif message["action"] == UPDATE_SECURE_CONNECTION:
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
@@ -128,14 +126,11 @@ class IPCServer(Thread):
             if not Clock().set_clock(message):
                 return_value["result"] = False
                 return_value["message"] = "Failed to update date/time and zone"
-        elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
         else:
             return_value["result"] = False
-            return_value["message"] = "Unknown command"
+            return_value["message"] = f"Unknown command: {message}"
 
         return return_value
-
 
     def run(self):
         self._logger.info("IPC server started")

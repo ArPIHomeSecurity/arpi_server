@@ -14,7 +14,7 @@ from monitoring.constants import LOG_ADKEYPAD
 class MockKeypad(KeypadBase):
 
     # ACTIONS = "1234    1111      9876   65       C0C1"
-    ACTIONS = "                                  C1"
+    ACTIONS = "                                    C1"
     CARDS = [
         "305419896",  # 12:34:56:78   <== C0
         "272625547",  # 10:3F:EF:8B   <== C1
@@ -26,7 +26,7 @@ class MockKeypad(KeypadBase):
         self._armed = False
         self._error = False
         self._ready = False
-        self._index = None
+        self._index = 0
         self._start = time()
 
     def initialise(self):
@@ -74,5 +74,5 @@ class MockKeypad(KeypadBase):
                 self._keys.append(self.ACTIONS[self._index])
 
             self._index += 1
-            if self._index == len(self.ACTIONS):
-                self._index = None
+            if self._index >= len(self.ACTIONS):
+                self._index = 0

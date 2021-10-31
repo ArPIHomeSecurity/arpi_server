@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:03:47
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:03:53
 import argparse
 
 from sqlalchemy.exc import ProgrammingError
@@ -125,7 +119,8 @@ def env_test_01():
     print(" - Created sensors")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-    session.add_all([kt1])
+    kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
+    session.add_all([kt1, kt2])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
@@ -146,10 +141,11 @@ def env_admin_registration():
 
 
 def main():
-    environments = []
-    for attribute, value in globals().items():
-        if attribute.startswith("env_"):
-            environments.append(attribute.replace("env_", ""))
+    environments = [
+        attribute.replace("env_", "")
+        for attribute, value in globals().items()
+        if attribute.startswith("env_")
+    ]
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")

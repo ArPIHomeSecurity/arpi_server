@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:07:27
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:07:29
 
 import json
 import logging
@@ -47,6 +42,7 @@ def start_socketio():
     app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
     app.run(
         threaded=True,
+        debug=False,  # avoid starting application twice in development
         host=os.environ["MONITOR_HOST"],
         port=int(os.environ["MONITOR_PORT"]),
     )

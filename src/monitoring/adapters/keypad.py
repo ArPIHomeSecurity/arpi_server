@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:09:09
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:09:10
-
 import logging
 import os
 from multiprocessing import Process
@@ -23,6 +17,7 @@ from monitoring.constants import (
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DISARM,
+    MONITOR_REGISTER_CARD,
     MONITOR_STOP,
     MONITOR_UPDATE_KEYPAD,
     THREAD_KEYPAD,
@@ -85,6 +80,7 @@ class KeypadHandler(Process):
         return Session()
 
     def configure(self):
+        self._logger.debug("Configure keypad")
         db_session = self.get_database_session()
         keypad_settings = db_session.query(models.Keypad).first()
         if keypad_settings:
@@ -113,6 +109,7 @@ class KeypadHandler(Process):
     def communicate(self):
         last_press = int(time())
         presses = ""
+        register_card = False
         while True:
             try:
                 self._logger.debug("Wait for command...")
@@ -123,6 +120,8 @@ class KeypadHandler(Process):
                     self._logger.info("Updating keypad")
                     self.configure()
                     last_press = int(time())
+                elif message == MONITOR_REGISTER_CARD:
+                    register_card = True
                 elif message in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY) and self._keypad:
                     self._logger.info("Keypad armed")
                     self._keypad.set_armed(True)
@@ -151,15 +150,20 @@ class KeypadHandler(Process):
                         self.handle_code(presses)
                         presses = ""
                 elif action == Action.CARD:
-                    self.handle_card(self._keypad.get_card())
+                    if register_card:
+                        self.register_card(self._keypad.get_card())
+                        register_card = False
+                    else:
+                        self.handle_card(self._keypad.get_card())
                 elif action == Action.FUNCTION:
-                    function = self._keypad.get_function()
+                    # function = self._keypad.get_function()
+                    pass
                 elif action is not None:
                     self._logger.error("Uknown keypad action: %s", action)
 
     def handle_code(self, presses):
         if self.check_code(presses):
-            self._logger.debug("Code: %s", presses)
+            self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
             self._responses.put(MONITOR_DISARM)
             # loopback action
@@ -168,7 +172,7 @@ class KeypadHandler(Process):
             self._logger.info("Invalid code")
             self._keypad.set_error(True)
 
-    def handle_card(self, card):
+    def handle_card(self, card, register=False):
         self._logger.debug("Card: %s", card)
         if self.check_card(card):
             self._logger.info("Accepted card => disarming")
@@ -190,7 +194,18 @@ class KeypadHandler(Process):
     def check_card(self, card) -> Boolean:
         db_session = self.get_database_session()
         users = db_session.query(models.User).all()
-        cards = [user.card for user in users]
+        cards = [card.card for user in users for card in user.cards]
         db_session.close()
-
+        self._logger.info("Card %s in %s", card, cards)
         return models.hash_code(card) in cards
+
+    def register_card(self, card):
+        """Find the first user from the database with valid card registration"""
+        db_session = self.get_database_session()
+        users = db_session.query(models.User).filter(models.User.card_registration_expiry >= 'NOW()').all()
+        if users:
+            card = models.Card(card, users[0].id)
+            self._logger.info("Card created: %s", card)
+            db_session.add(card)
+            users[0].card_registration_expiry = None
+            db_session.commit()

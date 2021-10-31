@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:05:48
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:05:48
+
 class Broadcaster(object):
     """Send message to registered queues."""
 

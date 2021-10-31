@@ -1,15 +1,10 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:03:05
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:03:13
-import datetime
 import hashlib
 import json
 import locale
 import os
 import uuid
 from copy import deepcopy
+from datetime import date, timedelta, datetime as dt
 from re import search
 
 from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime
@@ -28,11 +23,7 @@ def hash_code(access_code):
 
 def convert2camel(data):
     """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
-    converted = {}
-    for key, value in data.items():
-        converted[camelcase(key)] = value
-
-    return converted
+    return {camelcase(key): value for key, value in data.items()}
 
 
 metadata = MetaData()
@@ -56,7 +47,7 @@ class BaseModel(Base):
         Define a base way to jsonify models, dealing with datetime objects
         """
         return {
-            column: value if not isinstance(value, datetime.date) else value.strftime("%Y-%m-%d")
+            column: value if not isinstance(value, date) else value.strftime("%Y-%m-%d")
             for column, value in self.__dict__.items()
         }
 
@@ -65,19 +56,14 @@ class BaseModel(Base):
         record_changed = False
         for key, value in data.items():
             snake_key = snakecase(key)
-            if snake_key in attributes:
-                if value != getattr(self, snake_key, value):
-                    setattr(self, snake_key, value)
-                    record_changed = True
+            if snake_key in attributes and value != getattr(self, snake_key, value):
+                setattr(self, snake_key, value)
+                record_changed = True
         return record_changed
 
     def serialize_attributes(self, attributes):
         """Create JSON object with given attributes"""
-        result = {}
-        for attribute in attributes:
-            result[attribute] = getattr(self, attribute, None)
-
-        return result
+        return {attribute: getattr(self, attribute, None) for attribute in attributes}
 
 
 class SensorType(BaseModel):
@@ -264,9 +250,10 @@ class User(BaseModel):
     role = Column(String(12), nullable=False)
     registration_code = Column(String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
     registration_expiry = Column(DateTime(timezone=True))
+    card_registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
     fourkey_code = Column(String(64), nullable=False)
-    card = Column(String(64), nullable=False)
+    cards = relationship("Card")
     comment = Column(String, nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
@@ -295,10 +282,10 @@ class User(BaseModel):
                 "fourkey_code",
             )
 
-        if data.get("card", ""):
-            self.card = hash_code(data["card"])
-
         return self.update_record(fields, data)
+
+    def set_card_registration(self):
+        self.update_record(("card_registration_expiry"), {"card_registration_expiry": dt.now() + timedelta(seconds=60)})
 
     def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
@@ -308,7 +295,7 @@ class User(BaseModel):
         if expiry is None:
             registration_expiry = None
         else:
-            registration_expiry = datetime.datetime.now() + datetime.timedelta(seconds=expiry)
+            registration_expiry = dt.now() + timedelta(seconds=expiry)
 
         if self.update_record(
             ("registration_code", "registration_expiry"),
@@ -324,6 +311,7 @@ class User(BaseModel):
                 "name": self.name,
                 "email": self.email,
                 "has_registration_code": bool(self.registration_code),
+                "has_card": bool(self.cards),
                 "registration_expiry": self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
                 if self.registration_expiry
                 else None,
@@ -344,6 +332,43 @@ class User(BaseModel):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
         return email
+
+
+class Card(BaseModel):
+
+    __tablename__ = "card"
+
+    id = Column(Integer, primary_key=True)
+    card = Column(String(64), nullable=False)
+    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    enabled = Column(Boolean, default=True)
+    description = Column(String, nullable=True)
+
+    def __init__(self, card, owner_id, description=None):
+        self.id = int(str(uuid.uuid1(1000).int)[:8])
+        self.card = hash_code(card)
+        self.owner_id = owner_id
+        self.description = description or self.generate_card_description()
+        self.enabled = True
+
+    @staticmethod
+    def generate_card_description():
+        """Example: 2021-10-30_08:15_284"""
+        return f"{dt.now().isoformat().replace('T', '_')[0:16]}_{str(uuid.uuid1(1000).int)[:3]}"
+
+    def update(self, data):
+        fields = ("enabled", "description")
+        return self.update_record(fields, data)
+
+    @property
+    def serialize(self):
+        return convert2camel(
+            {
+                "id": self.id,
+                "description": self.description,
+                "enabled": self.enabled,
+            }
+        )
 
 
 class Option(BaseModel):
@@ -388,7 +413,7 @@ class Option(BaseModel):
         assert 0 < len(option) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(option)})"
         if key == "name":
             assert option in ("notifications", "network"), f"Unknown option ({option})"
-        if key == "section":
+        elif key == "section":
             if option == "notification":
                 assert option in ("email", "gsm", "subscriptions"), f"Unknown section ({option})"
             elif option == "network":
