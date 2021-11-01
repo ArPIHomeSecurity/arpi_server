@@ -7,7 +7,7 @@
 import logging
 from time import time
 
-from monitoring.adapters.keypads.base import Action, KeypadBase
+from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.constants import LOG_ADKEYPAD
 
 
@@ -32,19 +32,8 @@ class MockKeypad(KeypadBase):
     def initialise(self):
         self._logger.debug("Keypad initialised")
 
-    def get_card(self):
-        card = self._card
-        self._card = None
-        return card
-
     def get_function(self):
         pass
-
-    def last_action(self) -> Action:
-        if self._card is not None:
-            return Action.CARD
-        elif self._keys:
-            return Action.KEY
 
     def set_armed(self, state):
         self._armed = state

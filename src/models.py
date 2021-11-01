@@ -340,14 +340,14 @@ class Card(BaseModel):
 
     id = Column(Integer, primary_key=True)
     card = Column(String(64), nullable=False)
-    owner_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     enabled = Column(Boolean, default=True)
     description = Column(String, nullable=True)
 
     def __init__(self, card, owner_id, description=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
         self.card = hash_code(card)
-        self.owner_id = owner_id
+        self.user_id = owner_id
         self.description = description or self.generate_card_description()
         self.enabled = True
 
@@ -365,6 +365,7 @@ class Card(BaseModel):
         return convert2camel(
             {
                 "id": self.id,
+                "user_id": self.user_id,
                 "description": self.description,
                 "enabled": self.enabled,
             }

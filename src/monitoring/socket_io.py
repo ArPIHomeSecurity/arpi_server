@@ -78,7 +78,7 @@ def connect(sid, environ):
 
 @sio.on("disconnect")
 def disconnect(sid):
-    logging.getLogger("SocketIO").info('Disconnected "%s"', sid)
+    logging.getLogger(LOG_SOCKETIO).info('Disconnected "%s"', sid)
 
 
 def send_alert_state(arm_state):
@@ -105,6 +105,10 @@ def send_power_state_change(power_state):
     send_message("power_state_change", power_state)
 
 
+def send_card_registered():
+    send_message("card_registered", True)
+
+
 def send_message(message_type, message):
-    logging.getLogger("SocketIO").debug("Sending message: %s -> %s", message_type, message)
+    logging.getLogger(LOG_SOCKETIO).debug("Sending message: %s -> %s", message_type, message)
     sio.emit(message_type, message)

@@ -20,6 +20,7 @@ class KeypadBase(ABC):
 
     def __init__(self):
         self.enabled = True
+        self._armed = False
         self._keys = []
         self._card = None
         self._function: Action = None
@@ -30,20 +31,22 @@ class KeypadBase(ABC):
         else:
             return None
 
-    @abstractmethod
     def get_card(self):
-        """Return the last identified card"""
-        pass
+        card = self._card
+        self._card = None
+        return card
 
     @abstractmethod
     def get_function(self):
         """Return the last identified function"""
         pass
 
-    @abstractmethod
     def last_action(self) -> Action:
         """Last identified action on the keypad"""
-        pass
+        if self._card is not None:
+            return Action.CARD
+        elif self._keys:
+            return Action.KEY
 
     @abstractmethod
     def initialise(self):
@@ -57,9 +60,11 @@ class KeypadBase(ABC):
     def set_ready(self, state: bool):
         pass
 
-    @abstractmethod
     def set_armed(self, state: bool):
-        pass
+        self._armed = state
+
+    def get_armed(self):
+        return self._armed
 
     @abstractmethod
     def communicate(self):

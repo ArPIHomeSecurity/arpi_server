@@ -171,6 +171,8 @@ def authenticate():
 @authenticated()
 @restrict_host
 def register_card(user_id):
+    for user in db.session.query(User).all():
+        user.card_registration_expiry = None
     user = db.session.query(User).get(user_id)
     user.set_card_registration()
     db.session.commit()

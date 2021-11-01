@@ -9,6 +9,13 @@ from server.decorators import authenticated, restrict_host
 card_blueprint = Blueprint("card", __name__)
 
 
+@card_blueprint.route("/api/cards", methods=["GET"])
+@authenticated()
+@restrict_host
+def cards():
+    return jsonify([i.serialize for i in db.session.query(Card).order_by(Card.description).all()])
+
+
 @card_blueprint.route("/api/card/<int:card_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
 @restrict_host

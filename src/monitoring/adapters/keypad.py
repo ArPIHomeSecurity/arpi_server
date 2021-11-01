@@ -1,6 +1,6 @@
 import logging
 import os
-from multiprocessing import Process
+from threading import Thread
 from queue import Empty
 from time import time
 
@@ -22,6 +22,7 @@ from monitoring.constants import (
     MONITOR_UPDATE_KEYPAD,
     THREAD_KEYPAD,
 )
+from monitoring.socket_io import send_card_registered
 
 if os.uname()[4][:3] == "arm":
     from monitoring.adapters.keypads.dsc import DSCKeypad
@@ -30,11 +31,11 @@ if os.uname()[4][:3] == "arm":
 COMMUNICATION_PERIOD = 0.5  # sec
 
 
-class KeypadHandler(Process):
+class KeypadHandler(Thread):
     # pins
-    DATA_PIN0 = 0
+    DATA_PIN0 = 6
     DATA_PIN1 = 5
-    DATA_PIN2 = 6
+    DATA_PIN2 = 0
 
     def __init__(self, commands, responses):
         super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
@@ -52,7 +53,7 @@ class KeypadHandler(Process):
         elif type == "DSC":
             self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
         elif type == "WIEGAND":
-            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN2, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN0, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN2)
         elif type is None:
             self._logger.debug("Keypad removed")
             self._keypad = None
@@ -114,7 +115,7 @@ class KeypadHandler(Process):
             try:
                 self._logger.debug("Wait for command...")
                 message = self._commands.get(timeout=COMMUNICATION_PERIOD)
-                self._logger.info("Command: %s", message)
+                self._logger.debug("Command: %s", message)
 
                 if message == MONITOR_UPDATE_KEYPAD:
                     self._logger.info("Updating keypad")
@@ -126,6 +127,7 @@ class KeypadHandler(Process):
                     self._logger.info("Keypad armed")
                     self._keypad.set_armed(True)
                 elif message == MONITOR_DISARM and self._keypad:
+                    self._logger.info("Keypad disarmed")
                     self._keypad.set_armed(False)
                 elif message == MONITOR_STOP:
                     break
@@ -174,6 +176,9 @@ class KeypadHandler(Process):
 
     def handle_card(self, card, register=False):
         self._logger.debug("Card: %s", card)
+        if not self._keypad.get_armed():
+            return
+
         if self.check_card(card):
             self._logger.info("Accepted card => disarming")
             self._responses.put(MONITOR_DISARM)
@@ -196,7 +201,7 @@ class KeypadHandler(Process):
         users = db_session.query(models.User).all()
         cards = [card.card for user in users for card in user.cards]
         db_session.close()
-        self._logger.info("Card %s in %s", card, cards)
+        self._logger.debug("Card %s/%s in %s", card, models.hash_code(card), cards)
         return models.hash_code(card) in cards
 
     def register_card(self, card):
@@ -205,7 +210,8 @@ class KeypadHandler(Process):
         users = db_session.query(models.User).filter(models.User.card_registration_expiry >= 'NOW()').all()
         if users:
             card = models.Card(card, users[0].id)
-            self._logger.info("Card created: %s", card)
+            self._logger.debug("Card created: %s", card)
             db_session.add(card)
             users[0].card_registration_expiry = None
             db_session.commit()
+            send_card_registered()

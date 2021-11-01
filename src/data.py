@@ -131,7 +131,7 @@ def env_test_01():
 
 
 def env_admin_registration():
-    admin_user = session.query(User).filter(User.role==ROLE_ADMIN).first()
+    admin_user = session.query(User).filter(User.role == ROLE_ADMIN).first()
     code = admin_user.add_registration_code("ABCD")
     print("Code: ", code)
     admin_user.update({"access_code": "1234"})
@@ -149,7 +149,8 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")
-    parser.add_argument("-c", "--create", metavar="environment", help="Create database content (environments: {})".format(", ".join(environments)))
+    parser.add_argument("-c", "--create", metavar="environment",
+                        help="Create database content (environments: {})".format(", ".join(environments)))
     args = parser.parse_args()
 
     if args.delete:

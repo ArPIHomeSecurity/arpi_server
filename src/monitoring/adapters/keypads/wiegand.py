@@ -21,7 +21,6 @@ class WiegandKeypad(KeypadBase):
         self._data0 = data0
         self._data1 = data1
         self._reader = None
-        self._card_number = None
         self._beeper = LED(beeper)
         self._beeper.on()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
@@ -31,25 +30,25 @@ class WiegandKeypad(KeypadBase):
         wr.begin(self._reader, self._data0, self._data1)
         self._logger.info("Wiegand keypad initialized: %s", wr.isinitialized(self._reader))
 
-        # ???
+        # Cleanup before using
         wr.ReadData(self._reader)
 
     def set_error(self, state: bool):
-        for _ in range(2):
-            self._beeper.off()
-            sleep(0.1)
-            self._beeper.on()
-            sleep(0.5)
+        self.beeps(3, 0.1, 0.1)
 
     def set_ready(self, state: bool):
         pass
 
     def set_armed(self, state: bool):
-        for _ in range(6 if state else 3):
+        super().set_armed(state)
+        self.beeps(2, 0.1, 0.1)
+
+    def beeps(self, count, beep, mute):
+        for _ in range(count):
             self._beeper.off()
-            sleep(0.01)
+            sleep(mute)
             self._beeper.on()
-            sleep(0.3)
+            sleep(beep)
 
     def communicate(self):
         pending = wr.GetPendingBitCount(self._reader)
@@ -60,17 +59,15 @@ class WiegandKeypad(KeypadBase):
         self._logger.debug("Wiegand(Data:%s Bit count:%s Pending: %s)", binary_data, bits, pending)
 
         if bits in (26, 34):
-            self._card_number = str(int(binary_data, 2))
-            self._logger.debug("Using card: %s", self._card_number)
+            self._card = str(int(binary_data, 2))
+            self._logger.debug("Using card: %s", self._card)
         else:
             self._keys += self.decode_keys(binary_data, bits)
             self._logger.debug("Pressed key: %s", self._keys)
 
     @staticmethod
     def decode_keys(binary, bits):
-        words = []
-        for idx in range(0, bits, 8):
-            words.append(binary[idx:idx+8])
+        words = [binary[idx:idx+8] for idx in range(0, bits, 8)]
 
         keys = []
         for word in words:
@@ -80,3 +77,6 @@ class WiegandKeypad(KeypadBase):
                     bits -= 4
 
         return keys
+
+    def get_function(self):
+        pass
