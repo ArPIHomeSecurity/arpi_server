@@ -413,7 +413,7 @@ class Option(BaseModel):
     def validates_name(self, key, option):
         assert 0 < len(option) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(option)})"
         if key == "name":
-            assert option in ("notifications", "network"), f"Unknown option ({option})"
+            assert option in ("notifications", "network", "alert"), f"Unknown option ({option})"
         elif key == "section":
             if option == "notification":
                 assert option in ("email", "gsm", "subscriptions"), f"Unknown section ({option})"
