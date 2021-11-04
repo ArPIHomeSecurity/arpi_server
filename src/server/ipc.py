@@ -38,7 +38,7 @@ class IPCClient(object):
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
-            except ConnectionRefusedError:
+            except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
 
     def disarm(self):

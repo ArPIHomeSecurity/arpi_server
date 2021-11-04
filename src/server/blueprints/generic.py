@@ -28,7 +28,6 @@ def version():
 
 @generic_blueprint.route("/", defaults={"path": ""})
 @generic_blueprint.route("/<path:path>")
-@restrict_host
 def catch_all(path):
     current_app.logger.debug("Working in: %s", os.environ.get("SERVER_STATIC_FOLDER", ""))
     current_app.logger.debug("FALLBACK for path: %s", path)

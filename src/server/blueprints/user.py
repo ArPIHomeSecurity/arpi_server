@@ -2,8 +2,6 @@ from datetime import datetime as dt
 import os
 from dateutil.tz.tz import tzlocal
 
-
-import jose.exceptions
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
 from flask import jsonify, request, current_app
@@ -11,7 +9,7 @@ from jose import jwt
 
 from models import User, hash_code
 from server.database import db
-from server.decorators import authenticated, generate_user_token, restrict_host
+from server.decorators import authenticated, generate_user_token, registered, restrict_host
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
 
@@ -68,11 +66,9 @@ def user(user_id):
 @authenticated()
 @restrict_host
 def registration_code(user_id):
-    current_app.logger.debug("Authenticating...")
-    # check user credentials and return fake jwt token if valid
-    remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
+    remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     current_app.logger.debug(
-        "Input from '%s' on '%s': '%s'", remote_address, request.environ.get("HTTP_ORIGIN", ""), request.json
+        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.json
     )
 
     if request.method == "GET":
@@ -104,9 +100,11 @@ def registration_code(user_id):
 @restrict_host
 def register_device():
     current_app.logger.debug("Authenticating...")
-
     remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
-    current_app.logger.debug("Input from '%s' on '%s': '%s'", remote_ip, request.environ["HTTP_ORIGIN"], request.json)
+    current_app.logger.debug(
+        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.json
+    )
+
     if request.json["registration_code"]:
         user = (
             db.session.query(User)
@@ -131,38 +129,20 @@ def register_device():
 
 
 @user_blueprint.route("/api/user/authenticate", methods=["POST"])
+@registered
 @restrict_host
 def authenticate():
     current_app.logger.debug("Authenticating...")
-    try:
-        device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
-    except jose.exceptions.JWTError:
-        current_app.logger.info("Bad device token (%s) from %s", request.json["device_token"], request.remote_addr)
-        return jsonify({"error": "invalid device token"}), 400
-    except KeyError:
-        current_app.logger.info("Missing device token from %s", request.remote_addr)
-        return jsonify({"error": "missing device token"}), 400
 
-    # TODO: the client IP can change for mobile devices!?
-    remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
-    if device_token["ip"] != remote_address:
-        current_app.logger.warn("User access from not the registered IP: %s != %s", device_token["ip"], remote_address)
-
-    if device_token["origin"] != request.environ["HTTP_ORIGIN"]:
-        current_app.logger.warn(
-            "User access from not the registered origin: %s != %s", device_token["ip"], request.environ["HTTP_ORIGIN"]
-        )
-        return jsonify({"error": "invalid origin"}), 400
-
+    # device token must be valid because of the @registered decorator
+    device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
     user = db.session.query(User).get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
-        return jsonify(
-            {
-                "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
-            }
-        )
+        return jsonify({
+            "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
+        })
     elif not user:
-        return jsonify({"error": "invalid user id"}), 400
+        return jsonify({"error": f"invalid user id: {device_token['user_id']}"}), 400
 
     return jsonify(False)
 

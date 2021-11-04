@@ -57,11 +57,6 @@ def connect(sid, environ):
         device_info = jwt.decode(query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256")
         logger.info("Connecting with device info: %s", device_info)
 
-        # TODO: the client IP can change for mobile devices!?
-        if device_info.get("ip", "") != remote_address:
-            logger.info("Authentication failed from IP '%s'!= '%s'", device_info["ip"], remote_address)
-            return False
-
         referer = urlparse(environ["HTTP_REFERER"])
         origin = urlparse(device_info["origin"])
 
