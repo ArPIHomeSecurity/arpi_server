@@ -92,11 +92,11 @@ def send_syren_state(syren_state):
     send_message("syren_state_change", syren_state)
 
 
-def send_system_state_change(system_state):
+def send_system_state(system_state):
     send_message("system_state_change", system_state)
 
 
-def send_power_state_change(power_state):
+def send_power_state(power_state):
     send_message("power_state_change", power_state)
 
 

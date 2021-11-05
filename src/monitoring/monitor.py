@@ -42,8 +42,8 @@ from monitoring.constants import (
 )
 from monitoring.database import Session
 from monitoring.socket_io import (
-    send_power_state_change,
-    send_system_state_change,
+    send_power_state,
+    send_system_state,
     send_sensors_state,
     send_arm_state,
     send_alert_state,
@@ -116,13 +116,13 @@ class Monitor(Thread):
                     storage.set(storage.ARM_STATE, ARM_AWAY)
                     send_arm_state(ARM_AWAY)
                     storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
-                    send_system_state_change(MONITORING_ARMED)
+                    send_system_state(MONITORING_ARMED)
                     self._stop_alert.clear()
                 elif action == MONITOR_ARM_STAY:
                     storage.set(storage.ARM_STATE, ARM_STAY)
                     send_arm_state(ARM_STAY)
                     storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
-                    send_system_state_change(MONITORING_ARMED)
+                    send_system_state(MONITORING_ARMED)
                     self._stop_alert.clear()
                 elif action == MONITOR_DISARM:
                     current_state = storage.get(storage.MONITORING_STATE)
@@ -135,7 +135,7 @@ class Monitor(Thread):
                         storage.set(storage.ARM_STATE, ARM_DISARM)
                         send_arm_state(ARM_DISARM)
                         storage.set(storage.MONITORING_STATE, MONITORING_READY)
-                        send_system_state_change(MONITORING_READY)
+                        send_system_state(MONITORING_READY)
                     self._stop_alert.set()
                     continue
                 elif action == MONITOR_UPDATE_CONFIG:
@@ -162,10 +162,10 @@ class Monitor(Thread):
             self._logger.debug("System works from network")
 
         if new_power_source == PowerAdapter.SOURCE_BATTERY and self._power_source == PowerAdapter.SOURCE_NETWORK:
-            send_power_state_change(POWER_SOURCE_BATTERY)
+            send_power_state(POWER_SOURCE_BATTERY)
             self._logger.info("Power outage started!")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK and self._power_source == PowerAdapter.SOURCE_BATTERY:
-            send_power_state_change(POWER_SOURCE_NETWORK)
+            send_power_state(POWER_SOURCE_NETWORK)
             self._logger.info("Power outage ended!")
 
         self._power_source = new_power_source
@@ -186,7 +186,7 @@ class Monitor(Thread):
     def load_sensors(self):
         """Load the sensors from the db in the thread to avoid session problems"""
         storage.set(storage.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
-        send_system_state_change(MONITORING_UPDATING_CONFIG)
+        send_system_state(MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
         # TODO: wait a little bit to see status for debug
@@ -205,20 +205,20 @@ class Monitor(Thread):
             )
             self._sensors = []
             storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
-            send_system_state_change(MONITORING_INVALID_CONFIG)
+            send_system_state(MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
             self._logger.info("Invalid channel configuration")
             self._sensors = []
             storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
-            send_system_state_change(MONITORING_INVALID_CONFIG)
+            send_system_state(MONITORING_INVALID_CONFIG)
         elif self.has_uninitialized_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
             storage.set(storage.MONITORING_STATE, MONITORING_READY)
-            send_system_state_change(MONITORING_READY)
+            send_system_state(MONITORING_READY)
         else:
             storage.set(storage.MONITORING_STATE, MONITORING_READY)
-            send_system_state_change(MONITORING_READY)
+            send_system_state(MONITORING_READY)
 
         send_sensors_state(False)
 
@@ -339,7 +339,7 @@ class Monitor(Thread):
                 if self._alerts[sensor.id]["alert"]._alert_type == ALERT_SABOTAGE:
                     # stop sabotage
                     storage.set(storage.MONITORING_STATE, MONITORING_READY)
-                    send_system_state_change(MONITORING_READY)
+                    send_system_state(MONITORING_READY)
                 del self._alerts[sensor.id]
 
         if changes:
