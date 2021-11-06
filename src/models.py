@@ -206,25 +206,29 @@ class Zone(BaseModel):
     disarmed_delay = Column(Integer, default=None, nullable=True)
     away_alert_delay = Column(Integer, default=None, nullable=True)
     stay_alert_delay = Column(Integer, default=None, nullable=True)
+    away_arm_delay = Column(Integer, default=None, nullable=True)
+    stay_arm_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
 
-    def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, description="Default zone"):
+    def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
         self.name = name
         self.description = description
         self.disarmed_delay = disarmed_delay
         self.away_alert_delay = away_alert_delay
         self.stay_alert_delay = stay_alert_delay
+        self.away_arm_delay = away_arm_delay
+        self.stay_arm_delay = stay_arm_delay
 
     def update(self, data):
-        return self.update_record(("name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay"), data)
+        return self.update_record(("name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"), data)
 
     @property
     def serialize(self):
         return convert2camel(
-            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay"))
+            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"))
         )
 
-    @validates("disarmed_delay", "away_alert_delay", "stay_alert_delay")
+    @validates("disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay")
     def validates_away_alert_delay(self, key, delay):
         assert delay and delay >= 0 or not delay, "Delay is positive integer (>= 0)"
         return delay
