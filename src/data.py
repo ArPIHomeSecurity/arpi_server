@@ -62,11 +62,11 @@ def env_live_01():
     print(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
-    z2 = Zone(name="Away delayed", away_delay=20, description="Alert delayed when armed AWAY")
-    z3 = Zone(name="Stay delayed", stay_delay=20, description="Alert delayed when armed STAY")
-    z4 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
-    z5 = Zone(name="Away/Stay delayed", away_delay=40, stay_delay=20, description="Alert delayed when armed AWAY/STAY")
-    z6 = Zone(name="Tamper", disarmed_delay=0, away_delay=None, stay_delay=None, description="Sabotage alert")
+    z2 = Zone(name="Away delayed", away_alert_delay=20, description="Alert delayed when armed AWAY")
+    z3 = Zone(name="Stay delayed", stay_alert_delay=20, description="Alert delayed when armed STAY")
+    z4 = Zone(name="Stay", stay_alert_delay=None, description="No alert when armed STAY")
+    z5 = Zone(name="Away/Stay delayed", away_alert_delay=40, stay_alert_delay=20, description="Alert delayed when armed AWAY/STAY")
+    z6 = Zone(name="Tamper", disarmed_delay=0, away_alert_delay=None, stay_alert_delay=None, description="Sabotage alert")
     session.add_all([z1, z2, z3, z4, z5, z6])
     print(" - Created zones")
 
@@ -102,10 +102,10 @@ def env_test_01():
     print(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
-    z2 = Zone(name="Tamper", disarmed_delay=0, away_delay=None, stay_delay=None, description="Sabotage alert")
-    z3 = Zone(name="Away/stay delayed", away_delay=5, stay_delay=5, description="Alert delayed when armed AWAY or STAY")
-    z4 = Zone(name="Stay delayed", stay_delay=5, description="Alert delayed when armed STAY")
-    z5 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
+    z2 = Zone(name="Tamper", disarmed_delay=0, away_alert_delay=None, stay_alert_delay=None, description="Sabotage alert")
+    z3 = Zone(name="Away/stay delayed", away_alert_delay=5, stay_alert_delay=5, description="Alert delayed when armed AWAY or STAY")
+    z4 = Zone(name="Stay delayed", stay_alert_delay=5, description="Alert delayed when armed STAY")
+    z5 = Zone(name="Stay", stay_alert_delay=None, description="No alert when armed STAY")
     session.add_all([z1, z2, z3, z4, z5])
     print(" - Created zones")
 

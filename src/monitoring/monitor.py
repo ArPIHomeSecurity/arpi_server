@@ -321,12 +321,12 @@ class Monitor(Thread):
                 if sensor.zone.disarmed_delay is not None:
                     alert_type = ALERT_SABOTAGE
                     delay = sensor.zone.disarmed_delay
-                elif current_arm == ARM_AWAY and sensor.zone.away_delay is not None:
+                elif current_arm == ARM_AWAY and sensor.zone.away_alert_delay is not None:
                     alert_type = ALERT_AWAY
-                    delay = sensor.zone.away_delay
-                elif current_arm == ARM_STAY and sensor.zone.stay_delay is not None:
+                    delay = sensor.zone.away_alert_delay
+                elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
                     alert_type = ALERT_STAY
-                    delay = sensor.zone.stay_delay
+                    delay = sensor.zone.stay_alert_delay
 
                 if alert_type:
                     self._alerts[sensor.id] = {

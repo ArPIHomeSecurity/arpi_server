@@ -204,28 +204,28 @@ class Zone(BaseModel):
     name = Column(String(NAME_LENGTH), nullable=False)
     description = Column(String, nullable=False)
     disarmed_delay = Column(Integer, default=None, nullable=True)
-    away_delay = Column(Integer, default=None, nullable=True)
-    stay_delay = Column(Integer, default=None, nullable=True)
+    away_alert_delay = Column(Integer, default=None, nullable=True)
+    stay_alert_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
 
-    def __init__(self, name="zone", disarmed_delay=None, away_delay=0, stay_delay=0, description="Default zone"):
+    def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, description="Default zone"):
         self.name = name
         self.description = description
         self.disarmed_delay = disarmed_delay
-        self.away_delay = away_delay
-        self.stay_delay = stay_delay
+        self.away_alert_delay = away_alert_delay
+        self.stay_alert_delay = stay_alert_delay
 
     def update(self, data):
-        return self.update_record(("name", "description", "disarmed_delay", "away_delay", "stay_delay"), data)
+        return self.update_record(("name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay"), data)
 
     @property
     def serialize(self):
         return convert2camel(
-            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_delay", "stay_delay"))
+            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay"))
         )
 
-    @validates("disarmed_delay", "away_delay", "stay_delay")
-    def validates_away_delay(self, key, delay):
+    @validates("disarmed_delay", "away_alert_delay", "stay_alert_delay")
+    def validates_away_alert_delay(self, key, delay):
         assert delay and delay >= 0 or not delay, "Delay is positive integer (>= 0)"
         return delay
 
