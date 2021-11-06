@@ -13,9 +13,12 @@ from subprocess import CalledProcessError, check_output, run
 from monitoring.constants import LOG_CLOCK
 
 
+TIME1970 = 2208988800
+
+
 class Clock:
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_CLOCK)
+        self._logger = logger or logging.getLogger(LOG_CLOCK)
 
     def gettime_ntp(self, addr="0.pool.ntp.org"):
         # http://code.activestate.com/recipes/117211-simple-very-sntp-client/
@@ -23,11 +26,10 @@ class Clock:
         import struct
 
         try:
-            TIME1970 = 2208988800
             client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             data = ("\x1b" + 47 * "\0").encode("utf-8")
             client.sendto(data, (addr, 123))
-            data, address = client.recvfrom(1024)
+            data, _ = client.recvfrom(1024)
             if data:
                 t = struct.unpack("!12I", data)[10]
                 t -= TIME1970
