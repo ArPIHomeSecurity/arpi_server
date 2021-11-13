@@ -291,18 +291,19 @@ class User(BaseModel):
         self.fourkey_code = hash_code(access_code[:4])
 
     def update(self, data):
+        # !!! incoming data has camelCase key/field name format
         fields = ("name", "email", "role", "comment")
-        access_code = data.get("access_code", "")
-        if data.get("access_code", ""):
+        access_code = data.get("accessCode", "")
+        if access_code:
             assert len(access_code) >= 4 and len(access_code) <= 12, "Access code length (>=4, <=12)"
             assert access_code.isdigit(), "Access code only number"
-            data["access_code"] = hash_code(access_code)
-            if not data.get("fourkey_code", None):
-                data["fourkey_code"] = hash_code(access_code[:4])
+            data["accessCode"] = hash_code(access_code)
+            if not data.get("fourkeyCode", None):
+                data["fourkeyCode"] = hash_code(access_code[:4])
             else:
-                assert len(data["fourkey_code"]) == 4, "Fourkey code length (=4)"
-                assert data["fourkey_code"].isdigit(), "Fourkey code only number"
-                data["fourkey_code"] = hash_code(data["fourkey_code"])
+                assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
+                assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
+                data["fourkeyCode"] = hash_code(data["fourkeyCode"])
             fields += (
                 "access_code",
                 "fourkey_code",

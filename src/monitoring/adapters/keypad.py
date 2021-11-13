@@ -224,7 +224,7 @@ class KeypadHandler(Thread):
         db_session.close()
 
         code_hash = models.hash_code(code)
-        self._logger.debug("Card %s/%s in %s", code, code_hash, [u.fourkey_code for u in users])
+        self._logger.debug("User access code %s/%s in %s", code, code_hash, [u.fourkey_code for u in users])
         return next(filter(lambda u: u.fourkey_code == code_hash, users), None)
 
     def get_card_by_number(self, number) -> Boolean:
