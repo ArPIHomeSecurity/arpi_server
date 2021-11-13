@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:08:29
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:08:31
-
 import json
 import logging
 import os
@@ -76,29 +70,33 @@ class Notifier(Thread):
     MAX_RETRY = 5
     RETRY_WAIT = 30
 
-    _actions = None
+    _notifications = []
 
     @classmethod
     def notify_alert_started(cls, alert_id, sensors, time):
-        cls._actions.put(
-            {
+        cls._notifications.append({
                 "type": ALERT_STARTED,
                 "id": alert_id,
                 "sensors": sensors,
                 "time": time,
-            }
-        )
+                "retry": 0
+        })
 
     @classmethod
     def notify_alert_stopped(cls, alert_id, time):
-        cls._actions.put({"type": ALERT_STOPPED, "id": alert_id, "time": time})
+        cls._notifications.append({
+            "type": ALERT_STOPPED,
+            "id": alert_id,
+            "time": time,
+            "retry": 0
+        })
 
-    def __init__(self, notifications_queue):
+    def __init__(self, actions):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
-        Notifier._actions = notifications_queue
+        self._actions = actions
         self._logger = logging.getLogger(LOG_NOTIFIER)
         self._gsm = GSM()
-        self._messages = []
+        self._notifications = []
         self._options = None
         self._db_session = None
 
@@ -122,29 +120,26 @@ class Notifier(Thread):
                 # self._logger.debug("No message found")
                 pass
 
-            # handle actions or messages
-            if type(message) is str:
-                if message == MONITOR_STOP:
+            # handle monitoring and notification actions
+            if message and "action" in message:
+                if message["action"] == MONITOR_STOP:
                     break
-                elif message == MONITOR_UPDATE_CONFIG:
+                elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self._options = self.get_options()
                     self._gsm.destroy()
                     self._gsm = GSM()
                     self._gsm.setup()
-            elif message is not None:
-                message["retry"] = 0
-                self._messages.append(message)
 
             # try to send the message but not forever
-            if len(self._messages) > 0:
-                message = self._messages[0]
+            if len(self._notifications) > 0:
+                notification = self._notifications[0]
                 if self.send_message(message):
-                    self._messages.pop(0)
+                    self._notifications.pop(0)
                 else:
-                    message["retry"] += 1
-                    if message["retry"] >= Notifier.MAX_RETRY:
+                    notification["retry"] += 1
+                    if notification["retry"] >= Notifier.MAX_RETRY:
                         self._logger.debug(
-                            "Deleted message after max retry (%s): %s", Notifier.MAX_RETRY, self._messages.pop(0)
+                            "Deleted message after max retry (%s): %s", Notifier.MAX_RETRY, self._notifications.pop(0)
                         )
 
         self._db_session.close()
@@ -183,7 +178,7 @@ class Notifier(Thread):
         except Exception:
             self._logger.exception("Sending message failed!")
 
-        return not (not success and has_subscription)
+        return success or not has_subscription
 
     def notify_alert_started_SMS(self, message):
         return self.notify_SMS(ALERT_STARTED_SMS.format(**message))

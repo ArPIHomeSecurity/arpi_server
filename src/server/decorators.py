@@ -6,6 +6,7 @@ import os
 from datetime import datetime as dt
 from urllib.parse import urlparse
 from dateutil.tz import UTC
+import flask
 from flask.globals import request
 from flask.json import jsonify
 from jose import jwt
@@ -89,8 +90,8 @@ def registered(request_handler):
     return _registered
 
 
-def generate_user_token(name, role, origin):
-    token = {"name": name, "role": role, "origin": origin, "timestamp": int(dt.now(tz=UTC).timestamp())}
+def generate_user_token(id, name, role, origin):
+    token = {"id": id, "name": name, "role": role, "origin": origin, "timestamp": int(dt.now(tz=UTC).timestamp())}
 
     return jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
 
@@ -126,11 +127,13 @@ def authenticated(role=ROLE_ADMIN):
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
 
+                    flask.request.environ["requester_id"] = user_token["id"]
+                    flask.request.environ["requester_role"] = user_token["role"]
                     response = request_handler(*args, **kws)
                     # generate new user token to extend the user session
                     referer = urlparse(request.environ.get("HTTP_REFERER", ""))
                     response.headers["User-Token"] = generate_user_token(
-                        user_token["name"], user_token["role"], f"{referer.scheme}://{referer.netloc}"
+                        user_token["id"], user_token["name"], user_token["role"], f"{referer.scheme}://{referer.netloc}"
                     )
                     return response
                 except jose.exceptions.JWTError:

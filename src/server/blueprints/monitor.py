@@ -21,14 +21,14 @@ def get_arm():
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_arm():
-    return process_ipc_response(IPCClient().arm(request.args.get("type")))
+    return process_ipc_response(IPCClient().arm(request.args.get("type"), request.environ["requester_id"]))
 
 
 @monitor_blueprint.route("/api/monitoring/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def disarm():
-    return process_ipc_response(IPCClient().disarm())
+    return process_ipc_response(IPCClient().disarm(request.environ["requester_id"]))
 
 
 @monitor_blueprint.route("/api/monitoring/state", methods=["GET"])

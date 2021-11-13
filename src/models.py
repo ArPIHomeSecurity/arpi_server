@@ -193,6 +193,28 @@ class AlertSensor(BaseModel):
         return convert2camel(self.serialize_attributes(("sensor_id", "channel", "type_id", "description")))
 
 
+class Arm(BaseModel):
+    __tablename__ = "arm"
+    id = Column(Integer, primary_key=True)
+    arm_type = Column(String)
+    start_time = Column(DateTime(timezone=True))
+    end_time = Column(DateTime(timezone=True))
+    start_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
+    start_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    end_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
+    end_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+
+    def __init__(self, arm_type, start_time, keypad_id=None, user_id=None):
+        self.arm_type = arm_type
+        self.start_time = start_time
+        self.start_keypad_id = keypad_id
+        self.start_user_id = user_id
+
+    @property
+    def serialize(self):
+        return convert2camel(self.serialize_attributes(("start_time", "end_time", "keypad_id", "user_id")))
+
+
 class Zone(BaseModel):
     """Model for zone table"""
 
@@ -343,14 +365,14 @@ class Card(BaseModel):
     __tablename__ = "card"
 
     id = Column(Integer, primary_key=True)
-    card = Column(String(64), nullable=False)
+    code = Column(String(64), nullable=False)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     enabled = Column(Boolean, default=True)
     description = Column(String, nullable=True)
 
     def __init__(self, card, owner_id, description=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
-        self.card = hash_code(card)
+        self.code = hash_code(card)
         self.user_id = owner_id
         self.description = description or self.generate_card_description()
         self.enabled = True

@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:07:34
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:07:37
 from datetime import datetime
 import logging
 
@@ -11,43 +6,43 @@ from queue import Empty
 from threading import Thread, Event
 from time import sleep
 
-from models import Alert, Sensor
-import monitoring.alert
+from models import Alert, Arm, Sensor
+from monitoring.alert import SensorAlert
 
 from monitoring import storage
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
 from monitoring.constants import (
+    ALERT_AWAY,
+    ALERT_SABOTAGE,
+    ALERT_STAY,
+    ARM_AWAY,
+    ARM_DISARM,
+    ARM_STAY,
+    LOG_MONITOR,
+    MONITOR_ARM_AWAY,
+    MONITOR_ARM_STAY,
+    MONITOR_DISARM,
+    MONITOR_STOP,
+    MONITOR_UPDATE_CONFIG,
+    MONITORING_ARMED,
+    MONITORING_INVALID_CONFIG,
+    MONITORING_READY,
+    MONITORING_SABOTAGE,
+    MONITORING_STARTUP,
+    MONITORING_UPDATING_CONFIG,
     POWER_SOURCE_BATTERY,
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
-    LOG_MONITOR,
-    MONITORING_STARTUP,
-    ARM_DISARM,
-    MONITOR_STOP,
-    MONITOR_ARM_AWAY,
-    ARM_AWAY,
-    MONITORING_ARMED,
-    MONITOR_ARM_STAY,
-    ARM_STAY,
-    MONITOR_DISARM,
-    MONITORING_READY,
-    MONITOR_UPDATE_CONFIG,
-    MONITORING_UPDATING_CONFIG,
-    MONITORING_INVALID_CONFIG,
-    MONITORING_SABOTAGE,
-    ALERT_AWAY,
-    ALERT_STAY,
-    ALERT_SABOTAGE,
 )
 from monitoring.database import Session
 from monitoring.socket_io import (
-    send_power_state,
-    send_system_state,
-    send_sensors_state,
-    send_arm_state,
     send_alert_state,
+    send_arm_state,
+    send_power_state,
+    send_sensors_state,
     send_syren_state,
+    send_system_state,
 )
 
 
@@ -78,7 +73,6 @@ class Monitor(Thread):
         self._powerAdapter = PowerAdapter()
         self._actions = actions
         self._sensors = None
-        self._db_alert = None
         self._power_source = None
         self._alerts = {}
         self._stop_alert = Event()
@@ -108,23 +102,34 @@ class Monitor(Thread):
 
         while True:
             try:
-                action = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
-                self._logger.debug("Action: %s" % action)
-                if action == MONITOR_STOP:
+                message = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
+                self._logger.debug("Action: %s" % message)
+                if message["action"] == MONITOR_STOP:
                     break
-                elif action == MONITOR_ARM_AWAY:
+                elif message["action"] == MONITOR_ARM_AWAY:
+                    self._db_session.add(Arm(arm_type=ARM_AWAY, start_time=datetime.now(), user_id=message["user_id"]))
+                    self._db_session.commit()
                     storage.set(storage.ARM_STATE, ARM_AWAY)
                     send_arm_state(ARM_AWAY)
                     storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
                     send_system_state(MONITORING_ARMED)
                     self._stop_alert.clear()
-                elif action == MONITOR_ARM_STAY:
+                elif message["action"] == MONITOR_ARM_STAY:
+                    self._db_session.add(Arm(arm_type=ARM_STAY, start_time=datetime.now(), user_id=message["user_id"]))
+                    self._db_session.commit()
                     storage.set(storage.ARM_STATE, ARM_STAY)
                     send_arm_state(ARM_STAY)
                     storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
                     send_system_state(MONITORING_ARMED)
                     self._stop_alert.clear()
-                elif action == MONITOR_DISARM:
+                elif message["action"] == MONITOR_DISARM:
+                    arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+                    if arm:
+                        arm.end_time = datetime.now()
+                        arm.end_user_id = message.get("user_id", None)
+                        arm.end_keypad_id = message.get("keypad_id", None)
+                        self._db_session.commit()
+
                     current_state = storage.get(storage.MONITORING_STATE)
                     current_arm = storage.get(storage.ARM_STATE)
                     if (
@@ -138,7 +143,7 @@ class Monitor(Thread):
                         send_system_state(MONITORING_READY)
                     self._stop_alert.set()
                     continue
-                elif action == MONITOR_UPDATE_CONFIG:
+                elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self.load_sensors()
             except Empty:
                 pass
@@ -232,11 +237,7 @@ class Monitor(Thread):
             self._logger.error("Error measure values! %s", self._references)
 
     def has_uninitialized_sensor(self):
-        for sensor in self._sensors:
-            if sensor.reference_value is None:
-                return True
-
-        return False
+        return any(sensor.reference_value is None for sensor in self._sensors)
 
     def cleanup_database(self):
         changed = False
@@ -249,6 +250,11 @@ class Monitor(Thread):
         for alert in self._db_session.query(Alert).filter_by(end_time=None).all():
             alert.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
             self._logger.debug("Cleared alert")
+            changed = True
+
+        for arm in self._db_session.query(Arm).filter_by(end_time=None).all():
+            arm.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
+            self._logger.debug("Cleared arm")
             changed = True
 
         if changed:
@@ -264,7 +270,7 @@ class Monitor(Thread):
 
     def measure_sensor_references(self):
         measurements = []
-        for cycle in range(MEASUREMENT_CYCLES):
+        for _ in range(MEASUREMENT_CYCLES):
             measurements.append(self._sensorAdapter.get_values())
             sleep(MEASUREMENT_TIME)
 
@@ -272,9 +278,7 @@ class Monitor(Thread):
 
         references = {}
         for channel in range(self._sensorAdapter.channel_count):
-            value_sum = 0
-            for cycle in range(MEASUREMENT_CYCLES):
-                value_sum += measurements[cycle][channel]
+            value_sum = sum(measurements[cycle][channel] for cycle in range(MEASUREMENT_CYCLES))
             references[channel] = value_sum / MEASUREMENT_CYCLES
 
         return list(references.values())
@@ -292,11 +296,10 @@ class Monitor(Thread):
                     )
                     sensor.alert = True
                     changes = True
-            else:
-                if sensor.alert:
-                    self._logger.debug("Cleared alert on channel: %s", sensor.channel)
-                    sensor.alert = False
-                    changes = True
+            elif sensor.alert:
+                self._logger.debug("Cleared alert on channel: %s", sensor.channel)
+                sensor.alert = False
+                changes = True
 
             if sensor.alert and sensor.enabled:
                 found_alert = True
@@ -315,6 +318,7 @@ class Monitor(Thread):
 
         changes = False
         for sensor in self._sensors:
+            # add new alerting, enabled sensors to the alert
             if sensor.alert and sensor.id not in self._alerts and sensor.enabled:
                 alert_type = None
                 # sabotage has higher priority
@@ -329,17 +333,13 @@ class Monitor(Thread):
                     delay = sensor.zone.stay_alert_delay
 
                 if alert_type:
-                    self._alerts[sensor.id] = {
-                        "alert": monitoring.alert.SensorAlert(sensor.id, delay, alert_type, self._stop_alert)
-                    }
+                    self._alerts[sensor.id] = {"alert": SensorAlert(sensor.id, delay, alert_type, self._stop_alert)}
                     self._alerts[sensor.id]["alert"].start()
-                    changes = True
                     self._stop_alert.clear()
+                    changes = True
+            # stop alert
             elif not sensor.alert and sensor.id in self._alerts:
-                if self._alerts[sensor.id]["alert"]._alert_type == ALERT_SABOTAGE:
-                    # stop sabotage
-                    storage.set(storage.MONITORING_STATE, MONITORING_READY)
-                    send_system_state(MONITORING_READY)
+                # TODO: if removing SensorAlert will block alerting
                 del self._alerts[sensor.id]
 
         if changes:

@@ -4,12 +4,14 @@
 # @Last Modified by:   Gábor Kovács
 # @Last Modified time: 2021-02-25 20:06:12
 import json
+import logging
 import socket
 from os import environ
 
 from monitoring.constants import (
     ARM_AWAY,
     ARM_STAY,
+    LOG_IPC,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DISARM,
@@ -34,6 +36,7 @@ class IPCClient(object):
     _socket = None
 
     def __init__(self):
+        self._logger = logging.getLogger(LOG_IPC)
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
@@ -41,17 +44,17 @@ class IPCClient(object):
             except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
 
-    def disarm(self):
-        return self._send_message({"action": MONITOR_DISARM})
+    def disarm(self, user_id):
+        return self._send_message({"action": MONITOR_DISARM, "user_id": user_id})
 
     def get_arm(self):
         return self._send_message({"action": MONITOR_GET_ARM})
 
-    def arm(self, arm_type):
+    def arm(self, arm_type, user_id):
         if arm_type == ARM_AWAY:
-            return self._send_message({"action": MONITOR_ARM_AWAY})
+            return self._send_message({"action": MONITOR_ARM_AWAY, "user_id": user_id})
         elif arm_type == ARM_STAY:
-            return self._send_message({"action": MONITOR_ARM_STAY})
+            return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id})
         else:
             print("Unknown arm type: %s" % arm_type)
 

@@ -139,7 +139,7 @@ def authenticate():
     user = db.session.query(User).get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
         return jsonify({
-            "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
+            "user_token": generate_user_token(user.id, user.name, user.role, request.environ["HTTP_ORIGIN"]),
         })
     elif not user:
         return jsonify({"error": f"invalid user id: {device_token['user_id']}"}), 400

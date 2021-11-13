@@ -8,7 +8,6 @@
 from datetime import datetime
 import logging
 import json
-import pytz
 from threading import Thread, BoundedSemaphore
 from time import time
 
@@ -141,7 +140,7 @@ class SyrenAlert(Thread):
         SyrenAlert.SUSPEND_TIME = syren_config["suspend_time"]
 
     def start_alert(self):
-        start_time = datetime.now(pytz.timezone("CET"))
+        start_time = datetime.now()
         self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
         self._db_session.commit()
@@ -166,7 +165,7 @@ class SyrenAlert(Thread):
         with SyrenAlert._semaphore:
             SyrenAlert._alert = None
             self.handle_sensors()
-            self._alert.end_time = datetime.now(pytz.timezone("CET"))
+            self._alert.end_time = datetime.now()
             self._db_session.commit()
 
             send_alert_state(None)
@@ -183,11 +182,10 @@ class SyrenAlert(Thread):
                 sensor_id = self._sensor_queue.get(False)
                 sensor = self._db_session.query(Sensor).get(sensor_id)
 
-                # check if already added to the alert
-                already_added = False
-                for alert_sensor in self._alert.sensors:
-                    if alert_sensor.sensor.id == sensor.id:
-                        already_added = True
+                already_added = any(
+                    alert_sensor.sensor.id == sensor.id
+                    for alert_sensor in self._alert.sensors
+                )
 
                 if not already_added:
                     alert_sensor = AlertSensor(

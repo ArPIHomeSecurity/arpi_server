@@ -73,7 +73,7 @@ def start():
 
     def stop_service():
         logger.info("Stopping service...")
-        broadcaster.send_message(MONITOR_STOP)
+        broadcaster.send_message({"action": MONITOR_STOP})
         stop_event.set()
 
         keypad.join()

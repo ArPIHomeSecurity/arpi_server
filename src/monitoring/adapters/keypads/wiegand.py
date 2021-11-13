@@ -18,17 +18,11 @@ class WiegandKeypad(KeypadBase):
     '''
     def __init__(self, data0, data1, beeper):
         super(WiegandKeypad, self).__init__()
-        self._data0 = data0
-        self._data1 = data1
-        self._reader = None
-        self._beeper = LED(beeper)
-        self._beeper.on()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
-
-    def initialise(self):
+        self._beeper = LED(beeper)
         self._reader = wr.construct()
-        wr.begin(self._reader, self._data0, self._data1)
-        self._logger.info("Wiegand keypad initialized: %s", wr.isinitialized(self._reader))
+        wr.begin(self._reader, data0, data1)
+        self._logger.info("Wiegand keypad created: %s", wr.isinitialized(self._reader))
 
         # Cleanup before using
         wr.ReadData(self._reader)
@@ -39,10 +33,6 @@ class WiegandKeypad(KeypadBase):
     def set_ready(self, state: bool):
         pass
 
-    def set_armed(self, state: bool):
-        super().set_armed(state)
-        self.beeps(2, 0.1, 0.1)
-
     def beeps(self, count, beep, mute):
         for _ in range(count):
             self._beeper.off()
@@ -50,7 +40,13 @@ class WiegandKeypad(KeypadBase):
             self._beeper.on()
             sleep(beep)
 
+    def set_armed(self, state: bool):
+        super().set_armed(state)
+        self.beeps(2, 0.1, 0.1)
+
     def communicate(self):
+        self.manage_delay()
+
         pending = wr.GetPendingBitCount(self._reader)
         if pending == 0:
             return

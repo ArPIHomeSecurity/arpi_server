@@ -105,7 +105,7 @@ class IPCServer(Thread):
         if message["action"] in self.BROADCASTED_ACTIONS:
             # broadcast message
             self._logger.info("IPC action received: %s", message["action"])
-            self._broadcaster.send_message(message["action"])
+            self._broadcaster.send_message(message)
         elif message["action"] == MONITOR_GET_ARM:
             return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
         elif message["action"] == MONITOR_GET_STATE:
