@@ -11,6 +11,7 @@ from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTi
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.schema import ForeignKey
 from sqlalchemy.orm import relationship, backref
+from monitoring.constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_DISARM, ARM_STAY
 
 from tools.dictionary import merge_dicts, filter_keys
 from sqlalchemy.orm.mapper import validates
@@ -146,16 +147,26 @@ class Alert(BaseModel):
     __tablename__ = "alert"
 
     id = Column(Integer, primary_key=True)
-    alert_type = Column(String)
+    arm_id = Column(Integer, ForeignKey("arm.id"), nullable=True)
+    arm = relationship("Arm", backref=backref("arm", lazy="dynamic"))
     start_time = Column(DateTime(timezone=True))
     end_time = Column(DateTime(timezone=True))
     sensors = relationship("AlertSensor", back_populates="alert")
 
-    def __init__(self, alert_type, start_time, sensors, end_time=None):
-        self.alert_type = alert_type
+    def __init__(self, arm, start_time, sensors, end_time=None):
+        self.arm = arm
         self.start_time = start_time
         self.end_time = end_time
         self.sensors = sensors
+
+    @staticmethod
+    def get_alert_type(arm_type):
+        if arm_type == ARM_AWAY:
+            return ALERT_AWAY
+        elif arm_type == ARM_STAY:
+            return ALERT_STAY
+        elif arm_type == ARM_DISARM:
+            return ALERT_SABOTAGE
 
     @property
     def serialize(self):
@@ -163,7 +174,7 @@ class Alert(BaseModel):
         return convert2camel(
             {
                 "id": self.id,
-                "alert_type": self.alert_type,
+                "alert_type": Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE,
                 "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
                 "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
                 if self.end_time
@@ -196,7 +207,7 @@ class AlertSensor(BaseModel):
 class Arm(BaseModel):
     __tablename__ = "arm"
     id = Column(Integer, primary_key=True)
-    arm_type = Column(String)
+    type = Column(String)
     start_time = Column(DateTime(timezone=True))
     end_time = Column(DateTime(timezone=True))
     start_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
@@ -205,7 +216,7 @@ class Arm(BaseModel):
     end_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
 
     def __init__(self, arm_type, start_time, keypad_id=None, user_id=None):
-        self.arm_type = arm_type
+        self.type = arm_type
         self.start_time = start_time
         self.start_keypad_id = keypad_id
         self.start_user_id = user_id

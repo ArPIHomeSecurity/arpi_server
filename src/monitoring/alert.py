@@ -1,24 +1,17 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:08:04
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:08:04
-
-
-from datetime import datetime
 import logging
 import json
+from datetime import datetime
+from multiprocessing import Queue
 from threading import Thread, BoundedSemaphore
 from time import time
 
-from models import Alert, AlertSensor, Option, Sensor
+from models import Alert, AlertSensor, Arm, Option, Sensor
 from monitoring import storage
 from monitoring.adapters.syren import SyrenAdapter
 from monitoring.database import Session
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import send_syren_state, send_alert_state, send_system_state
 from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
-from multiprocessing import Queue
 from queue import Empty
 
 
@@ -141,7 +134,8 @@ class SyrenAlert(Thread):
 
     def start_alert(self):
         start_time = datetime.now()
-        self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
+        arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+        self._alert = Alert(arm=arm, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
         self._db_session.commit()
         self.handle_sensors()

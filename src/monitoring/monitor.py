@@ -107,21 +107,9 @@ class Monitor(Thread):
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
-                    self._db_session.add(Arm(arm_type=ARM_AWAY, start_time=datetime.now(), user_id=message["user_id"]))
-                    self._db_session.commit()
-                    storage.set(storage.ARM_STATE, ARM_AWAY)
-                    send_arm_state(ARM_AWAY)
-                    storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
-                    send_system_state(MONITORING_ARMED)
-                    self._stop_alert.clear()
+                    self.arm_monitoring(ARM_AWAY, message["user_id"])
                 elif message["action"] == MONITOR_ARM_STAY:
-                    self._db_session.add(Arm(arm_type=ARM_STAY, start_time=datetime.now(), user_id=message["user_id"]))
-                    self._db_session.commit()
-                    storage.set(storage.ARM_STATE, ARM_STAY)
-                    send_arm_state(ARM_STAY)
-                    storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
-                    send_system_state(MONITORING_ARMED)
-                    self._stop_alert.clear()
+                    self.arm_monitoring(ARM_STAY, message["user_id"])
                 elif message["action"] == MONITOR_DISARM:
                     arm = self._db_session.query(Arm).filter_by(end_time=None).first()
                     if arm:
@@ -137,10 +125,7 @@ class Monitor(Thread):
                         and current_arm in (ARM_AWAY, ARM_STAY)
                         or current_state == MONITORING_SABOTAGE
                     ):
-                        storage.set(storage.ARM_STATE, ARM_DISARM)
-                        send_arm_state(ARM_DISARM)
-                        storage.set(storage.MONITORING_STATE, MONITORING_READY)
-                        send_system_state(MONITORING_READY)
+                        self.update_state(ARM_DISARM, MONITORING_READY)
                     self._stop_alert.set()
                     continue
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
@@ -155,6 +140,27 @@ class Monitor(Thread):
         self._stop_alert.set()
         self._db_session.close()
         self._logger.info("Monitoring stopped")
+
+    def arm_monitoring(self, arm_type, user_id):
+        self._db_session.add(
+            Arm(
+                arm_type=arm_type,
+                start_time=datetime.now(),
+                user_id=user_id,
+            )
+        )
+
+        self._db_session.commit()
+        self.update_state(arm_type, MONITORING_ARMED)
+        self._stop_alert.clear()
+
+    def update_state(self, arm_state=None, monitoring_state=None):
+        if arm_state:
+            storage.set(storage.ARM_STATE, arm_state)
+            send_arm_state(arm_state)
+        if monitoring_state:
+            storage.set(storage.MONITORING_STATE, monitoring_state)
+            send_system_state(monitoring_state)
 
     def check_power(self):
         # load the value once from the adapter
@@ -209,21 +215,17 @@ class Monitor(Thread):
                 self._sensorAdapter.channel_count,
             )
             self._sensors = []
-            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
-            send_system_state(MONITORING_INVALID_CONFIG)
+            self.update_state(monitoring_state=MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
             self._logger.info("Invalid channel configuration")
             self._sensors = []
-            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
-            send_system_state(MONITORING_INVALID_CONFIG)
+            self.update_state(monitoring_state=MONITORING_INVALID_CONFIG)
         elif self.has_uninitialized_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
-            storage.set(storage.MONITORING_STATE, MONITORING_READY)
-            send_system_state(MONITORING_READY)
+            self.update_state(monitoring_state=MONITORING_READY)
         else:
-            storage.set(storage.MONITORING_STATE, MONITORING_READY)
-            send_system_state(MONITORING_READY)
+            self.update_state(monitoring_state=MONITORING_READY)
 
         send_sensors_state(False)
 
