@@ -96,7 +96,6 @@ class Monitor(Thread):
         send_alert_state(None)
         send_syren_state(None)
         storage.set(storage.ARM_STATE, ARM_DISARM)
-        send_arm_state(ARM_DISARM)
 
         self.load_sensors()
 
@@ -125,7 +124,8 @@ class Monitor(Thread):
                         and current_arm in (ARM_AWAY, ARM_STAY)
                         or current_state == MONITORING_SABOTAGE
                     ):
-                        self.update_state(ARM_DISARM, MONITORING_READY)
+                        storage.set(storage.ARM_STATE, ARM_DISARM)
+                        storage.set(storage.MONITORING_STATE, MONITORING_READY)
                     self._stop_alert.set()
                     continue
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
@@ -151,16 +151,9 @@ class Monitor(Thread):
         )
 
         self._db_session.commit()
-        self.update_state(arm_type, MONITORING_ARMED)
+        storage.set(storage.ARM_STATE, arm_type)
+        storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
         self._stop_alert.clear()
-
-    def update_state(self, arm_state=None, monitoring_state=None):
-        if arm_state:
-            storage.set(storage.ARM_STATE, arm_state)
-            send_arm_state(arm_state)
-        if monitoring_state:
-            storage.set(storage.MONITORING_STATE, monitoring_state)
-            send_system_state(monitoring_state)
 
     def check_power(self):
         # load the value once from the adapter
@@ -197,7 +190,6 @@ class Monitor(Thread):
     def load_sensors(self):
         """Load the sensors from the db in the thread to avoid session problems"""
         storage.set(storage.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
-        send_system_state(MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
         # TODO: wait a little bit to see status for debug
@@ -215,17 +207,17 @@ class Monitor(Thread):
                 self._sensorAdapter.channel_count,
             )
             self._sensors = []
-            self.update_state(monitoring_state=MONITORING_INVALID_CONFIG)
+            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
             self._logger.info("Invalid channel configuration")
             self._sensors = []
-            self.update_state(monitoring_state=MONITORING_INVALID_CONFIG)
+            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
         elif self.has_uninitialized_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
-            self.update_state(monitoring_state=MONITORING_READY)
+            storage.set(storage.MONITORING_STATE, MONITORING_READY)
         else:
-            self.update_state(monitoring_state=MONITORING_READY)
+            storage.set(storage.MONITORING_STATE, MONITORING_READY)
 
         send_sensors_state(False)
 

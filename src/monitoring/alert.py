@@ -10,7 +10,7 @@ from monitoring import storage
 from monitoring.adapters.syren import SyrenAdapter
 from monitoring.database import Session
 from monitoring.notifications.notifier import Notifier
-from monitoring.socket_io import send_syren_state, send_alert_state, send_system_state
+from monitoring.socket_io import send_syren_state, send_alert_state
 from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
 from queue import Empty
 
@@ -51,7 +51,6 @@ class SensorAlert(Thread):
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
                 storage.set(storage.MONITORING_STATE, MONITORING_SABOTAGE)
-                send_system_state(MONITORING_SABOTAGE)
         else:
             self._logger.info("Sensor alert stopped")
 

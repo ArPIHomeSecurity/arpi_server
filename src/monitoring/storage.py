@@ -1,6 +1,9 @@
 # @Description: In memory storage for communicating between components
 # TODO: make it thread safe???
 
+from monitoring.socket_io import send_arm_state, send_system_state
+
+
 _data = {}
 
 ARM_STATE = 0
@@ -14,3 +17,7 @@ def get(key):
 
 def set(key, value):
     _data[key] = value
+    if key == MONITORING_STATE:
+        send_system_state(value)
+    elif key == ARM_STATE:
+        send_arm_state(value)
