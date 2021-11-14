@@ -2,7 +2,7 @@ from datetime import datetime
 import logging
 
 from os import environ
-from queue import Empty
+from queue import Empty, Queue
 from threading import Thread, Event
 from time import sleep
 
@@ -12,6 +12,7 @@ from monitoring.alert import SensorAlert
 from monitoring import storage
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
+from monitoring.broadcast import Broadcaster
 from monitoring.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -38,11 +39,9 @@ from monitoring.constants import (
 from monitoring.database import Session
 from monitoring.socket_io import (
     send_alert_state,
-    send_arm_state,
     send_power_state,
     send_sensors_state,
     send_syren_state,
-    send_system_state,
 )
 
 
@@ -63,7 +62,7 @@ class Monitor(Thread):
     classdocs
     """
 
-    def __init__(self, actions):
+    def __init__(self, broadcaster: Broadcaster):
         """
         Constructor
         """
@@ -71,16 +70,18 @@ class Monitor(Thread):
         self._logger = logging.getLogger(LOG_MONITOR)
         self._sensorAdapter = SensorAdapter()
         self._powerAdapter = PowerAdapter()
-        self._actions = actions
+        self._broadcaster = broadcaster
         self._sensors = None
         self._power_source = None
-        self._alerts = {}
-        self._stop_alert = Event()
         self._db_session = None
+        self._alerts = {}
+        self._actions = Queue()
+        self._stop_alert = Event()
 
-        self._logger.info("Monitoring created")
         storage.set(storage.MONITORING_STATE, MONITORING_STARTUP)
         storage.set(storage.ARM_STATE, ARM_DISARM)
+        self._broadcaster.register_queue(id(self), self._actions)
+        self._logger.info("Monitoring created")
 
     def run(self):
         self._logger.info("Monitoring started")

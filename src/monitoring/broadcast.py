@@ -2,14 +2,15 @@
 class Broadcaster(object):
     """Send message to registered queues."""
 
-    def __init__(self, queues):
-        self._queues = queues
+    def __init__(self):
+        self._queues = {}
 
-    def add_queue(self, queue):
+    def register_queue(self, client_id, queue):
         """Register queues to broadcast messages"""
-        self._queues.append(queue)
+        self._queues[client_id] = queue
 
-    def send_message(self, message):
+    def send_message(self, message, sender_id=None):
         """Broadcast message"""
-        for queue in self._queues:
-            queue.put(message)
+        for client_id, queue in self._queues.items():
+            if client_id != sender_id:
+                queue.put(message)

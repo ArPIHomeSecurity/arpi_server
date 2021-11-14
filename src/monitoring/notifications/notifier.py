@@ -2,12 +2,13 @@ import json
 import logging
 import os
 import smtplib
-from queue import Empty
+from queue import Empty, Queue
 from smtplib import SMTPException
 from threading import Thread
 from time import sleep
 
 from models import Option
+from monitoring.broadcast import Broadcaster
 from monitoring.constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
 from monitoring.database import Session
 from monitoring.notifications.templates import (
@@ -91,14 +92,18 @@ class Notifier(Thread):
             "retry": 0
         })
 
-    def __init__(self, actions):
+    def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
-        self._actions = actions
+        self._actions = Queue()
+        self._broadcaster = broadcaster
         self._logger = logging.getLogger(LOG_NOTIFIER)
         self._gsm = GSM()
         self._notifications = []
         self._options = None
         self._db_session = None
+
+        self._broadcaster.register_queue(id(self), self._actions)
+        self._logger.info("Notifier created")
 
     def run(self):
         self._logger.info("Notifier started...")

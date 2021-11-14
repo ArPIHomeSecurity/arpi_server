@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from multiprocessing import Queue
 from signal import SIGTERM, signal
 from threading import Event
 from time import sleep
@@ -50,19 +49,16 @@ def start():
 
     logger = logging.getLogger(LOG_SERVICE)
 
-    monitor_actions = Queue()
-    monitor = Monitor(monitor_actions)
+    broadcaster = Broadcaster()
+
+    monitor = Monitor(broadcaster)
     monitor.start()
 
-    notifier_actions = Queue()
-    notifier = Notifier(notifier_actions)
+    notifier = Notifier(broadcaster)
     notifier.start()
 
-    keypad_actions = Queue()
-    keypad = KeypadHandler(keypad_actions, monitor_actions)
+    keypad = KeypadHandler(broadcaster)
     keypad.start()
-
-    broadcaster = Broadcaster([monitor_actions, notifier_actions, keypad_actions])
 
     stop_event = Event()
     ipc_server = IPCServer(stop_event, broadcaster)
@@ -73,7 +69,7 @@ def start():
 
     def stop_service():
         logger.info("Stopping service...")
-        broadcaster.send_message({"action": MONITOR_STOP})
+        broadcaster.send_message(message={"action": MONITOR_STOP})
         stop_event.set()
 
         keypad.join()

@@ -1,7 +1,7 @@
 import logging
 import os
 from threading import Thread
-from queue import Empty
+from queue import Empty, Queue
 from time import time
 
 from sqlalchemy.engine import create_engine
@@ -14,6 +14,7 @@ from sqlalchemy.sql.sqltypes import Boolean
 import models
 from monitoring.adapters.keypads.base import Action, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
+from monitoring.broadcast import Broadcaster
 from monitoring.constants import (
     LOG_ADKEYPAD,
     MONITOR_ARM_AWAY,
@@ -39,14 +40,16 @@ class KeypadHandler(Thread):
     DATA_PIN1 = 5
     DATA_PIN2 = 0
 
-    def __init__(self, commands, responses):
+    def __init__(self, broadcaster: Broadcaster):
         super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
         self._logger = logging.getLogger(LOG_ADKEYPAD)
-        self._commands = commands
-        self._responses = responses
+        self._actions = Queue()
         self._codes = []
         self._keypad: KeypadBase = None
         self._db_session = None
+        self._broadcaster = broadcaster
+
+        self._broadcaster.register_queue(id(self), self._actions)
 
     def create_keypad(self, settings):
         # check if running on Raspberry
@@ -121,7 +124,7 @@ class KeypadHandler(Thread):
         while True:
             try:
                 self._logger.debug("Wait for command...")
-                message = self._commands.get(timeout=COMMUNICATION_PERIOD)
+                message = self._actions.get(timeout=COMMUNICATION_PERIOD)
                 self._logger.debug("Command: %s", message)
 
                 if message["action"] == MONITOR_UPDATE_KEYPAD:
@@ -196,9 +199,11 @@ class KeypadHandler(Thread):
         if user:
             self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
-            self._responses.put({"action": MONITOR_DISARM, "user_id": user.id, "keypad_id": self._keypad._id})
-            # loopback action
-            self._commands.put({"action": MONITOR_DISARM, "user_id": user.id, "keypad_id": self._keypad._id})
+            self._broadcaster.send_message(message={
+                "action": MONITOR_DISARM,
+                "user_id": user.id,
+                "keypad_id": self._keypad._id
+            })
         else:
             self._logger.info("Invalid code")
             self._keypad.set_error(True)
@@ -211,9 +216,11 @@ class KeypadHandler(Thread):
         db_card = self.get_card_by_number(card)
         if db_card:
             self._logger.info("Accepted card => disarming")
-            self._responses.put({"action": MONITOR_DISARM, "user_id": db_card.user_id, "keypad_id": self._keypad.id})
-            # loopback action
-            self._commands.put({"action": MONITOR_DISARM, "user_id": db_card.user_id, "keypad_id": self._keypad.id})
+            self._broadcaster.send_message(message={
+                "action": MONITOR_DISARM,
+                "user_id": db_card.user_id,
+                "keypad_id": self._keypad.id
+            })
         else:
             self._logger.info("Unknown card")
             self._keypad.set_error(True)
