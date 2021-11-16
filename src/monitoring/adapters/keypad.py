@@ -7,11 +7,11 @@ from time import time
 from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
-from sqlalchemy.sql.expression import false
+from sqlalchemy.sql.expression import false, true
 from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.sqltypes import Boolean
 
-import models
+from models import Arm, Card, Keypad, Sensor, User, Zone, hash_code
 from monitoring.adapters.keypads.base import Action, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
@@ -96,7 +96,7 @@ class KeypadHandler(Thread):
     def configure(self):
         self._logger.debug("Configure keypad")
         db_session = self.get_database_session()
-        keypad_settings = db_session.query(models.Keypad).first()
+        keypad_settings = db_session.query(Keypad).first()
         if keypad_settings:
             self.create_keypad(keypad_settings)
         else:
@@ -135,13 +135,13 @@ class KeypadHandler(Thread):
                     register_card = True
                 elif message["action"] in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY) and self._keypad:
                     if message["action"] == MONITOR_ARM_AWAY:
-                        arm_delay = self.get_database_session().query(
-                            func.max(models.Zone.away_arm_delay).label("max_delay")
-                        ).filter(models.Zone.deleted == false()).one()
+                        arm_delay = self._db_session.query(
+                            func.max(Zone.away_arm_delay).label("max_delay")
+                        ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
                     elif message["action"] == MONITOR_ARM_STAY:
-                        arm_delay = self.get_database_session().query(
-                            func.max(models.Zone.stay_arm_delay).label("max_delay")
-                        ).filter(models.Zone.deleted == false()).one()
+                        arm_delay = self._db_session.query(
+                            func.max(Zone.stay_arm_delay).label("max_delay")
+                        ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
                     self._logger.info("Keypad armed")
                     self._keypad.set_armed(True)
                     self._logger.debug("Delay: %s", arm_delay)
@@ -150,7 +150,7 @@ class KeypadHandler(Thread):
                     # synchronizing the two threads
                     arm = None
                     while not arm:
-                        arm = self.get_database_session().query(models.Arm).filter_by(end_time=None).first()
+                        arm = self.get_database_session().query(Arm).filter_by(end_time=None).first()
                     self._logger.debug("Arm: %s", arm)
 
                     if arm_delay.max_delay and arm_delay.max_delay > 0:
@@ -227,32 +227,32 @@ class KeypadHandler(Thread):
 
     def get_user_by_access_code(self, code) -> Boolean:
         db_session = self.get_database_session()
-        users = db_session.query(models.User).all()
+        users = db_session.query(User).all()
         db_session.close()
 
-        code_hash = models.hash_code(code)
+        code_hash = hash_code(code)
         self._logger.debug("User access code %s/%s in %s", code, code_hash, [u.fourkey_code for u in users])
         return next(filter(lambda u: u.fourkey_code == code_hash, users), None)
 
     def get_card_by_number(self, number) -> Boolean:
         db_session = self.get_database_session()
-        users = db_session.query(models.User).all()
+        users = db_session.query(User).all()
 
         cards = []
         for user in users:
             cards.extend(user.cards)
 
         db_session.close()
-        card_hash = models.hash_code(number)
+        card_hash = hash_code(number)
         self._logger.debug("Card %s/%s in %s", number, card_hash, [c.code for c in cards])
         return next(filter(lambda c: c.code == card_hash, cards), None)
 
     def register_card(self, card):
         """Find the first user from the database with valid card registration"""
         db_session = self.get_database_session()
-        users = db_session.query(models.User).filter(models.User.card_registration_expiry >= 'NOW()').all()
+        users = db_session.query(User).filter(User.card_registration_expiry >= 'NOW()').all()
         if users:
-            card = models.Card(card, users[0].id)
+            card = Card(card, users[0].id)
             self._logger.debug("Card created: %s", card)
             db_session.add(card)
             users[0].card_registration_expiry = None

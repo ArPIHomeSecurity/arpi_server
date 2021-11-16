@@ -242,6 +242,7 @@ class Zone(BaseModel):
     away_arm_delay = Column(Integer, default=None, nullable=True)
     stay_arm_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
+    sensors = relationship("Sensor")
 
     def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
         self.name = name

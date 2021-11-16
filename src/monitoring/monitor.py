@@ -3,10 +3,13 @@ import logging
 
 from os import environ
 from queue import Empty, Queue
-from threading import Thread, Event
+from threading import Thread, Event, Timer
 from time import sleep
+from sqlalchemy.sql.expression import false, true
 
-from models import Alert, Arm, Sensor
+from sqlalchemy.sql.functions import func
+
+from models import Alert, Arm, Sensor, Zone
 from monitoring.alert import SensorAlert
 
 from monitoring import storage
@@ -26,6 +29,7 @@ from monitoring.constants import (
     MONITOR_DISARM,
     MONITOR_STOP,
     MONITOR_UPDATE_CONFIG,
+    MONITORING_ARM_DELAY,
     MONITORING_ARMED,
     MONITORING_INVALID_CONFIG,
     MONITORING_READY,
@@ -77,6 +81,7 @@ class Monitor(Thread):
         self._alerts = {}
         self._actions = Queue()
         self._stop_alert = Event()
+        self._delay_timer = None
 
         storage.set(storage.MONITORING_STATE, MONITORING_STARTUP)
         storage.set(storage.ARM_STATE, ARM_DISARM)
@@ -111,6 +116,10 @@ class Monitor(Thread):
                 elif message["action"] == MONITOR_ARM_STAY:
                     self.arm_monitoring(ARM_STAY, message["user_id"])
                 elif message["action"] == MONITOR_DISARM:
+                    if self._delay_timer:
+                        self._delay_timer.cancel()
+                        self._delay_timer = None
+
                     arm = self._db_session.query(Arm).filter_by(end_time=None).first()
                     if arm:
                         arm.end_time = datetime.now()
@@ -121,7 +130,7 @@ class Monitor(Thread):
                     current_state = storage.get(storage.MONITORING_STATE)
                     current_arm = storage.get(storage.ARM_STATE)
                     if (
-                        current_state == MONITORING_ARMED
+                        current_state in (MONITORING_ARM_DELAY, MONITORING_ARMED)
                         and current_arm in (ARM_AWAY, ARM_STAY)
                         or current_state == MONITORING_SABOTAGE
                     ):
@@ -152,8 +161,28 @@ class Monitor(Thread):
         )
 
         self._db_session.commit()
+
+        # get max delay of arm
+        arm_delay = None
+        if arm_type == ARM_AWAY:
+            arm_delay = self._db_session.query(
+                func.max(Zone.away_arm_delay).label("max_delay")
+            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
+        elif arm_type == ARM_STAY:
+            arm_delay = self._db_session.query(
+                func.max(Zone.stay_arm_delay).label("max_delay")
+            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
+
+        def stop_arm_delay():
+            self._logger.debug("End arm delay => armed!!!")
+            storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
+
         storage.set(storage.ARM_STATE, arm_type)
-        storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
+        if arm_delay is not None:
+            self._logger.debug("Arm with delay: %s / %s", arm_delay.max_delay, arm_type)
+            storage.set(storage.MONITORING_STATE, MONITORING_ARM_DELAY)
+            self._delay_timer = Timer(arm_delay.max_delay, stop_arm_delay)
+            self._delay_timer.start()
         self._stop_alert.clear()
 
     def check_power(self):
@@ -328,7 +357,9 @@ class Monitor(Thread):
                     delay = sensor.zone.stay_alert_delay
 
                 if alert_type:
-                    self._alerts[sensor.id] = {"alert": SensorAlert(sensor.id, delay, alert_type, self._stop_alert)}
+                    self._alerts[sensor.id] = {
+                        "alert": SensorAlert(sensor.id, delay, alert_type, self._stop_alert, self._broadcaster)
+                    }
                     self._alerts[sensor.id]["alert"].start()
                     self._stop_alert.clear()
                     changes = True
