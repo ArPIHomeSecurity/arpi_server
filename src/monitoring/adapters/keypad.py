@@ -7,15 +7,15 @@ from time import time
 from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
-from sqlalchemy.sql.expression import false, true
-from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.sqltypes import Boolean
 
-from models import Arm, Card, Keypad, Sensor, User, Zone, hash_code
+from models import Arm, Card, Keypad, User, hash_code
 from monitoring.adapters.keypads.base import Action, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
 from monitoring.constants import (
+    ARM_AWAY,
+    ARM_STAY,
     LOG_ADKEYPAD,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
@@ -26,6 +26,7 @@ from monitoring.constants import (
     THREAD_KEYPAD,
 )
 from monitoring.socket_io import send_card_registered
+from tools.queries import get_arm_delay
 
 if os.uname()[4][:3] == "arm":
     from monitoring.adapters.keypads.dsc import DSCKeypad
@@ -133,29 +134,10 @@ class KeypadHandler(Thread):
                     last_press = int(time())
                 elif message["action"] == MONITOR_REGISTER_CARD:
                     register_card = True
-                elif message["action"] in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY) and self._keypad:
-                    if message["action"] == MONITOR_ARM_AWAY:
-                        arm_delay = self._db_session.query(
-                            func.max(Zone.away_arm_delay).label("max_delay")
-                        ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
-                    elif message["action"] == MONITOR_ARM_STAY:
-                        arm_delay = self._db_session.query(
-                            func.max(Zone.stay_arm_delay).label("max_delay")
-                        ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
-                    self._logger.info("Keypad armed")
-                    self._keypad.set_armed(True)
-                    self._logger.debug("Delay: %s", arm_delay)
-
-                    # wait for the arm created in the database
-                    # synchronizing the two threads
-                    arm = None
-                    while not arm:
-                        arm = self.get_database_session().query(Arm).filter_by(end_time=None).first()
-                    self._logger.debug("Arm: %s", arm)
-
-                    if arm_delay.max_delay and arm_delay.max_delay > 0:
-                        self._keypad.start_delay(arm.start_time, arm_delay.max_delay)
-
+                elif message["action"] == MONITOR_ARM_AWAY and self._keypad:
+                    self.arm_keypad(ARM_AWAY)
+                elif message["action"] == MONITOR_ARM_STAY and self._keypad:
+                    self.arm_keypad(ARM_STAY)
                 elif message["action"] == MONITOR_DISARM and self._keypad:
                     self._logger.info("Keypad disarmed")
                     self._keypad.set_armed(False)
@@ -193,6 +175,21 @@ class KeypadHandler(Thread):
                     pass
                 elif action is not None:
                     self._logger.error("Uknown keypad action: %s", action)
+
+    def arm_keypad(self, arm_type):
+        arm_delay = get_arm_delay(self.get_database_session(), arm_type)
+        self._logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
+        self._keypad.set_armed(True)
+
+        # wait for the arm created in the database
+        # synchronizing the two threads
+        arm = None
+        while not arm:
+            arm = self.get_database_session().query(Arm).filter_by(end_time=None).first()
+        self._logger.debug("Arm: %s", arm)
+
+        if arm_delay and arm_delay > 0:
+            self._keypad.start_delay(arm.start_time, arm_delay)
 
     def handle_access_code(self, presses):
         user = self.get_user_by_access_code(presses)

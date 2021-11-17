@@ -47,6 +47,7 @@ from monitoring.socket_io import (
     send_sensors_state,
     send_syren_state,
 )
+from tools.queries import get_arm_delay
 
 
 MEASUREMENT_CYCLES = 2
@@ -163,15 +164,7 @@ class Monitor(Thread):
         self._db_session.commit()
 
         # get max delay of arm
-        arm_delay = None
-        if arm_type == ARM_AWAY:
-            arm_delay = self._db_session.query(
-                func.max(Zone.away_arm_delay).label("max_delay")
-            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
-        elif arm_type == ARM_STAY:
-            arm_delay = self._db_session.query(
-                func.max(Zone.stay_arm_delay).label("max_delay")
-            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())).one()
+        arm_delay = get_arm_delay(self._db_session, arm_type)
 
         def stop_arm_delay():
             self._logger.debug("End arm delay => armed!!!")
@@ -179,9 +172,9 @@ class Monitor(Thread):
 
         storage.set(storage.ARM_STATE, arm_type)
         if arm_delay is not None:
-            self._logger.debug("Arm with delay: %s / %s", arm_delay.max_delay, arm_type)
+            self._logger.debug("Arm with delay: %s / %s", arm_delay, arm_type)
             storage.set(storage.MONITORING_STATE, MONITORING_ARM_DELAY)
-            self._delay_timer = Timer(arm_delay.max_delay, stop_arm_delay)
+            self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
         self._stop_alert.clear()
 
