@@ -25,3 +25,20 @@ def get_arm_delay(session, arm_type):
             .max_delay
     else:
         logger.error("Unknown arm type: %s", arm_type)
+
+
+def get_alert_delay(session, arm_type):
+    if arm_type == ARM_AWAY:
+        return session.query(
+                func.max(Zone.away_alert_delay).label("max_delay")
+            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())) \
+            .one() \
+            .max_delay
+    elif arm_type == ARM_STAY:
+        return session.query(
+                func.max(Zone.stay_alert_delay).label("max_delay")
+            ).filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())) \
+            .one() \
+            .max_delay
+    else:
+        logger.error("Unknown arm type: %s", arm_type)

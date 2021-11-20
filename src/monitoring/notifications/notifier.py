@@ -73,6 +73,8 @@ class Notifier(Thread):
 
     _notifications = []
 
+    # TODO: consider instead of calling these methods to be notified with actions
+    # and retrieve information from the database
     @classmethod
     def notify_alert_started(cls, alert_id, sensors, time):
         cls._notifications.append({

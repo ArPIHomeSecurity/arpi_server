@@ -20,6 +20,7 @@ def get_alerts():
 @registered
 @restrict_host
 def get_alert():
+    # TODO: get state from monitoring
     alert = db.session.query(Alert).filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
     if alert:
         return jsonify(alert.serialize)

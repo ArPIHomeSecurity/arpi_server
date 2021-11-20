@@ -21,7 +21,7 @@ class Handler():
         self._logger = logging.getLogger(LOG_ADKEYPAD)
 
     def do(self) -> bool:
-        self._logger.debug("Arm start: %s delay: %s step: %s", self._start, self._delay, self._step)
+        self._logger.debug("Start: %s delay: %s step: %s", self._start, self._delay, self._step)
         now = dt.now()
         if self._start.replace(tzinfo=None) + timedelta(seconds=self._delay) > now:
             if (now - self._start.replace(tzinfo=None)).total_seconds() > self._step:

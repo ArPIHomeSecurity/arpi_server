@@ -78,6 +78,8 @@ ARM_DISARM = "disarm"
 # alert types
 ALERT_AWAY = "alert_away"
 ALERT_STAY = "alert_stay"
+ALERT_AWAY_DELAYED = "alert_away_delayed"
+ALERT_STAY_DELAYED = "alert_stay_delayed"
 ALERT_SABOTAGE = "alert_sabotage"
 
 # monitoring system states
@@ -87,6 +89,8 @@ MONITORING_UPDATING_CONFIG = "monitoring_updating_config"
 MONITORING_INVALID_CONFIG = "monitoring_invalid_config"
 MONITORING_ARM_DELAY = "monitoring_arm_delay"
 MONITORING_ARMED = "monitoring_armed"
+MONITORING_ALERT_DELAY = "monitoring_alert_delay"
+MONITORING_ALERT = "monitoring_alert"
 MONITORING_SABOTAGE = "monitoring_sabotage"
 MONITORING_ERROR = "monitoring_error"
 

@@ -1,15 +1,12 @@
-from datetime import datetime
+from datetime import datetime as dt, timedelta
 import logging
 
 from os import environ
 from queue import Empty, Queue
 from threading import Thread, Event, Timer
 from time import sleep
-from sqlalchemy.sql.expression import false, true
 
-from sqlalchemy.sql.functions import func
-
-from models import Alert, Arm, Sensor, Zone
+from models import Alert, Arm, Sensor
 from monitoring.alert import SensorAlert
 
 from monitoring import storage
@@ -29,6 +26,8 @@ from monitoring.constants import (
     MONITOR_DISARM,
     MONITOR_STOP,
     MONITOR_UPDATE_CONFIG,
+    MONITORING_ALERT,
+    MONITORING_ALERT_DELAY,
     MONITORING_ARM_DELAY,
     MONITORING_ARMED,
     MONITORING_INVALID_CONFIG,
@@ -116,6 +115,10 @@ class Monitor(Thread):
                     self.arm_monitoring(ARM_AWAY, message["user_id"])
                 elif message["action"] == MONITOR_ARM_STAY:
                     self.arm_monitoring(ARM_STAY, message["user_id"])
+                elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
+                    if self._delay_timer:
+                        self._delay_timer.cancel()
+                        self._delay_timer = None
                 elif message["action"] == MONITOR_DISARM:
                     if self._delay_timer:
                         self._delay_timer.cancel()
@@ -123,7 +126,7 @@ class Monitor(Thread):
 
                     arm = self._db_session.query(Arm).filter_by(end_time=None).first()
                     if arm:
-                        arm.end_time = datetime.now()
+                        arm.end_time = dt.now()
                         arm.end_user_id = message.get("user_id", None)
                         arm.end_keypad_id = message.get("keypad_id", None)
                         self._db_session.commit()
@@ -131,7 +134,11 @@ class Monitor(Thread):
                     current_state = storage.get(storage.MONITORING_STATE)
                     current_arm = storage.get(storage.ARM_STATE)
                     if (
-                        current_state in (MONITORING_ARM_DELAY, MONITORING_ARMED)
+                        current_state in (
+                            MONITORING_ARM_DELAY,
+                            MONITORING_ARMED,
+                            MONITORING_ALERT_DELAY,
+                            MONITORING_ALERT)
                         and current_arm in (ARM_AWAY, ARM_STAY)
                         or current_state == MONITORING_SABOTAGE
                     ):
@@ -156,7 +163,7 @@ class Monitor(Thread):
         self._db_session.add(
             Arm(
                 arm_type=arm_type,
-                start_time=datetime.now(),
+                start_time=dt.now(),
                 user_id=user_id,
             )
         )
@@ -265,12 +272,12 @@ class Monitor(Thread):
                 self._logger.debug("Cleared sensor")
 
         for alert in self._db_session.query(Alert).filter_by(end_time=None).all():
-            alert.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
+            alert.end_time = dt.fromtimestamp(DEFAULT_DATETIME)
             self._logger.debug("Cleared alert")
             changed = True
 
         for arm in self._db_session.query(Arm).filter_by(end_time=None).all():
-            arm.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
+            arm.end_time = dt.fromtimestamp(DEFAULT_DATETIME)
             self._logger.debug("Cleared arm")
             changed = True
 
@@ -301,6 +308,10 @@ class Monitor(Thread):
         return list(references.values())
 
     def scan_sensors(self):
+        """
+        Checking for alerting sensors if armed
+        TODO: merge with handle_alerts?
+        """
         changes = False
         found_alert = False
         for sensor in self._sensors:
@@ -332,24 +343,61 @@ class Monitor(Thread):
 
         # save current state to avoid concurrency
         current_arm = storage.get(storage.ARM_STATE)
+        current_monitoring = storage.get(storage.MONITORING_STATE)
+        now = dt.now()
+        self._logger.debug("Checking sensors in %s/%s", current_arm, current_monitoring)
+
+        arm: Arm = None
+        if current_monitoring == MONITORING_ARM_DELAY:
+            # wait for the arm created in the database
+            # synchronizing the two threads
+            while not arm:
+                arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+            self._logger.debug("Arm: %s", arm)
 
         changes = False
         for sensor in self._sensors:
             # add new alerting, enabled sensors to the alert
             if sensor.alert and sensor.id not in self._alerts and sensor.enabled:
                 alert_type = None
+                delay = None
                 # sabotage has higher priority
-                if sensor.zone.disarmed_delay is not None:
-                    alert_type = ALERT_SABOTAGE
-                    delay = sensor.zone.disarmed_delay
-                elif current_arm == ARM_AWAY and sensor.zone.away_alert_delay is not None:
-                    alert_type = ALERT_AWAY
-                    delay = sensor.zone.away_alert_delay
-                elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
-                    alert_type = ALERT_STAY
-                    delay = sensor.zone.stay_alert_delay
+                if current_monitoring == MONITORING_READY:
+                    if sensor.zone.disarmed_delay is not None:
+                        alert_type = ALERT_SABOTAGE
+                        delay = sensor.zone.disarmed_delay
+                elif current_monitoring == MONITORING_ARMED:
+                    if sensor.zone.disarmed_delay is not None:
+                        alert_type = ALERT_SABOTAGE
+                        delay = sensor.zone.disarmed_delay
+                    elif current_arm == ARM_AWAY and sensor.zone.away_alert_delay is not None:
+                        alert_type = ALERT_AWAY
+                        delay = sensor.zone.away_alert_delay
+                    elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
+                        alert_type = ALERT_STAY
+                        delay = sensor.zone.stay_alert_delay
+                elif current_monitoring == MONITORING_ARM_DELAY:
+                    if sensor.zone.disarmed_delay is not None:
+                        alert_type = ALERT_SABOTAGE
+                        delay = sensor.zone.disarmed_delay
+                    elif current_arm == ARM_AWAY and sensor.zone.away_arm_delay is not None:
+                        alert_type = ALERT_AWAY
+                        delay = sensor.zone.away_arm_delay
+                    elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
+                        alert_type = ALERT_STAY
+                        delay = sensor.zone.stay_arm_delay
 
-                if alert_type:
+                    if delay is not None and (arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now):
+                        self._logger.debug("Ignore alert on sensor(%s): %s + %s < %s",
+                            sensor.id,
+                            arm.start_time.replace(tzinfo=None),
+                            timedelta(seconds=delay),
+                            now
+                        )
+                        # ignore alert
+                        continue
+
+                if alert_type is not None and delay is not None:
                     self._alerts[sensor.id] = {
                         "alert": SensorAlert(sensor.id, delay, alert_type, self._stop_alert, self._broadcaster)
                     }
@@ -358,7 +406,7 @@ class Monitor(Thread):
                     changes = True
             # stop alert
             elif not sensor.alert and sensor.id in self._alerts:
-                # TODO: if removing SensorAlert will block alerting
+                # TODO: check if removing SensorAlert will block alerting
                 del self._alerts[sensor.id]
 
         if changes:

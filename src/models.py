@@ -107,7 +107,7 @@ class Sensor(BaseModel):
     description = Column(String, nullable=False)
 
     zone_id = Column(Integer, ForeignKey("zone.id"), nullable=False)
-    zone = relationship("Zone", backref=backref("zone", lazy="dynamic"))
+    zone = relationship("Zone", back_populates="sensors")
 
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
@@ -242,7 +242,7 @@ class Zone(BaseModel):
     away_arm_delay = Column(Integer, default=None, nullable=True)
     stay_arm_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
-    sensors = relationship("Sensor")
+    sensors = relationship("Sensor", back_populates="zone")
 
     def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
         self.name = name

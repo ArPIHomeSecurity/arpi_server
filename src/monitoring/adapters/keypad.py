@@ -1,7 +1,9 @@
 import logging
 import os
-from threading import Thread
+
+from datetime import datetime as dt
 from queue import Empty, Queue
+from threading import Thread
 from time import time
 
 from sqlalchemy.engine import create_engine
@@ -10,6 +12,7 @@ from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
+from monitoring import storage
 from monitoring.adapters.keypads.base import Action, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
@@ -23,10 +26,12 @@ from monitoring.constants import (
     MONITOR_REGISTER_CARD,
     MONITOR_STOP,
     MONITOR_UPDATE_KEYPAD,
+    MONITORING_ALERT,
+    MONITORING_ALERT_DELAY,
     THREAD_KEYPAD,
 )
 from monitoring.socket_io import send_card_registered
-from tools.queries import get_arm_delay
+from tools.queries import get_alert_delay, get_arm_delay
 
 if os.uname()[4][:3] == "arm":
     from monitoring.adapters.keypads.dsc import DSCKeypad
@@ -51,26 +56,6 @@ class KeypadHandler(Thread):
         self._broadcaster = broadcaster
 
         self._broadcaster.register_queue(id(self), self._actions)
-
-    def create_keypad(self, settings):
-        # check if running on Raspberry
-        if os.uname()[4][:3] != "arm":
-            self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
-            settings.type.name = "MOCK"
-        elif settings.type.name == "DSC":
-            self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
-        elif settings.type.name == "WIEGAND":
-            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN0, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN2)
-        else:
-            self._logger.error("Unknown keypad type: %s", settings.type.name)
-        self._logger.debug("Keypad created type: %s", settings.type.name)
-
-        # save the database keypad id
-        self._keypad.id = settings.id
-
-        if settings.enabled:
-            self._keypad.enabled = True
-            self._keypad.initialise()
 
     def get_database_session(self):
         if not self._db_session:
@@ -98,13 +83,29 @@ class KeypadHandler(Thread):
         self._logger.debug("Configure keypad")
         db_session = self.get_database_session()
         keypad_settings = db_session.query(Keypad).first()
-        if keypad_settings:
-            self.create_keypad(keypad_settings)
-        else:
+
+        if keypad_settings is None or not keypad_settings.enabled:
             self._keypad = None
             self._logger.info("Keypad removed")
+            db_session.close()
+            return
 
+        # check if running on Raspberry
+        if os.uname()[4][:3] != "arm":
+            self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+            keypad_settings.type.name = "MOCK"
+        elif keypad_settings.type.name == "DSC":
+            self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+        elif keypad_settings.type.name == "WIEGAND":
+            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN0, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN2)
+        else:
+            self._logger.error("Unknown keypad type: %s", keypad_settings.type.name)
+        self._logger.debug("Keypad created type: %s", keypad_settings.type.name)
         db_session.close()
+
+        # save the database keypad id
+        self._keypad.id = keypad_settings.id
+        self._keypad.initialise()
 
     def run(self):
         self.configure()
@@ -138,6 +139,10 @@ class KeypadHandler(Thread):
                     self.arm_keypad(ARM_AWAY)
                 elif message["action"] == MONITOR_ARM_STAY and self._keypad:
                     self.arm_keypad(ARM_STAY)
+                elif message["action"] == MONITORING_ALERT and self._keypad:
+                    self._keypad.stop_delay()
+                elif message["action"] == MONITORING_ALERT_DELAY and self._keypad:
+                    self.alert_delay()
                 elif message["action"] == MONITOR_DISARM and self._keypad:
                     self._logger.info("Keypad disarmed")
                     self._keypad.set_armed(False)
@@ -147,7 +152,7 @@ class KeypadHandler(Thread):
             except Empty:
                 pass
 
-            if self._keypad.enabled:
+            if self._keypad is not None:
                 self._keypad.communicate()
 
                 # delete pressed keys after 10 secs
@@ -190,6 +195,16 @@ class KeypadHandler(Thread):
 
         if arm_delay and arm_delay > 0:
             self._keypad.start_delay(arm.start_time, arm_delay)
+
+    def alert_delay(self):
+        arm_type = storage.get(storage.ARM_STATE)
+        alert_delay = get_alert_delay(self.get_database_session(), arm_type)
+        self._logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
+
+        # TODO: for now we don't have a reference time as for delayed arm
+        # we need to add the alerts to the database
+        if alert_delay and alert_delay > 0:
+            self._keypad.start_delay(dt.now(), alert_delay)
 
     def handle_access_code(self, presses):
         user = self.get_user_by_access_code(presses)

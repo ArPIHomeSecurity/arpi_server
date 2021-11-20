@@ -8,10 +8,18 @@ from time import time
 from models import Alert, AlertSensor, Arm, Option, Sensor
 from monitoring import storage
 from monitoring.adapters.syren import SyrenAdapter
+from monitoring.broadcast import Broadcaster
 from monitoring.database import Session
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import send_syren_state, send_alert_state
-from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
+from monitoring.constants import (
+    ALERT_SABOTAGE,
+    MONITORING_ALERT,
+    MONITORING_ALERT_DELAY,
+    MONITORING_SABOTAGE,
+    LOG_ALERT,
+    THREAD_ALERT
+)
 from queue import Empty
 
 
@@ -22,7 +30,7 @@ class SensorAlert(Thread):
 
     _sensor_queue = Queue()
 
-    def __init__(self, sensor_id, delay, alert_type, stop_event):
+    def __init__(self, sensor_id, delay, alert_type, stop_event, broadcaster: Broadcaster):
         """
         Constructor
         """
@@ -32,6 +40,7 @@ class SensorAlert(Thread):
         self._delay = delay
         self._alert_type = alert_type
         self._stop_event = stop_event
+        self._broadcaster = broadcaster
 
     def run(self):
         self._logger.info(
@@ -40,6 +49,11 @@ class SensorAlert(Thread):
             self._sensor_id,
             self._delay,
         )
+
+        if self._delay > 0:
+            storage.set(storage.MONITORING_STATE, MONITORING_ALERT_DELAY)
+            self._broadcaster.send_message({"action": MONITORING_ALERT_DELAY})
+
         if not self._stop_event.wait(self._delay):
             self._logger.info(
                 "Start syren because not disarmed (%s) sensor (id:%s) in %s secs",
@@ -51,6 +65,10 @@ class SensorAlert(Thread):
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
                 storage.set(storage.MONITORING_STATE, MONITORING_SABOTAGE)
+                self._broadcaster.send_message({"action": MONITORING_SABOTAGE})
+            else:
+                storage.set(storage.MONITORING_STATE, MONITORING_ALERT)
+                self._broadcaster.send_message({"action": MONITORING_ALERT})
         else:
             self._logger.info("Sensor alert stopped")
 
@@ -65,7 +83,7 @@ class SyrenAlert(Thread):
     SUSPEND_TIME = 300  # 5 minutes
 
     _semaphore = BoundedSemaphore()
-    _alert = None
+    _alert: Alert = None
 
     @classmethod
     def start_syren(cls, alert_type, sensor_queue, stop_event):
