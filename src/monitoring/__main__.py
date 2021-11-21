@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from signal import SIGTERM, signal
 from threading import Event
 from time import sleep
@@ -64,9 +63,6 @@ def start():
     ipc_server = IPCServer(stop_event, broadcaster)
     ipc_server.start()
 
-    # start the socket IO server in he main thread
-    start_socketio()
-
     def stop_service():
         logger.info("Stopping service...")
         broadcaster.send_message(message={"action": MONITOR_STOP})
@@ -81,7 +77,7 @@ def start():
         ipc_server.join()
         logger.debug("IPC thread stopped")
         logger.info("All threads stopped")
-        sys.exit(0)
+        os._exit(0)
 
     def signal_term_handler(signal, frame):
         logger.debug("Received signal (SIGTERM)")
@@ -89,15 +85,19 @@ def start():
 
     signal(SIGTERM, signal_term_handler)
 
+    start_socketio()
+
     """
     The main thread checks the health of the sub threads and crashes the application if any problem happens.
     If the application stops the service running system has to restart it clearly.
 
     May be later threads can be implemented safe to avoid restarting the application.
     """
+    threads = (monitor, ipc_server, notifier, keypad)
     while True:
         try:
-            for thread in (monitor, ipc_server, notifier, keypad):
+            logger.debug("Health check of threads: %s", [t.name for t in threads])
+            for thread in threads:
                 if not thread.is_alive():
                     logger.error("Thread crashed: %s", thread.name)
                     stop_service()

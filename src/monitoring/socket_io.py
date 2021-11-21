@@ -4,6 +4,7 @@ import logging
 import os
 import socketio
 
+from threading import Thread
 
 from flask import Flask
 from urllib.parse import parse_qs, urlparse
@@ -40,12 +41,14 @@ def start_socketio():
     app = Flask(__name__)
     # wrap Flask application with socketio's middleware
     app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
-    app.run(
-        threaded=True,
-        debug=False,  # avoid starting application twice in development
-        host=os.environ["MONITOR_HOST"],
-        port=int(os.environ["MONITOR_PORT"]),
-    )
+
+    # start on a thread to avoid blocking the main thread (health check)
+    Thread(target=app.run, kwargs={
+        "threaded": True,
+        "debug": False,  # avoid starting application twice in development
+        "host": os.environ["MONITOR_HOST"],
+        "port": int(os.environ["MONITOR_PORT"])}
+    ).start()
 
 
 @sio.on("connect")
