@@ -215,7 +215,7 @@ class Arm(BaseModel):
     end_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
     end_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
 
-    def __init__(self, arm_type, start_time, keypad_id=None, user_id=None):
+    def __init__(self, arm_type, start_time, user_id=None, keypad_id=None):
         self.type = arm_type
         self.start_time = start_time
         self.start_keypad_id = keypad_id

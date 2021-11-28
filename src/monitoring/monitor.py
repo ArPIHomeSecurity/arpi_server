@@ -112,39 +112,15 @@ class Monitor(Thread):
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
-                    self.arm_monitoring(ARM_AWAY, message["user_id"])
+                    self.arm_monitoring(ARM_AWAY, message.get("user_id", None), message.get("keypad_id", None))
                 elif message["action"] == MONITOR_ARM_STAY:
-                    self.arm_monitoring(ARM_STAY, message["user_id"])
+                    self.arm_monitoring(ARM_STAY, message.get("user_id", None), message.get("keypad_id", None))
                 elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
                     if self._delay_timer:
                         self._delay_timer.cancel()
                         self._delay_timer = None
                 elif message["action"] == MONITOR_DISARM:
-                    if self._delay_timer:
-                        self._delay_timer.cancel()
-                        self._delay_timer = None
-
-                    arm = self._db_session.query(Arm).filter_by(end_time=None).first()
-                    if arm:
-                        arm.end_time = dt.now()
-                        arm.end_user_id = message.get("user_id", None)
-                        arm.end_keypad_id = message.get("keypad_id", None)
-                        self._db_session.commit()
-
-                    current_state = storage.get(storage.MONITORING_STATE)
-                    current_arm = storage.get(storage.ARM_STATE)
-                    if (
-                        current_state in (
-                            MONITORING_ARM_DELAY,
-                            MONITORING_ARMED,
-                            MONITORING_ALERT_DELAY,
-                            MONITORING_ALERT)
-                        and current_arm in (ARM_AWAY, ARM_STAY)
-                        or current_state == MONITORING_SABOTAGE
-                    ):
-                        storage.set(storage.ARM_STATE, ARM_DISARM)
-                        storage.set(storage.MONITORING_STATE, MONITORING_READY)
-                    self._stop_alert.set()
+                    self.disarm_monitoring(message.get("user_id", None), message.get("keypad_id", None))
                     continue
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self.load_sensors()
@@ -159,12 +135,13 @@ class Monitor(Thread):
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
-    def arm_monitoring(self, arm_type, user_id):
+    def arm_monitoring(self, arm_type, user_id, keypad_id):
         self._db_session.add(
             Arm(
                 arm_type=arm_type,
                 start_time=dt.now(),
                 user_id=user_id,
+                keypad_id=keypad_id,
             )
         )
 
@@ -184,6 +161,33 @@ class Monitor(Thread):
             self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
         self._stop_alert.clear()
+
+    def disarm_monitoring(self, user_id, keypad_id):
+        if self._delay_timer:
+            self._delay_timer.cancel()
+            self._delay_timer = None
+
+        arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+        if arm:
+            arm.end_time = dt.now()
+            arm.end_user_id = user_id
+            arm.end_keypad_id = keypad_id
+            self._db_session.commit()
+
+        current_state = storage.get(storage.MONITORING_STATE)
+        current_arm = storage.get(storage.ARM_STATE)
+        if (
+            current_state in (
+                            MONITORING_ARM_DELAY,
+                            MONITORING_ARMED,
+                            MONITORING_ALERT_DELAY,
+                            MONITORING_ALERT)
+                        and current_arm in (ARM_AWAY, ARM_STAY)
+                        or current_state == MONITORING_SABOTAGE
+        ):
+            storage.set(storage.ARM_STATE, ARM_DISARM)
+            storage.set(storage.MONITORING_STATE, MONITORING_READY)
+        self._stop_alert.set()
 
     def check_power(self):
         # load the value once from the adapter

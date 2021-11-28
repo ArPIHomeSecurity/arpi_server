@@ -30,8 +30,8 @@ class KeypadBase(ABC):
         self._armed = False
         self._keys = []
         self._card = None
-        self._delay: Handler = None
         self._function: Action = None
+        self._delay: Handler = None
         self._db_session = None
 
     def get_last_key(self):
@@ -45,10 +45,10 @@ class KeypadBase(ABC):
         self._card = None
         return card
 
-    @abstractmethod
     def get_function(self):
-        """Return the last identified function"""
-        pass
+        function = self._function
+        self._function = None
+        return function
 
     def last_action(self) -> Action:
         """Last identified action on the keypad"""
@@ -56,6 +56,8 @@ class KeypadBase(ABC):
             return Action.CARD
         elif self._keys:
             return Action.KEY
+        elif self._function:
+            return Action.FUNCTION
 
     def initialise(self):
         pass

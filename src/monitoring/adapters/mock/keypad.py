@@ -3,7 +3,7 @@ import os
 
 from time import sleep, time
 
-from monitoring.adapters.keypads.base import KeypadBase
+from monitoring.adapters.keypads.base import Function, KeypadBase
 from monitoring.constants import LOG_ADKEYPAD
 
 
@@ -11,7 +11,9 @@ class MockKeypad(KeypadBase):
 
     # ACTIONS = "1234    1111      9876   65       C0C1"
     # ACTIONS = "                                    C1"
-    ACTIONS = "                                                            1234"
+    # ACTIONS = "                                                            1234"
+    ACTIONS = "                                                                  A"
+    # ACTIONS = " "
     CARDS = [
         "305419896",  # 12:34:56:78   <== C0
         "272625547",  # 10:3F:EF:8B   <== C1
@@ -28,9 +30,6 @@ class MockKeypad(KeypadBase):
 
     def initialise(self):
         self._logger.debug("Keypad initialised")
-
-    def get_function(self):
-        pass
 
     def beeps(self, count, beep, mute):
         for _ in range(count):
@@ -63,6 +62,16 @@ class MockKeypad(KeypadBase):
             if self.ACTIONS[self._index] == 'C':
                 self._card = self.CARDS[int(self.ACTIONS[self._index+1])]
                 self._index += 1
+            elif self.ACTIONS[self._index] == 'A':
+                self._logger.debug("Function: %s", self.ACTIONS[self._index])
+                self._function = Function.AWAY
+                self.ACTIONS = " "
+                # avoid repeating the test action
+            elif self.ACTIONS[self._index] == 'S':
+                self._logger.debug("Function: %s", self.ACTIONS[self._index])
+                self._function = Function.STAY
+                self.ACTIONS = " "
+                # avoid repeating the test action
             elif self.ACTIONS[self._index] != ' ':
                 self._logger.debug("Pressed: %s", self.ACTIONS[self._index])
                 self._keys.append(self.ACTIONS[self._index])

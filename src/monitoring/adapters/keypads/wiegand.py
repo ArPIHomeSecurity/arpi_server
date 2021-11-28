@@ -1,12 +1,19 @@
 
 import logging
+from re import compile
 from time import sleep
 
 from gpiozero import LED
 
-from monitoring.adapters.keypads.base import KeypadBase
+from monitoring.adapters.keypads.base import Function, KeypadBase
 from monitoring.constants import LOG_ADKEYPAD
 import wiegand_io as wr
+
+# Function key combinations
+ACTION_AWAY = "#1"
+ACTION_STAY = "#2"
+
+FUNCTION_REGEX = compile(r'([#]\d)')
 
 
 class WiegandKeypad(KeypadBase):
@@ -19,10 +26,14 @@ class WiegandKeypad(KeypadBase):
     def __init__(self, data0, data1, beeper):
         super(WiegandKeypad, self).__init__()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
-        self._beeper = LED(beeper)
         self._reader = wr.construct()
         wr.begin(self._reader, data0, data1)
         self._logger.info("Wiegand keypad created: %s", wr.isinitialized(self._reader))
+        self._function_mode = False
+
+        # initialize sound
+        self._beeper = LED(beeper)
+        self._beeper.on()
 
         # Cleanup before using
         wr.ReadData(self._reader)
@@ -58,21 +69,61 @@ class WiegandKeypad(KeypadBase):
             self._card = str(int(binary_data, 2))
             self._logger.debug("Using card: %s", self._card)
         else:
-            self._keys += self.decode_keys(binary_data, bits)
-            self._logger.debug("Pressed key: %s", self._keys)
+            keys = self.decode_keys(binary_data, bits)
+            self._logger.debug("Pressed keys: %s", keys)
+            if self._function_mode:
+                # previous key was a #
+                # next key is the function
+                keys = list(filter(lambda k: k != '#', keys))
+                if keys:
+                    self.identify_function(f"#{keys[0]}")
+                    self._function_mode = False
+            elif ['#'] == keys:
+                # only a # pressed
+                self._logger.debug("Waiting for next key to identify the function...")
+                self._function_mode = True
+            elif '#' in keys:
+                # multiple keys pressed
+                matches = FUNCTION_REGEX.search(''.join(keys))
+                if matches:
+                    # use only the first match
+                    action = matches.group()
+                    self.identify_function(action)
+                    self._function_mode = False
+                else:
+                    # no function number found => switch to function mode
+                    self._function_mode = True
+            else:
+                # normal key presses
+                self._keys += keys
+
+    def identify_function(self, action):
+        self._logger.debug("Detected action: %s", action)
+        if ACTION_AWAY == action:
+            self._function = Function.AWAY
+        elif ACTION_STAY == action:
+            self._function = Function.STAY
+        else:
+            self._logger.warning("Unknown function: %s", action)
 
     @staticmethod
     def decode_keys(binary, bits):
+        """
+        Reading multiple keys presses from the keypad.
+        """
         words = [binary[idx:idx+8] for idx in range(0, bits, 8)]
 
         keys = []
         for word in words:
             for idx in range(8-min(8, bits), 7, 4):
                 if bits > 0:
-                    keys.append(str(int(word[idx:idx+4], 2)))
+                    key = int(word[idx:idx+4], 2)
+                    # replace number with character
+                    if key == 11:
+                        key = '#'
+                    elif key == 12:
+                        key = '*'
+                    keys.append(str(key))
                     bits -= 4
 
         return keys
-
-    def get_function(self):
-        pass

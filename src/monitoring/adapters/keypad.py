@@ -13,7 +13,7 @@ from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
 from monitoring import storage
-from monitoring.adapters.keypads.base import Action, KeypadBase
+from monitoring.adapters.keypads.base import Action, Function, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
 from monitoring.constants import (
@@ -176,8 +176,7 @@ class KeypadHandler(Thread):
                     else:
                         self.handle_card(self._keypad.get_card())
                 elif action == Action.FUNCTION:
-                    # function = self._keypad.get_function()
-                    pass
+                    self.handle_function(self._keypad.get_function())
                 elif action is not None:
                     self._logger.error("Uknown keypad action: %s", action)
 
@@ -236,6 +235,14 @@ class KeypadHandler(Thread):
         else:
             self._logger.info("Unknown card")
             self._keypad.set_error(True)
+
+    def handle_function(self, function: Function):
+        if Function.AWAY == function:
+            self._broadcaster.send_message({"action": MONITOR_ARM_AWAY})
+        elif Function.STAY == function:
+            self._broadcaster.send_message({"action": MONITOR_ARM_STAY})
+        else:
+            self._logger.error("Unknown function: %s", function)
 
     def get_user_by_access_code(self, code) -> Boolean:
         db_session = self.get_database_session()
