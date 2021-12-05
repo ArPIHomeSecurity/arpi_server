@@ -4,10 +4,11 @@ from re import compile
 from time import sleep
 
 from gpiozero import LED
+from pywiegand import WiegandReader
 
 from monitoring.adapters.keypads.base import Function, KeypadBase
 from monitoring.constants import LOG_ADKEYPAD
-import wiegand_io as wr
+
 
 # Function key combinations
 ACTION_AWAY = "#1"
@@ -26,17 +27,13 @@ class WiegandKeypad(KeypadBase):
     def __init__(self, data0, data1, beeper):
         super(WiegandKeypad, self).__init__()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
-        self._reader = wr.construct()
-        wr.begin(self._reader, data0, data1)
-        self._logger.info("Wiegand keypad created: %s", wr.isinitialized(self._reader))
+        self._reader = WiegandReader(data0, data1)
+        self._logger.info("Wiegand keypad created: %s", self._reader.is_initialized())
         self._function_mode = False
 
         # initialize sound
         self._beeper = LED(beeper)
         self._beeper.on()
-
-        # Cleanup before using
-        wr.ReadData(self._reader)
 
     def set_error(self, state: bool):
         self.beeps(3, 0.1, 0.1)
@@ -58,18 +55,18 @@ class WiegandKeypad(KeypadBase):
     def communicate(self):
         self.manage_delay()
 
-        pending = wr.GetPendingBitCount(self._reader)
-        if pending == 0:
+        pending_bits = self._reader.get_pending_bit_count()
+        if pending_bits == 0:
             return
 
-        binary_data, bits = wr.ReadData(self._reader)
-        self._logger.debug("Wiegand(Data:%s Bit count:%s Pending: %s)", binary_data, bits, pending)
+        data = self._reader.read()
+        self._logger.debug("Wiegand(Data:%s Bit count:%s)", data, pending_bits)
 
-        if bits in (26, 34):
-            self._card = str(int(binary_data, 2))
+        if pending_bits in (26, 34):
+            self._card = data
             self._logger.debug("Using card: %s", self._card)
         else:
-            keys = self.decode_keys(binary_data, bits)
+            keys = data
             self._logger.debug("Pressed keys: %s", keys)
             if self._function_mode:
                 # previous key was a #
