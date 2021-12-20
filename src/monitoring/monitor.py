@@ -155,11 +155,14 @@ class Monitor(Thread):
             storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
 
         storage.set(storage.ARM_STATE, arm_type)
+        self._logger.debug("Arm with delay: %s / %s", arm_delay, arm_type)
         if arm_delay is not None:
-            self._logger.debug("Arm with delay: %s / %s", arm_delay, arm_type)
             storage.set(storage.MONITORING_STATE, MONITORING_ARM_DELAY)
             self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
+        else:
+            storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
+
         self._stop_alert.clear()
 
     def disarm_monitoring(self, user_id, keypad_id):

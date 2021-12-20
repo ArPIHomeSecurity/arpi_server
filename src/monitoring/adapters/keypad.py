@@ -192,7 +192,7 @@ class KeypadHandler(Thread):
             arm = self.get_database_session().query(Arm).filter_by(end_time=None).first()
         self._logger.debug("Arm: %s", arm)
 
-        if arm_delay and arm_delay > 0:
+        if arm_delay is not None and arm_delay > 0:
             self._keypad.start_delay(arm.start_time, arm_delay)
 
     def alert_delay(self):
@@ -237,6 +237,7 @@ class KeypadHandler(Thread):
             self._keypad.set_error(True)
 
     def handle_function(self, function: Function):
+        self._logger.debug("Handling function: %s", function)
         if Function.AWAY == function:
             self._broadcaster.send_message({"action": MONITOR_ARM_AWAY})
         elif Function.STAY == function:
