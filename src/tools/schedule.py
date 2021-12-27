@@ -31,13 +31,14 @@ def enable_dyndns_job(enable=True):
         return
 
     jobs = list(argus_cron.find_command("argus_dyndns"))
-    job = jobs[0] if len(jobs) > 0 else None
+    job = jobs[0] if jobs else None
     if job is None:
         job = argus_cron.new(
             command=dyndns_job,
             comment="Update the IP address at the dynamic DNS provider",
         )
-        job.hours.every(1)
+
+    job.hours.every(1)
     job.enable(enable)
     argus_cron.write()
 
@@ -50,12 +51,13 @@ def enable_certbot_job(enable=True):
         return
 
     jobs = list(root_cron.find_command("argus_certbot"))
-    job = jobs[0] if len(jobs) > 0 else None
+    job = jobs[0] if jobs else None
     if job is None:
         job = root_cron.new(
             command=certbot_job,
             comment="Generate or update certificate with certbot",
         )
-        job.day.every(1)
+
+    job.day.every(1)
     job.enable(enable)
     root_cron.write()
