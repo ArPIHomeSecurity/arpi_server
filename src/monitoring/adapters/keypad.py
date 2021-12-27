@@ -225,7 +225,7 @@ class KeypadHandler(Thread):
             return
 
         db_card = self.get_card_by_number(card)
-        if db_card:
+        if db_card and db_card.enabled:
             self._logger.info("Accepted card => disarming")
             self._broadcaster.send_message(message={
                 "action": MONITOR_DISARM,
@@ -254,7 +254,7 @@ class KeypadHandler(Thread):
         self._logger.debug("User access code %s/%s in %s", code, code_hash, [u.fourkey_code for u in users])
         return next(filter(lambda u: u.fourkey_code == code_hash, users), None)
 
-    def get_card_by_number(self, number) -> Boolean:
+    def get_card_by_number(self, number) -> Card:
         db_session = self.get_database_session()
         users = db_session.query(User).all()
 
