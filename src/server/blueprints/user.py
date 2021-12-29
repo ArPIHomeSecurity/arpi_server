@@ -142,7 +142,8 @@ def authenticate():
             "user_token": generate_user_token(user.id, user.name, user.role, request.environ["HTTP_ORIGIN"]),
         })
     elif not user:
-        return jsonify({"error": f"invalid user id: {device_token['user_id']}"}), 400
+        current_app.logger.warn("Invalid user id %s", device_token["user_id"])
+        return jsonify({"error": "invalid user id"}), 400
 
     return jsonify(False)
 
