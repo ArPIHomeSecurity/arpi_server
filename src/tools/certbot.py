@@ -82,6 +82,9 @@ class Certbot:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
             else:
                 self._logger.info("Certificate renewed")
+
+            self.restart_nginx()
+
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
