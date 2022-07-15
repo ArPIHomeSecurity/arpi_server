@@ -19,7 +19,7 @@ from stringcase import camelcase, snakecase
 
 
 def hash_code(access_code):
-    return hashlib.sha256((access_code + ":" + os.environ.get("SALT")).encode("utf-8")).hexdigest()
+    return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
 
 
 def convert2camel(data):
@@ -41,16 +41,13 @@ class BaseModel(Base):
 
     def __repr__(self):
         """Define a base way to print models"""
-        return "%s(%s)" % (self.__class__.__name__, {column: value for column, value in self.__dict__.items()})
+        return f"{self.__class__.__name__}({dict(self.__dict__.items())})"
 
     def json(self):
         """
         Define a base way to jsonify models, dealing with datetime objects
         """
-        return {
-            column: value if not isinstance(value, date) else value.strftime("%Y-%m-%d")
-            for column, value in self.__dict__.items()
-        }
+        return {column: value.strftime("%Y-%m-%d") if isinstance(value, date) else value for column, value in self.__dict__.items()}
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -393,7 +390,7 @@ class Card(BaseModel):
     @staticmethod
     def generate_card_description():
         """Example: 2021-10-30_08:15_284"""
-        return f"{dt.now().isoformat().replace('T', '_')[0:16]}_{str(uuid.uuid1(1000).int)[:3]}"
+        return f"{dt.now().isoformat().replace('T', '_')[:16]}_{str(uuid.uuid1(1000).int)[:3]}"
 
     def update(self, data):
         fields = ("enabled", "description")

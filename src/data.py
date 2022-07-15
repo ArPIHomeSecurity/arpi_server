@@ -24,7 +24,7 @@ session = Session()
 def cleanup():
     print("Clean up database...")
     for table in reversed(metadata.sorted_tables):
-        print(" - Clear table %s" % table)
+        print(f" - Clear table {table}")
         try:
             session.execute(table.delete())
             session.commit()
@@ -143,23 +143,19 @@ def env_admin_registration():
 
 
 def main():
-    environments = [
-        attribute.replace("env_", "")
-        for attribute, value in globals().items()
-        if attribute.startswith("env_")
-    ]
+    environments = [attribute.replace("env_", "") for attribute in globals() if attribute.startswith("env_")]
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")
-    parser.add_argument("-c", "--create", metavar="environment",
-                        help="Create database content (environments: {})".format(", ".join(environments)))
+    parser.add_argument("-c", "--create", metavar="environment", help=f'Create database content (environments: {", ".join(environments)})')
+
     args = parser.parse_args()
 
     if args.delete:
         cleanup()
 
     if args.create:
-        create_method = globals()["env_" + args.create]
+        create_method = globals()[f"env_{args.create}"]
         print("Creating '%s' environment..." % args.create)
         create_method()
         print("Environment created")

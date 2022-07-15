@@ -62,11 +62,10 @@ class SensorAdapter(object):
             return 0
 
     def get_values(self):
-        """Get the values from all the channels"""
-        values = []
-        for channel in self._channels:
-            values.append(channel.value)
-        return values
+        """
+        Get the values from all the channels
+        """
+        return [channel.value for channel in self._channels]
 
     @property
     def channel_count(self):

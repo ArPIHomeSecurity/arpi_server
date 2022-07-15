@@ -215,10 +215,11 @@ class Monitor(Thread):
         channels = set()
         for sensor in self._sensors:
             if sensor.channel in channels:
-                self._logger.debug("Channels: %s", channels)
+                self._logger.debug(f"Channel already in use: {sensor.channel}")
                 return False
             else:
                 channels.add(sensor.channel)
+                self._logger.debug(f"Channel added: {sensor.channel}")
 
         self._logger.debug("Channels: %s", channels)
         return True

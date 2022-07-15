@@ -39,7 +39,11 @@ class PowerAdapter(object):
         self._logger.debug("Power sense on BCM1 creating...")
         # the sense is on the last channel
         self._sense = MCP3008(
-            channel=7, clock_pin=SPI_CLK, mosi_pin=SPI_MOSI, miso_pin=SPI_MISO, select_pin=PowerAdapter.SPI_CS
+            channel=7,
+            clock_pin=SPI_CLK,
+            mosi_pin=SPI_MOSI,
+            miso_pin=SPI_MISO,
+            select_pin=PowerAdapter.SPI_CS
         )
 
     @property
