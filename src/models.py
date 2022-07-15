@@ -11,7 +11,7 @@ from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTi
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.schema import ForeignKey
 from sqlalchemy.orm import relationship, backref
-from monitoring.constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_DISARM, ARM_STAY
+from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_DISARM, ARM_STAY
 
 from tools.dictionary import merge_dicts, filter_keys
 from sqlalchemy.orm.mapper import validates

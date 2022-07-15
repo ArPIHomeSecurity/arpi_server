@@ -11,7 +11,7 @@ import os
 from gsmmodem.modem import GsmModem
 from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmeError, CmsError, CommandError
 from models import Option
-from monitoring.constants import LOG_ADGSM
+from constants import LOG_ADGSM
 from monitoring.database import Session
 from time import sleep
 

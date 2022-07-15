@@ -6,7 +6,7 @@ from time import sleep
 
 from monitoring.adapters.keypad import KeypadHandler
 from monitoring.broadcast import Broadcaster
-from monitoring.constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP
+from constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP
 from monitoring.ipc import IPCServer
 from monitoring.monitor import Monitor
 from monitoring.notifications.notifier import Notifier

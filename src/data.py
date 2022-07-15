@@ -4,7 +4,7 @@ import argparse
 
 from sqlalchemy.exc import ProgrammingError
 
-from monitoring.constants import ROLE_ADMIN, ROLE_USER
+from constants import ROLE_ADMIN, ROLE_USER
 
 from models import Keypad, KeypadType, Sensor, SensorType, User, Zone
 from monitoring.database import Session

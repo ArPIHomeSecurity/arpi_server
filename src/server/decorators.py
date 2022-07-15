@@ -13,7 +13,7 @@ from jose import jwt
 import jose
 
 from models import Option
-from monitoring.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.database import db
 
 

@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime as dt, timedelta
 import logging
 
@@ -13,7 +14,7 @@ from monitoring import storage
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
 from monitoring.broadcast import Broadcaster
-from monitoring.constants import (
+from constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
     ALERT_STAY,
@@ -106,9 +107,9 @@ class Monitor(Thread):
         self.load_sensors()
 
         while True:
-            try:
+            with contextlib.suppress(Empty):
                 message = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
-                self._logger.debug("Action: %s" % message)
+                self._logger.debug(f"Action: {message}")
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
@@ -124,8 +125,6 @@ class Monitor(Thread):
                     continue
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self.load_sensors()
-            except Empty:
-                pass
 
             self.check_power()
             self.scan_sensors()
@@ -185,8 +184,8 @@ class Monitor(Thread):
                             MONITORING_ARMED,
                             MONITORING_ALERT_DELAY,
                             MONITORING_ALERT)
-                        and current_arm in (ARM_AWAY, ARM_STAY)
-                        or current_state == MONITORING_SABOTAGE
+            and current_arm in (ARM_AWAY, ARM_STAY)
+            or current_state == MONITORING_SABOTAGE
         ):
             storage.set(storage.ARM_STATE, ARM_DISARM)
             storage.set(storage.MONITORING_STATE, MONITORING_READY)
@@ -411,6 +410,7 @@ class Monitor(Thread):
                     self._alerts[sensor.id]["alert"].start()
                     self._stop_alert.clear()
                     changes = True
+
             # stop alert
             elif not sensor.alert and sensor.id in self._alerts:
                 # TODO: check if removing SensorAlert will block alerting

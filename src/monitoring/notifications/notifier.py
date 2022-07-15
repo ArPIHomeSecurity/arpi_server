@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ from time import sleep
 
 from models import Option
 from monitoring.broadcast import Broadcaster
-from monitoring.constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
+from constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
 from monitoring.database import Session
 from monitoring.notifications.templates import (
     ALERT_STARTED_EMAIL,
@@ -121,11 +122,8 @@ class Notifier(Thread):
         self._gsm.setup()
         while True:
             message = None
-            try:
+            with contextlib.suppress(Empty):
                 message = self._actions.get(timeout=Notifier.RETRY_WAIT)
-            except Empty:
-                # self._logger.debug("No message found")
-                pass
 
             # handle monitoring and notification actions
             if message and "action" in message:
@@ -157,7 +155,7 @@ class Notifier(Thread):
         for section_name in ("email", "gsm", "subscriptions"):
             section = self._db_session.query(Option).filter_by(name="notifications", section=section_name).first()
             options[section_name] = json.loads(section.value) if section else ""
-        self._logger.debug("Notifier loaded subscriptions: {}".format(options))
+        self._logger.debug(f"Notifier loaded subscriptions: {options}")
         return options
 
     def send_message(self, message):

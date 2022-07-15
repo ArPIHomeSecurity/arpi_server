@@ -3,7 +3,7 @@ from flask import jsonify, request, current_app
 from flask.helpers import make_response
 from models import Sensor, SensorType, Zone
 
-from monitoring.constants import ROLE_USER
+from constants import ROLE_USER
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host

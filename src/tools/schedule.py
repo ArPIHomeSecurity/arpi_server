@@ -7,7 +7,7 @@ import logging
 
 from crontab import CronTab
 
-from monitoring.constants import LOG_IPC
+from constants import LOG_IPC
 
 
 dyndns_job = (

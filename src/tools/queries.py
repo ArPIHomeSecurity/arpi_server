@@ -4,7 +4,7 @@ from sqlalchemy.sql.expression import false, true
 from sqlalchemy.sql.functions import func
 from models import Sensor, Zone
 
-from monitoring.constants import ARM_AWAY, ARM_STAY, LOG_MONITOR
+from constants import ARM_AWAY, ARM_STAY, LOG_MONITOR
 
 
 logger = logging.getLogger(LOG_MONITOR)

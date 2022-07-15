@@ -12,7 +12,7 @@ from jose import jwt
 import jose.exceptions
 
 from models import Option
-from monitoring.constants import LOG_SOCKETIO
+from constants import LOG_SOCKETIO
 from monitoring.database import Session
 
 

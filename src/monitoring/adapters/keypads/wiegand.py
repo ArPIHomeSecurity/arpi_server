@@ -7,7 +7,7 @@ from gpiozero import LED
 from pywiegand import WiegandReader
 
 from monitoring.adapters.keypads.base import Function, KeypadBase
-from monitoring.constants import LOG_ADKEYPAD
+from constants import LOG_ADKEYPAD
 
 
 # Function key combinations

@@ -9,7 +9,7 @@ from threading import Event, Thread
 from tools.certbot import Certbot
 from tools.dyndns import DynDns
 from tools.schedule import enable_certbot_job, enable_dyndns_job
-from monitoring.constants import THREAD_SECCON, LOG_SECCON
+from constants import THREAD_SECCON, LOG_SECCON
 
 
 class SecureConnection(Thread):

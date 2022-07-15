@@ -1,14 +1,9 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:06:08
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:06:12
 import json
 import logging
 import socket
 from os import environ
 
-from monitoring.constants import (
+from constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_IPC,
@@ -56,7 +51,7 @@ class IPCClient(object):
         elif arm_type == ARM_STAY:
             return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id})
         else:
-            print("Unknown arm type: %s" % arm_type)
+            print(f"Unknown arm type: {arm_type}")
 
     def get_state(self):
         return self._send_message({"action": MONITOR_GET_STATE})

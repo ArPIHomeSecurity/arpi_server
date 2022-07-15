@@ -1,6 +1,6 @@
 from flask.blueprints import Blueprint
 from flask import request
-from monitoring.constants import ROLE_USER
+from constants import ROLE_USER
 
 from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient

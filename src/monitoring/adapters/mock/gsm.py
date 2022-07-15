@@ -7,7 +7,7 @@
 import logging
 import os
 
-from monitoring.constants import LOG_ADGSM
+from constants import LOG_ADGSM
 
 
 class GSM(object):

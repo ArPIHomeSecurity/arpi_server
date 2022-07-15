@@ -2,7 +2,7 @@ import logging
 from datetime import datetime as dt, timedelta
 from enum import Enum
 
-from monitoring.constants import LOG_ADKEYPAD
+from constants import LOG_ADKEYPAD
 
 
 class DelayPhase(Enum):

@@ -8,7 +8,7 @@ import logging
 import os
 
 from monitoring.adapters import SYREN_OUT
-from monitoring.constants import LOG_ADSYREN
+from constants import LOG_ADSYREN
 
 # check if running on Raspberry
 if os.uname()[4][:3] == "arm":

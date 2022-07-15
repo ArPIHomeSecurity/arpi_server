@@ -5,7 +5,7 @@ from time import sleep, time
 import RPi.GPIO as GPIO
 
 from monitoring.adapters.keypads.base import KeypadBase
-from monitoring.constants import LOG_ADKEYPAD
+from constants import LOG_ADKEYPAD
 
 # Magic numbers
 NULL = 0x00

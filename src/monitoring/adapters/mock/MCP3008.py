@@ -7,7 +7,7 @@
 import logging
 
 from time import time
-from monitoring.constants import LOG_ADSENSOR
+from constants import LOG_ADSENSOR
 
 
 class TimeBasedMockMCP3008(object):

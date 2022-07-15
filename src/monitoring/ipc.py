@@ -4,6 +4,7 @@
 # @Last Modified by:   Gábor Kovács
 # @Last Modified time: 2021-02-25 20:07:45
 
+import contextlib
 import json
 import logging
 import socket
@@ -13,7 +14,7 @@ from grp import getgrnam
 from threading import Thread
 
 from monitoring import storage
-from monitoring.constants import (
+from constants import (
     LOG_IPC,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
@@ -66,10 +67,8 @@ class IPCServer(Thread):
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.settimeout(1.0)
 
-        try:
+        with contextlib.suppress(OSError):
             remove(MONITOR_INPUT_SOCKET)
-        except OSError:
-            pass
 
         self.create_socket_file()
         self._socket.bind(MONITOR_INPUT_SOCKET)
@@ -137,10 +136,8 @@ class IPCServer(Thread):
         # read all the messages
         while not self._stop_event.is_set():
             connection = None
-            try:
+            with contextlib.suppress(socket.timeout):
                 connection, _ = self._socket.accept()
-            except socket.timeout:
-                pass
 
             # read all the parts of a messages
             while connection:
@@ -153,17 +150,11 @@ class IPCServer(Thread):
 
                 response = self.handle_actions(json.loads(data.decode()))
 
-                try:
+                with contextlib.suppress(BrokenPipeError):
                     connection.send(json.dumps(response).encode())
-                except BrokenPipeError:
-                    pass
-
             if connection:
                 connection.close()
 
-        try:
+        with contextlib.suppress(FileNotFoundError):
             remove(MONITOR_INPUT_SOCKET)
-        except FileNotFoundError:
-            pass
-
         self._logger.info("IPC server stopped")

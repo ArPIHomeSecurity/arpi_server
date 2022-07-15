@@ -16,7 +16,7 @@ from monitoring import storage
 from monitoring.adapters.keypads.base import Action, Function, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
-from monitoring.constants import (
+from constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_ADKEYPAD,

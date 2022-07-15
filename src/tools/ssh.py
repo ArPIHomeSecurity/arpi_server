@@ -7,7 +7,7 @@ import json
 import logging
 from pydbus import SystemBus
 from models import Option
-from monitoring.constants import LOG_SC_ACCESS
+from constants import LOG_SC_ACCESS
 
 from gi.repository import GLib
 

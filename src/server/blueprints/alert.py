@@ -2,7 +2,7 @@ from flask.blueprints import Blueprint
 from flask import jsonify
 from models import Alert
 
-from monitoring.constants import ROLE_USER
+from constants import ROLE_USER
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 

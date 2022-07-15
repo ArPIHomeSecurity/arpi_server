@@ -12,7 +12,7 @@ from monitoring.broadcast import Broadcaster
 from monitoring.database import Session
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import send_syren_state, send_alert_state
-from monitoring.constants import (
+from constants import (
     ALERT_SABOTAGE,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,

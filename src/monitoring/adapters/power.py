@@ -8,7 +8,7 @@ import os
 import logging
 
 from monitoring.adapters import SPI_CLK, SPI_MISO, SPI_MOSI
-from monitoring.constants import LOG_ADPOWER
+from constants import LOG_ADPOWER
 
 # check if running on Raspberry
 if os.uname()[4][:3] == "arm":

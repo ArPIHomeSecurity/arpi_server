@@ -14,7 +14,7 @@ from pathlib import Path, PosixPath
 from pydbus import SystemBus
 
 from models import Option
-from monitoring.constants import LOG_SC_CERTBOT
+from constants import LOG_SC_CERTBOT
 from monitoring.database import Session
 from tools.dictionary import filter_keys
 

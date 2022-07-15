@@ -2,7 +2,7 @@ from flask.blueprints import Blueprint
 from flask import jsonify, request
 from flask.helpers import make_response
 from models import Zone
-from monitoring.constants import ROLE_USER
+from constants import ROLE_USER
 
 from server.database import db
 from server.decorators import authenticated, restrict_host
