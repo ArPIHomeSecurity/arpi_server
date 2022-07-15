@@ -91,13 +91,17 @@ class SensorType(BaseModel):
 
 
 class Sensor(BaseModel):
-    """Model for the sensor table"""
+    """
+    Model for the sensor table
+
+    The disconnected channel value is "-1".
+    """
 
     __tablename__ = "sensor"
 
     id = Column(Integer, primary_key=True)
-    channel = Column(Integer, nullable=False)
-    reference_value = Column(Float)
+    channel = Column(Integer, nullable=True)
+    reference_value = Column(Float, nullable=True)
     alert = Column(Boolean, default=False)
     enabled = Column(Boolean, default=True)
     deleted = Column(Boolean, default=False)
@@ -119,6 +123,10 @@ class Sensor(BaseModel):
         self.deleted = False
 
     def update(self, data):
+        # reset reference value if channel changed
+        if data["channel"] != self.channel:
+            self.reference_value = None
+
         return self.update_record(("channel", "enabled", "description", "zone_id", "type_id"), data)
 
     @property
@@ -134,7 +142,7 @@ class Sensor(BaseModel):
 
     @validates("channel")
     def validates_channel(self, key, channel):
-        assert 0 <= channel <= int(os.environ["INPUT_NUMBER"]), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+        assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
         return channel
 
 

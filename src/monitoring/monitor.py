@@ -296,10 +296,17 @@ class Monitor(Thread):
 
     def save_sensor_references(self, references):
         for sensor in self._sensors:
+            # skip sensors without a channel
+            if sensor.channel == -1:
+                continue
+
             sensor.reference_value = references[sensor.channel]
             self._db_session.commit()
 
     def measure_sensor_references(self):
+        """
+        Retrieves a list of vales messuared on the all the channels.
+        """
         measurements = []
         for _ in range(MEASUREMENT_CYCLES):
             measurements.append(self._sensorAdapter.get_values())
@@ -322,7 +329,12 @@ class Monitor(Thread):
         changes = False
         found_alert = False
         for sensor in self._sensors:
+            # skip sensor without a channel
+            if sensor.channel == -1:
+                continue
+
             value = self._sensorAdapter.get_value(sensor.channel)
+
             # self._logger.debug("Sensor({}): R:{} -> V:{}".format(sensor.channel, sensor.reference_value, value))
             if not is_close(value, sensor.reference_value, TOLERANCE):
                 if not sensor.alert:

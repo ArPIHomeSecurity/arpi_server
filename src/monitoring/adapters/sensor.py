@@ -54,12 +54,13 @@ class SensorAdapter(object):
             )
 
     def get_value(self, channel):
-        """Get the value from one channel"""
-        if 0 <= channel <= 14:
-            # !!! channel numbering correction board numbering CH1..CH15 => array 0..14
-            return self._channels[channel].value
-        else:
-            return 0
+        """
+        Get the value from one channel
+
+        We have IO_NUMBER of channels we can use for sensors,
+        the last channel is for sensing the battery mode.
+        """
+        return self._channels[channel].value if 0 <= channel <= (self.IO_NUMBER - 1) else 0
 
     def get_values(self):
         """
