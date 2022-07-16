@@ -104,7 +104,7 @@ def authenticated(role=ROLE_ADMIN):
             auth_header = request.headers.get("Authorization")
             logger.debug("Header: %s", auth_header)
             remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
-            logger.debug("Request from '%s': '%s'", remote_address, request.json)
+            logger.debug("Request from '%s': '%s'", remote_address, request.get_json(silent=True))
 
             raw_token = auth_header.split(" ")[1] if auth_header else ""
             if raw_token:

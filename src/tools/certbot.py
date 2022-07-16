@@ -21,7 +21,7 @@ from tools.dictionary import filter_keys
 
 class Certbot:
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_SC_CERTBOT)
+        self._logger = logger or logging.getLogger(LOG_SC_CERTBOT)
         self._db_session = Session()
 
     def generate_certificate(self):

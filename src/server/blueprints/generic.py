@@ -43,7 +43,7 @@ def catch_all(path):
     # detect language from url path (en|hu)
     languages = os.environ["LANGUAGES"].split(" ")
     result = re.search("(" + "|".join(languages) + ")", path)
-    language = result.group(0) if result else ""
+    language = result[0] if result else ""
 
     current_app.logger.debug("Language: %s from %s", language or "No language in URL", languages)
 
