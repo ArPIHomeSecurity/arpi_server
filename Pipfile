@@ -3,6 +3,10 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[scripts]
+start-server = "flask run"
+start-monitor = "python -d -s -m monitoring"
+
 [packages]
 eventlet = "==0.32.0"
 flask = "==2.0.1"
