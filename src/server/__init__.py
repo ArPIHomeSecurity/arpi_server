@@ -20,6 +20,12 @@ from server.database import db
 
 
 app = Flask(__name__)
+
+# enable CORS if necessary (in development)
+if environ.get("FLASK_CORS", False):
+    from flask_cors import CORS
+    CORS(app, expose_headers=["User-Token"])
+
 app.config["WEBAPP_SOURCE"] = path.join(getcwd(), environ.get("SERVER_STATIC_FOLDER", ""))
 app.logger.debug("Web application folder: %s", app.config["WEBAPP_SOURCE"])
 app.logger.debug("App name: %s", __name__)
@@ -58,3 +64,13 @@ app.register_blueprint(zone_blueprint)
 @app.errorhandler(AssertionError)
 def handle_validation_errors(error):
     return jsonify({"error": str(error)}), 400
+
+
+@app.errorhandler(404)
+def invalid_route(e):
+    return "Invalid route", 404
+
+
+@app.errorhandler(Exception)
+def all_exception_handler(error):
+    return 'Error', 500

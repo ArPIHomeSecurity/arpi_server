@@ -28,6 +28,7 @@ pywiegand="==0.4.2"
 flake8 = "*"
 rope = "*"
 black = "*"
+flask-cors = "*"
 
 [requires]
 python_version = "3.9"

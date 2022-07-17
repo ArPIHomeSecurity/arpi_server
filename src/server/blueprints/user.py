@@ -68,7 +68,7 @@ def user(user_id):
 def registration_code(user_id):
     remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     current_app.logger.debug(
-        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.json
+        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.get_json(silent=True)
     )
 
     if request.method == "GET":
