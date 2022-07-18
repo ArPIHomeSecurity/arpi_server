@@ -1,5 +1,5 @@
 import logging
-from os import environ, path, getcwd
+from os import environ
 
 from flask import Flask, jsonify
 from flask_migrate import Migrate
@@ -26,8 +26,6 @@ if environ.get("FLASK_CORS", False):
     from flask_cors import CORS
     CORS(app, expose_headers=["User-Token"])
 
-app.config["WEBAPP_SOURCE"] = path.join(getcwd(), environ.get("SERVER_STATIC_FOLDER", ""))
-app.logger.debug("Web application folder: %s", app.config["WEBAPP_SOURCE"])
 app.logger.debug("App name: %s", __name__)
 
 if __name__ != "server":
