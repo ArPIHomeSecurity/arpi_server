@@ -79,8 +79,8 @@ class SyrenAlert(Thread):
     """
 
     # default timing
-    ALERT_TIME = 600  # 10 minutes
-    SUSPEND_TIME = 300  # 5 minutes
+    ALERT_TIME = 10  # 10 minutes
+    SUSPEND_TIME = 5  # 5 minutes
 
     _semaphore = BoundedSemaphore()
     _alert: Alert = None
@@ -114,23 +114,20 @@ class SyrenAlert(Thread):
 
         self.start_alert()
         start_time = time()
-        sysren_is_on = True
-        while not self._stop_event.is_set():
-            if self._stop_event.wait(timeout=1):
-                break
-
+        syren_is_on = True
+        while not self._stop_event.is_set() and not self._stop_event.wait(timeout=1):
             now = time()
-            if (now - start_time > SyrenAlert.ALERT_TIME) and sysren_is_on:
+            if (now - start_time > SyrenAlert.ALERT_TIME) and syren_is_on:
                 start_time = time()
-                sysren_is_on = False
-                self._syren.alert(sysren_is_on)
-                send_syren_state(sysren_is_on)
+                syren_is_on = False
+                self._syren.alert(syren_is_on)
+                send_syren_state(syren_is_on)
                 self._logger.info("Syren suspended")
-            elif (now - start_time > SyrenAlert.SUSPEND_TIME) and not sysren_is_on:
+            elif (now - start_time > SyrenAlert.SUSPEND_TIME) and not syren_is_on:
                 start_time = time()
-                sysren_is_on = True
-                self._syren.alert(sysren_is_on)
-                send_syren_state(sysren_is_on)
+                syren_is_on = True
+                self._syren.alert(syren_is_on)
+                send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
 
             self.handle_sensors()
@@ -139,11 +136,11 @@ class SyrenAlert(Thread):
         self._db_session.close()
 
     def load_syren_config(self):
-        syren_config = self._db_session.query(Option).filter_by(name="sysren", section="timing").first()
+        syren_config = self._db_session.query(Option).filter_by(name="syren", section="timing").first()
         if syren_config:
             syren_config = json.loads(syren_config.value)
         else:
-            self._logger.error("Missing syren settings!")
+            self._logger.warn("Missing syren settings!")
             return
 
         SyrenAlert.ALERT_TIME = syren_config["alert_time"]
