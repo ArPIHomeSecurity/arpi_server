@@ -15,7 +15,7 @@ if os.uname()[4][:3] == "arm":
     from gpiozero import MCP3008
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitoring.adapters.mock.MCP3008 import DoubleAlertMCP3008 as MCP3008
+    from monitoring.adapters.mock.MCP3008 import Channels as MCP3008
 
 
 class SensorAdapter(object):
