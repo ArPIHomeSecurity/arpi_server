@@ -69,7 +69,6 @@ class Calculator(GridView):
     CHANNEL_LOW = 0.247828446754
     CHANNEL_HIGH = 0.727374223523
     channels = {
-        "CH00": CHANNEL_LOW,
         "CH01": CHANNEL_LOW,
         "CH02": CHANNEL_LOW,
         "CH03": CHANNEL_LOW,
@@ -120,7 +119,7 @@ class Calculator(GridView):
         # Make all the buttons
         self.buttons = {
             name: make_button(f"CH{int(name):02d}", self.DARK)
-            for name in "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15".split(",")
+            for name in "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15".split(",")
         }
 
         self.power_button = Button(FigletText("POWER"), style=self.DARK, name="POWER")
@@ -131,8 +130,8 @@ class Calculator(GridView):
         self.grid.set_align("center", "center")
 
         # Create rows / columns / areas
-        self.grid.add_column("col", max_size=30, repeat=8)
-        self.grid.add_row("numbers", max_size=15, repeat=2)
+        self.grid.add_column("col", max_size=30, repeat=5)
+        self.grid.add_row("numbers", max_size=15, repeat=3)
         self.grid.add_row("power", max_size=15, repeat=1)
         self.grid.add_areas(
             numbers="col1-start|col3-end,numbers",
