@@ -72,13 +72,14 @@ class Notifier(Thread):
     MAX_RETRY = 5
     RETRY_WAIT = 30
 
-    _notifications = []
+    _notifications = Queue()
 
     # TODO: consider instead of calling these methods to be notified with actions
     # and retrieve information from the database
     @classmethod
     def notify_alert_started(cls, alert_id, sensors, time):
-        cls._notifications.append({
+        logging.getLogger(LOG_NOTIFIER).debug("Message adding (start): %s", alert_id)
+        cls._notifications.put({
                 "type": ALERT_STARTED,
                 "id": alert_id,
                 "sensors": sensors,
@@ -88,7 +89,8 @@ class Notifier(Thread):
 
     @classmethod
     def notify_alert_stopped(cls, alert_id, time):
-        cls._notifications.append({
+        logging.getLogger(LOG_NOTIFIER).debug("Message adding (stop): %s", alert_id)
+        cls._notifications.put({
             "type": ALERT_STOPPED,
             "id": alert_id,
             "time": time,
@@ -101,7 +103,6 @@ class Notifier(Thread):
         self._broadcaster = broadcaster
         self._logger = logging.getLogger(LOG_NOTIFIER)
         self._gsm = GSM()
-        self._notifications = []
         self._options = None
         self._db_session = None
 
@@ -125,8 +126,8 @@ class Notifier(Thread):
             with contextlib.suppress(Empty):
                 message = self._actions.get(timeout=Notifier.RETRY_WAIT)
 
-            # handle monitoring and notification actions
-            if message and "action" in message:
+            if message is not None:
+                # handle monitoring and notification actions
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
@@ -135,12 +136,13 @@ class Notifier(Thread):
                     self._gsm = GSM()
                     self._gsm.setup()
 
-            # try to send the message but not forever
-            if len(self._notifications) > 0:
-                notification = self._notifications[0]
-                if self.send_message(message):
-                    self._notifications.pop(0)
+            if len(self._notifications.queue) > 0:
+                notification = self._notifications.queue[0]
+                if self.send_message(notification):
+                    # send succeeded
+                    self._notifications.queue.popleft()
                 else:
+                    # send failed
                     notification["retry"] += 1
                     if notification["retry"] >= Notifier.MAX_RETRY:
                         self._logger.debug(
