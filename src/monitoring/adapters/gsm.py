@@ -89,6 +89,7 @@ class GSM(object):
 
     def destroy(self):
         if self._modem is not None:
+            self._logger.debug("Closing modem")
             self._modem.close()
 
     def sendSMS(self, phone_number, message):
@@ -109,20 +110,21 @@ class GSM(object):
             return False
         except TimeoutException:
             self._logger.error(
-                ("Network signal strength is not sufficient," " please adjust modem position/antenna and try again.")
+                "Network signal strength is not sufficient, "
+                "please adjust modem position/antenna and try again."
             )
             return False
-        else:
-            try:
-                self._modem.sendSms(phone_number, message)
-            except TimeoutException:
-                self._logger.error("Failed to send message: the send operation timed out")
-                return False
-            except CmsError as error:
-                self._logger.error("Failed to send message: %s", error)
-                return False
-            else:
-                self._logger.debug("Message sent.")
-                return True
 
-        return False
+        try:
+            self._logger.info("Sending SMS to %s", phone_number)
+            self._logger.debug("Sending message %s", message)
+            self._modem.sendSms(phone_number, message)
+        except TimeoutException:
+            self._logger.error("Failed to send message: the send operation timed out")
+            return False
+        except CmsError as error:
+            self._logger.error("Failed to send message: %s", error)
+            return False
+
+        self._logger.debug("SMS sent")
+        return True
