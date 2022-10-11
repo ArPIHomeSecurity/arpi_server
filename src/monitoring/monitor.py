@@ -113,9 +113,9 @@ class Monitor(Thread):
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
-                    self.arm_monitoring(ARM_AWAY, message.get("user_id", None), message.get("keypad_id", None))
+                    self.arm_monitoring(ARM_AWAY, message.get("user_id", None), message.get("keypad_id", None), message.get("delay", True))
                 elif message["action"] == MONITOR_ARM_STAY:
-                    self.arm_monitoring(ARM_STAY, message.get("user_id", None), message.get("keypad_id", None))
+                    self.arm_monitoring(ARM_STAY, message.get("user_id", None), message.get("keypad_id", None), message.get("delay", True))
                 elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
                     if self._delay_timer:
                         self._delay_timer.cancel()
@@ -134,7 +134,7 @@ class Monitor(Thread):
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
-    def arm_monitoring(self, arm_type, user_id, keypad_id):
+    def arm_monitoring(self, arm_type, user_id, keypad_id, delay):
         self._db_session.add(
             Arm(
                 arm_type=arm_type,
@@ -147,7 +147,7 @@ class Monitor(Thread):
         self._db_session.commit()
 
         # get max delay of arm
-        arm_delay = get_arm_delay(self._db_session, arm_type)
+        arm_delay = get_arm_delay(self._db_session, arm_type) if delay else None
 
         def stop_arm_delay():
             self._logger.debug("End arm delay => armed!!!")

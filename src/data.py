@@ -122,7 +122,8 @@ def env_test_01():
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
-    session.add_all([kt1, kt2])
+    kt3 = KeypadType(3, "MOCK", "MOCK keypad")
+    session.add_all([kt1, kt2, kt3])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)

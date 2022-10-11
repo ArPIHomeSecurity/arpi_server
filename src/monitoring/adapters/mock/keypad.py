@@ -29,7 +29,7 @@ class MockKeypad(KeypadBase):
         self._start = time()
 
     def initialise(self):
-        self._logger.debug("Keypad initialised")
+        self._logger.debug("Keypad initialized")
 
     def beeps(self, count, beep, mute):
         for _ in range(count):

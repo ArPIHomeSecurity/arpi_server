@@ -47,9 +47,9 @@ class IPCClient(object):
 
     def arm(self, arm_type, user_id):
         if arm_type == ARM_AWAY:
-            return self._send_message({"action": MONITOR_ARM_AWAY, "user_id": user_id})
+            return self._send_message({"action": MONITOR_ARM_AWAY, "user_id": user_id, "delay": False})
         elif arm_type == ARM_STAY:
-            return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id})
+            return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id, "delay": False})
         else:
             print(f"Unknown arm type: {arm_type}")
 

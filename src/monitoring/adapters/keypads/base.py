@@ -35,10 +35,7 @@ class KeypadBase(ABC):
         self._db_session = None
 
     def get_last_key(self):
-        if self._keys:
-            return self._keys.pop(0)
-        else:
-            return None
+        return self._keys.pop(0) if self._keys else None
 
     def get_card(self):
         card = self._card

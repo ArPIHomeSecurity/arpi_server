@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 
@@ -94,10 +95,16 @@ class KeypadHandler(Thread):
         if os.uname()[4][:3] != "arm":
             self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
             keypad_settings.type.name = "MOCK"
+            # see data.py -=> env_test_01
+            keypad = db_session.query(Keypad).filter_by(type_id=3).first()
+            if keypad:
+                self._keypad._id = keypad.id
         elif keypad_settings.type.name == "DSC":
             self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+            self._keypad._id = keypad_settings.id
         elif keypad_settings.type.name == "WIEGAND":
             self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN0, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN2)
+            self._keypad._id = keypad_settings.id
         else:
             self._logger.error("Unknown keypad type: %s", keypad_settings.type.name)
         self._logger.debug("Keypad created type: %s", keypad_settings.type.name)
@@ -124,7 +131,7 @@ class KeypadHandler(Thread):
         presses = ""
         register_card = False
         while True:
-            try:
+            with contextlib.suppress(Empty):
                 self._logger.debug("Wait for command...")
                 message = self._actions.get(timeout=COMMUNICATION_PERIOD)
                 self._logger.debug("Command: %s", message)
@@ -136,9 +143,9 @@ class KeypadHandler(Thread):
                 elif message["action"] == MONITOR_REGISTER_CARD:
                     register_card = True
                 elif message["action"] == MONITOR_ARM_AWAY and self._keypad:
-                    self.arm_keypad(ARM_AWAY)
+                    self.arm_keypad(ARM_AWAY, message.get("delay", True))
                 elif message["action"] == MONITOR_ARM_STAY and self._keypad:
-                    self.arm_keypad(ARM_STAY)
+                    self.arm_keypad(ARM_STAY, message.get("delay", True))
                 elif message["action"] == MONITORING_ALERT and self._keypad:
                     self._keypad.stop_delay()
                 elif message["action"] == MONITORING_ALERT_DELAY and self._keypad:
@@ -149,8 +156,6 @@ class KeypadHandler(Thread):
                     self._keypad.stop_delay()
                 elif message["action"] == MONITOR_STOP:
                     break
-            except Empty:
-                pass
 
             if self._keypad is not None:
                 self._keypad.communicate()
@@ -178,10 +183,10 @@ class KeypadHandler(Thread):
                 elif action == Action.FUNCTION:
                     self.handle_function(self._keypad.get_function())
                 elif action is not None:
-                    self._logger.error("Uknown keypad action: %s", action)
+                    self._logger.error("Unknown keypad action: %s", action)
 
-    def arm_keypad(self, arm_type):
-        arm_delay = get_arm_delay(self.get_database_session(), arm_type)
+    def arm_keypad(self, arm_type, delay):
+        arm_delay = get_arm_delay(self.get_database_session(), arm_type) if delay else 0
         self._logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
         self._keypad.set_armed(True)
 
@@ -239,9 +244,9 @@ class KeypadHandler(Thread):
     def handle_function(self, function: Function):
         self._logger.debug("Handling function: %s", function)
         if Function.AWAY == function:
-            self._broadcaster.send_message({"action": MONITOR_ARM_AWAY})
+            self._broadcaster.send_message({"action": MONITOR_ARM_AWAY, "keypad_id": self._keypad._id})
         elif Function.STAY == function:
-            self._broadcaster.send_message({"action": MONITOR_ARM_STAY})
+            self._broadcaster.send_message({"action": MONITOR_ARM_STAY, "keypad_id": self._keypad._id})
         else:
             self._logger.error("Unknown function: %s", function)
 
