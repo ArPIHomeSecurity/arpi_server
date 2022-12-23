@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:09:39
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:09:41
+import logging
+
+from constants import LOG_ADSYREN
 
 
 class Output(object):
     def __init__(self, pin):
-        pass
+        self._pin = pin
+        self._logger = logging.getLogger(LOG_ADSYREN)
 
     def on(self):
-        pass
+        self._logger.debug("Pin(%s) ON", self._pin)
 
     def off(self):
-        pass
+        self._logger.debug("Pin(%s) OFF", self._pin)

@@ -210,7 +210,7 @@ class Notifier(Thread):
             server.starttls()
             server.login(self._options["email"]["smtp_username"], self._options["email"]["smtp_password"])
 
-            message = "Subject: {}\n\n{}".format(subject, content).encode(encoding="utf_8", errors="strict")
+            message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
             server.sendmail(from_addr="info@argus", to_addrs=self._options["email"]["email_address"], msg=message)
             server.quit()
         except SMTPException as error:
