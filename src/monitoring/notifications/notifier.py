@@ -79,23 +79,14 @@ class Notifier(Thread):
     @classmethod
     def notify_alert_started(cls, alert_id, sensors, time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding (start): %s", alert_id)
-        cls._notifications.put({
-                "type": ALERT_STARTED,
-                "id": alert_id,
-                "sensors": sensors,
-                "time": time,
-                "retry": 0
-        })
+        cls._notifications.put(
+            {"type": ALERT_STARTED, "id": alert_id, "sensors": sensors, "time": time, "retry": 0}
+        )
 
     @classmethod
     def notify_alert_stopped(cls, alert_id, time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding (stop): %s", alert_id)
-        cls._notifications.put({
-            "type": ALERT_STOPPED,
-            "id": alert_id,
-            "time": time,
-            "retry": 0
-        })
+        cls._notifications.put({"type": ALERT_STOPPED, "id": alert_id, "time": time, "retry": 0})
 
     def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
@@ -136,18 +127,18 @@ class Notifier(Thread):
                     self._gsm = GSM()
                     self._gsm.setup()
 
-            if len(self._notifications.queue) > 0:
-                notification = self._notifications.queue[0]
-                if self.send_message(notification):
-                    # send succeeded
-                    self._notifications.queue.popleft()
-                else:
+            if not self._notifications.empty():
+                notification = self._notifications.get(False)
+                if not self.send_message(notification):
                     # send failed
                     notification["retry"] += 1
                     if notification["retry"] >= Notifier.MAX_RETRY:
                         self._logger.debug(
-                            "Deleted message after max retry (%s): %s", Notifier.MAX_RETRY, self._notifications.pop(0)
+                            "Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification
                         )
+                    else:
+                        # sending message failed put back to message queue
+                        self._notifications.put(notification)
 
         self._db_session.close()
         self._logger.info("Notifier stopped")
@@ -155,7 +146,11 @@ class Notifier(Thread):
     def get_options(self):
         options = {}
         for section_name in ("email", "gsm", "subscriptions"):
-            section = self._db_session.query(Option).filter_by(name="notifications", section=section_name).first()
+            section = (
+                self._db_session.query(Option)
+                .filter_by(name="notifications", section=section_name)
+                .first()
+            )
             options[section_name] = json.loads(section.value) if section else ""
         self._logger.debug(f"Notifier loaded subscriptions: {options}")
         return options
@@ -208,10 +203,16 @@ class Notifier(Thread):
             server = smtplib.SMTP("smtp.gmail.com:587")
             server.ehlo()
             server.starttls()
-            server.login(self._options["email"]["smtp_username"], self._options["email"]["smtp_password"])
+            server.login(
+                self._options["email"]["smtp_username"], self._options["email"]["smtp_password"]
+            )
 
             message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
-            server.sendmail(from_addr="info@argus", to_addrs=self._options["email"]["email_address"], msg=message)
+            server.sendmail(
+                from_addr="info@argus",
+                to_addrs=self._options["email"]["email_address"],
+                msg=message,
+            )
             server.quit()
         except SMTPException as error:
             self._logger.error("Can't send email %s ", error)
