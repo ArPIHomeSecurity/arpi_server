@@ -395,7 +395,7 @@ class Monitor(Thread):
                     elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
                         alert_type = ALERT_STAY
                         delay = sensor.zone.stay_alert_delay
-                elif current_monitoring == MONITORING_ARM_DELAY:
+                elif current_monitoring in (MONITORING_ARM_DELAY, MONITORING_ALERT_DELAY):
                     if sensor.zone.disarmed_delay is not None:
                         alert_type = ALERT_SABOTAGE
                         delay = sensor.zone.disarmed_delay
@@ -406,7 +406,8 @@ class Monitor(Thread):
                         alert_type = ALERT_STAY
                         delay = sensor.zone.stay_arm_delay
 
-                    if delay is not None and (arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now):
+                    if current_monitoring != MONITORING_ALERT_DELAY and \
+                        delay is not None and (arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now):
                         self._logger.debug("Ignore alert on sensor(%s): %s + %s < %s",
                             sensor.id,
                             arm.start_time.replace(tzinfo=None),
