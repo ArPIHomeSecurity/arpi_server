@@ -3,14 +3,16 @@ import json
 import logging
 import os
 import smtplib
+from dataclasses import asdict
 from queue import Empty, Queue
 from smtplib import SMTPException
 from threading import Thread
-from time import sleep
+from time import sleep, time
 
 from models import Option
 from monitoring.broadcast import Broadcaster
 from constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
+from monitoring.notifications.notification import Notification, NotificationType
 from monitoring.database import Session
 from monitoring.notifications.templates import (
     ALERT_STARTED_EMAIL,
@@ -26,21 +28,6 @@ else:
     from monitoring.adapters.mock.gsm import GSM
 
 
-"""
-Messages
-
-{
-    "type": "alert_started" / "alert_stopped",
-    "id": "alert id",
-    "sensors": ["Sensor name"],
-    "time": "start time",
-}
-
-
-"""
-
-ALERT_STARTED = "alert_started"
-ALERT_STOPPED = "alert_stopped"
 
 """
 options = {
@@ -80,13 +67,13 @@ class Notifier(Thread):
     def notify_alert_started(cls, alert_id, sensors, time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding (start): %s", alert_id)
         cls._notifications.put(
-            {"type": ALERT_STARTED, "id": alert_id, "sensors": sensors, "time": time, "retry": 0}
+            Notification(type=NotificationType.ALERT_STARTED, id=alert_id, sensors=sensors, time=time)
         )
 
     @classmethod
     def notify_alert_stopped(cls, alert_id, time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding (stop): %s", alert_id)
-        cls._notifications.put({"type": ALERT_STOPPED, "id": alert_id, "time": time, "retry": 0})
+        cls._notifications.put(Notification(type=NotificationType.ALERT_STOPPED, id=alert_id, sensors=None, time=time))
 
     def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
@@ -115,7 +102,7 @@ class Notifier(Thread):
         while True:
             message = None
             with contextlib.suppress(Empty):
-                message = self._actions.get(timeout=Notifier.RETRY_WAIT)
+                message = self._actions.get(timeout=1)
 
             if message is not None:
                 # handle monitoring and notification actions
@@ -128,17 +115,7 @@ class Notifier(Thread):
                     self._gsm.setup()
 
             if not self._notifications.empty():
-                notification = self._notifications.get(False)
-                if not self.send_message(notification):
-                    # send failed
-                    notification["retry"] += 1
-                    if notification["retry"] >= Notifier.MAX_RETRY:
-                        self._logger.debug(
-                            "Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification
-                        )
-                    else:
-                        # sending message failed put back to message queue
-                        self._notifications.put(notification)
+                self.process_notifications()
 
         self._db_session.close()
         self._logger.info("Notifier stopped")
@@ -155,52 +132,89 @@ class Notifier(Thread):
         self._logger.debug(f"Notifier loaded subscriptions: {options}")
         return options
 
-    def send_message(self, message):
-        self._logger.info("Sending message: %s", message)
-        success = False
-        has_subscription = False
-        try:
-            if self._options["subscriptions"]["sms"][message["type"]]:
-                if message["type"] == ALERT_STARTED:
-                    has_subscription = True
-                    success |= self.notify_alert_started_SMS(message)
-                elif message["type"] == ALERT_STOPPED:
-                    has_subscription = True
-                    success |= self.notify_alert_stopped_SMS(message)
+    def process_notifications(self):
+        notification: Notification = self._notifications.get(block=False)
 
-            if self._options["subscriptions"]["email"][message["type"]]:
-                if message["type"] == ALERT_STARTED:
-                    has_subscription = True
-                    success |= self.notify_alert_started_email(message)
-                elif message["type"] == ALERT_STOPPED:
-                    has_subscription = True
-                    success |= self.notify_alert_stopped_email(message)
+        if notification.last_try + Notifier.RETRY_WAIT < time():
+            self.send_message(notification)
+            notification.last_try = time()
+            notification.retry += 1
+
+        if not notification.processed:
+            # send failed
+            if notification.retry >= Notifier.MAX_RETRY:
+                self._logger.debug("Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification)
+            else:
+                # sending message failed put back to message queue
+                self._notifications.put(notification)
+
+    def send_message(self, notification: Notification):
+        self._logger.info("Sending message: %s", notification)
+        self._logger.debug("Options: %s", self._options)
+        try:
+            if notification.type == NotificationType.ALERT_STARTED:
+                self.notify_alert_started_SMS(notification)
+                self.notify_alert_started_email(notification)
+            elif notification.type == NotificationType.ALERT_STOPPED:
+                self.notify_alert_stopped_SMS(notification)
+                self.notify_alert_stopped_email(notification)
+            else:
+                self._logger.error("Unknown notification type!")
+
         except (KeyError, TypeError) as error:
-            self._logger.info("Failed to send message: '%s'! (%s)", message, error)
+            self._logger.exception("Failed to send message: '%s'! (%s)", notification, error)
         except Exception:
             self._logger.exception("Sending message failed!")
 
-        return success or not has_subscription
+    def notify_alert_started_SMS(self, notification: Notification):
+        if self._options["subscriptions"]["sms"][NotificationType.ALERT_STARTED] and notification.sms_sent == False:
+            notification.sms_sent = self.notify_SMS(ALERT_STARTED_SMS.format(**asdict(notification)))
+        else:
+            notification.sms_sent = None 
 
-    def notify_alert_started_SMS(self, message):
-        return self.notify_SMS(ALERT_STARTED_SMS.format(**message))
+    def notify_alert_stopped_SMS(self, notification: Notification):
+        if self._options["subscriptions"]["sms"][NotificationType.ALERT_STOPPED] and notification.sms_sent == False:
+            notification.sms_sent = self.notify_SMS(ALERT_STOPPED_SMS.format(**asdict(notification)))
+        else:
+            notification.sms_sent = None
 
-    def notify_alert_stopped_SMS(self, message):
-        return self.notify_SMS(ALERT_STOPPED_SMS.format(**message))
+    def notify_alert_started_email(self, notification: Notification):
+        if self._options["subscriptions"]["email1"][NotificationType.ALERT_STARTED] and notification.email1_sent == False:
+            notification.email1_sent = self.notify_email(
+                self._options["email"]["email1_address"], "Alert started", ALERT_STARTED_EMAIL.format(**asdict(notification))
+            )
+        else:
+            notification.email1_sent = None
 
-    def notify_alert_started_email(self, message):
-        return self.notify_email("Alert started", ALERT_STARTED_EMAIL.format(**message))
+        if self._options["subscriptions"]["email2"][NotificationType.ALERT_STARTED] and notification.email1_sent == False:
+            notification.email2_sent = self.notify_email(
+                self._options["email"]["email2_address"], "Alert started", ALERT_STARTED_EMAIL.format(**asdict(notification))
+            )
+        else:
+            notification.email2_sent = None
 
-    def notify_alert_stopped_email(self, message):
-        return self.notify_email("Alert stopped", ALERT_STOPPED_EMAIL.format(**message))
+    def notify_alert_stopped_email(self, notification: Notification):
+        if self._options["subscriptions"]["email1"][NotificationType.ALERT_STOPPED] and notification.email2_sent == False:
+            notification.email1_sent = self.notify_email(
+                self._options["email"]["email1_address"], "Alert stopped", ALERT_STOPPED_EMAIL.format(**asdict(notification))
+            )
+        else:
+            notification.email1_sent = None
 
-    def notify_SMS(self, message):
-        return self._gsm.sendSMS(self._options["gsm"]["phone_number"], message)
+        if self._options["subscriptions"]["email2"][NotificationType.ALERT_STOPPED] and notification.email2_sent == False:
+            notification.email2_sent = self.notify_email(
+                self._options["email"]["email2_address"], "Alert stopped", ALERT_STOPPED_EMAIL.format(**asdict(notification))
+            )
+        else:
+            notification.email2_sent = None
 
-    def notify_email(self, subject, content):
-        self._logger.info("Sending email ...")
+    def notify_SMS(self, notification):
+        return self._gsm.sendSMS(self._options["gsm"]["phone_number"], notification)
+
+    def notify_email(self, to_address, subject, content):
+        self._logger.info("Sending email to %s ...", to_address)
         try:
-            server = smtplib.SMTP("smtp.gmail.com:587")
+            server = smtplib.SMTP(f"{self._options['email']['smtp_hostname']}:{self._options['email']['smtp_port']}")
             server.ehlo()
             server.starttls()
             server.login(
@@ -209,13 +223,13 @@ class Notifier(Thread):
 
             message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
             server.sendmail(
-                from_addr="info@argus",
-                to_addrs=self._options["email"]["email_address"],
+                from_addr="alert@arpi-security.info",
+                to_addrs=to_address,
                 msg=message,
             )
             server.quit()
         except SMTPException as error:
-            self._logger.error("Can't send email %s ", error)
+            self._logger.error("Can't send email! Error: %s ", error)
             return False
 
         self._logger.info("Sent email")

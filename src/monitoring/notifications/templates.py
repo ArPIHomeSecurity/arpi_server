@@ -4,6 +4,9 @@
 # @Last Modified by:   Gábor Kovács
 # @Last Modified time: 2021-02-25 20:08:26
 
+# See fields of monitoring.notifications.notification.Notification
+
+
 ALERT_STARTED_SMS = "Alert({id}) started at {time}!"
 ALERT_STARTED_EMAIL = """
 Hi,
