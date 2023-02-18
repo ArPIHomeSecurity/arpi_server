@@ -6,6 +6,7 @@ import uuid
 from copy import deepcopy
 from datetime import date, timedelta, datetime as dt
 from re import search
+from dateutil.tz.tz import tzlocal
 
 from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
@@ -339,7 +340,7 @@ class User(BaseModel):
         if expiry is None:
             registration_expiry = None
         else:
-            registration_expiry = dt.now() + timedelta(seconds=expiry)
+            registration_expiry = dt.now(tzlocal()) + timedelta(seconds=expiry)
 
         if self.update_record(
             ("registration_code", "registration_expiry"),
