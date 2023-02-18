@@ -18,7 +18,8 @@ from time import sleep
 
 class GSM(object):
 
-    RETRY_GAP = 5
+    RETRY_GAP_SECONDS = 5
+    MAX_RETRY = 5
 
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADGSM)
@@ -41,8 +42,9 @@ class GSM(object):
         self._modem = GsmModem(self._options["port"], int(self._options["baud"]))
         self._modem.smsTextMode = True
 
+        attempts = 0
         connected = False
-        while not connected:
+        while not connected and attempts <= GSM.MAX_RETRY:
             try:
                 self._logger.info(
                     "Connecting to GSM modem on %s with %s baud (PIN: %s)...",
@@ -64,26 +66,27 @@ class GSM(object):
                 return False
             except TimeoutException as error:
                 self._logger.error(
-                    "No answer from GSM module: %s! Request timeout, retry in %s seconds...", str(error), GSM.RETRY_GAP
+                    "No answer from GSM module: %s! Request timeout, retry in %s seconds...", str(error), GSM.RETRY_GAP_SECONDS
                 )
             except CmeError as error:
                 self._logger.error(
-                    "CME error from GSM module: %s! Unexpected error, retry in %s seconds...", str(error), GSM.RETRY_GAP
+                    "CME error from GSM module: %s! Unexpected error, retry in %s seconds...", str(error), GSM.RETRY_GAP_SECONDS
                 )
             except CmsError as error:
                 if str(error) == "CMS 302":
-                    self._logger.debug("GSM modem not ready, retry in %s seconds...", GSM.RETRY_GAP)
+                    self._logger.debug("GSM modem not ready, retry in %s seconds...", GSM.RETRY_GAP_SECONDS)
                 else:
                     self._logger.error(
                         "CMS error from GSM module: %s. Unexpected error, retry in %s seconds...",
                         str(error),
-                        GSM.RETRY_GAP,
+                        GSM.RETRY_GAP_SECONDS,
                     )
             except Exception:
                 self._logger.exception("Failed to access GSM module!")
                 return False
 
-            sleep(GSM.RETRY_GAP)
+            sleep(GSM.RETRY_GAP_SECONDS)
+            attempts += 1
 
         return True
 
