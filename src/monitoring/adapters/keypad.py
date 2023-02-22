@@ -60,21 +60,21 @@ class KeypadHandler(Thread):
 
     def get_database_session(self):
         if not self._db_session:
-            uri = None
+            url = None
             try:
-                uri = URL(
+                url = URL.create(
                     drivername="postgresql+psycopg2",
                     username=os.environ.get("DB_USER", None),
                     password=os.environ.get("DB_PASSWORD", None),
                     host=os.environ.get("DB_HOST", None),
                     port=os.environ.get("DB_PORT", None),
-                    database=os.environ.get("DB_SCHEMA", None),
+                    database=os.environ.get("DB_SCHEMA", None)
                 )
             except KeyError:
                 self._logger.error("Database connnection not configured")
                 return
 
-            engine = create_engine(uri)
+            engine = create_engine(url)
             Session = sessionmaker(bind=engine)
             self._db_session = Session()
 
