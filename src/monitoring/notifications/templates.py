@@ -1,11 +1,6 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:08:24
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:08:26
-
-# See fields of monitoring.notifications.notification.Notification
-
+"""
+Templates for email and SMS messages
+"""
 
 ALERT_STARTED_SMS = "Alert({id}) started at {time}!"
 ALERT_STARTED_EMAIL = """
@@ -23,6 +18,27 @@ ALERT_STOPPED_EMAIL = """
 Hi,
 
 The alert({id}) stopped at {time}!
+
+ArPI Home Security
+
+"""
+
+
+POWER_OUTAGE_STARTED_SMS = "Power outage started at {time}!"
+POWER_OUTAGE_STARTED_EMAIL = """
+Hi,
+
+You have a power outage since {time}.
+
+ArPI Home Security
+
+"""
+
+POWER_OUTAGE_STOPPED_SMS = "Power outage stopped at {time}!"
+POWER_OUTAGE_STOPPED_EMAIL = """
+Hi,
+
+The power outage stopped at {time}!
 
 ArPI Home Security
 
