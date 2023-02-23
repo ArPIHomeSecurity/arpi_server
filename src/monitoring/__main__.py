@@ -20,13 +20,13 @@ def initialize_logging():
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler("monitoring.log")
-    file_handler.setFormatter(formatter)
+    # file_handler = logging.FileHandler("monitoring.log")
+    # file_handler.setFormatter(formatter)
 
     for name, level in LOGGING_MODULES:
         logger = logging.getLogger(name)
         logger.setLevel(level)
-        logger.addHandler(file_handler)
+        # logger.addHandler(file_handler)
         logger.addHandler(console_handler)
 
     logging.getLogger("SocketIOServer").setLevel(logging.INFO)
