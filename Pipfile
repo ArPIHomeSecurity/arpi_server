@@ -35,7 +35,7 @@ flake8 = "*"
 rope = "*"
 black = "*"
 flask-cors = "*"
-textual = "*"
+textual = "==0.1.18"
 pyfiglet = "*"
 
 [requires]
