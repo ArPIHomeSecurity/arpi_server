@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:07:43
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:07:45
-
 import contextlib
 import json
 import logging
@@ -13,7 +7,6 @@ from pwd import getpwnam
 from grp import getgrnam
 from threading import Thread
 
-from monitoring import storage
 from constants import (
     LOG_IPC,
     MONITOR_ARM_AWAY,
@@ -29,8 +22,12 @@ from constants import (
     THREAD_IPC,
     MONITOR_GET_ARM,
     MONITOR_GET_STATE,
+    SEND_TEST_EMAIL,
+    SEND_TEST_SMS,
     UPDATE_SSH,
 )
+from monitoring import storage
+from monitoring.notifications.notifier import Notifier
 from tools.clock import Clock
 from tools.connection import SecureConnection
 from tools.ssh import SSH
@@ -95,7 +92,7 @@ class IPCServer(Thread):
         """
         Return value:
         {
-            "result": boolean, # True if succeded
+            "result": boolean, # True if succeeded
             "message": string, # Error message
             "value: dict # value to return
         }
@@ -117,6 +114,16 @@ class IPCServer(Thread):
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
             SSH().update_ssh_service()
+        elif message["action"] == SEND_TEST_SMS:
+            succeeded, results = Notifier.send_test_sms()
+            return_value["result"] = succeeded
+            return_value["message"] = "Error in SMS sending!" if not succeeded else ""
+            return_value["other"] = results
+        elif message["action"] == SEND_TEST_EMAIL:
+            succeeded, results = Notifier.send_test_email()
+            return_value["result"] = succeeded
+            return_value["message"] = "Error in email sending!" if not succeeded else ""
+            return_value["other"] = results
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
                 return_value["result"] = False

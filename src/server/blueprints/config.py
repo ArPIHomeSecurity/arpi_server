@@ -1,6 +1,7 @@
+import logging
 import os
 
-from flask import jsonify, request
+from flask import jsonify, request, current_app
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
 from models import Option
@@ -9,6 +10,7 @@ from server.decorators import authenticated, restrict_host
 from server.database import db
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
+
 
 config_blueprint = Blueprint("configuration", __name__)
 
@@ -47,3 +49,23 @@ def option(option, section):
         return make_response("", 204)
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
+
+
+@config_blueprint.route("/api/config/test_email", methods=["GET"])
+@authenticated()
+@restrict_host
+def test_email():
+    if request.method == "GET":
+        return process_ipc_response(IPCClient().send_test_email())
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+
+@config_blueprint.route("/api/config/test_sms", methods=["GET"])
+@authenticated()
+@restrict_host
+def test_sms():
+    if request.method == "GET":
+        return process_ipc_response(IPCClient().send_test_sms())
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)

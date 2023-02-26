@@ -19,6 +19,8 @@ from constants import (
     MONITOR_UPDATE_KEYPAD,
     MONITOR_GET_STATE,
     MONITOR_GET_ARM,
+    SEND_TEST_EMAIL,
+    SEND_TEST_SMS,
     UPDATE_SSH,
 )
 
@@ -73,6 +75,12 @@ class IPCClient(object):
 
     def update_ssh(self):
         return self._send_message({"action": UPDATE_SSH})
+
+    def send_test_email(self):
+        return self._send_message({"action": SEND_TEST_EMAIL})
+
+    def send_test_sms(self):
+        return self._send_message({"action": SEND_TEST_SMS})
 
     def sync_clock(self):
         return self._send_message({"action": MONITOR_SYNC_CLOCK})

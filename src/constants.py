@@ -63,6 +63,8 @@ MONITOR_SET_CLOCK = "monitor_set_clock"
 UPDATE_SECURE_CONNECTION = "monitor_update_secure_connection"
 POWER_GET_STATE = "power_get_state"
 UPDATE_SSH = "update_ssh"
+SEND_TEST_EMAIL = "send_test_email"
+SEND_TEST_SMS = "send_test_sms"
 
 """---------------------------------------------------------------"""
 # CONSTANTS USED ALSO BY THE WEB APPLICATION

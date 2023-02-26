@@ -61,7 +61,7 @@ class Notification:
         mapping = {
             NotificationType.ALERT_STARTED: "Alert started",
             NotificationType.ALERT_STOPPED: "Alert stopped",
-            NotificationType.POWER_OUTAGE_STARTED: "Oower outage started",
+            NotificationType.POWER_OUTAGE_STARTED: "Power outage started",
             NotificationType.POWER_OUTAGE_STOPPED: "Power outage stopped",
         }
 

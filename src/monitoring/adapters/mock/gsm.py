@@ -1,38 +1,33 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:09:57
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:09:57
-
 import logging
-import os
 
 from constants import LOG_ADGSM
 
 
 class GSM(object):
-    def __init__(self):
+    def __init__(self, pin_code, port, baud):
         self._logger = logging.getLogger(LOG_ADGSM)
-        self._options = None
+        self._pin_code = pin_code
+        self._port = port
+        self._baud = baud
 
     def setup(self):
-        self._options = {}
-        self._options["pin_code"] = "4321"
-        self._options["port"] = os.environ["GSM_PORT"]
-        self._options["baud"] = os.environ["GSM_PORT_BAUD"]
+        if not self._port or \
+                not self._baud:
+            self._logger.error("Invalid GSM options: %s %s", self._port, self._baud)
+            return False
 
         self._logger.info(
             "Connecting to GSM modem on %s with %s baud (PIN: %s)...",
-            self._options["port"],
-            self._options["baud"],
-            self._options["pin_code"],
+            self._port,
+            self._baud,
+            self._pin_code or "-"
         )
 
         return True
 
-    def destroy(self):
-        pass
-
-    def sendSMS(self, phone_number, message):
+    def send_SMS(self, phone_number, message):
         self._logger.info('Message sent to %s: "%s"', phone_number, message)
         return True
+
+    def destroy(self):
+        pass
