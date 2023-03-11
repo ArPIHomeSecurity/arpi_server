@@ -5,17 +5,18 @@ import logging
 from datetime import datetime
 from os import environ
 from queue import Empty, Queue
-from threading import Thread, Event, Timer
+from threading import Thread, Timer
 from time import sleep
 
 from models import Alert, Arm, Sensor
 from monitoring.alert import SensorAlert
 
 from monitoring import storage
-from monitoring.notifications.notifier import Notifier
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
 from monitoring.broadcast import Broadcaster
+from monitoring.notifications.notifier import Notifier
+from monitoring.syren import Syren
 from constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -81,9 +82,8 @@ class Monitor(Thread):
         self._sensors = None
         self._power_source = None
         self._db_session = None
-        self._alerts = {}
+        self._alerting_sensors = set()
         self._actions = Queue()
-        self._stop_alert = Event()
         self._delay_timer = None
 
         storage.set(storage.MONITORING_STATE, MONITORING_STARTUP)
@@ -132,7 +132,7 @@ class Monitor(Thread):
             self.scan_sensors()
             self.handle_alerts()
 
-        self._stop_alert.set()
+        self.stop_alert()
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
@@ -164,8 +164,6 @@ class Monitor(Thread):
         else:
             storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
 
-        self._stop_alert.clear()
-
     def disarm_monitoring(self, user_id, keypad_id):
         if self._delay_timer:
             self._delay_timer.cancel()
@@ -191,7 +189,8 @@ class Monitor(Thread):
         ):
             storage.set(storage.ARM_STATE, ARM_DISARM)
             storage.set(storage.MONITORING_STATE, MONITORING_READY)
-        self._stop_alert.set()
+
+        self.stop_alert()
 
     def check_power(self):
         # load the value once from the adapter
@@ -378,10 +377,9 @@ class Monitor(Thread):
                 arm = self._db_session.query(Arm).filter_by(end_time=None).first()
             self._logger.debug("Arm: %s", arm)
 
-        changes = False
         for sensor in self._sensors:
             # add new alerting, enabled sensors to the alert
-            if sensor.alert and sensor.id not in self._alerts and sensor.enabled:
+            if sensor.alert and sensor.id not in self._alerting_sensors and sensor.enabled:
                 alert_type = None
                 delay = None
                 # sabotage has higher priority
@@ -389,7 +387,7 @@ class Monitor(Thread):
                     if sensor.zone.disarmed_delay is not None:
                         alert_type = ALERT_SABOTAGE
                         delay = sensor.zone.disarmed_delay
-                elif current_monitoring == MONITORING_ARMED:
+                elif current_monitoring in (MONITORING_ARMED, MONITORING_ALERT):
                     if sensor.zone.disarmed_delay is not None:
                         alert_type = ALERT_SABOTAGE
                         delay = sensor.zone.disarmed_delay
@@ -406,34 +404,32 @@ class Monitor(Thread):
                     elif current_arm == ARM_AWAY and sensor.zone.away_arm_delay is not None:
                         alert_type = ALERT_AWAY
                         delay = sensor.zone.away_arm_delay
-                    elif current_arm == ARM_STAY and sensor.zone.stay_alert_delay is not None:
+                    elif current_arm == ARM_STAY and sensor.zone.stay_arm_delay is not None:
                         alert_type = ALERT_STAY
                         delay = sensor.zone.stay_arm_delay
 
                     if current_monitoring != MONITORING_ALERT_DELAY and \
-                        delay is not None and (arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now):
+                            delay is not None and (arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now):
                         self._logger.debug("Ignore alert on sensor(%s): %s + %s < %s",
-                            sensor.id,
-                            arm.start_time.replace(tzinfo=None),
-                            timedelta(seconds=delay),
-                            now
-                        )
+                                           sensor.id,
+                                           arm.start_time.replace(tzinfo=None),
+                                           timedelta(seconds=delay),
+                                           now)
                         # ignore alert
                         continue
 
+                self._logger.debug("Found alerting sensor id: %s delay: %s, alert type: %s", sensor.id, delay, alert_type)
                 if alert_type is not None and delay is not None:
-                    self._alerts[sensor.id] = {
-                        "alert": SensorAlert(sensor.id, delay, alert_type, self._stop_alert, self._broadcaster)
-                    }
-                    self._alerts[sensor.id]["alert"].start()
-                    self._stop_alert.clear()
-                    changes = True
+                    self._alerting_sensors.add(sensor.id)
+                    SensorAlert.start_alert(sensor.id, delay, alert_type, self._broadcaster)
+                else:
+                    self._logger.debug("Can't start alert")
 
             # stop alert
-            elif not sensor.alert and sensor.id in self._alerts:
+            elif not sensor.alert and sensor.id in self._alerting_sensors:
                 # TODO: check if removing SensorAlert will block alerting
-                del self._alerts[sensor.id]
+                self._alerting_sensors.remove(sensor.id)
 
-        if changes:
-            self._logger.debug("Save sensor changes")
-            self._db_session.commit()
+    def stop_alert(self):
+        SensorAlert.stop_alerts()
+        Syren.stop_syren()

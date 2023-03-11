@@ -21,6 +21,7 @@ from constants import (
     MONITOR_GET_ARM,
     SEND_TEST_EMAIL,
     SEND_TEST_SMS,
+    SEND_TEST_SYREN,
     UPDATE_SSH,
 )
 
@@ -81,6 +82,9 @@ class IPCClient(object):
 
     def send_test_sms(self):
         return self._send_message({"action": SEND_TEST_SMS})
+
+    def send_test_syren(self, duration):
+        return self._send_message({"action": SEND_TEST_SYREN, "duration": duration})
 
     def sync_clock(self):
         return self._send_message({"action": MONITOR_SYNC_CLOCK})

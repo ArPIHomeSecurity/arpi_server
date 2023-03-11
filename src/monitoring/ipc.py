@@ -6,6 +6,7 @@ from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
 from grp import getgrnam
 from threading import Thread
+from time import sleep
 
 from constants import (
     LOG_IPC,
@@ -24,9 +25,11 @@ from constants import (
     MONITOR_GET_STATE,
     SEND_TEST_EMAIL,
     SEND_TEST_SMS,
+    SEND_TEST_SYREN,
     UPDATE_SSH,
 )
 from monitoring import storage
+from monitoring.alert import Syren
 from monitoring.notifications.notifier import Notifier
 from tools.clock import Clock
 from tools.connection import SecureConnection
@@ -124,6 +127,8 @@ class IPCServer(Thread):
             return_value["result"] = succeeded
             return_value["message"] = "Error in email sending!" if not succeeded else ""
             return_value["other"] = results
+        elif message["action"] == SEND_TEST_SYREN:
+            self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
                 return_value["result"] = False
@@ -165,3 +170,9 @@ class IPCServer(Thread):
         with contextlib.suppress(FileNotFoundError):
             remove(MONITOR_INPUT_SOCKET)
         self._logger.info("IPC server stopped")
+
+    def test_syren(self, duration=5):
+        self._logger.debug("Testing syren %ss...", duration)
+        Syren.start_syren()
+        sleep(duration)
+        Syren.stop_syren()
