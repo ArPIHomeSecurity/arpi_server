@@ -13,7 +13,7 @@ card_blueprint = Blueprint("card", __name__)
 @authenticated()
 @restrict_host
 def cards():
-    return jsonify([i.serialize for i in db.session.query(Card).order_by(Card.description).all()])
+    return jsonify([i.serialized for i in db.session.query(Card).order_by(Card.description).all()])
 
 
 @card_blueprint.route("/api/card/<int:card_id>", methods=["GET", "PUT", "DELETE"])
@@ -23,7 +23,7 @@ def card(card_id):
     if request.method == "GET":
         card = db.session.query(Card).get(card_id)
         if card:
-            return jsonify(card.serialize)
+            return jsonify(card.serialized)
 
         return make_response(jsonify({"error": "Card not found"}), 404)
     elif request.method == "PUT":

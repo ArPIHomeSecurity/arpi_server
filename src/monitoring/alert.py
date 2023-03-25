@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from threading import Thread, Event
 
-from models import Alert, AlertSensor, Arm, Sensor
+from models import Alert, AlertSensor, Arm, Disarm, Sensor
 from monitoring import storage
 from monitoring.broadcast import Broadcaster
 from monitoring.database import Session
@@ -33,14 +33,15 @@ class SensorAlert(Thread):
         SensorAlert(sensor_id, delay, alert_type, broadcaster).start()
 
     @classmethod
-    def stop_alerts(cls):
+    def stop_alerts(cls, disarm: Disarm):
         cls._stop_event.set()
         send_alert_state(None)
 
         db_session = Session()
-        alert = db_session.query(Alert).filter_by(end_time=None).first()
+        alert = db_session.query(Alert).filter_by(disarm=None).first()
         if alert:
             alert.end_time = datetime.now()
+            alert.disarm = disarm
             db_session.commit()
 
             send_alert_state(None)
@@ -61,6 +62,8 @@ class SensorAlert(Thread):
 
     def run(self):
         self._db_session = Session()
+
+        start_time = datetime.now()
 
         self._logger.debug("Alert prepared in arm state: %s", self._alert_type)
 
@@ -89,7 +92,7 @@ class SensorAlert(Thread):
         if not alert:
             alert = self.create_alert()
 
-        self.add_sensor_to_alert(alert)
+        self.add_sensor_to_alert(alert=alert, start_time=start_time, delay=self._delay)
         sensor_descriptions = list(
             map(
                 lambda item: f"{item.sensor.description}(id:{item.sensor.id}/CH{item.sensor.channel+1})",
@@ -113,14 +116,14 @@ class SensorAlert(Thread):
         return self._db_session.query(Alert).filter_by(end_time=None).first()
 
     def create_alert(self) -> Alert:
-        arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         start_time = datetime.now()
         alert = Alert(arm=arm, start_time=start_time, sensors=[])
         self._db_session.add(alert)
         self._db_session.commit()
         return alert
 
-    def add_sensor_to_alert(self, alert):
+    def add_sensor_to_alert(self, alert, start_time, delay):
         sensor = self._db_session.query(Sensor).get(self._sensor_id)
         already_added = any(
             alert_sensor.sensor.id == sensor.id
@@ -134,11 +137,13 @@ class SensorAlert(Thread):
         alert_sensor = AlertSensor(
             channel=sensor.channel,
             type_id=sensor.type_id,
-            description=sensor.description
+            description=sensor.description,
+            start_time=start_time,
+            delay=delay
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)
         self._db_session.commit()
         self._logger.debug("Added sensor by id: %s", self._sensor_id)
 
-        send_alert_state(alert.serialize)
+        send_alert_state(alert.serialized)

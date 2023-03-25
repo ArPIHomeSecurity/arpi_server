@@ -11,7 +11,7 @@ from dateutil.tz.tz import tzlocal
 from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.schema import ForeignKey
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_DISARM, ARM_STAY
 
 from tools.dictionary import merge_dicts, filter_keys
@@ -62,7 +62,14 @@ class BaseModel(Base):
 
     def serialize_attributes(self, attributes):
         """Create JSON object with given attributes"""
-        return {attribute: getattr(self, attribute, None) for attribute in attributes}
+        serialized = {}
+        for attribute in attributes:
+            value = getattr(self, attribute, None)
+            if isinstance(value, dt):
+                value = value.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+            serialized[attribute] = value
+
+        return serialized
 
 
 class SensorType(BaseModel):
@@ -82,7 +89,7 @@ class SensorType(BaseModel):
         self.description = description
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(self.serialize_attributes(("id", "name", "description")))
 
     @validates("name")
@@ -131,7 +138,7 @@ class Sensor(BaseModel):
         return self.update_record(("channel", "enabled", "description", "zone_id", "type_id"), data)
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(
             self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "type_id", "enabled"))
         )
@@ -153,11 +160,12 @@ class Alert(BaseModel):
     __tablename__ = "alert"
 
     id = Column(Integer, primary_key=True)
-    arm_id = Column(Integer, ForeignKey("arm.id"), nullable=True)
-    arm = relationship("Arm", backref=backref("arm", lazy="dynamic"))
     start_time = Column(DateTime(timezone=True))
     end_time = Column(DateTime(timezone=True))
+
     sensors = relationship("AlertSensor", back_populates="alert")
+    arm: Mapped["Arm"] = relationship(back_populates="alert")
+    disarm: Mapped["Disarm"] = relationship(back_populates="alert")
 
     def __init__(self, arm, start_time, sensors, end_time=None):
         self.arm = arm
@@ -175,7 +183,7 @@ class Alert(BaseModel):
             return ALERT_SABOTAGE
 
     @property
-    def serialize(self):
+    def serialized(self):
         locale.setlocale(locale.LC_ALL)
         return convert2camel(
             {
@@ -183,9 +191,9 @@ class Alert(BaseModel):
                 "alert_type": Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE,
                 "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
                 "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
-                if self.end_time
-                else "",
-                "sensors": [alert_sensor.serialize for alert_sensor in self.sensors],
+                            if self.end_time
+                            else None,
+                "sensors": [alert_sensor.serialized for alert_sensor in self.sensors],
             }
         )
 
@@ -197,39 +205,73 @@ class AlertSensor(BaseModel):
     channel = Column(Integer)
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
     description = Column(String)
+    start_time = Column(DateTime(timezone=True))
+    end_time = Column(DateTime(timezone=True))
+    delay = Column(Integer)
+
     sensor = relationship("Sensor", back_populates="alerts")
     alert = relationship("Alert", back_populates="sensors")
 
-    def __init__(self, channel, type_id, description):
+    def __init__(self, channel, type_id, description, start_time, delay):
         self.channel = channel
         self.type_id = type_id
         self.description = description
+        self.start_time = start_time
+        self.delay = delay
 
     @property
-    def serialize(self):
-        return convert2camel(self.serialize_attributes(("sensor_id", "channel", "type_id", "description")))
+    def serialized(self):
+        return convert2camel(self.serialize_attributes(("sensor_id", "channel", "type_id", "description", "start_time", "end_time", "delay")))
 
 
 class Arm(BaseModel):
     __tablename__ = "arm"
     id = Column(Integer, primary_key=True)
     type = Column(String)
-    start_time = Column(DateTime(timezone=True))
-    end_time = Column(DateTime(timezone=True))
-    start_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
-    start_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
-    end_keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
-    end_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    time = Column(DateTime(timezone=True))
+    keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
 
-    def __init__(self, arm_type, start_time, user_id=None, keypad_id=None):
+    alert_id = Column(Integer, ForeignKey("alert.id"), nullable=True)
+    alert: Mapped["Alert"] = relationship(back_populates="arm")
+
+    disarm: Mapped["Disarm"] = relationship(back_populates="arm")
+
+    def __init__(self, arm_type, time, user_id=None, keypad_id=None):
         self.type = arm_type
-        self.start_time = start_time
-        self.start_keypad_id = keypad_id
-        self.start_user_id = user_id
+        self.time = time
+        self.keypad_id = keypad_id
+        self.user_id = user_id
 
     @property
-    def serialize(self):
-        return convert2camel(self.serialize_attributes(("start_time", "end_time", "keypad_id", "user_id")))
+    def serialized(self):
+        response = self.serialize_attributes(("type", "time", "keypad_id", "user_id"))
+        return convert2camel(response)
+
+
+class Disarm(BaseModel):
+    __tablename__ = "disarm"
+    id = Column(Integer, primary_key=True)
+    time = Column(DateTime(timezone=True))
+    keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+
+    alert_id = Column(Integer, ForeignKey("alert.id"), nullable=True)
+    alert: Mapped[Alert] = relationship(back_populates="disarm")
+
+    arm_id: Mapped[int] = mapped_column(ForeignKey("arm.id"), nullable=True)
+    arm: Mapped[Arm] = relationship(back_populates="disarm")
+
+    def __init__(self, arm_id, time, user_id=None, keypad_id=None):
+        self.arm_id = arm_id
+        self.time = time
+        self.keypad_id = keypad_id
+        self.user_id = user_id
+
+    @property
+    def serialized(self):
+        response = self.serialize_attributes(("time", "keypad_id", "user_id"))
+        return convert2camel(response)
 
 
 class Zone(BaseModel):
@@ -263,7 +305,7 @@ class Zone(BaseModel):
         return self.update_record(("name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"), data)
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(
             self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"))
         )
@@ -349,7 +391,7 @@ class User(BaseModel):
             return registration_code
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(
             {
                 "id": self.id,
@@ -406,7 +448,7 @@ class Card(BaseModel):
         return self.update_record(fields, data)
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(
             {
                 "id": self.id,
@@ -448,7 +490,7 @@ class Option(BaseModel):
             return changed
 
     @property
-    def serialize(self):
+    def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
         filter_keys(filtered_value, ["smtp_password"])
         filter_keys(filtered_value, ["password"])
@@ -486,7 +528,7 @@ class Keypad(BaseModel):
         return self.update_record(("enabled", "type_id"), data)
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(self.serialize_attributes(("id", "type_id", "enabled")))
 
 
@@ -505,5 +547,5 @@ class KeypadType(BaseModel):
         self.description = description
 
     @property
-    def serialize(self):
+    def serialized(self):
         return convert2camel(self.serialize_attributes(("id", "name", "description")))

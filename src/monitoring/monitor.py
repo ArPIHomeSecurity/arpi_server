@@ -8,7 +8,7 @@ from queue import Empty, Queue
 from threading import Thread, Timer
 from time import sleep
 
-from models import Alert, Arm, Sensor
+from models import Alert, Arm, Disarm, Sensor, AlertSensor
 from monitoring.alert import SensorAlert
 
 from monitoring import storage
@@ -132,7 +132,7 @@ class Monitor(Thread):
             self.scan_sensors()
             self.handle_alerts()
 
-        self.stop_alert()
+        self.stop_alert(None)
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
@@ -140,9 +140,9 @@ class Monitor(Thread):
         self._db_session.add(
             Arm(
                 arm_type=arm_type,
-                start_time=dt.now(),
+                time=dt.now(),
                 user_id=user_id,
-                keypad_id=keypad_id,
+                keypad_id=keypad_id
             )
         )
 
@@ -169,12 +169,10 @@ class Monitor(Thread):
             self._delay_timer.cancel()
             self._delay_timer = None
 
-        arm = self._db_session.query(Arm).filter_by(end_time=None).first()
-        if arm:
-            arm.end_time = dt.now()
-            arm.end_user_id = user_id
-            arm.end_keypad_id = keypad_id
-            self._db_session.commit()
+        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+        disarm = Disarm(arm_id=arm.id if arm else None, time=dt.now(), user_id=user_id, keypad_id=keypad_id)
+        self._db_session.add(disarm)
+        self._db_session.commit()
 
         current_state = storage.get(storage.MONITORING_STATE)
         current_arm = storage.get(storage.ARM_STATE)
@@ -190,7 +188,7 @@ class Monitor(Thread):
             storage.set(storage.ARM_STATE, ARM_DISARM)
             storage.set(storage.MONITORING_STATE, MONITORING_READY)
 
-        self.stop_alert()
+        self.stop_alert(disarm)
 
     def check_power(self):
         # load the value once from the adapter
@@ -279,20 +277,26 @@ class Monitor(Thread):
             if sensor.alert:
                 sensor.alert = False
                 changed = True
-                self._logger.debug("Cleared sensor")
+                self._logger.debug("Cleared sensor (id=%s)", sensor.id)
+
+        for alert_sensor in self._db_session.query(AlertSensor).filter_by(end_time=None).all():
+            alert_sensor.end_time = dt.fromtimestamp(DEFAULT_DATETIME)
+            self._logger.debug("Cleared sensor alert (alert id=%s, sensor_id=%s)", alert_sensor.alert_id, alert_sensor.sensor_id)
+            changed = True
 
         for alert in self._db_session.query(Alert).filter_by(end_time=None).all():
             alert.end_time = dt.fromtimestamp(DEFAULT_DATETIME)
-            self._logger.debug("Cleared alert")
+            self._logger.debug("Cleared alert (id=%s)", alert.id)
             changed = True
 
-        for arm in self._db_session.query(Arm).filter_by(end_time=None).all():
-            arm.end_time = dt.fromtimestamp(DEFAULT_DATETIME)
-            self._logger.debug("Cleared arm")
+        for arm in self._db_session.query(Arm).filter_by(disarm=None).all():
+            disarm = Disarm(arm_id=arm.id, time=dt.now())
+            self._db_session.add(disarm)
+            self._logger.debug("Cleared arm (id=%s)", arm.id)
             changed = True
 
         if changed:
-            self._logger.debug("Cleared db")
+            self._logger.debug("Saved to database")
             self._db_session.commit()
         else:
             self._logger.debug("Cleared nothing")
@@ -374,7 +378,7 @@ class Monitor(Thread):
             # wait for the arm created in the database
             # synchronizing the two threads
             while not arm:
-                arm = self._db_session.query(Arm).filter_by(end_time=None).first()
+                arm = self._db_session.query(Arm).filter_by(disarm=None).first()
             self._logger.debug("Arm: %s", arm)
 
         for sensor in self._sensors:
@@ -425,11 +429,16 @@ class Monitor(Thread):
                 else:
                     self._logger.debug("Can't start alert")
 
-            # stop alert
+            # stop alert of sensor
             elif not sensor.alert and sensor.id in self._alerting_sensors:
-                # TODO: check if removing SensorAlert will block alerting
+                self._logger.debug("Stop alerting sensor id: %s", sensor.id)
+                alert_sensor = self._db_session.query(AlertSensor).filter_by(sensor_id=sensor.id, end_time=None).first()
+                alert_sensor.end_time = dt.now()
+                self._logger.debug("Cleared sensor alert: alert id=%s, sensor id=%s", alert_sensor.alert_id, alert_sensor.sensor_id)
+                self._db_session.commit()
+
                 self._alerting_sensors.remove(sensor.id)
 
-    def stop_alert(self):
-        SensorAlert.stop_alerts()
+    def stop_alert(self, disarm: Disarm):
+        SensorAlert.stop_alerts(disarm)
         Syren.stop_syren()

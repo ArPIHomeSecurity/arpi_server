@@ -22,7 +22,7 @@ def option(option, section):
     if request.method == "GET":
         db_option = db.session.query(Option).filter_by(name=option, section=section).first()
         if db_option:
-            return jsonify(db_option.serialize) if db_option else jsonify(None)
+            return jsonify(db_option.serialized) if db_option else jsonify(None)
 
         return make_response(jsonify({}), 200)
     elif request.method == "PUT":

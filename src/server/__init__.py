@@ -42,6 +42,8 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://%(user)s:%(pw)s@%(host)s:%
     "port": environ.get("DB_PORT", None),
 }
 
+app.logger.debug("App config: %s", app.config)
+
 # avoid reloading records from database after session commit
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -71,4 +73,5 @@ def invalid_route(e):
 
 @app.errorhandler(Exception)
 def all_exception_handler(error):
-    return 'Error', 500
+    app.logger.exception(error)
+    return (str(error), 500) if app.debug else ('Error: internal error', 500)

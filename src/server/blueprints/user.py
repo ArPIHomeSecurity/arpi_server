@@ -21,7 +21,7 @@ user_blueprint = Blueprint("user", __name__)
 @restrict_host
 def users():
     if request.method == "GET":
-        return jsonify([i.serialize for i in db.session.query(User).order_by(User.role).all()])
+        return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
     elif request.method == "POST":
         data = request.json
         user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
@@ -38,7 +38,7 @@ def user(user_id):
     if request.method == "GET":
         user = db.session.query(User).get(user_id)
         if user:
-            return jsonify(user.serialize)
+            return jsonify(user.serialized)
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "PUT":
@@ -164,4 +164,4 @@ def register_card(user_id):
 @user_blueprint.route("/api/user/<int:user_id>/cards", methods=["GET"])
 def cards(user_id):
     user = db.session.query(User).get(user_id)
-    return jsonify([i.serialize for i in user.cards])
+    return jsonify([i.serialized for i in user.cards])

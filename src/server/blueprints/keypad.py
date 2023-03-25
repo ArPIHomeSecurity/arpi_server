@@ -15,8 +15,8 @@ keypad_blueprint = Blueprint("keypad", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_keypads():
-    # return jsonify([i.serialize for i in db.session.query(Keypad).filter_by(deleted=False).all()])
-    return jsonify([i.serialize for i in db.session.query(Keypad).all()])
+    # return jsonify([i.serialized for i in db.session.query(Keypad).filter_by(deleted=False).all()])
+    return jsonify([i.serialized for i in db.session.query(Keypad).all()])
 
 
 @keypad_blueprint.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
@@ -29,7 +29,7 @@ def keypad(keypad_id):
     if request.method == "GET":
         keypad = db.session.query(Keypad).first()
         if keypad:
-            return jsonify(keypad.serialize)
+            return jsonify(keypad.serialized)
 
         return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "DELETE":
@@ -58,4 +58,4 @@ def keypad(keypad_id):
 @authenticated()
 @restrict_host
 def keypadtypes():
-    return jsonify([i.serialize for i in db.session.query(KeypadType).all()])
+    return jsonify([i.serialized for i in db.session.query(KeypadType).all()])

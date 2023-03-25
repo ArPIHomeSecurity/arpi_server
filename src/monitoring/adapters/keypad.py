@@ -194,7 +194,7 @@ class KeypadHandler(Thread):
         # synchronizing the two threads
         arm = None
         while not arm:
-            arm = self.get_database_session().query(Arm).filter_by(end_time=None).first()
+            arm = self.get_database_session().query(Arm).filter_by(disarm=None).first()
         self._logger.debug("Arm: %s", arm)
 
         if arm_delay is not None and arm_delay > 0:
