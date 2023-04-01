@@ -433,11 +433,14 @@ class Monitor(Thread):
             elif not sensor.alert and sensor.id in self._alerting_sensors:
                 self._logger.debug("Stop alerting sensor id: %s", sensor.id)
                 alert_sensor = self._db_session.query(AlertSensor).filter_by(sensor_id=sensor.id, end_time=None).first()
-                alert_sensor.end_time = dt.now()
-                self._logger.debug("Cleared sensor alert: alert id=%s, sensor id=%s", alert_sensor.alert_id, alert_sensor.sensor_id)
-                self._db_session.commit()
+                if alert_sensor is not None:
+                    alert_sensor.end_time = dt.now()
+                    self._logger.debug("Cleared sensor alert: alert id=%s, sensor id=%s", alert_sensor.alert_id, alert_sensor.sensor_id)
+                    self._db_session.commit()
+                    self._alerting_sensors.remove(sensor.id)
+                else:
+                    self._logger.debug("Cleared sensor alert: sensor id=%s (already closed in alert)", sensor.id)
 
-                self._alerting_sensors.remove(sensor.id)
 
     def stop_alert(self, disarm: Disarm):
         SensorAlert.stop_alerts(disarm)

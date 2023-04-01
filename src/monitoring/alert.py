@@ -130,6 +130,7 @@ class SensorAlert(Thread):
             for alert_sensor in alert.sensors
         )
 
+        # we can't add a sensor twice to the same alert, check database AlertSensor schema
         if already_added:
             self._logger.debug("Sensor by id: %s already added", self._sensor_id)
             return
