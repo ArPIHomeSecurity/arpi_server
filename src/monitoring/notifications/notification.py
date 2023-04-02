@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 from monitoring.notifications.templates import (
     ALERT_STARTED_EMAIL,
@@ -24,7 +24,7 @@ class NotificationType:
 class Notification:
     type: NotificationType
     id: int
-    sensors: list[str]
+    sensors: List[str]
     time: str
     retry: int = 0
     last_try: float = 0.0

@@ -1,9 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:04:45
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:05:17
+#!/usr/bin/env python3
 import json
 import logging
 import socket
@@ -22,7 +17,7 @@ from tools.dictionary import filter_keys
 
 class DynDns:
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_SC_DYNDNS)
+        self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
         self._db_session = Session()
 
     def update_ip(self, force=False):
@@ -42,7 +37,7 @@ class DynDns:
         noip_config["force"] = force
         tmp_config = copy(noip_config)
         filter_keys(tmp_config, ["password"])
-        self._logger.info("Update dynamics DNS provider with options: %s" % tmp_config)
+        self._logger.info("Update dynamics DNS provider with options: %s", tmp_config)
 
         # DNS lookup IP from hostname
         try:
@@ -56,17 +51,17 @@ class DynDns:
             # converting the address to string for comparision
             new_ip = format(ip_address(new_ip))
         except ValueError:
-            self._logger.info("Invalid IP address: %s" % new_ip)
+            self._logger.info("Invalid IP address: %s", new_ip)
             return False
 
         if (new_ip != current_ip) or force:
-            self._logger.info("IP: '%s' => '%s'" % (current_ip, new_ip))
+            self._logger.info("IP: '%s' => '%s'", current_ip, new_ip)
             noip_config["ip"] = new_ip
             result = self.save_ip(noip_config)
-            self._logger.info("Update result: '%s'" % result)
+            self._logger.info("Update result: '%s'", result)
             return True
         else:
-            self._logger.info("IP: '%s' == '%s'" % (current_ip, new_ip))
+            self._logger.info("IP: '%s' == '%s'", current_ip, new_ip)
             self._logger.info("No IP update necessary")
 
         return True

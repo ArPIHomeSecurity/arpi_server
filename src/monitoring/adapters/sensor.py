@@ -61,8 +61,8 @@ class SensorAdapter(object):
         """
         Get the values from all the channels
         """
-        values = [f"{channel.value:.4f}" for channel in self._channels]
-        self._logger.debug("Values: %s", values)
+        values = [channel.value for channel in self._channels]
+        self._logger.debug("Values: %s", [f"{v:.4f}" for v in values])
         return values
 
     @property

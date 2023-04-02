@@ -1,18 +1,29 @@
-[Unit] 
-Description=Argus webapplication 
-After=network.target 
+[Unit]
+Description=Argus webapplication
+After=network.target
  
-[Service] 
-Type=simple 
-User=argus 
-Group=www-data 
-PIDFile=/run/argus/argus_server.pid 
-WorkingDirectory=/home/argus/server 
-ExecStart=/usr/local/bin/pipenv run gunicorn server:app
-ExecReload=/bin/kill -s HUP $MAINPID 
-ExecStop=/bin/kill -s TERM $MAINPID 
-Restart=on-failure 
-PrivateTmp=true 
- 
-[Install] 
+[Service]
+Type=simple
+User=argus
+Group=www-data
+PIDFile=/run/argus/argus_server.pid
+WorkingDirectory=/home/argus/server
+EnvironmentFile=/home/argus/server/.env
+ExecStart=/usr/bin/python3 -m gunicorn \
+    --workers 2 \
+    --umask 0117 \
+    --error-logfile - \
+    --capture-output \
+    --log-level=INFO \
+    --pid /run/argus/argus_server.pid \
+    --bind unix:/run/argus/argus_server.sock \
+    --threads=2 \
+    --timeout=400 \
+    server:app
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
+PrivateTmp=true
+
+[Install]
 WantedBy=multi-user.target

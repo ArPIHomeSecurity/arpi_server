@@ -40,9 +40,11 @@ def option(option, section):
             if changed:
                 return process_ipc_response(IPCClient().update_configuration())
         elif db_option.name == "network" and db_option.section == "dyndns":
+            # update dyndns in production mode
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
                 return process_ipc_response(IPCClient().update_dyndns())
         elif db_option.name == "network" and db_option.section == "access":
+            # update ssh service in production mode
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
                 return process_ipc_response(IPCClient().update_ssh())
 

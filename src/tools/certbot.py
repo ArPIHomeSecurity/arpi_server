@@ -1,16 +1,11 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:04:12
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:04:20
+#!/usr/bin/env python3
 import json
 import logging
 import subprocess
+
 from copy import copy
 from os import symlink
 from pathlib import Path, PosixPath
-
 from pydbus import SystemBus
 
 from models import Option
@@ -48,7 +43,7 @@ class Certbot:
                     "certonly",
                     "--webroot",
                     "--webroot-path",
-                    "/home/argus/server/webapplication",
+                    "/home/argus/webapplication",
                     "--agree-tos",
                     "--non-interactive",
                     "--quiet",
