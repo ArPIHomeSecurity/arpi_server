@@ -11,7 +11,7 @@ from monitoring.adapters import SYREN_OUT
 from constants import LOG_ADSYREN
 
 # check if running on Raspberry
-if os.uname()[4][:3] == "arm":
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero.output_devices import DigitalOutputDevice
 else:
     from monitoring.adapters.mock.output import Output as DigitalOutputDevice

@@ -34,7 +34,7 @@ from constants import (
 from monitoring.socket_io import send_card_registered
 from tools.queries import get_alert_delay, get_arm_delay
 
-if os.uname()[4][:3] == "arm":
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitoring.adapters.keypads.dsc import DSCKeypad
     from monitoring.adapters.keypads.wiegand import WiegandKeypad
 
@@ -92,7 +92,7 @@ class KeypadHandler(Thread):
             return
 
         # check if running on Raspberry
-        if os.uname()[4][:3] != "arm":
+        if os.environ.get("USE_SIMULATOR", "true").lower() == "true":
             self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
             keypad_settings.type.name = "MOCK"
             # see data.py -=> env_test_01

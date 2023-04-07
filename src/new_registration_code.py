@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
 
 import contextlib
 import logging

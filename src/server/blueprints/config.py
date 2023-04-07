@@ -41,11 +41,11 @@ def option(option, section):
                 return process_ipc_response(IPCClient().update_configuration())
         elif db_option.name == "network" and db_option.section == "dyndns":
             # update dyndns in production mode
-            if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
+            if os.environ.get("USE_SECURE_CONNECTION", "true").lower() == "true":
                 return process_ipc_response(IPCClient().update_dyndns())
         elif db_option.name == "network" and db_option.section == "access":
             # update ssh service in production mode
-            if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
+            if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
                 return process_ipc_response(IPCClient().update_ssh())
 
         return make_response("", 204)

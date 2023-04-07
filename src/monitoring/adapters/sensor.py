@@ -5,7 +5,7 @@ from monitoring.adapters import SPI_CLK, SPI_MISO, SPI_MOSI
 from constants import LOG_ADSENSOR
 
 # check if running on Raspberry
-if os.uname()[4][:3] == "arm":
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import MCP3008
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008

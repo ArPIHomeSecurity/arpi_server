@@ -18,7 +18,7 @@ from monitoring.notifications.notification import Notification, NotificationType
 
 
 # check if running on Raspberry
-if os.uname()[4][:3] == "arm":
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitoring.adapters.gsm import GSM
 else:
     from monitoring.adapters.mock.gsm import GSM

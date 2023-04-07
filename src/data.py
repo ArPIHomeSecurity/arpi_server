@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
 
 import argparse
 
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-
 from models import Keypad, KeypadType, Sensor, SensorType, User, Zone
 from monitoring.database import Session
 from models import metadata
@@ -157,7 +159,7 @@ def main():
 
     if args.create:
         create_method = globals()[f"env_{args.create}"]
-        print("Creating '%s' environment..." % args.create)
+        print(f"Creating '{args.create}' environment...")
         create_method()
         print("Environment created")
 
