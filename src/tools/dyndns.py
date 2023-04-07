@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
+
 import json
 import logging
 import socket
