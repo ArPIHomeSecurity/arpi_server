@@ -28,7 +28,7 @@ python-gsmmodem-new = "==0.12"
 python-jose = "==3.2.0"
 python-socketio = "==5.4.0"
 pytz = "==2021.1"
-pywiegand="==0.4.2"
+pywiegand="==0.4.3"
 stringcase = "==1.2.0"
 
 [dev-packages]
