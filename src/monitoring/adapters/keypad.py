@@ -13,7 +13,7 @@ from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
-from monitoring import storage
+from monitoring.storage import States
 from monitoring.adapters.keypads.base import Action, Function, KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.broadcast import Broadcaster
@@ -201,7 +201,7 @@ class KeypadHandler(Thread):
             self._keypad.start_delay(arm.start_time, arm_delay)
 
     def alert_delay(self):
-        arm_type = storage.get(storage.ARM_STATE)
+        arm_type = States.get(States.ARM_STATE)
         alert_delay = get_alert_delay(self.get_database_session(), arm_type)
         self._logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
 

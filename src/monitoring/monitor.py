@@ -11,7 +11,7 @@ from time import sleep
 from models import Alert, Arm, Disarm, Sensor, AlertSensor
 from monitoring.alert import SensorAlert
 
-from monitoring import storage
+from monitoring.storage import States
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
 from monitoring.broadcast import Broadcaster
@@ -86,8 +86,8 @@ class Monitor(Thread):
         self._actions = Queue()
         self._delay_timer = None
 
-        storage.set(storage.MONITORING_STATE, MONITORING_STARTUP)
-        storage.set(storage.ARM_STATE, ARM_DISARM)
+        States.set(States.MONITORING_STATE, MONITORING_STARTUP)
+        States.set(States.ARM_STATE, ARM_DISARM)
         self._broadcaster.register_queue(id(self), self._actions)
         self._logger.info("Monitoring created")
 
@@ -104,7 +104,7 @@ class Monitor(Thread):
         # initialize state
         send_alert_state(None)
         send_syren_state(None)
-        storage.set(storage.ARM_STATE, ARM_DISARM)
+        States.set(States.ARM_STATE, ARM_DISARM)
 
         self.load_sensors()
 
@@ -153,16 +153,16 @@ class Monitor(Thread):
 
         def stop_arm_delay():
             self._logger.debug("End arm delay => armed!!!")
-            storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
+            States.set(States.MONITORING_STATE, MONITORING_ARMED)
 
-        storage.set(storage.ARM_STATE, arm_type)
+        States.set(States.ARM_STATE, arm_type)
         self._logger.debug("Arm with delay: %s / %s", arm_delay, arm_type)
         if arm_delay is not None:
-            storage.set(storage.MONITORING_STATE, MONITORING_ARM_DELAY)
+            States.set(States.MONITORING_STATE, MONITORING_ARM_DELAY)
             self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
         else:
-            storage.set(storage.MONITORING_STATE, MONITORING_ARMED)
+            States.set(States.MONITORING_STATE, MONITORING_ARMED)
 
     def disarm_monitoring(self, user_id, keypad_id):
         if self._delay_timer:
@@ -174,8 +174,8 @@ class Monitor(Thread):
         self._db_session.add(disarm)
         self._db_session.commit()
 
-        current_state = storage.get(storage.MONITORING_STATE)
-        current_arm = storage.get(storage.ARM_STATE)
+        current_state = States.get(States.MONITORING_STATE)
+        current_arm = States.get(States.ARM_STATE)
         if (
             current_state in (
                             MONITORING_ARM_DELAY,
@@ -185,8 +185,8 @@ class Monitor(Thread):
             and current_arm in (ARM_AWAY, ARM_STAY)
             or current_state == MONITORING_SABOTAGE
         ):
-            storage.set(storage.ARM_STATE, ARM_DISARM)
-            storage.set(storage.MONITORING_STATE, MONITORING_READY)
+            States.set(States.ARM_STATE, ARM_DISARM)
+            States.set(States.MONITORING_STATE, MONITORING_READY)
 
         self.stop_alert(disarm)
 
@@ -194,10 +194,10 @@ class Monitor(Thread):
         # load the value once from the adapter
         new_power_source = self._powerAdapter.source_type
         if new_power_source == PowerAdapter.SOURCE_BATTERY:
-            storage.set(storage.POWER_STATE, POWER_SOURCE_BATTERY)
+            States.set(States.POWER_STATE, POWER_SOURCE_BATTERY)
             self._logger.debug("System works from battery")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK:
-            storage.set(storage.POWER_STATE, POWER_SOURCE_NETWORK)
+            States.set(States.POWER_STATE, POWER_SOURCE_NETWORK)
             self._logger.debug("System works from network")
 
         if new_power_source == PowerAdapter.SOURCE_BATTERY and self._power_source == PowerAdapter.SOURCE_NETWORK:
@@ -227,7 +227,7 @@ class Monitor(Thread):
 
     def load_sensors(self):
         """Load the sensors from the db in the thread to avoid session problems"""
-        storage.set(storage.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
+        States.set(States.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
         # TODO: wait a little bit to see status for debug
@@ -245,17 +245,17 @@ class Monitor(Thread):
                 self._sensorAdapter.channel_count,
             )
             self._sensors = []
-            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
+            States.set(States.MONITORING_STATE, MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
             self._logger.info("Invalid channel configuration")
             self._sensors = []
-            storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
+            States.set(States.MONITORING_STATE, MONITORING_INVALID_CONFIG)
         elif self.has_uninitialized_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
-            storage.set(storage.MONITORING_STATE, MONITORING_READY)
+            States.set(States.MONITORING_STATE, MONITORING_READY)
         else:
-            storage.set(storage.MONITORING_STATE, MONITORING_READY)
+            States.set(States.MONITORING_STATE, MONITORING_READY)
 
         send_sensors_state(False)
 
@@ -368,8 +368,8 @@ class Monitor(Thread):
         """
 
         # save current state to avoid concurrency
-        current_arm = storage.get(storage.ARM_STATE)
-        current_monitoring = storage.get(storage.MONITORING_STATE)
+        current_arm = States.get(States.ARM_STATE)
+        current_monitoring = States.get(States.MONITORING_STATE)
         now = dt.now()
         self._logger.debug("Checking sensors in %s/%s", current_arm, current_monitoring)
 

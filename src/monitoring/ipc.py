@@ -28,7 +28,7 @@ from constants import (
     SEND_TEST_SYREN,
     UPDATE_SSH,
 )
-from monitoring import storage
+from monitoring.storage import States
 from monitoring.alert import Syren
 from monitoring.notifications.notifier import Notifier
 from tools.clock import Clock
@@ -106,11 +106,11 @@ class IPCServer(Thread):
             self._logger.info("IPC action received: %s", message["action"])
             self._broadcaster.send_message(message=message)
         elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
+            return_value["value"] = {"type": States.get(States.ARM_STATE)}
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": storage.get(storage.MONITORING_STATE)}
+            return_value["value"] = {"state": States.get(States.MONITORING_STATE)}
         elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
+            return_value["value"] = {"state": States.get(States.POWER_STATE)}
         elif message["action"] == UPDATE_SECURE_CONNECTION:
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
