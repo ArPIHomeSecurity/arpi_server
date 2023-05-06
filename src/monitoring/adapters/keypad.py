@@ -198,7 +198,7 @@ class KeypadHandler(Thread):
         self._logger.debug("Arm: %s", arm)
 
         if arm_delay is not None and arm_delay > 0:
-            self._keypad.start_delay(arm.start_time, arm_delay)
+            self._keypad.start_delay(arm.time, arm_delay)
 
     def alert_delay(self):
         arm_type = States.get(States.ARM_STATE)
