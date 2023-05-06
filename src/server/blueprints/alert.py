@@ -8,7 +8,7 @@ from sqlalchemy import or_
 from sqlalchemy.dialects import postgresql
 
 from constants import ROLE_USER, ARM_DISARM
-from models import Alert, Arm, Disarm
+from models import Alert, Arm, Disarm, ArmSensor
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 
@@ -88,12 +88,27 @@ def get_arms():
 
     results = []
     for i in query_events.all():
-        #current_app.logger.info("DB events: %s", str(i))
+        # current_app.logger.info("DB events: %s", str(i))
         event = {}
         if i[0]:
             event["arm"] = i[0].serialized
             if i[0].alert:
                 event["alert"] = i[0].alert.serialized
+            
+            sensors_by_timestamp = {}
+            for sensor in i[0].sensors:
+                if sensor.serialized["timestamp"] in sensors_by_timestamp:
+                    sensors_by_timestamp[sensor.serialized["timestamp"]].append(sensor.serialized)
+                else:
+                    sensors_by_timestamp[sensor.serialized["timestamp"]] = [sensor.serialized]
+
+            event["armSensors"] = []
+            for timestamp, sensors in sensors_by_timestamp.items():
+                event["armSensors"].append({
+                    "timestamp": timestamp,
+                    "sensors": sensors
+                })
+
         if i[1]:
             event["disarm"] = i[1].serialized
             if i[1].alert:

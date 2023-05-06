@@ -1,3 +1,4 @@
+import enum
 import hashlib
 import json
 import locale
@@ -7,16 +8,17 @@ from copy import deepcopy
 from datetime import date, timedelta, datetime as dt
 from re import search
 from dateutil.tz.tz import tzlocal
+from typing import List
 
-from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.schema import ForeignKey
 from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
-from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_DISARM, ARM_STAY
-
-from tools.dictionary import merge_dicts, filter_keys
 from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
+
+from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_STAY, ARM_DISARM, ARM_MIXED
+from tools.dictionary import merge_dicts, filter_keys
 
 
 def hash_code(access_code):
@@ -26,6 +28,28 @@ def hash_code(access_code):
 def convert2camel(data):
     """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
     return {camelcase(key): value for key, value in data.items()}
+
+
+class ArmStates(str, enum.Enum):
+    AWAY = ARM_AWAY
+    STAY = ARM_STAY
+    MIXED = ARM_MIXED
+    DISARM = ARM_DISARM
+
+    @staticmethod
+    def merge(as1, as2):
+        if as1 == as2:
+            return as1
+        elif as1 != ArmStates.DISARM and as2 != ArmStates.DISARM:
+            return ArmStates.MIXED
+        elif as1 == ArmStates.DISARM or as2 == ArmStates.DISARM:
+            if as1 == ArmStates.DISARM:
+                return as2
+            elif as2 == ArmStates.DISARM:
+                return as1
+        else:
+            return ArmStates.DISARM
+
 
 
 metadata = MetaData()
@@ -118,13 +142,17 @@ class Sensor(BaseModel):
     zone_id = Column(Integer, ForeignKey("zone.id"), nullable=False)
     zone = relationship("Zone", back_populates="sensors")
 
+    area_id = Column(Integer, ForeignKey("area.id"), nullable=False)
+    area = relationship("Area", back_populates="sensors")
+
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
 
-    def __init__(self, channel, sensor_type, zone=None, description=None):
+    def __init__(self, channel, sensor_type, zone=None, area=None, description=None):
         self.channel = channel
         self.zone = zone
+        self.area = area
         self.type = sensor_type
         self.description = description
         self.enabled = True
@@ -135,12 +163,12 @@ class Sensor(BaseModel):
         if data["channel"] != self.channel:
             self.reference_value = None
 
-        return self.update_record(("channel", "enabled", "description", "zone_id", "type_id"), data)
+        return self.update_record(("channel", "enabled", "description", "zone_id", "area_id", "type_id"), data)
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "type_id", "enabled"))
+            self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "area_id", "type_id", "enabled"))
         )
 
     @validates("name")
@@ -199,6 +227,9 @@ class Alert(BaseModel):
 
 
 class AlertSensor(BaseModel):
+    """
+    Storing the state of the sensors when the alert started.
+    """
     __tablename__ = "alert_sensor"
     alert_id = Column(Integer, ForeignKey("alert.id"), primary_key=True)
     sensor_id = Column(Integer, ForeignKey("sensor.id"), primary_key=True)
@@ -225,15 +256,19 @@ class AlertSensor(BaseModel):
 
 
 class Arm(BaseModel):
+    """
+    Storing arm events.
+    """
     __tablename__ = "arm"
     id = Column(Integer, primary_key=True)
-    type = Column(String)
-    time = Column(DateTime(timezone=True))
+    type = Column(Enum(ArmStates), nullable=False)
+    time = Column(DateTime(timezone=True), nullable=False)
     keypad_id = Column(Integer, ForeignKey("keypad.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
 
     alert_id = Column(Integer, ForeignKey("alert.id"), nullable=True)
     alert: Mapped["Alert"] = relationship(back_populates="arm")
+    sensors: Mapped[List["ArmSensor"]] = relationship(back_populates="arm")
 
     disarm: Mapped["Disarm"] = relationship(back_populates="arm")
 
@@ -250,6 +285,9 @@ class Arm(BaseModel):
 
 
 class Disarm(BaseModel):
+    """
+    Storing disarm events.
+    """
     __tablename__ = "disarm"
     id = Column(Integer, primary_key=True)
     time = Column(DateTime(timezone=True))
@@ -272,6 +310,54 @@ class Disarm(BaseModel):
     def serialized(self):
         response = self.serialize_attributes(("time", "keypad_id", "user_id"))
         return convert2camel(response)
+
+
+class ArmSensor(BaseModel):
+    """
+    Storing the state of the sensors when an arm is changed.
+    """
+    __tablename__ = "arm_sensor"
+    id = Column(Integer, primary_key=True)
+    arm_id = Column(Integer, ForeignKey("arm.id"))
+    sensor_id = Column(Integer, ForeignKey("sensor.id"))
+    channel = Column(Integer, nullable=False)
+    type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
+    description = Column(String, nullable=False)
+    timestamp = Column(DateTime(timezone=True))
+    delay = Column(Integer, nullable=True)
+    enabled = Column(Boolean, nullable=False)
+
+    sensor = relationship("Sensor")
+    arm = relationship("Arm", back_populates="sensors")
+
+    def __init__(self, arm_id, sensor_id, channel, type_id, description, timestamp, delay, enabled):
+        self.arm_id = arm_id
+        self.sensor_id = sensor_id
+        self.channel = channel
+        self.type_id = type_id
+        self.description = description
+        self.timestamp = timestamp
+        self.delay = delay
+        self.enabled = enabled
+
+    @classmethod
+    def from_sensor(cls, arm: Arm, sensor: Sensor, timestamp: DateTime, delay: Integer):
+        return ArmSensor(
+            arm_id=arm.id,
+            sensor_id=sensor.id,
+            channel=sensor.channel,
+            type_id=sensor.type_id,
+            description=sensor.description,
+            timestamp=timestamp,
+            delay=delay,
+            enabled=sensor.enabled
+        )
+
+    @property
+    def serialized(self):
+        return convert2camel(self.serialize_attributes(
+            ("sensor_id", "channel", "type_id", "description", "timestamp", "delay", "enabled"))
+        )
 
 
 class Zone(BaseModel):
@@ -321,6 +407,33 @@ class Zone(BaseModel):
         return name
 
 
+class Area(BaseModel):
+    """Model for area table"""
+
+    __tablename__ = "area"
+
+    NAME_LENGTH = 32
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(NAME_LENGTH), nullable=False)
+    arm_state = Column(Enum(ArmStates), nullable=False)
+
+    sensors = relationship("Sensor", back_populates="area")
+
+    def __init__(self, name="area"):
+        self.name = name
+        self.arm_state = ArmStates.DISARM
+
+    @property
+    def serialized(self):
+        return convert2camel(
+            self.serialize_attributes(("id", "name", "arm_state"))
+        )
+
+    def update(self, data):
+        return self.update_record(("name", "arm_state"), data)
+
+
 class User(BaseModel):
     """Model for role table"""
 
@@ -348,7 +461,7 @@ class User(BaseModel):
         self.email = ""
         self.role = role
         self.access_code = hash_code(access_code)
-        self.fourkey_code = hash_code(access_code[:4])
+        self.fourkey_code = fourkey_code or hash_code(access_code[:4])
 
     def update(self, data):
         # !!! incoming data has camelCase key/field name format

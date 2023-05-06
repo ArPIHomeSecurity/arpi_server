@@ -74,6 +74,7 @@ SEND_TEST_SYREN = "send_test_syren"
 USER_TOKEN_EXPIRY = 60 * 15
 
 # arm types
+ARM_MIXED = "arm_mixed"
 ARM_AWAY = "arm_away"
 ARM_STAY = "arm_stay"
 ARM_DISARM = "disarm"

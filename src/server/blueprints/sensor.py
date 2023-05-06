@@ -1,7 +1,7 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request, current_app
 from flask.helpers import make_response
-from models import Sensor, SensorType, Zone
+from models import Sensor, SensorType, Zone, Area
 
 from constants import ROLE_USER
 
@@ -31,10 +31,12 @@ def view_sensors():
 def create_sensor():
     data = request.json
     zone = db.session.query(Zone).get(request.json["zoneId"])
+    area = db.session.query(Area).get(request.json["areaId"])
     sensor_type = db.session.query(SensorType).get(data["typeId"])
     sensor = Sensor(
         channel=data["channel"],
         zone=zone,
+        area=area,
         sensor_type=sensor_type,
         description=data["description"],
     )

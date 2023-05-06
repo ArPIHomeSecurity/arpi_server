@@ -42,19 +42,33 @@ class IPCClient(object):
             except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
 
-    def disarm(self, user_id):
-        return self._send_message({"action": MONITOR_DISARM, "user_id": user_id})
-
     def get_arm(self):
         return self._send_message({"action": MONITOR_GET_ARM})
 
-    def arm(self, arm_type, user_id):
+    def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:
-            return self._send_message({"action": MONITOR_ARM_AWAY, "user_id": user_id, "delay": False})
+            return self._send_message({
+                "action": MONITOR_ARM_AWAY,
+                "user_id": user_id,
+                "area_id": area_id,
+                "delay": False
+            })
         elif arm_type == ARM_STAY:
-            return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id, "delay": False})
+            return self._send_message({
+                "action": MONITOR_ARM_STAY,
+                "user_id": user_id,
+                "area_id": area_id,
+                "delay": False
+            })
         else:
             print(f"Unknown arm type: {arm_type}")
+
+    def disarm(self, user_id, area_id=None):
+        return self._send_message({
+            "action": MONITOR_DISARM,
+            "user_id": user_id,
+            "area_id": area_id
+        })
 
     def get_state(self):
         return self._send_message({"action": MONITOR_GET_STATE})
