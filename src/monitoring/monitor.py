@@ -547,10 +547,10 @@ class Monitor(Thread):
                 # do not start alert if in delay
                 if (current_monitoring != MONITORING_ALERT_DELAY and
                         delay is not None and
-                        (arm is not None and arm.start_time.replace(tzinfo=None) + timedelta(seconds=delay) > now)):
+                        (arm is not None and arm.time.replace(tzinfo=None) + timedelta(seconds=delay) > now)):
                     self._logger.debug("Ignore alert on sensor(%s): %s + %s < %s",
                                        sensor.id,
-                                       arm.start_time.replace(tzinfo=None),
+                                       arm.time.replace(tzinfo=None),
                                        timedelta(seconds=delay),
                                        now)
                     # ignore alert
