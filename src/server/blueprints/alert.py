@@ -102,9 +102,9 @@ def get_arms():
                 else:
                     sensors_by_timestamp[sensor.serialized["timestamp"]] = [sensor.serialized]
 
-            event["armSensors"] = []
+            event["sensorChanges"] = []
             for timestamp, sensors in sensors_by_timestamp.items():
-                event["armSensors"].append({
+                event["sensorChanges"].append({
                     "timestamp": timestamp,
                     "sensors": sensors
                 })
