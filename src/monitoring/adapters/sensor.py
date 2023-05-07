@@ -54,8 +54,9 @@ class SensorAdapter(object):
         We have IO_NUMBER of channels we can use for sensors,
         the last channel is for sensing the battery mode.
         """
-        self._logger.debug("Value[%s]: %.4f", channel, self._channels[channel].value)
-        return self._channels[channel].value if 0 <= channel <= (self.INPUT_CHANNELS_NUMBER - 1) else 0
+        value = self._channels[channel].value
+        self._logger.debug("Value[CH%02d]: %.4f", channel+1, value)
+        return value if 0 <= channel <= (self.INPUT_CHANNELS_NUMBER - 1) else 0
 
     def get_values(self):
         """
