@@ -7,6 +7,7 @@ from flask_migrate import Migrate
 
 from server.blueprints.alert import alert_blueprint
 from server.blueprints.area import area_blueprint
+from server.blueprints.arm import arm_blueprint
 from server.blueprints.card import card_blueprint
 from server.blueprints.clock import clock_blueprint
 from server.blueprints.config import config_blueprint
@@ -50,6 +51,7 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 app.register_blueprint(alert_blueprint)
+app.register_blueprint(arm_blueprint)
 app.register_blueprint(area_blueprint)
 app.register_blueprint(card_blueprint)
 app.register_blueprint(clock_blueprint)
