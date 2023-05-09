@@ -417,6 +417,7 @@ class Area(BaseModel):
     id = Column(Integer, primary_key=True)
     name = Column(String(NAME_LENGTH), nullable=False)
     arm_state = Column(Enum(ArmStates), nullable=False)
+    deleted = Column(Boolean, default=False)
 
     sensors = relationship("Sensor", back_populates="area")
 

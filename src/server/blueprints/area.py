@@ -16,7 +16,7 @@ area_blueprint = Blueprint("area", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_areas():
-    return jsonify([i.serialized for i in db.session.query(Area).order_by(Area.id.asc()).all()])
+    return jsonify([i.serialized for i in db.session.query(Area).filter_by(deleted=False).order_by(Area.id.asc()).all()])
 
 
 @area_blueprint.route("/api/areas/", methods=["POST"])
@@ -44,7 +44,7 @@ def area(area_id):
     elif request.method == "DELETE":
         area = db.session.query(Area).get(area_id)
         if area:
-            db.session.delete(area)
+            area.deleted = True
             db.session.commit()
             return process_ipc_response(IPCClient().update_configuration())
 
