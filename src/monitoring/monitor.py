@@ -180,8 +180,8 @@ class Monitor(Thread):
                 self.arm_system(self.get_areas_state(), user_id=user_id, delay=False, keypad_id=None)
             else:
                 areas_state = self.get_areas_state()
-                if areas_state != States.get(States.ARM_STATE):
-                    States.set(States.ARM_STATE, areas_state)
+                # send always notification
+                States.set(States.ARM_STATE, areas_state)
 
         self.update_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
 
@@ -264,7 +264,6 @@ class Monitor(Thread):
             self.arm_areas(ARM_DISARM)
             self.disarm_system(user_id, keypad_id)
 
-
     def disarm_system(self, user_id, keypad_id):
         self._logger.info("Disarming system")
         if self._delay_timer:
@@ -291,7 +290,6 @@ class Monitor(Thread):
             States.set(States.MONITORING_STATE, MONITORING_READY)
 
         self.stop_alert(disarm)
-        
 
     def check_power(self):
         # load the value once from the adapter
@@ -369,13 +367,17 @@ class Monitor(Thread):
             self._logger.info("New references: %s", new_references)
             self.save_sensor_references(new_references)
         else:
-            self._logger.error("Error measure values! %s", self._references)
+            self._logger.error("Error measure values! %s", new_references)
 
     def has_uninitialized_sensor(self):
         return any(sensor.reference_value is None for sensor in self._sensors)
 
     def cleanup_database(self):
         changed = False
+        for area in self._db_session.query(Area).filter(Area.arm_state != ARM_DISARM).all():
+            area.arm_state = ARM_DISARM
+            changed = True
+
         for sensor in self._db_session.query(Sensor).all():
             if sensor.alert:
                 sensor.alert = False
@@ -397,10 +399,6 @@ class Monitor(Thread):
             disarm = Disarm(arm_id=arm.id, time=dt.now())
             self._db_session.add(disarm)
             self._logger.debug("Cleared arm (id=%s)", arm.id)
-            changed = True
-
-        for area in self._db_session.query(Area).filter(Area.arm_state!=ARM_DISARM).all():
-            area.arm_state = ARM_DISARM
             changed = True
 
         if changed:
@@ -579,7 +577,6 @@ class Monitor(Thread):
                     self._alerting_sensors.remove(sensor.id)
                 else:
                     self._logger.debug("Cleared sensor alert: sensor id=%s (already closed in alert)", sensor.id)
-
 
     def stop_alert(self, disarm: Disarm):
         SensorAlert.stop_alerts(disarm)
