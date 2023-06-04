@@ -6,7 +6,7 @@ from time import sleep
 from gpiozero import LED
 from pywiegand import WiegandReader
 
-from monitoring.adapters.keypads.base import Function, KeypadBase
+from monitor.adapters.keypads.base import Function, KeypadBase
 from constants import LOG_ADKEYPAD
 
 

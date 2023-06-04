@@ -5,9 +5,9 @@ from threading import Thread, Event
 from time import time
 
 from models import Alert, Option
-from monitoring.adapters.syren import SyrenAdapter
-from monitoring.database import Session
-from monitoring.socket_io import send_syren_state
+from monitor.adapters.syren import SyrenAdapter
+from monitor.database import Session
+from monitor.socket_io import send_syren_state
 
 from constants import (
     LOG_ALERT,

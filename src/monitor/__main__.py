@@ -4,13 +4,13 @@ from signal import SIGTERM, signal
 from threading import Event
 from time import sleep
 
-from monitoring.adapters.keypad import KeypadHandler
-from monitoring.broadcast import Broadcaster
+from monitor.adapters.keypad import KeypadHandler
+from monitor.broadcast import Broadcaster
 from constants import LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP
-from monitoring.ipc import IPCServer
-from monitoring.monitor import Monitor
-from monitoring.notifications.notifier import Notifier
-from monitoring.socket_io import start_socketio
+from monitor.ipc import IPCServer
+from monitor.monitor import Monitor
+from monitor.notifications.notifier import Notifier
+from monitor.socket_io import start_socketio
 from tools.ssh import SSH
 
 

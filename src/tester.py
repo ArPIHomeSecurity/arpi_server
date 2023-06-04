@@ -5,8 +5,8 @@ from time import sleep
 
 import argparse
 
-from monitoring.adapters.sensor import SensorAdapter
-from monitoring.adapters.syren import SyrenAdapter
+from monitor.adapters.sensor import SensorAdapter
+from monitor.adapters.syren import SyrenAdapter
 
 basicConfig(format="%(message)s", level=DEBUG)
 

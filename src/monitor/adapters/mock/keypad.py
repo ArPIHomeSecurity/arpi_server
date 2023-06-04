@@ -3,7 +3,7 @@ import os
 
 from time import sleep, time
 
-from monitoring.adapters.keypads.base import Function, KeypadBase
+from monitor.adapters.keypads.base import Function, KeypadBase
 from constants import LOG_ADKEYPAD
 
 
@@ -12,8 +12,6 @@ class MockKeypad(KeypadBase):
     # ACTIONS = "1234    1111      9876   65       C0C1"
     # ACTIONS = "                                    C1"
     # ACTIONS = "                                                            1234"
-    ACTIONS = "                                                                  A"
-    # ACTIONS = " "
     CARDS = [
         "305419896",  # 12:34:56:78   <== C0
         "272625547",  # 10:3F:EF:8B   <== C1

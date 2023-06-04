@@ -28,9 +28,9 @@ from constants import (
     SEND_TEST_SYREN,
     UPDATE_SSH,
 )
-from monitoring.storage import States
-from monitoring.alert import Syren
-from monitoring.notifications.notifier import Notifier
+from monitor.storage import States
+from monitor.alert import Syren
+from monitor.notifications.notifier import Notifier
 from tools.clock import Clock
 from tools.connection import SecureConnection
 from tools.ssh import SSH

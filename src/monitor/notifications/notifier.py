@@ -10,18 +10,18 @@ from threading import Thread
 from time import sleep, time
 
 from models import Option
-from monitoring.broadcast import Broadcaster
+from monitor.broadcast import Broadcaster
 from constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
-from monitoring.adapters.smtp import SMTPSender
-from monitoring.database import Session
-from monitoring.notifications.notification import Notification, NotificationType
+from monitor.adapters.smtp import SMTPSender
+from monitor.database import Session
+from monitor.notifications.notification import Notification, NotificationType
 
 
 # check if running on Raspberry
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitoring.adapters.gsm import GSM
+    from monitor.adapters.gsm import GSM
 else:
-    from monitoring.adapters.mock.gsm import GSM
+    from monitor.adapters.mock.gsm import GSM
 
 
 """

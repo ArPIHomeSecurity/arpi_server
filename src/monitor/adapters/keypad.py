@@ -13,10 +13,10 @@ from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
-from monitoring.storage import States
-from monitoring.adapters.keypads.base import Action, Function, KeypadBase
-from monitoring.adapters.mock.keypad import MockKeypad
-from monitoring.broadcast import Broadcaster
+from monitor.storage import States
+from monitor.adapters.keypads.base import Action, Function, KeypadBase
+from monitor.adapters.mock.keypad import MockKeypad
+from monitor.broadcast import Broadcaster
 from constants import (
     ARM_AWAY,
     ARM_STAY,
@@ -31,12 +31,12 @@ from constants import (
     MONITORING_ALERT_DELAY,
     THREAD_KEYPAD,
 )
-from monitoring.socket_io import send_card_registered
+from monitor.socket_io import send_card_registered
 from tools.queries import get_alert_delay, get_arm_delay
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitoring.adapters.keypads.dsc import DSCKeypad
-    from monitoring.adapters.keypads.wiegand import WiegandKeypad
+    from monitor.adapters.keypads.dsc import DSCKeypad
+    from monitor.adapters.keypads.wiegand import WiegandKeypad
 
 COMMUNICATION_PERIOD = 0.2  # sec
 

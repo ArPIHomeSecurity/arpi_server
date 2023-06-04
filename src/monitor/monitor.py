@@ -8,14 +8,14 @@ from threading import Thread, Timer
 from time import sleep
 
 from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
-from monitoring.alert import SensorAlert
+from monitor.alert import SensorAlert
 
-from monitoring.storage import States
-from monitoring.adapters.power import PowerAdapter
-from monitoring.adapters.sensor import SensorAdapter
-from monitoring.broadcast import Broadcaster
-from monitoring.notifications.notifier import Notifier
-from monitoring.syren import Syren
+from monitor.storage import States
+from monitor.adapters.power import PowerAdapter
+from monitor.adapters.sensor import SensorAdapter
+from monitor.broadcast import Broadcaster
+from monitor.notifications.notifier import Notifier
+from monitor.syren import Syren
 from constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -43,8 +43,8 @@ from constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
-from monitoring.database import Session
-from monitoring.socket_io import (
+from monitor.database import Session
+from monitor.socket_io import (
     send_alert_state,
     send_area_state,
     send_power_state,

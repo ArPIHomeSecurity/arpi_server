@@ -7,7 +7,7 @@
 import os
 import logging
 
-from monitoring.adapters import SPI_CLK, SPI_MISO, SPI_MOSI
+from monitor.adapters import SPI_CLK, SPI_MISO, SPI_MOSI
 from constants import LOG_ADPOWER
 
 # check if running on Raspberry
@@ -15,7 +15,7 @@ if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import MCP3008
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitoring.adapters.mock.MCP3008 import Power as MCP3008
+    from monitor.adapters.mock.MCP3008 import Power as MCP3008
 
 
 class PowerAdapter(object):

@@ -2,7 +2,7 @@
 
 from threading import Lock
 
-from monitoring.socket_io import send_arm_state, send_system_state
+from monitor.socket_io import send_arm_state, send_system_state
 
 
 class States:

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
-from monitoring.notifications.templates import (
+from monitor.notifications.templates import (
     ALERT_STARTED_EMAIL,
     ALERT_STARTED_SMS,
     ALERT_STOPPED_EMAIL,

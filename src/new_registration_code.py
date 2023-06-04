@@ -13,7 +13,7 @@ from logging import basicConfig
 from time import sleep
 
 from models import User
-from monitoring.database import Session
+from monitor.database import Session
 
 
 description = """

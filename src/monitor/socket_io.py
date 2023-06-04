@@ -13,7 +13,7 @@ import jose.exceptions
 
 from models import Option
 from constants import LOG_SOCKETIO
-from monitoring.database import Session
+from monitor.database import Session
 
 
 session = Session()

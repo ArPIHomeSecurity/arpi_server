@@ -4,12 +4,12 @@ from datetime import datetime
 from threading import Thread, Event
 
 from models import Alert, AlertSensor, Arm, Disarm, Sensor
-from monitoring.storage import States
-from monitoring.broadcast import Broadcaster
-from monitoring.database import Session
-from monitoring.notifications.notifier import Notifier
-from monitoring.socket_io import send_syren_state, send_alert_state
-from monitoring.syren import Syren
+from monitor.storage import States
+from monitor.broadcast import Broadcaster
+from monitor.database import Session
+from monitor.notifications.notifier import Notifier
+from monitor.socket_io import send_syren_state, send_alert_state
+from monitor.syren import Syren
 from constants import (
     ALERT_SABOTAGE,
     MONITORING_ALERT,

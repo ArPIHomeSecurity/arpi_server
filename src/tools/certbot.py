@@ -14,7 +14,7 @@ from pydbus import SystemBus
 
 from models import Option
 from constants import LOG_SC_CERTBOT
-from monitoring.database import Session
+from monitor.database import Session
 from tools.dictionary import filter_keys
 
 

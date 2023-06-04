@@ -6,7 +6,7 @@ from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
 
-from monitoring.adapters.keypads.delay import DelayPhase, Handler
+from monitor.adapters.keypads.delay import DelayPhase, Handler
 
 
 class Action(Enum):

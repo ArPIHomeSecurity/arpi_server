@@ -9,7 +9,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
 from models import Keypad, KeypadType, Sensor, SensorType, User, Zone
-from monitoring.database import Session
+from monitor.database import Session
 from models import metadata
 
 

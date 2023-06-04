@@ -14,7 +14,7 @@ import requests
 from socket import gaierror
 
 from models import Option
-from monitoring.database import Session
+from monitor.database import Session
 from constants import LOG_SC_DYNDNS
 from tools.dictionary import filter_keys
 
