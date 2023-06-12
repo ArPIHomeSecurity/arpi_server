@@ -190,16 +190,18 @@ class Alert(BaseModel):
     id = Column(Integer, primary_key=True)
     start_time = Column(DateTime(timezone=True))
     end_time = Column(DateTime(timezone=True))
+    silent = Column(Boolean, nullable=True, default=False)
 
     sensors = relationship("AlertSensor", back_populates="alert")
     arm: Mapped["Arm"] = relationship(back_populates="alert")
     disarm: Mapped["Disarm"] = relationship(back_populates="alert")
 
-    def __init__(self, arm, start_time, sensors, end_time=None):
+    def __init__(self, arm, start_time, sensors, silent=None, end_time=None):
         self.arm = arm
         self.start_time = start_time
         self.end_time = end_time
         self.sensors = sensors
+        self.silent = silent
 
     @staticmethod
     def get_alert_type(arm_type):
@@ -221,6 +223,7 @@ class Alert(BaseModel):
                 "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
                             if self.end_time
                             else None,
+                "silent": self.silent,
                 "sensors": [alert_sensor.serialized for alert_sensor in self.sensors],
             }
         )

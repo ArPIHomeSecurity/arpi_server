@@ -9,10 +9,7 @@ from monitor.adapters.syren import SyrenAdapter
 from monitor.database import Session
 from monitor.socket_io import send_syren_state
 
-from constants import (
-    LOG_ALERT,
-    THREAD_ALERT
-)
+from constants import LOG_ALERT, THREAD_ALERT
 
 
 class Syren(Thread):
@@ -20,9 +17,10 @@ class Syren(Thread):
     Handling of syren alerts.
     """
 
-    # default timing
-    ALERT_TIME = 10  # 10 minutes
-    SUSPEND_TIME = 5  # 5 minutes
+    # default config
+    SILENT = False      # never
+    DELAY = 0           # 5 seconds
+    STOP_TIME = 600     # 10 seconds
 
     _is_running = False
     _stop_event = Event()
@@ -51,39 +49,65 @@ class Syren(Thread):
         self._alert = None
         self._syren_config = {}
 
-    def run(self):
-        self.load_syren_config()
+    def get_alert(self) -> Alert:
+        return self._db_session.query(Alert).filter_by(end_time=None).first()
 
+    def run(self):
+        self._db_session = Session()
+
+        self.load_syren_config()
+        SILENT = self._syren_config.get("silent", Syren.SILENT)
+
+        alert = self.get_alert()
+        alert.silent = SILENT
+        self._db_session.commit()
+
+        if SILENT:
+            self._logger.info("Syren is in silent mode")
+            return
+
+        DELAY = self._syren_config.get("delay", Syren.DELAY)
+        STOP_TIME = self._syren_config.get("stop_time", Syren.STOP_TIME)
+
+        now = time()
         start_time = time()
-        syren_is_on = True
+        syren_is_on = False
         self._syren.alert(syren_is_on)
         send_syren_state(syren_is_on)
-
-        while not self._stop_event.is_set() and not self._stop_event.wait(timeout=1):
-            now = time()
-            if (now - start_time > self._syren_config.get("alert_time", Syren.ALERT_TIME)) and syren_is_on:
-                start_time = time()
-                syren_is_on = False
-                self._syren.alert(syren_is_on)
-                send_syren_state(syren_is_on)
-                self._logger.info("Syren suspended")
-            elif (now - start_time > self._syren_config.get("suspend_time", Syren.SUSPEND_TIME)) and not syren_is_on:
-                start_time = time()
+        while (
+            not self._stop_event.is_set()
+            and not self._stop_event.wait(timeout=1)
+        ):
+            if not syren_is_on and (now - start_time > DELAY):
+                self._logger.info("Syren turned on after delay")
+                # turn on the syren
                 syren_is_on = True
                 self._syren.alert(syren_is_on)
                 send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
+            elif syren_is_on and now - start_time > STOP_TIME:
+                self._logger.info("Syren stopped after time")
+                break
+
+            now = time()
+
+        # turn off the syren
+        syren_is_on = None
+        self._syren.alert(syren_is_on)
+        send_syren_state(syren_is_on)
+        self._logger.info("Syren stopped")
 
         self._logger.debug("Syren exited")
 
     def load_syren_config(self):
-        db_session = Session()
-        syren_config = db_session.query(Option).filter_by(name="syren", section="timing").first()
+        syren_config = self._db_session.query(Option).filter_by(name="syren", section="timing").first()
         if syren_config:
             self._syren_config = json.loads(syren_config.value)
-            self._logger.warn("Using syren config: %s )!", self._syren_config)
+            self._logger.info("Using syren config: %s )!", self._syren_config)
         else:
-            self._logger.warn("Missing syren settings (using defaults: %s / %s )!",
-                              Syren.ALERT_TIME,
-                              Syren.SUSPEND_TIME)
+            self._logger.warning(
+                "Missing syren settings (using defaults: %s / %s )!",
+                Syren.STOP_TIME,
+                Syren.DELAY,
+            )
             return

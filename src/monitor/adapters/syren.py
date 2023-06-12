@@ -36,10 +36,12 @@ class SyrenAdapter(object):
             self._logger.info("Syren on")
             self._is_alerting = True
             self._output.on()
-        else:
+        elif not start:
             self._logger.info("Syren off")
             self._is_alerting = False
             self._output.off()
+        elif start is not None:
+            self._logger.error("Syren invalid state")
 
     @property
     def is_alerting(self):

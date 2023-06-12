@@ -72,7 +72,6 @@ class SensorAlert(Thread):
             self._sensor_id,
             self._delay,
         )
-        self._db_session = Session()
 
         if self._delay > 0:
             States.set(States.MONITORING_STATE, MONITORING_ALERT_DELAY)
