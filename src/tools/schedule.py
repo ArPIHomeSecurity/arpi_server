@@ -7,14 +7,14 @@ from constants import LOG_IPC
 
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
-    "bash -c 'cd /home/argus/server/; "
-    "/home/argus/server/src/tools/dyndns.py'"
+    "bash -c 'cd /home/argus/server; "
+    "PYTHONPATH=src /home/argus/server/src/tools/dyndns.py'"
 )
 
 certbot_job = (
     "systemd-cat -t 'argus_certbot' "
-    "bash -c 'cd /home/argus/server/; "
-    "/home/argus/server/src/tools/certbot.py'"
+    "bash -c 'cd /home/argus/server; "
+    "PYTHONPATH=src /home/argus/server/src/tools/certbot.py'"
 )
 
 
