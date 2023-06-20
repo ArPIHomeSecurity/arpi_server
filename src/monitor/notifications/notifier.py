@@ -280,7 +280,7 @@ class Notifier(Thread):
 
     def notify_SMS(self, notification: Notification):
         template = notification.get_email_template()
-        if (self._options["subscriptions"]["sms"][notification.type] and
+        if (self._options["subscriptions"].get("sms", {}).get(notification.type, False) and
                 notification.sms_sent == False and
                 self._gsm):
             notification.sms_sent = \
@@ -290,8 +290,8 @@ class Notifier(Thread):
 
     def notify_email(self, notification: Notification):
         template = notification.get_email_template()
-        if (self._options["subscriptions"]["email1"][notification.type] and
-                notification.email1_sent == False and
+        if (self._options["subscriptions"].get("email1", {}).get(notification.type, False) and
+                notification.email1_sent is False and
                 self._smtp):
             notification.email1_sent = self._smtp.send_email(
                 to_address=self._options["smtp"].get("email1_address"),
@@ -301,8 +301,8 @@ class Notifier(Thread):
         else:
             notification.email1_sent = None
 
-        if (self._options["subscriptions"]["email2"][NotificationType.ALERT_STARTED] and
-                notification.email1_sent == False and
+        if (self._options["subscriptions"].get("email2", {}).get(notification.type, False) and
+                notification.email1_sent is False and
                 self._smtp):
             notification.email2_sent = self._smtp.send_email(
                 to_address=self._options["smtp"].get("email2_address"),
