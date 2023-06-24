@@ -307,7 +307,7 @@ class Monitor(Thread):
             self._logger.info("Power outage started!")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK and self._power_source == PowerAdapter.SOURCE_BATTERY:
             send_power_state(POWER_SOURCE_NETWORK)
-            Notifier.notify_power_outage_started(dt.now())
+            Notifier.notify_power_outage_stopped(dt.now())
             self._logger.info("Power outage ended!")
 
         self._power_source = new_power_source
