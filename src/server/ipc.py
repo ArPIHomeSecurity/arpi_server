@@ -110,6 +110,9 @@ class IPCClient(object):
 
     def _send_message(self, message):
         if self._socket:
-            self._socket.send(json.dumps(message).encode())
-            data = self._socket.recv(1024)
-            return json.loads(data.decode())
+            try:
+                self._socket.send(json.dumps(message).encode())
+                data = self._socket.recv(1024)
+                return json.loads(data.decode())
+            except ConnectionResetError:
+                self._logger.error("Sending message to monitor socket failed!")
