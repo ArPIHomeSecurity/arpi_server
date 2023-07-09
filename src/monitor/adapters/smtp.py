@@ -6,7 +6,13 @@ from socket import gaierror
 from constants import LOG_NOTIFIER
 
 
+class SMTPNotConnected(Exception):
+    """Thrown when SMTP is disconnected after a while."""
+    pass
+
+
 class SMTPSender:
+    """Class for sending messages in email."""
 
     def __init__(self, hostname, port, username, password) -> None:
         self._logger = logging.getLogger(LOG_NOTIFIER)
@@ -34,15 +40,37 @@ class SMTPSender:
             self._server.ehlo()
             self._server.starttls()
             self._server.login(self._username, self._password)
+            self._server.close()
             return True
         except (gaierror, SMTPException, OSError) as error:
             self._logger.error("Can't connect to SMTP server! Error: %s ", error)
             return False
 
     def send_email(self, to_address, subject, content):
+        """Send an email with re-try when disconnected."""
         if not self._server:
             return False
 
+        sent_email_counter = 0
+        while sent_email_counter <= 2:
+            try:
+                self._send_email(to_address, subject, content)
+                sent_email_counter = 2
+                self._logger.info("Sent email")
+                return True
+            except SMTPNotConnected:
+                # re-try when disconnected
+                self.setup()
+                sent_email_counter += 1
+            except SMTPException as error:
+                self._logger.error("Can't send email! Error: %s ", error)
+                return False
+
+        self._logger.error("Sending email failed")
+        return False
+
+    def _send_email(self, to_address, subject, content):
+        """Send an email and detect disconnected state."""
         try:
             self._logger.info("Sending email to '%s' ...", to_address)
             message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
@@ -52,13 +80,14 @@ class SMTPSender:
                 msg=message
             )
         except SMTPException as error:
-            self._logger.error("Can't send email! Error: %s ", error)
-            return False
+            if "please run connect() first" in str(error):
+                self._logger.warning("Can't send email because of disconnected server")
+                raise SMTPNotConnected from error
 
-        self._logger.info("Sent email")
-        return True
+            raise error
 
     def destroy(self):
+        """Destroy the connection"""
         if self._server:
             self._logger.debug("Closing SMTP")
             self._server.quit()

@@ -213,6 +213,9 @@ class Notifier(Thread):
             self._logger.debug("GSM disabled")
             self.destroy_gsm()
 
+        # we will try to connect to verify the connection
+        # but after a long time the connection is not available
+        # so we need to re-connect
         self.destroy_smtp()
         if self._options["smtp"].get("enabled", False):
             self._logger.debug("SMTP enabled")
