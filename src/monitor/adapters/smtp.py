@@ -40,7 +40,6 @@ class SMTPSender:
             self._server.ehlo()
             self._server.starttls()
             self._server.login(self._username, self._password)
-            self._server.close()
             return True
         except (gaierror, SMTPException, OSError) as error:
             self._logger.error("Can't connect to SMTP server! Error: %s ", error)
