@@ -173,6 +173,6 @@ class IPCServer(Thread):
 
     def test_syren(self, duration=5):
         self._logger.debug("Testing syren %ss...", duration)
-        Syren.start_syren()
+        Syren.start_syren(silent=False, delay=0, stop_time=duration)
         sleep(duration)
         Syren.stop_syren()

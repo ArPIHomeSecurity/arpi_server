@@ -38,7 +38,7 @@ class SensorAlert(Thread):
         send_alert_state(None)
 
         db_session = Session()
-        alert = db_session.query(Alert).filter_by(disarm=None).first()
+        alert = db_session.query(Alert).filter_by(end_time=None).first()
         if alert:
             alert.end_time = datetime.now()
             alert.disarm = disarm
