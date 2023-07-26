@@ -59,8 +59,9 @@ class Syren(Thread):
         SILENT = self._syren_config.get("silent", Syren.SILENT)
 
         alert = self.get_alert()
-        alert.silent = SILENT
-        self._db_session.commit()
+        if alert:
+            alert.silent = SILENT
+            self._db_session.commit()
 
         if SILENT:
             self._logger.info("Syren is in silent mode")
