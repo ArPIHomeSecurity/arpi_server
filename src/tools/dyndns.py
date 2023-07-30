@@ -5,13 +5,11 @@ load_dotenv("secrets.env")
 
 import json
 import logging
-import socket
 from copy import copy
 from ipaddress import ip_address
 
 from noipy.main import execute_update
 import requests
-from socket import gaierror
 
 from models import Option
 from monitor.database import Session
@@ -19,7 +17,28 @@ from constants import LOG_SC_DYNDNS
 from tools.dictionary import filter_keys
 
 
+def get_dns_records(hostname=None, record_type='A'):
+    """
+    Query IP address from google.
+
+    Avoid conflict of local and remote IP addresses.
+    """
+    if hostname is None:
+        return None
+
+    api_url = 'https://dns.google.com/resolve?'
+    params = {'name': hostname, 'type': record_type}
+    try:
+        response = requests.get(api_url, params=params)
+        return response.json()
+    except requests.exceptions.RequestException:
+        return None
+
+
 class DynDns:
+    """
+    Class for managing the IP address of the dynamic DNS name.
+    """
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
         self._db_session = Session()
@@ -45,8 +64,9 @@ class DynDns:
 
         # DNS lookup IP from hostname
         try:
-            current_ip = socket.gethostbyname(noip_config["hostname"])
-        except gaierror:
+            current_ip = get_dns_records(hostname=noip_config["hostname"])["Answer"][0]["data"]
+        except KeyError as error:
+            self._logger.error("Faield to query IP Address! %s", error)
             return False
 
         # Getting public IP
@@ -73,7 +93,7 @@ class DynDns:
     def save_ip(self, noip_config):
         """
         Save IP to the DNS provider
-        :param noip_config: dictonary of settings (provider, username, password, hostname, ip)
+        :param noip_config: dictionary of settings (provider, username, password, hostname, ip)
         """
 
         class Arguments:
