@@ -1,14 +1,9 @@
 import logging
 
-from smtplib import SMTP, SMTPException
+from smtplib import SMTP, SMTPException, SMTPServerDisconnected
 from socket import gaierror
 
 from constants import LOG_NOTIFIER
-
-
-class SMTPNotConnected(Exception):
-    """Thrown when SMTP is disconnected after a while."""
-    pass
 
 
 class SMTPSender:
@@ -47,22 +42,22 @@ class SMTPSender:
 
     def send_email(self, to_address, subject, content):
         """Send an email with re-try when disconnected."""
-        if not self._server:
-            return False
 
         sent_email_counter = 0
         while sent_email_counter <= 2:
             try:
+                if not self._server:
+                    raise SMTPServerDisconnected
+
                 self._send_email(to_address, subject, content)
                 sent_email_counter = 2
-                self._logger.info("Sent email")
                 return True
-            except SMTPNotConnected:
+            except SMTPServerDisconnected:
                 # re-try when disconnected
                 self.setup()
                 sent_email_counter += 1
             except SMTPException as error:
-                self._logger.error("Can't send email! Error: %s ", error)
+                self._logger.error("Can't send email! %s ", error)
                 return False
 
         self._logger.error("Sending email failed")
@@ -78,15 +73,17 @@ class SMTPSender:
                 to_addrs=to_address,
                 msg=message
             )
-        except SMTPException as error:
-            if "please run connect() first" in str(error):
-                self._logger.warning("Can't send email because of disconnected server")
-                raise SMTPNotConnected from error
-
+            self._logger.info("Sent email")
+        except SMTPServerDisconnected as error:
             raise error
+        except SMTPException as error:
+            self._logger.error("Failed to send email! %s", error)
 
     def destroy(self):
         """Destroy the connection"""
         if self._server:
             self._logger.debug("Closing SMTP")
-            self._server.quit()
+            try:
+                self._server.quit()
+            except SMTPException:
+                self._logger.warning("Closing connection failed!")
