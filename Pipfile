@@ -12,7 +12,7 @@ create-package = "tar -cvzf arpi-server.tar.gz --exclude='__pycache__' etc scrip
 [packages]
 dnspython = "==2.2.1"
 eventlet = "==0.33.1"
-flask = "==2.2.2"
+flask = "==2.2.5"
 flask-migrate = "*"
 flask-sqlalchemy = "==3.0.3"
 gobject = "==0.1.0"
