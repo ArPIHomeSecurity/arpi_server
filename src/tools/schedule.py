@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:05:23
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:05:26
 import logging
 
 from crontab import CronTab
@@ -12,14 +7,14 @@ from constants import LOG_IPC
 
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
-    "bash -c 'cd /home/argus/server/; "
-    "/usr/local/bin/pipenv run python /home/argus/server/src/tools/dyndns.py'"
+    "bash -c 'cd /home/argus/server; "
+    "PYTHONPATH=src /home/argus/server/src/tools/dyndns.py'"
 )
 
 certbot_job = (
     "systemd-cat -t 'argus_certbot' "
-    "bash -c 'cd /home/argus/server/; "
-    "/usr/local/bin/pipenv run python /home/argus/server/src/tools/certbot.py'"
+    "bash -c 'cd /home/argus/server; "
+    "PYTHONPATH=src /home/argus/server/src/tools/certbot.py'"
 )
 
 

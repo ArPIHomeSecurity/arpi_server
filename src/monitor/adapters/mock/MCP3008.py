@@ -181,7 +181,13 @@ class PowerMCP3008(PatternBasedMockMCP3008):
 class SimulatorBasedMockMCP3008(object):
 
     def __init__(self, channel=None, clock_pin=None, mosi_pin=None, miso_pin=None, select_pin=None):
-        self._channel = channel
+        if select_pin == 12:
+            self._channel = channel
+        elif select_pin == 1:
+            self._channel = channel + 8
+        else:
+            raise ValueError("Unkonw value for select_pin")
+
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._logger.debug("Created mock MCP3008 %s", self.__class__)
         self._input_file = ""
@@ -194,7 +200,7 @@ class SimulatorBasedMockMCP3008(object):
         with lock:
             with open(self._input_file) as channels_file:
                 channels = json.load(channels_file)
-                self._logger.debug("Channel value simulator: %s", list(channels.values())[self._channel])
+                self._logger.debug("Channel[CH%02d] value simulator: %s", self._channel+1, list(channels.values())[self._channel])
                 return list(channels.values())[self._channel]
 
 

@@ -16,7 +16,7 @@ zone_blueprint = Blueprint("zone", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_zones():
-    return jsonify([i.serialize for i in db.session.query(Zone).filter_by(deleted=False).all()])
+    return jsonify([i.serialized for i in db.session.query(Zone).filter_by(deleted=False).all()])
 
 
 @zone_blueprint.route("/api/zones/", methods=["POST"])
@@ -30,7 +30,7 @@ def create_zone():
     db.session.add(zone)
     db.session.commit()
     IPCClient().update_configuration()
-    return jsonify(zone.serialize)
+    return jsonify(zone.serialized)
 
 
 @zone_blueprint.route("/api/zone/<int:zone_id>", methods=["GET", "PUT", "DELETE"])
@@ -40,7 +40,7 @@ def zone(zone_id):
     if request.method == "GET":
         zone = db.session.query(Zone).get(zone_id)
         if zone:
-            return jsonify(zone.serialize)
+            return jsonify(zone.serialized)
 
         return make_response(jsonify({"error": "Zone not found"}), 404)
     elif request.method == "DELETE":

@@ -11,7 +11,7 @@ from constants import LOG_SC_ACCESS
 
 from gi.repository import GLib
 
-from monitoring.database import Session
+from monitor.database import Session
 
 
 class SSH:

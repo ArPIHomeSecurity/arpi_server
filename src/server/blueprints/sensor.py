@@ -1,7 +1,7 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request, current_app
 from flask.helpers import make_response
-from models import Sensor, SensorType, Zone
+from models import Sensor, SensorType, Zone, Area
 
 from constants import ROLE_USER
 
@@ -20,9 +20,9 @@ def view_sensors():
     current_app.logger.debug("Request->alerting: %s", request.args.get("alerting"))
     if not request.args.get("alerting"):
         return jsonify(
-            [i.serialize for i in db.session.query(Sensor).filter_by(deleted=False).order_by(Sensor.channel.asc())]
+            [i.serialized for i in db.session.query(Sensor).filter_by(deleted=False).order_by(Sensor.channel.asc())]
         )
-    return jsonify([i.serialize for i in db.session.query(Sensor).filter_by(alert=True).all()])
+    return jsonify([i.serialized for i in db.session.query(Sensor).filter_by(alert=True).all()])
 
 
 @sensor_blueprint.route("/api/sensors/", methods=["POST"])
@@ -31,10 +31,12 @@ def view_sensors():
 def create_sensor():
     data = request.json
     zone = db.session.query(Zone).get(request.json["zoneId"])
+    area = db.session.query(Area).get(request.json["areaId"])
     sensor_type = db.session.query(SensorType).get(data["typeId"])
     sensor = Sensor(
         channel=data["channel"],
         zone=zone,
+        area=area,
         sensor_type=sensor_type,
         description=data["description"],
     )
@@ -66,7 +68,7 @@ def sensor(sensor_id):
     if request.method == "GET":
         sensor = db.session.query(Sensor).filter_by(id=sensor_id, deleted=False).first()
         if sensor:
-            return jsonify(sensor.serialize)
+            return jsonify(sensor.serialized)
         return jsonify({"error": "Sensor not found"}), (404)
     elif request.method == "DELETE":
         sensor = db.session.query(Sensor).get(sensor_id)
@@ -91,7 +93,7 @@ def sensor(sensor_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def sensor_types():
-    return jsonify([i.serialize for i in db.session.query(SensorType).all()])
+    return jsonify([i.serialized for i in db.session.query(SensorType).all()])
 
 
 @sensor_blueprint.route("/api/sensor/alert", methods=["GET"])

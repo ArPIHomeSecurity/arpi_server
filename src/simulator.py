@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 A Textual app to create a fully working calculator, modelled after MacOS Calculator.
 """

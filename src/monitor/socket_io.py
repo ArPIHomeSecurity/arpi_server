@@ -13,7 +13,7 @@ import jose.exceptions
 
 from models import Option
 from constants import LOG_SOCKETIO
-from monitoring.database import Session
+from monitor.database import Session
 
 
 session = Session()
@@ -89,6 +89,10 @@ def send_arm_state(arm_state):
 
 def send_sensors_state(sensors_state):
     send_message("sensors_state_change", sensors_state)
+
+
+def send_area_state(area_state):
+    send_message("area_state_change", area_state)
 
 
 def send_syren_state(syren_state):

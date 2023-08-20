@@ -7,14 +7,14 @@
 import logging
 import os
 
-from monitoring.adapters import SYREN_OUT
+from monitor.adapters import SYREN_OUT
 from constants import LOG_ADSYREN
 
 # check if running on Raspberry
-if os.uname()[4][:3] == "arm":
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero.output_devices import DigitalOutputDevice
 else:
-    from monitoring.adapters.mock.output import Output as DigitalOutputDevice
+    from monitor.adapters.mock.output import Output as DigitalOutputDevice
 
 
 class SyrenAdapter(object):
@@ -36,10 +36,12 @@ class SyrenAdapter(object):
             self._logger.info("Syren on")
             self._is_alerting = True
             self._output.on()
-        else:
+        elif not start:
             self._logger.info("Syren off")
             self._is_alerting = False
             self._output.off()
+        elif start is not None:
+            self._logger.error("Syren invalid state")
 
     @property
     def is_alerting(self):

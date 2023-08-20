@@ -6,6 +6,8 @@ from flask_migrate import Migrate
 
 
 from server.blueprints.alert import alert_blueprint
+from server.blueprints.area import area_blueprint
+from server.blueprints.arm import arm_blueprint
 from server.blueprints.card import card_blueprint
 from server.blueprints.clock import clock_blueprint
 from server.blueprints.config import config_blueprint
@@ -42,11 +44,15 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://%(user)s:%(pw)s@%(host)s:%
     "port": environ.get("DB_PORT", None),
 }
 
+app.logger.debug("App config: %s", app.config)
+
 # avoid reloading records from database after session commit
 db.init_app(app)
 migrate = Migrate(app, db)
 
 app.register_blueprint(alert_blueprint)
+app.register_blueprint(arm_blueprint)
+app.register_blueprint(area_blueprint)
 app.register_blueprint(card_blueprint)
 app.register_blueprint(clock_blueprint)
 app.register_blueprint(config_blueprint)
@@ -71,4 +77,5 @@ def invalid_route(e):
 
 @app.errorhandler(Exception)
 def all_exception_handler(error):
-    return 'Error', 500
+    app.logger.exception(error)
+    return (str(error), 500) if app.debug else ('Error: internal error', 500)

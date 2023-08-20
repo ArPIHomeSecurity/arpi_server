@@ -1,28 +1,46 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:04:45
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:05:17
+#!/usr/bin/env python3
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
+
 import json
 import logging
-import socket
 from copy import copy
 from ipaddress import ip_address
 
 from noipy.main import execute_update
 import requests
-from socket import gaierror
 
 from models import Option
-from monitoring.database import Session
+from monitor.database import Session
 from constants import LOG_SC_DYNDNS
 from tools.dictionary import filter_keys
 
 
+def get_dns_records(hostname=None, record_type='A'):
+    """
+    Query IP address from google.
+
+    Avoid conflict of local and remote IP addresses.
+    """
+    if hostname is None:
+        return None
+
+    api_url = 'https://dns.google.com/resolve?'
+    params = {'name': hostname, 'type': record_type}
+    try:
+        response = requests.get(api_url, params=params)
+        return response.json()
+    except requests.exceptions.RequestException:
+        return None
+
+
 class DynDns:
+    """
+    Class for managing the IP address of the dynamic DNS name.
+    """
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_SC_DYNDNS)
+        self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
         self._db_session = Session()
 
     def update_ip(self, force=False):
@@ -42,12 +60,13 @@ class DynDns:
         noip_config["force"] = force
         tmp_config = copy(noip_config)
         filter_keys(tmp_config, ["password"])
-        self._logger.info("Update dynamics DNS provider with options: %s" % tmp_config)
+        self._logger.info("Update dynamics DNS provider with options: %s", tmp_config)
 
         # DNS lookup IP from hostname
         try:
-            current_ip = socket.gethostbyname(noip_config["hostname"])
-        except gaierror:
+            current_ip = get_dns_records(hostname=noip_config["hostname"])["Answer"][0]["data"]
+        except KeyError as error:
+            self._logger.error("Faield to query IP Address! %s", error)
             return False
 
         # Getting public IP
@@ -56,17 +75,17 @@ class DynDns:
             # converting the address to string for comparision
             new_ip = format(ip_address(new_ip))
         except ValueError:
-            self._logger.info("Invalid IP address: %s" % new_ip)
+            self._logger.info("Invalid IP address: %s", new_ip)
             return False
 
         if (new_ip != current_ip) or force:
-            self._logger.info("IP: '%s' => '%s'" % (current_ip, new_ip))
+            self._logger.info("IP: '%s' => '%s'", current_ip, new_ip)
             noip_config["ip"] = new_ip
             result = self.save_ip(noip_config)
-            self._logger.info("Update result: '%s'" % result)
+            self._logger.info("Update result: '%s'", result)
             return True
         else:
-            self._logger.info("IP: '%s' == '%s'" % (current_ip, new_ip))
+            self._logger.info("IP: '%s' == '%s'", current_ip, new_ip)
             self._logger.info("No IP update necessary")
 
         return True
@@ -74,7 +93,7 @@ class DynDns:
     def save_ip(self, noip_config):
         """
         Save IP to the DNS provider
-        :param noip_config: dictonary of settings (provider, username, password, hostname, ip)
+        :param noip_config: dictionary of settings (provider, username, password, hostname, ip)
         """
 
         class Arguments:
@@ -85,7 +104,7 @@ class DynDns:
         try:
             args.provider = noip_config["provider"]
             args.usertoken = noip_config["username"]
-            args.password = noip_config["password"]
+            args.password = noip_config["password"].replace(".duckdns.org", "")
             args.hostname = noip_config["hostname"]
             args.ip = noip_config["ip"]
             return execute_update(args)

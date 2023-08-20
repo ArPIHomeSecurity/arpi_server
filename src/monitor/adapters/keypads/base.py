@@ -6,7 +6,7 @@ from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
 
-from monitoring.adapters.keypads.delay import DelayPhase, Handler
+from monitor.adapters.keypads.delay import DelayPhase, Handler
 
 
 class Action(Enum):
@@ -35,10 +35,7 @@ class KeypadBase(ABC):
         self._db_session = None
 
     def get_last_key(self):
-        if self._keys:
-            return self._keys.pop(0)
-        else:
-            return None
+        return self._keys.pop(0) if self._keys else None
 
     def get_card(self):
         card = self._card

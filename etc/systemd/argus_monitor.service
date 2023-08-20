@@ -7,7 +7,9 @@ Type=simple
 User=root
 PIDFile=/run/argus/argus_monitor.pid
 WorkingDirectory=/home/argus/server
-ExecStart=/usr/local/bin/pipenv run python -u -s -m monitoring
+EnvironmentFile=/home/argus/server/.env
+EnvironmentFile=/home/argus/server/secrets.env
+ExecStart=/usr/bin/python3 -u -s -m monitor
 Restart=on-failure
 
 [Install]

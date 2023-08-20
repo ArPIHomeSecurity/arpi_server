@@ -1,21 +1,20 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:04:12
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:04:20
+#!/usr/bin/env python3
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
+
 import json
 import logging
 import subprocess
+
 from copy import copy
 from os import symlink
 from pathlib import Path, PosixPath
-
 from pydbus import SystemBus
 
 from models import Option
 from constants import LOG_SC_CERTBOT
-from monitoring.database import Session
+from monitor.database import Session
 from tools.dictionary import filter_keys
 
 
@@ -48,7 +47,7 @@ class Certbot:
                     "certonly",
                     "--webroot",
                     "--webroot-path",
-                    "/home/argus/server/webapplication",
+                    "/home/argus/webapplication",
                     "--agree-tos",
                     "--non-interactive",
                     "--quiet",
@@ -56,7 +55,7 @@ class Certbot:
                     "arpi",
                     "--email",
                     noip_config["username"],
-                    "-d %s" % noip_config["hostname"],
+                    f'-d {noip_config["hostname"]}',
                 ],
                 capture_output=True,
             )
@@ -88,7 +87,7 @@ class Certbot:
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
-    def swith2certbot(self):
+    def switch2certbot(self):
         """
         Changes the symlink for nginx using the certbot certificates instead of the self-signed
         """
@@ -108,6 +107,9 @@ class Certbot:
         systemd.RestartUnit("nginx.service", "fail")
 
     def update_certificates(self):
+        """
+        Updates the certificate with letsencrypt
+        """
         # check if certificate exists
         full_certificate = Path("/etc/letsencrypt/live/arpi/fullchain.pem")
         if full_certificate.is_file():
@@ -124,7 +126,7 @@ class Certbot:
                 "/usr/local/nginx/conf/snippets/self-signed.conf"
             ):
                 self._logger.info("NGINX uses self-signed certificates")
-                self.swith2certbot()
+                self.switch2certbot()
                 self.restart_nginx()
             elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
                 "/usr/local/nginx/conf/snippets/certbot-signed.conf"

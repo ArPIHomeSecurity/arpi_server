@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:07:43
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:07:45
-
 import contextlib
 import json
 import logging
@@ -12,8 +6,8 @@ from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
 from grp import getgrnam
 from threading import Thread
+from time import sleep
 
-from monitoring import storage
 from constants import (
     LOG_IPC,
     MONITOR_ARM_AWAY,
@@ -29,8 +23,14 @@ from constants import (
     THREAD_IPC,
     MONITOR_GET_ARM,
     MONITOR_GET_STATE,
+    SEND_TEST_EMAIL,
+    SEND_TEST_SMS,
+    SEND_TEST_SYREN,
     UPDATE_SSH,
 )
+from monitor.storage import States
+from monitor.alert import Syren
+from monitor.notifications.notifier import Notifier
 from tools.clock import Clock
 from tools.connection import SecureConnection
 from tools.ssh import SSH
@@ -95,7 +95,7 @@ class IPCServer(Thread):
         """
         Return value:
         {
-            "result": boolean, # True if succeded
+            "result": boolean, # True if succeeded
             "message": string, # Error message
             "value: dict # value to return
         }
@@ -106,17 +106,29 @@ class IPCServer(Thread):
             self._logger.info("IPC action received: %s", message["action"])
             self._broadcaster.send_message(message=message)
         elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
+            return_value["value"] = {"type": States.get(States.ARM_STATE)}
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": storage.get(storage.MONITORING_STATE)}
+            return_value["value"] = {"state": States.get(States.MONITORING_STATE)}
         elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
+            return_value["value"] = {"state": States.get(States.POWER_STATE)}
         elif message["action"] == UPDATE_SECURE_CONNECTION:
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
             SSH().update_ssh_service()
+        elif message["action"] == SEND_TEST_SMS:
+            succeeded, results = Notifier.send_test_sms()
+            return_value["result"] = succeeded
+            return_value["message"] = "Error in SMS sending!" if not succeeded else ""
+            return_value["other"] = results
+        elif message["action"] == SEND_TEST_EMAIL:
+            succeeded, results = Notifier.send_test_email()
+            return_value["result"] = succeeded
+            return_value["message"] = "Error in email sending!" if not succeeded else ""
+            return_value["other"] = results
+        elif message["action"] == SEND_TEST_SYREN:
+            self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
                 return_value["result"] = False
@@ -158,3 +170,9 @@ class IPCServer(Thread):
         with contextlib.suppress(FileNotFoundError):
             remove(MONITOR_INPUT_SOCKET)
         self._logger.info("IPC server stopped")
+
+    def test_syren(self, duration=5):
+        self._logger.debug("Testing syren %ss...", duration)
+        Syren.start_syren(silent=False, delay=0, stop_time=duration)
+        sleep(duration)
+        Syren.stop_syren()

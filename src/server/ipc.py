@@ -19,6 +19,9 @@ from constants import (
     MONITOR_UPDATE_KEYPAD,
     MONITOR_GET_STATE,
     MONITOR_GET_ARM,
+    SEND_TEST_EMAIL,
+    SEND_TEST_SMS,
+    SEND_TEST_SYREN,
     UPDATE_SSH,
 )
 
@@ -39,19 +42,33 @@ class IPCClient(object):
             except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
 
-    def disarm(self, user_id):
-        return self._send_message({"action": MONITOR_DISARM, "user_id": user_id})
-
     def get_arm(self):
         return self._send_message({"action": MONITOR_GET_ARM})
 
-    def arm(self, arm_type, user_id):
+    def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:
-            return self._send_message({"action": MONITOR_ARM_AWAY, "user_id": user_id})
+            return self._send_message({
+                "action": MONITOR_ARM_AWAY,
+                "user_id": user_id,
+                "area_id": area_id,
+                "delay": False
+            })
         elif arm_type == ARM_STAY:
-            return self._send_message({"action": MONITOR_ARM_STAY, "user_id": user_id})
+            return self._send_message({
+                "action": MONITOR_ARM_STAY,
+                "user_id": user_id,
+                "area_id": area_id,
+                "delay": False
+            })
         else:
             print(f"Unknown arm type: {arm_type}")
+
+    def disarm(self, user_id, area_id=None):
+        return self._send_message({
+            "action": MONITOR_DISARM,
+            "user_id": user_id,
+            "area_id": area_id
+        })
 
     def get_state(self):
         return self._send_message({"action": MONITOR_GET_STATE})
@@ -74,6 +91,15 @@ class IPCClient(object):
     def update_ssh(self):
         return self._send_message({"action": UPDATE_SSH})
 
+    def send_test_email(self):
+        return self._send_message({"action": SEND_TEST_EMAIL})
+
+    def send_test_sms(self):
+        return self._send_message({"action": SEND_TEST_SMS})
+
+    def send_test_syren(self, duration):
+        return self._send_message({"action": SEND_TEST_SYREN, "duration": duration})
+
     def sync_clock(self):
         return self._send_message({"action": MONITOR_SYNC_CLOCK})
 
@@ -84,6 +110,9 @@ class IPCClient(object):
 
     def _send_message(self, message):
         if self._socket:
-            self._socket.send(json.dumps(message).encode())
-            data = self._socket.recv(1024)
-            return json.loads(data.decode())
+            try:
+                self._socket.send(json.dumps(message).encode())
+                data = self._socket.recv(1024)
+                return json.loads(data.decode())
+            except ConnectionResetError:
+                self._logger.error("Sending message to monitor socket failed!")
