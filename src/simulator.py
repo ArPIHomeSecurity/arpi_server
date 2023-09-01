@@ -66,8 +66,8 @@ class Numbers(Widget):
 
 class Calculator(GridView):
     """A working calculator app."""
-    CHANNEL_LOW = 0.247828446754
-    CHANNEL_HIGH = 0.727374223523
+    CHANNEL_LOW = 0
+    CHANNEL_HIGH = 1
     channels = {
         "CH01": CHANNEL_LOW,
         "CH02": CHANNEL_LOW,

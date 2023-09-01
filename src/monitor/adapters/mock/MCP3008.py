@@ -178,18 +178,12 @@ class PowerMCP3008(PatternBasedMockMCP3008):
         self._alert_source = PowerMCP3008.POWER_ALERT
 
 
-class SimulatorBasedMockMCP3008(object):
+class SimulatorBasedMockLED(object):
 
-    def __init__(self, channel=None, clock_pin=None, mosi_pin=None, miso_pin=None, select_pin=None):
-        if select_pin == 12:
-            self._channel = channel
-        elif select_pin == 1:
-            self._channel = channel + 8
-        else:
-            raise ValueError("Unkonw value for select_pin")
-
+    def __init__(self, channel=None):
         self._logger = logging.getLogger(LOG_ADSENSOR)
-        self._logger.debug("Created mock MCP3008 %s", self.__class__)
+        self._channel = channel
+        self._logger.debug("Created mock LED %s on channel %s", self.__class__, self._channel)
         self._input_file = ""
 
     @property
@@ -199,21 +193,42 @@ class SimulatorBasedMockMCP3008(object):
 
         with lock:
             with open(self._input_file) as channels_file:
-                channels = json.load(channels_file)
-                self._logger.debug("Channel[CH%02d] value simulator: %s", self._channel+1, list(channels.values())[self._channel])
-                return list(channels.values())[self._channel]
+                channels_data = json.load(channels_file)
+                self._logger.debug("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
+                return channels_data[self._channel]
+            
+    @property
+    def is_pressed(self):
+        return self.value == 1
 
 
-class Channels(SimulatorBasedMockMCP3008):
+class Channels(SimulatorBasedMockLED):
 
-    def __init__(self, channel=None, clock_pin=None, mosi_pin=None, miso_pin=None, select_pin=None):
-        super().__init__(channel, clock_pin, mosi_pin, miso_pin, select_pin)
+    CHANNEL_MAPPING = {
+        19: "CH01",
+        20: "CH02",
+        26: "CH03",
+        21: "CH04",
+        12: "CH05",
+        31: "CH06",
+        33: "CH07",
+        16: "CH08",
+        7:  "CH09",
+        1:  "CH10",
+        0:  "CH11",
+        5:  "CH12",
+        23: "CH13",
+        24: "CH14",
+        25: "CH15",
+    }
+
+    def __init__(self, channel=None):
+        super().__init__(channel=Channels.CHANNEL_MAPPING[channel])
         self._input_file = "channels.json"
 
 
-class Power(SimulatorBasedMockMCP3008):
+class Power(SimulatorBasedMockLED):
 
-    def __init__(self, channel=None, clock_pin=None, mosi_pin=None, miso_pin=None, select_pin=None):
-        super().__init__(channel, clock_pin, mosi_pin, miso_pin, select_pin)
-        self._channel = 0
+    def __init__(self, channel=None):
+        super().__init__(channel="POWER")
         self._input_file = "power.json"

@@ -1,13 +1,39 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:09:28
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:09:31
 
-# SPI bus BCM pins
-SPI_CLK = 21
-SPI_MISO = 20
-SPI_MOSI = 16
+# GPIO pins
+POWER_PIN = 8
+CH01_PIN = 19
+CH02_PIN = 20
+CH03_PIN = 26
+CH04_PIN = 21
+CH05_PIN = 12
+CH06_PIN = 31
+CH07_PIN = 33
+CH08_PIN = 16
+CH09_PIN = 7
+CH10_PIN = 1
+CH11_PIN = 0
+CH12_PIN = 5
+CH13_PIN = 23
+CH14_PIN = 24
+CH15_PIN = 25
+
+CHANNEL_GPIO_PINS = [
+    CH01_PIN,
+    CH02_PIN,
+    CH03_PIN,
+    CH04_PIN,
+    CH05_PIN,
+    CH06_PIN,
+    CH07_PIN,
+    CH08_PIN,
+    CH09_PIN,
+    CH10_PIN,
+    CH11_PIN,
+    CH12_PIN,
+    CH13_PIN,
+    CH14_PIN,
+    CH15_PIN
+]
 
 SYREN_OUT = 22
 RELAY1_OUT = 27
