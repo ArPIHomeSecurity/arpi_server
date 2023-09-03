@@ -109,7 +109,7 @@ class SensorAlert(Thread):
             self._broadcaster.send_message({"action": MONITORING_ALERT})
 
         if self._stop_event.wait(self._delay):
-            Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
+            Notifier.notify_alert_stopped(alert.id, alert.end_time)
 
     def get_alert(self) -> Alert:
         return self._db_session.query(Alert).filter_by(end_time=None).first()
