@@ -18,7 +18,7 @@ from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
 from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_STAY, ARM_DISARM, ARM_MIXED
-from tools.dictionary import merge_dicts, filter_keys
+from tools.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):
@@ -609,21 +609,18 @@ class Option(BaseModel):
     @property
     def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
-        filter_keys(filtered_value, ["smtp_password"])
-        filter_keys(filtered_value, ["password"])
+        replace_keys(filtered_value, {"smtp_password": "******", "replace_empty": False})
+        replace_keys(filtered_value, {"password": "******", "replace_empty": False})
         return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
 
     @validates("name", "section")
-    def validates_name(self, key, option):
-        assert 0 < len(option) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(option)})"
+    def validates_name(self, key, value):
+        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(value)})"
         if key == "name":
-            assert option in ("notifications", "network", "syren"), f"Unknown option ({option})"
+            assert value in ("notifications", "network", "syren"), f"Unknown option ({value})"
         elif key == "section":
-            if option == "notification":
-                assert option in ("email", "gsm", "subscriptions"), f"Unknown section ({option})"
-            elif option == "network":
-                assert option in ("dyndns", "access"), f"Unknown section ({option})"
-        return option
+            assert value in ("samtp", "gsm", "subscriptions", "dyndns", "access"), f"Unknown section ({value})"
+        return value
 
 
 class Keypad(BaseModel):

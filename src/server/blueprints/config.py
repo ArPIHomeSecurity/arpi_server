@@ -1,7 +1,6 @@
-import logging
 import os
 
-from flask import jsonify, request, current_app
+from flask import jsonify, request, Response
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
 from models import Option
@@ -15,42 +14,44 @@ from server.tools import process_ipc_response
 config_blueprint = Blueprint("configuration", __name__)
 
 
-@config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["GET", "PUT"])
+@config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["GET"])
 @authenticated()
 @restrict_host
-def option(option, section):
-    if request.method == "GET":
-        db_option = db.session.query(Option).filter_by(name=option, section=section).first()
-        if db_option:
-            return jsonify(db_option.serialized) if db_option else jsonify(None)
+def option_get(option, section) -> Response:
+    db_option = db.session.query(Option).filter_by(name=option, section=section).first()
+    if db_option:
+        return jsonify(db_option.serialized) if db_option else jsonify(None)
 
-        return make_response(jsonify({}), 200)
-    elif request.method == "PUT":
-        db_option = db.session.query(Option).filter_by(name=option, section=section).first()
-        if not db_option:
-            # create the new option
-            db_option = Option(name=option, section=section, value="")
-            db.session.add(db_option)
+    return make_response(jsonify({}), 200)
 
-        # do update
-        changed = db_option.update_value(request.json)
-        db.session.commit()
 
-        if option == "notifications":
-            if changed:
-                return process_ipc_response(IPCClient().update_configuration())
-        elif db_option.name == "network" and db_option.section == "dyndns":
-            # update dyndns in production mode
-            if os.environ.get("USE_SECURE_CONNECTION", "true").lower() == "true":
-                return process_ipc_response(IPCClient().update_dyndns())
-        elif db_option.name == "network" and db_option.section == "access":
-            # update ssh service in production mode
-            if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
-                return process_ipc_response(IPCClient().update_ssh())
+@config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["PUT"])
+@authenticated()
+@restrict_host
+def option_put(option, section) -> Response:
+    db_option = db.session.query(Option).filter_by(name=option, section=section).first()
+    if not db_option:
+        # create the new option
+        db_option = Option(name=option, section=section, value="")
+        db.session.add(db_option)
 
-        return make_response("", 204)
+    # do update
+    changed = db_option.update_value(request.json)
+    db.session.commit()
 
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+    if option == "notifications":
+        if changed:
+            return process_ipc_response(IPCClient().update_configuration())
+    elif db_option.name == "network" and db_option.section == "dyndns":
+        # update dyndns in production mode
+        if os.environ.get("USE_SECURE_CONNECTION", "true").lower() == "true":
+            return process_ipc_response(IPCClient().update_dyndns())
+    elif db_option.name == "network" and db_option.section == "access":
+        # update ssh service in production mode
+        if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
+            return process_ipc_response(IPCClient().update_ssh())
+
+    return make_response("", 204)
 
 
 @config_blueprint.route("/api/config/test_email", methods=["GET"])
