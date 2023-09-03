@@ -1,5 +1,7 @@
 import logging
 
+from serial.serialutil import PortNotOpenError
+
 from gsmmodem.modem import GsmModem
 from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmeError, CmsError, CommandError
 from constants import LOG_ADGSM
@@ -99,6 +101,9 @@ class GSM(object):
                 "Network signal strength is not sufficient, "
                 "please adjust modem position/antenna and try again."
             )
+            return False
+        except PortNotOpenError:
+            self._logger.error("Modem serial port not open!")
             return False
 
         try:
