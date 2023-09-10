@@ -63,7 +63,7 @@ def start():
     ipc_server = IPCServer(stop_event, broadcaster)
     ipc_server.start()
 
-    def stop_service():
+    def stop_service(exit_code=0):
         logger.info("Stopping service...")
         broadcaster.send_message(message={"action": MONITOR_STOP})
         stop_event.set()
@@ -77,7 +77,7 @@ def start():
         ipc_server.join()
         logger.debug("IPC thread stopped")
         logger.info("All threads stopped")
-        os._exit(0)
+        os._exit(exit_code)
 
     def signal_term_handler(signal, frame):
         logger.debug("Received signal (SIGTERM)")
@@ -100,7 +100,7 @@ def start():
             for thread in threads:
                 if not thread.is_alive():
                     logger.error("Thread crashed: %s", thread.name)
-                    stop_service()
+                    stop_service(exit_code=1)
             sleep(1)
         except KeyboardInterrupt:
             logger.info("Keyboard interruption!!!")

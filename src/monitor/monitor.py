@@ -490,7 +490,7 @@ class Monitor(Thread):
             elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_arm_delay is not None:
                 delay = sensor.zone.stay_arm_delay
         else:
-            logging.error("Unknown monitoring state")
+            logging.error("Unknown monitoring state: %s", monitoring_state)
 
         logging.info("Sensor (id=%s) delay: %s", sensor.id, delay)
         return delay
