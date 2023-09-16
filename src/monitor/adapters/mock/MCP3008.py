@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:09:45
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:09:47
-
 import json
 import logging
 import threading
@@ -210,8 +204,8 @@ class Channels(SimulatorBasedMockLED):
         26: "CH03",
         21: "CH04",
         12: "CH05",
-        31: "CH06",
-        33: "CH07",
+        6:  "CH06",
+        13: "CH07",
         16: "CH08",
         7:  "CH09",
         1:  "CH10",
@@ -222,9 +216,12 @@ class Channels(SimulatorBasedMockLED):
         25: "CH15",
     }
 
-    def __init__(self, channel=None):
+    def __init__(self, channel=None, pull_up=None):
         super().__init__(channel=Channels.CHANNEL_MAPPING[channel])
         self._input_file = "channels.json"
+
+    def close(self):
+        pass
 
 
 class Power(SimulatorBasedMockLED):

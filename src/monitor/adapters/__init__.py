@@ -1,5 +1,5 @@
 
-# GPIO pins
+# Channel pins
 CH01_PIN = 19
 CH02_PIN = 20
 CH03_PIN = 26
@@ -15,6 +15,8 @@ CH12_PIN = 5
 CH13_PIN = 23
 CH14_PIN = 24
 CH15_PIN = 25
+
+# Power pins
 POWER_PIN = 8
 
 CHANNEL_GPIO_PINS = [

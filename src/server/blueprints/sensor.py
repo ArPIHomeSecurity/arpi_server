@@ -39,6 +39,7 @@ def create_sensor():
         area=area,
         sensor_type=sensor_type,
         description=data["description"],
+        enabled=data["enabled"],
     )
     db.session.add(sensor)
     db.session.commit()

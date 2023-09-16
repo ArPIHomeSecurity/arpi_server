@@ -149,13 +149,13 @@ class Sensor(BaseModel):
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
 
-    def __init__(self, channel, sensor_type, zone=None, area=None, description=None):
+    def __init__(self, channel, sensor_type, zone=None, area=None, description=None, enabled=True):
         self.channel = channel
         self.zone = zone
         self.area = area
         self.type = sensor_type
         self.description = description
-        self.enabled = True
+        self.enabled = enabled
         self.deleted = False
 
     def update(self, data):
