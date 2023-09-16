@@ -12,10 +12,10 @@ from constants import LOG_ADPOWER
 
 # check if running on Raspberry
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero import LED
+    from gpiozero import DigitalInputDevice
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitor.adapters.mock.MCP3008 import Power as LED
+    from monitor.adapters.mock.MCP3008 import Power as DigitalInputDevice
 
 
 class PowerAdapter(object):
@@ -35,7 +35,7 @@ class PowerAdapter(object):
 
         self._logger.debug("Power sense creating...")
         # the sense is on the last channel
-        self._sense = LED(POWER_PIN)
+        self._sense = DigitalInputDevice(POWER_PIN)
 
     @property
     def source_type(self):

@@ -149,6 +149,7 @@ class Monitor(Thread):
             self.scan_sensors()
             self.handle_alerts()
 
+        self._sensorAdapter.close()
         self.stop_alert(None)
         self._db_session.close()
         self._logger.info("Monitoring stopped")

@@ -6,10 +6,10 @@ from constants import LOG_ADSENSOR
 
 # check if running on Raspberry
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero import LED
+    from gpiozero import DigitalInputDevice
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitor.adapters.mock.MCP3008 import Channels as LED
+    from monitor.adapters.mock.MCP3008 import Channels as DigitalInputDevice
 
 
 class SensorAdapter(object):
@@ -20,7 +20,7 @@ class SensorAdapter(object):
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADSENSOR)
 
-        self._channels = [LED(pin) for pin in CHANNEL_GPIO_PINS]
+        self._channels = [DigitalInputDevice(pin, pull_up=False) for pin in CHANNEL_GPIO_PINS]
         self._logger.debug("Created sensor adapter for GPIO pins: %s", CHANNEL_GPIO_PINS)
 
     def get_value(self, channel):
@@ -34,7 +34,7 @@ class SensorAdapter(object):
             self._logger.error("Invalid channel number: %s", channel)
             return 0
 
-        value = 1 if self._channels[channel].is_pressed else 0
+        value = int(self._channels[channel].value)
         self._logger.debug("Value[CH%02d]: %s", channel+1, value)
         return value
 
@@ -42,9 +42,16 @@ class SensorAdapter(object):
         """
         Get the values from all the channels
         """
-        values = [1 if channel.value else 0 for channel in self._channels]
+        values = [int(channel.value) for channel in self._channels]
         self._logger.debug("Values: %s", [f"{v}" for v in values])
         return values
+
+    def close(self):
+        """
+        Close all the channels
+        """
+        for channel in self._channels:
+            channel.close()
 
     @property
     def channel_count(self):
