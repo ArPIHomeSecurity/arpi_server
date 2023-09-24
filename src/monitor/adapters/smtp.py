@@ -78,6 +78,9 @@ class SMTPSender:
             raise error
         except SMTPException as error:
             self._logger.error("Failed to send email! %s", error)
+            code, message, _ = error.args
+            if code == 451 and "4.4.2 Timeout" in message.decode():
+                raise SMTPServerDisconnected
 
     def destroy(self):
         """Destroy the connection"""

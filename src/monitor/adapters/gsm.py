@@ -3,7 +3,15 @@ import logging
 from serial.serialutil import PortNotOpenError
 
 from gsmmodem.modem import GsmModem
-from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmeError, CmsError, CommandError
+from gsmmodem.exceptions import (
+    PinRequiredError,
+    IncorrectPinError,
+    TimeoutException,
+    CmeError,
+    CmsError,
+    CommandError,
+    InvalidStateException
+)
 from constants import LOG_ADGSM
 from time import sleep
 
@@ -92,9 +100,13 @@ class GSM(object):
 
         self._logger.debug("Checking for network coverage...")
         try:
-            self._modem.waitForNetworkCoverage(5)
+            self._modem.waitForNetworkCoverage(10)
         except CommandError as error:
             self._logger.error("Command error: %s", error)
+            return False
+        except InvalidStateException:
+            self._logger.error("Modem is not in a valid state!")
+            self.destroy()
             return False
         except TimeoutException:
             self._logger.error(
