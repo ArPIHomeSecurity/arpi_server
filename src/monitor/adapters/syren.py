@@ -1,45 +1,39 @@
-# -*- coding: utf-8 -*-
-# @Author: Gábor Kovács
-# @Date:   2021-02-25 20:08:45
-# @Last Modified by:   Gábor Kovács
-# @Last Modified time: 2021-02-25 20:08:46
-
 import logging
 import os
 
-from monitor.adapters import SYREN_OUT
-from constants import LOG_ADSYREN
+from constants import LOG_ADRELAYS
 
 # check if running on Raspberry
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero.output_devices import DigitalOutputDevice
+    from monitor.adapters.relay import RelayAdapter
 else:
-    from monitor.adapters.mock.output import Output as DigitalOutputDevice
+    from monitor.adapters.mock.relay import RelayAdapter
 
 
 class SyrenAdapter(object):
     """
-    classdocs
+    SyrenAdapter class for controlling the syren 
     """
+    RELAY_ID = 0
 
     def __init__(self):
         """
         Constructor
         """
         self._channels = []
-        self._logger = logging.getLogger(LOG_ADSYREN)
+        self._logger = logging.getLogger(LOG_ADRELAYS)
         self._is_alerting = False
-        self._output = DigitalOutputDevice(pin=SYREN_OUT)
+        self._relayAdapter = RelayAdapter()
 
     def alert(self, start=True):
         if start:
             self._logger.info("Syren on")
             self._is_alerting = True
-            self._output.on()
+            self._relayAdapter.control_relay(self.RELAY_ID, 1)
         elif not start:
             self._logger.info("Syren off")
             self._is_alerting = False
-            self._output.off()
+            self._relayAdapter.control_relay(self.RELAY_ID, 0)
         elif start is not None:
             self._logger.error("Syren invalid state")
 

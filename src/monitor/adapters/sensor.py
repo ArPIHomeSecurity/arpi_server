@@ -20,8 +20,10 @@ class SensorAdapter(object):
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADSENSOR)
 
-        self._channels = [DigitalInputDevice(pin, pull_up=False) for pin in CHANNEL_GPIO_PINS]
-        self._logger.debug("Created sensor adapter for GPIO pins: %s", CHANNEL_GPIO_PINS)
+        self._channels = []
+        for pin in CHANNEL_GPIO_PINS:
+            self._logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
+            self._channels.append(DigitalInputDevice(pin, pull_up=False))
 
     def get_value(self, channel):
         """
