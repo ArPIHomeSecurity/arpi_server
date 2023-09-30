@@ -74,7 +74,7 @@ class DynDns:
             return False
 
         # Getting public IP
-        new_ip = requests.get("http://ifconfig.me/ip").text.strip()
+        new_ip = requests.get("http://checkip.amazonaws.com/").text.strip()
         try:
             # converting the address to string for comparison
             new_ip = format(ip_address(new_ip))
