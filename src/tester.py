@@ -1,40 +1,57 @@
 #!/usr/bin/env python
 
+import logging
 from logging import basicConfig, INFO, DEBUG
 from time import sleep
 
 import argparse
 
+from monitor.adapters.power import PowerAdapter
 from monitor.adapters.sensor import SensorAdapter
 from monitor.adapters.relay import RelayAdapter
 
-basicConfig(format="%(message)s", level=DEBUG)
-
 
 def test_sensor_adapter():
-    sa = SensorAdapter()
+    adapter = SensorAdapter()
 
     for i in range(0, 9):
-        sa.get_values()
+        values = adapter.get_values()
+        logging.info("Values: %s", values)
+        sleep(1)
+
+
+def test_power_adapter():
+    adapter = PowerAdapter()
+
+    for i in range(0, 9):
+        logging.info("Source: %s", adapter.source_type)
         sleep(1)
 
 
 def test_relay_adapter():
-    ra = RelayAdapter()
+    adapter = RelayAdapter()
 
     for i in range(0, 8):
-        ra.control_relay(i, 1)
+        values = adapter.control_relay(i, 1)
+        logging.info("Values: %s", values)
         sleep(1)
     for i in range(0, 8):
-        ra.control_relay(i, 0)
+        values = adapter.control_relay(i, 0)
+        logging.info("Values: %s", values)
         sleep(1)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("adapter", choices=["sensor", "relay"])
+    parser.add_argument("adapter", choices=["power", "sensor", "relay"])
+    parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
+    if args.verbose:
+        basicConfig(format="%(message)s", level=DEBUG)
+    else:
+        basicConfig(format="%(message)s", level=INFO)
+
     test_function = f"test_{args.adapter}_adapter"
     globals()[test_function]()
 
