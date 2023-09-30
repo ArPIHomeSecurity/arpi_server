@@ -80,8 +80,9 @@ class Notifier(Thread):
                 type=NotificationType.ALERT_STOPPED,
                 id=alert_id,
                 sensors=None,
-                time=time.strftime(Notifier.DATETIME_FORMAT))
+                time=time.strftime(Notifier.DATETIME_FORMAT)
             )
+        )
 
     @classmethod
     def notify_power_outage_started(cls, time):
@@ -282,7 +283,7 @@ class Notifier(Thread):
             self._logger.exception("Sending message failed!")
 
     def notify_SMS(self, notification: Notification):
-        template = notification.get_email_template()
+        template = notification.get_sms_template()
         if (self._options["subscriptions"].get("sms", {}).get(notification.type, False) and
                 notification.sms_sent == False and
                 self._gsm):

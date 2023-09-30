@@ -39,6 +39,7 @@ def create_sensor():
         area=area,
         sensor_type=sensor_type,
         description=data["description"],
+        enabled=data["enabled"],
     )
     db.session.add(sensor)
     db.session.commit()
@@ -102,7 +103,7 @@ def sensor_types():
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
-            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), alert=True).first() is not None
+            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), enabled=True, alert=True).first() is not None
         )
     else:
-        return jsonify(db.session.query(Sensor).filter_by(alert=True).first() is not None)
+        return jsonify(db.session.query(Sensor).filter_by(enabled=True, alert=True).first() is not None)

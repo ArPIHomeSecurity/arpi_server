@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-from dotenv import load_dotenv
-load_dotenv()
-load_dotenv("secrets.env")
-
+import argparse
 import json
 import logging
+import os
 import subprocess
+import sys
 
 from copy import copy
+from dotenv import load_dotenv
 from os import symlink
 from pathlib import Path, PosixPath
 from pydbus import SystemBus
+
+load_dotenv()
+load_dotenv("secrets.env")
+sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from models import Option
 from constants import LOG_SC_CERTBOT
@@ -139,7 +143,19 @@ class Certbot:
             self._logger.info("No certbot certificate found")
 
 
-if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)-15s %(message)s", level=logging.INFO)
+def main():
+    parser = argparse.ArgumentParser(description="Update certificates with certbot")
+    parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
+    args = parser.parse_args()
+
+    logging.basicConfig(format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO)
 
     Certbot(logging.getLogger("argus_certbot")).update_certificates()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+
