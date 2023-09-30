@@ -116,6 +116,7 @@ class GSM(object):
             return False
         except PortNotOpenError:
             self._logger.error("Modem serial port not open!")
+            self.destroy()
             return False
 
         try:
@@ -136,3 +137,5 @@ class GSM(object):
         if self._modem:
             self._logger.debug("Closing modem")
             self._modem.close()
+            self._modem = None
+
