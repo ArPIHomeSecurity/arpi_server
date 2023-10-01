@@ -8,10 +8,9 @@ class RelayAdapter:
     _states = [0, 0, 0, 0, 0, 0, 0, 0]
 
     def __init__(self):
-        pass
+        self._logger = logging.getLogger(LOG_ADRELAYS)
 
     def setup(self):
-        self._logger = logging.getLogger(LOG_ADRELAYS)
         self._logger.debug("Relay adapter setup finished")
 
     def control_relay(self, relay_number, state):
