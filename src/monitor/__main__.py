@@ -44,7 +44,9 @@ def createPidFile():
 def start():
     createPidFile()
     initialize_logging()
-    SSH().update_ssh_service()
+
+    if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
+        SSH().update_ssh_service()
 
     logger = logging.getLogger(LOG_SERVICE)
 
