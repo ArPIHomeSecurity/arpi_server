@@ -30,7 +30,8 @@ class Notification:
     last_try: float = 0.0
 
     # True = sent, False = sending failed, None = no need to send (not subscribed)
-    sms_sent: Optional[bool] = False
+    sms_sent1: Optional[bool] = False
+    sms_sent2: Optional[bool] = False
     email1_sent: Optional[bool] = False
     email2_sent: Optional[bool] = False
 
@@ -70,7 +71,8 @@ class Notification:
     @property
     def processed(self):
         return (
-            (self.sms_sent is None or self.sms_sent) and
+            (self.sms_sent1 is None or self.sms_sent1) and
+            (self.sms_sent2 is None or self.sms_sent2) and
             (self.email1_sent is None or self.email1_sent) and
             (self.email2_sent is None or self.email2_sent)
         )
