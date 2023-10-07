@@ -9,7 +9,7 @@ if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import DigitalInputDevice
 else:
     # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitor.adapters.mock.MCP3008 import Channels as DigitalInputDevice
+    from monitor.adapters.mock.input import Channels as DigitalInputDevice
 
 
 class SensorAdapter(object):
