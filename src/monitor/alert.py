@@ -87,11 +87,16 @@ class SensorAlert(Thread):
                           self._sensor_id,
                           self._delay)
 
-        alert = self.get_alert() or self.create_alert()
+        new_alert = False
+        alert = self.get_alert()
+        if alert is None:
+            alert = self.create_alert()
+            new_alert = True
+
         self.add_sensor_to_alert(alert=alert, start_time=start_time, delay=self._delay)
 
         # send notification only on the first sensor alert
-        if len(alert.sensors) == 1:
+        if new_alert:
             sensor_descriptions = [
                 f"{item.sensor.description}(id:{item.sensor.id}/CH{item.sensor.channel+1})"
                 for item in alert.sensors
