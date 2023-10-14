@@ -43,10 +43,10 @@ class Subscriptions:
     email2: Subscription = None
 
     def __post_init__(self):
-        self.sms1 = Subscription(**self.sms1)
-        self.sms2 = Subscription(**self.sms2)
-        self.email1 = Subscription(**self.email1)
-        self.email2 = Subscription(**self.email2)
+        self.sms1 = Subscription(**self.sms1) if self.sms1 else Subscription()
+        self.sms2 = Subscription(**self.sms2) if self.sms2 else Subscription()
+        self.email1 = Subscription(**self.email1) if self.email1 else Subscription()
+        self.email2 = Subscription(**self.email2) if self.email2 else Subscription()
 
 
 @dataclass
@@ -92,50 +92,50 @@ class Notifier(Thread):
     # TODO: consider instead of calling these methods to be notified with actions
     # and retrieve information from the database
     @classmethod
-    def notify_alert_started(cls, alert_id, sensors, time: datetime):
+    def notify_alert_started(cls, alert_id, sensors, start_time: datetime):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding alert start id: %s", alert_id)
         cls._notifications.put(
             Notification(
                 type=NotificationType.ALERT_STARTED,
                 id=alert_id,
                 sensors=sensors,
-                time=time.strftime(Notifier.DATETIME_FORMAT)
+                time=start_time.strftime(Notifier.DATETIME_FORMAT)
             )
         )
 
     @classmethod
-    def notify_alert_stopped(cls, alert_id, time):
+    def notify_alert_stopped(cls, alert_id, stop_time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding alert stop id: %s", alert_id)
         cls._notifications.put(
             Notification(
                 type=NotificationType.ALERT_STOPPED,
                 id=alert_id,
                 sensors=None,
-                time=time.strftime(Notifier.DATETIME_FORMAT)
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT)
             )
         )
 
     @classmethod
-    def notify_power_outage_started(cls, time):
+    def notify_power_outage_started(cls, start_time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding power outage start")
         cls._notifications.put(
             Notification(
                 type=NotificationType.POWER_OUTAGE_STARTED,
                 id=None,
                 sensors=None,
-                time=time.strftime(Notifier.DATETIME_FORMAT)
+                time=start_time.strftime(Notifier.DATETIME_FORMAT)
             )
         )
 
     @classmethod
-    def notify_power_outage_stopped(cls, time):
+    def notify_power_outage_stopped(cls, stop_time):
         logging.getLogger(LOG_NOTIFIER).debug("Message adding power outage end")
         cls._notifications.put(
             Notification(
                 type=NotificationType.POWER_OUTAGE_STOPPED,
                 id=None,
                 sensors=None,
-                time=time.strftime(Notifier.DATETIME_FORMAT))
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT))
             )
 
     @staticmethod
@@ -293,11 +293,12 @@ class Notifier(Thread):
                 .first()
             )
             try:
-                value = section_class(**json.loads(section.value)) if section else section_class()
+                data = json.loads(section.value) if section else {}
+                value = section_class(**data)
                 setattr(options, section_name, value)
                 logger.debug("Loaded options for section: %s => %s", section_name, getattr(options, section_name))
-            except TypeError as error:
-                logger.warn("Failed to load options for section: %s! %s", section_name, error)
+            except (TypeError, json.JSONDecodeError) as error:
+                logger.warning("Failed to load options for section: %s! %s", section_name, error)
                 setattr(options, section_name, section_class())
 
         db_session.close()
