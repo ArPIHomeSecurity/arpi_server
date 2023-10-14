@@ -579,5 +579,6 @@ class Monitor(Thread):
                     self._logger.debug("Cleared sensor alert: sensor id=%s (already closed in alert)", sensor.id)
 
     def stop_alert(self, disarm: Disarm):
+        self._alerting_sensors.clear()
         SensorAlert.stop_alerts(disarm)
         Syren.stop_syren()
