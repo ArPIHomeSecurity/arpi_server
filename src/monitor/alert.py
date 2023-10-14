@@ -111,9 +111,6 @@ class SensorAlert(Thread):
             States.set(States.MONITORING_STATE, MONITORING_ALERT)
             self._broadcaster.send_message({"action": MONITORING_ALERT})
 
-        if self._stop_event.wait(self._delay):
-            Notifier.notify_alert_stopped(alert.id, alert.end_time)
-
     def get_alert(self) -> Alert:
         """
         Retrieves the first alert from the database that has not ended.
