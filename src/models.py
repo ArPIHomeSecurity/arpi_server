@@ -149,7 +149,7 @@ class Sensor(BaseModel):
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
 
-    def __init__(self, channel, sensor_type, zone=None, area=None, description=None, enabled=True):
+    def __init__(self, channel, sensor_type, area, zone=None, description=None, enabled=True):
         self.channel = channel
         self.zone = zone
         self.area = area
@@ -619,7 +619,7 @@ class Option(BaseModel):
         if key == "name":
             assert value in ("notifications", "network", "syren"), f"Unknown option ({value})"
         elif key == "section":
-            assert value in ("samtp", "gsm", "subscriptions", "dyndns", "access"), f"Unknown section ({value})"
+            assert value in ("smtp", "gsm", "subscriptions", "dyndns", "access"), f"Unknown section ({value})"
         return value
 
 

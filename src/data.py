@@ -8,7 +8,7 @@ import argparse
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import Keypad, KeypadType, Sensor, SensorType, User, Zone
+from models import Area, Keypad, KeypadType, Sensor, SensorType, User, Zone
 from monitor.database import Session
 from models import metadata
 
@@ -101,7 +101,7 @@ def env_live_01():
 
 def env_test_01():
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
-    admin_user.add_registration_code("1234")
+    admin_user.add_registration_code("ABCD1234")
     session.add_all([admin_user, User(name="Chuck Norris", role=ROLE_USER, access_code="1111")])
     print(" - Created users")
 
@@ -116,9 +116,13 @@ def env_test_01():
     session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
-    s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z3, description="Garage")
-    s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[2], zone=z5, description="Test room")
-    s3 = Sensor(channel=2, sensor_type=SENSOR_TYPES[1], zone=z2, description="Tamper")
+    area = Area(name="House")
+    session.add(area)
+    print(" - Created area")
+
+    s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], area=area, zone=z3, description="Garage")
+    s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[2], area=area, zone=z5, description="Test room")
+    s3 = Sensor(channel=2, sensor_type=SENSOR_TYPES[1], area=area, zone=z2, description="Tamper")
     session.add_all([s1, s2, s3])
     print(" - Created sensors")
 
