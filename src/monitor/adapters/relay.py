@@ -43,17 +43,20 @@ class RelayAdapter:
         except Exception as error:
             self._logger.error("Cannot setup relay adapter! %s", error)
 
-    def control_relay(self, relay_number, state):
+    def control_relay(self, relay_number: int, state: bool):
+        """
+        Control relay by number
+        """
         # set the relay number position in states array
-        self._states[relay_number] = state
+        self._states[relay_number] = 1 if state else 0
         self._logger.debug("Control relay %d to %d, %s",
                            relay_number,
                            state,
                            self._states
                            )
-        self.write_states()
+        self._write_states()
 
-    def write_states(self):
+    def _write_states(self):
         self._enable.off()
         self._latch.off()
         self._clock.off()
