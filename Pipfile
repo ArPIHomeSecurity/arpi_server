@@ -38,6 +38,7 @@ black = "*"
 flask-cors = "*"
 textual = "==0.1.18"
 pyfiglet = "*"
+cryptography = "*"
 
 [requires]
 python_version = "3.9"
