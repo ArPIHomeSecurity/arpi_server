@@ -68,7 +68,7 @@ def is_close(a, b, tolerance=0.0):
 
 class Monitor(Thread):
     """
-    classdocs
+    Class for implement monitoring of the sensors and manage alerting.
     """
 
     def __init__(self, broadcaster: Broadcaster):
@@ -156,14 +156,14 @@ class Monitor(Thread):
 
     def are_areas_mixed_state(self):
         count = self._db_session.query(Area).filter(Area.arm_state!=ARM_DISARM).distinct(Area.arm_state).count() > 1
-        self._logger.debug("Are areas mixed state %s", count > 1) 
+        self._logger.debug("Are areas mixed state %s", count > 1)
         return count
-    
+
     def get_areas_state(self):
         if self.are_areas_mixed_state():
             self._logger.debug("Areas state %s", ARM_MIXED)
             return ARM_MIXED
-        
+
         state = self._db_session.query(Area).distinct(Area.arm_state).first().arm_state
         self._logger.debug("Areas state %s", state)
         return state
@@ -493,9 +493,9 @@ class Monitor(Thread):
         else:
             logging.error("Unknown monitoring state: %s", monitoring_state)
 
-        logging.info("Sensor (id=%s) delay: %s", sensor.id, delay)
+        logging.getLogger(LOG_MONITOR).info("Sensor (id=%s) delay: %s", sensor.id, delay)
         return delay
-    
+
     @staticmethod
     def get_alert_type(sensor, monitoring_state):
         # sabotage has higher priority

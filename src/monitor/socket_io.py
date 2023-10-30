@@ -4,19 +4,18 @@ import logging
 import os
 import socketio
 
-from threading import Thread
+import jose.exceptions
 
 from flask import Flask
 from urllib.parse import parse_qs, urlparse
 from jose import jwt
-import jose.exceptions
 
 from models import Option
 from constants import LOG_SOCKETIO
 from monitor.database import Session
 
-
 session = Session()
+logger = logging.getLogger(LOG_SOCKETIO)
 
 noip_config = session.query(Option).filter_by(name="network", section="dyndns").first()
 if noip_config:
@@ -30,25 +29,12 @@ else:
 if len(allowed_origins) == 1:
     allowed_origins = allowed_origins[0]
 
+logger.info("Server CORS allowed on '%s'", allowed_origins)
+
 sio = socketio.Server(async_mode="threading", cors_allowed_origins=allowed_origins)
-logger = logging.getLogger(LOG_SOCKETIO)
-logging.getLogger("werkzeug").setLevel(logging.DEBUG)
-
-
-def start_socketio():
-    logger.info("Server CORS allowed on '%s'", allowed_origins)
-
-    app = Flask(__name__)
-    # wrap Flask application with socketio's middleware
-    app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
-
-    # start on a thread to avoid blocking the main thread (health check)
-    Thread(target=app.run, kwargs={
-        "threaded": True,
-        "debug": False,  # avoid starting application twice in development
-        "host": os.environ["MONITOR_HOST"],
-        "port": int(os.environ["MONITOR_PORT"])}
-    ).start()
+socketio_app = Flask(__name__)
+# wrap Flask application with socketio's middleware
+socketio_app.wsgi_app = socketio.WSGIApp(sio, socketio_app.wsgi_app)
 
 
 @sio.on("connect")

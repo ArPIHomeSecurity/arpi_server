@@ -5,11 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=root
-PIDFile=/run/argus/argus_monitor.pid
 WorkingDirectory=/home/argus/server
 EnvironmentFile=/home/argus/server/.env
 EnvironmentFile=/home/argus/server/secrets.env
-ExecStart=/usr/bin/python3 -u -s -m monitor
+ExecStart=/usr/bin/python3 -m gunicorn \
+    -c src/monitor/gunicorn.conf.py \
+    monitor.socket_io:socketio_app
 Restart=on-failure
 
 [Install]
