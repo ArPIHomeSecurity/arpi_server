@@ -33,7 +33,7 @@ class PowerAdapter(object):
 
     @property
     def source_type(self):
-        if self._sense.value > 0.2:
+        if self._sense.value == 0:
             return PowerAdapter.SOURCE_NETWORK
 
         return PowerAdapter.SOURCE_BATTERY
