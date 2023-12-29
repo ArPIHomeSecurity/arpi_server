@@ -533,7 +533,7 @@ class Monitor(Thread):
         else:
             logging.error("Unknown monitoring state: %s", monitoring_state)
 
-        logging.getLogger(LOG_MONITOR).info("Sensor (id=%s) delay: %s", sensor.id, delay)
+        logging.getLogger(LOG_MONITOR).debug("Sensor (id=%s) delay: %s", sensor.id, delay)
         return delay
 
     @staticmethod

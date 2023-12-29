@@ -67,7 +67,7 @@ class WiegandKeypad(KeypadBase):
             self._logger.debug("Using card: %s", self._card)
         else:
             keys = data
-            self._logger.debug("Pressed keys: %s", keys)
+            self._logger.info("Pressed keys: %s", keys)
             if self._function_mode:
                 # previous key was a #
                 # next key is the function
