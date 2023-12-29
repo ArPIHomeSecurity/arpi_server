@@ -30,7 +30,7 @@ class SecureConnection(Thread):
         # update configuration
         self._logger.debug("Start switching to secure connection...")
         DynDns().update_ip()
-        Certbot().update_certificates()
+        Certbot().update_certificate()
 
         # enable cron jobs for update configuration periodically
         enable_dyndns_job()

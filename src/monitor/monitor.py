@@ -68,7 +68,7 @@ def is_close(a, b, tolerance=0.0):
 
 class Monitor(Thread):
     """
-    classdocs
+    Class for implement monitoring of the sensors and manage alerting.
     """
 
     def __init__(self, broadcaster: Broadcaster):
@@ -149,33 +149,47 @@ class Monitor(Thread):
             self.scan_sensors()
             self.handle_alerts()
 
+        self._sensorAdapter.close()
         self.stop_alert(None)
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
-    def are_areas_mixed_state(self):
-        count = self._db_session.query(Area).filter(Area.arm_state!=ARM_DISARM).distinct(Area.arm_state).count() > 1
-        self._logger.debug("Are areas mixed state %s", count > 1) 
-        return count
-    
+    def are_areas_mixed_state(self) -> bool:
+        """
+        Check if there are areas with more than one state.
+        """
+        count = self._db_session.query(Area.arm_state) \
+            .filter(Area.arm_state!=ARM_DISARM) \
+            .filter(Area.deleted==False) \
+            .distinct(Area.arm_state) \
+            .count()
+        self._logger.debug("Are areas mixed state %s", count > 1)
+        return count > 1
+
     def get_areas_state(self):
+        """
+        Get the state of the areas.
+        """
         if self.are_areas_mixed_state():
             self._logger.debug("Areas state %s", ARM_MIXED)
             return ARM_MIXED
-        
+
         state = self._db_session.query(Area).distinct(Area.arm_state).first().arm_state
         self._logger.debug("Areas state %s", state)
         return state
 
     def arm_monitoring(self, arm_type, user_id, keypad_id, delay, area_id):
+        """
+        Arm the monitoring system to the given state (away, stay).
+        """
         self._logger.info("Arming to %s", arm_type)
 
         if area_id is None:
             # arm the system and all the areas
-            self.arm_areas(arm_type)
+            self.change_areas_arm(arm_type)
             self.arm_system(arm_type, user_id, keypad_id, delay)
         else:
-            self.arm_area(arm_type, area_id)
+            self.change_area_arm(arm_type, area_id)
             if States.get(States.ARM_STATE) == ARM_DISARM:
                 self.arm_system(self.get_areas_state(), user_id=user_id, delay=False, keypad_id=None)
             else:
@@ -184,35 +198,6 @@ class Monitor(Thread):
                 States.set(States.ARM_STATE, areas_state)
 
         self.update_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
-
-    def update_arm(self, arm_type, user_id, keypad_id):
-        # arm the system
-        now = dt.now()
-        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
-        if arm is None:
-            arm = Arm(
-                    arm_type=arm_type,
-                    time=now,
-                    user_id=user_id,
-                    keypad_id=keypad_id
-                )
-            self._db_session.add(arm)
-        else:
-            self._logger.info("Arm state: %s", arm.type)
-            arm.type = ArmStates.merge(arm.type, arm_type)
-
-        for sensor in self._sensors:
-            delay = Monitor.get_sensor_delay(sensor, States.get(States.MONITORING_STATE))
-            self._logger.debug("Sensor (id=%s) delay: %s", sensor.id, delay)
-            sensor_state = ArmSensor.from_sensor(
-                arm=arm,
-                sensor=sensor,
-                timestamp=now,
-                delay=delay
-            )
-            self._db_session.add(sensor_state)
-
-        self._db_session.commit()
 
     def arm_system(self, arm_type, user_id, keypad_id, delay):
         self._logger.info("Arming system to %s", arm_type)
@@ -233,24 +218,45 @@ class Monitor(Thread):
         else:
             States.set(States.MONITORING_STATE, MONITORING_ARMED)
 
-    def arm_areas(self, arm_type):
+    def change_areas_arm(self, arm_type):
+        """
+        Change the arm state of all the areas.
+        Skip deleted areas or areas without a sensor.
+        """
         self._logger.info("Arming areas to %s", arm_type)
-        self._db_session.query(Area).update({"arm_state": arm_type})
+        self._db_session.query(Area) \
+            .filter(Area.deleted == False) \
+            .filter(Area.sensors.any()) \
+            .update({"arm_state": arm_type})
         self._db_session.commit()
 
-    def arm_area(self, arm_type, area_id=None):
+    def change_area_arm(self, arm_type, area_id=None):
+        """
+        Change the arm state of the given area.
+        """
         self._logger.info("Arming area: %s to %s", area_id, arm_type)
         area = self._db_session.query(Area).get(area_id)
+        if area is None and not area.deleted:
+            self._logger.error("Area not found or deleted")
+            return
+
+        if area.sensors == []:
+            self._logger.error("Area has no sensors")
+            return
+
         area.arm_state = arm_type
         send_area_state(area.serialized)
         self._db_session.commit()
 
     def disarm_monitoring(self, user_id, keypad_id, area_id):
+        """
+        Disarm the monitoring system.
+        """
         self._logger.info("Disarming")
 
         if area_id is not None:
             # arm the system and the area
-            self.arm_area(ARM_DISARM, area_id)
+            self.change_area_arm(ARM_DISARM, area_id)
             if self.get_areas_state() == ARM_DISARM:
                 self.disarm_system(user_id, keypad_id)
             else:
@@ -261,10 +267,13 @@ class Monitor(Thread):
                 self.update_arm(arm_type=ARM_DISARM, user_id=user_id, keypad_id=keypad_id)
         else:
             # disarm system and all the areas
-            self.arm_areas(ARM_DISARM)
+            self.change_areas_arm(ARM_DISARM)
             self.disarm_system(user_id, keypad_id)
 
     def disarm_system(self, user_id, keypad_id):
+        """
+        Disarm only the system.
+        """
         self._logger.info("Disarming system")
         if self._delay_timer:
             self._delay_timer.cancel()
@@ -290,6 +299,38 @@ class Monitor(Thread):
             States.set(States.MONITORING_STATE, MONITORING_READY)
 
         self.stop_alert(disarm)
+
+    def update_arm(self, arm_type, user_id, keypad_id):
+        """
+        Update the arm in the database.
+        """
+        # arm the system
+        now = dt.now()
+        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+        if arm is None:
+            arm = Arm(
+                    arm_type=arm_type,
+                    time=now,
+                    user_id=user_id,
+                    keypad_id=keypad_id
+                )
+            self._db_session.add(arm)
+        else:
+            self._logger.info("Arm state to database: %s", arm.type)
+            arm.type = ArmStates.merge(arm.type, arm_type)
+
+        for sensor in self._sensors:
+            delay = Monitor.get_sensor_delay(sensor, States.get(States.MONITORING_STATE))
+            self._logger.debug("Sensor (id=%s) delay: %s", sensor.id, delay)
+            sensor_state = ArmSensor.from_sensor(
+                arm=arm,
+                sensor=sensor,
+                timestamp=now,
+                delay=delay
+            )
+            self._db_session.add(sensor_state)
+
+        self._db_session.commit()
 
     def check_power(self):
         # load the value once from the adapter
@@ -490,11 +531,11 @@ class Monitor(Thread):
             elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_arm_delay is not None:
                 delay = sensor.zone.stay_arm_delay
         else:
-            logging.error("Unknown monitoring state")
+            logging.error("Unknown monitoring state: %s", monitoring_state)
 
-        logging.info("Sensor (id=%s) delay: %s", sensor.id, delay)
+        logging.getLogger(LOG_MONITOR).debug("Sensor (id=%s) delay: %s", sensor.id, delay)
         return delay
-    
+
     @staticmethod
     def get_alert_type(sensor, monitoring_state):
         # sabotage has higher priority
@@ -579,5 +620,6 @@ class Monitor(Thread):
                     self._logger.debug("Cleared sensor alert: sensor id=%s (already closed in alert)", sensor.id)
 
     def stop_alert(self, disarm: Disarm):
+        self._alerting_sensors.clear()
         SensorAlert.stop_alerts(disarm)
         Syren.stop_syren()

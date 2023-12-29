@@ -1,15 +1,21 @@
 import json
 import logging
+import os
 
 from threading import Thread, Event
 from time import time
 
 from models import Alert, Option
-from monitor.adapters.syren import SyrenAdapter
 from monitor.database import Session
 from monitor.socket_io import send_syren_state
 
 from constants import LOG_ALERT, THREAD_ALERT
+
+# check if using the simulator
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
+    from monitor.adapters.relay import RelayAdapter
+else:
+    from monitor.adapters.mock.relay import RelayAdapter
 
 
 class Syren(Thread):
@@ -21,6 +27,8 @@ class Syren(Thread):
     SILENT = False      # alarm type not silent
     DELAY = 0           # default delay 0 seconds
     STOP_TIME = 600     # default stop 10 minutes
+
+    SYREN_RELAY_ID = 0
 
     _is_running = False
     _stop_event = Event()
@@ -82,7 +90,7 @@ class Syren(Thread):
     def __init__(self, config):
         super(Syren, self).__init__(name=THREAD_ALERT)
         self._logger = logging.getLogger(LOG_ALERT)
-        self._syren = SyrenAdapter()
+        self._relay_adapter = RelayAdapter()
         self._alert = None
         self._syren_config = config
 
@@ -109,7 +117,7 @@ class Syren(Thread):
         now = time()
         start_time = time()
         syren_is_on = (DELAY == 0)
-        self._syren.alert(syren_is_on)
+        self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
         send_syren_state(syren_is_on)
         while (
             not self._stop_event.is_set()
@@ -119,7 +127,7 @@ class Syren(Thread):
                 self._logger.info("Syren turned on after delay")
                 # turn on the syren
                 syren_is_on = True
-                self._syren.alert(syren_is_on)
+                self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
                 send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
             elif syren_is_on and now - start_time > STOP_TIME:
@@ -130,9 +138,9 @@ class Syren(Thread):
 
         # turn off the syren
         syren_is_on = None
-        self._syren.alert(syren_is_on)
+        self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
         send_syren_state(syren_is_on)
         self._logger.info("Syren stopped")
 
         self._logger.debug("Syren exited")
-
+        self._db_session.close()

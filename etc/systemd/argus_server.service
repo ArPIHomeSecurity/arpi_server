@@ -6,20 +6,11 @@ After=network.target
 Type=simple
 User=argus
 Group=www-data
-PIDFile=/run/argus/argus_server.pid
 WorkingDirectory=/home/argus/server
 EnvironmentFile=/home/argus/server/.env
 EnvironmentFile=/home/argus/server/secrets.env
 ExecStart=/usr/bin/python3 -m gunicorn \
-    --workers 2 \
-    --umask 0117 \
-    --error-logfile - \
-    --capture-output \
-    --log-level=INFO \
-    --pid /run/argus/argus_server.pid \
-    --bind unix:/run/argus/argus_server.sock \
-    --threads=2 \
-    --timeout=400 \
+    -c src/server/gunicorn.conf.py \
     server:app
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID

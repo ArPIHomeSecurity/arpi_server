@@ -87,18 +87,21 @@ class SensorAlert(Thread):
                           self._sensor_id,
                           self._delay)
 
+        new_alert = False
         alert = self.get_alert()
-        if not alert:
+        if alert is None:
             alert = self.create_alert()
+            new_alert = True
 
         self.add_sensor_to_alert(alert=alert, start_time=start_time, delay=self._delay)
-        sensor_descriptions = list(
-            map(
-                lambda item: f"{item.sensor.description}(id:{item.sensor.id}/CH{item.sensor.channel+1})",
-                alert.sensors,
-            )
-        )
-        Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
+
+        # send notification only on the first sensor alert
+        if new_alert:
+            sensor_descriptions = [
+                f"{item.sensor.description}(id:{item.sensor.id}/CH{(item.sensor.channel+1):02d})"
+                for item in alert.sensors
+            ]
+            Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
 
         Syren.start_syren()
         if self._alert_type == ALERT_SABOTAGE:
@@ -108,13 +111,18 @@ class SensorAlert(Thread):
             States.set(States.MONITORING_STATE, MONITORING_ALERT)
             self._broadcaster.send_message({"action": MONITORING_ALERT})
 
-        if self._stop_event.wait(self._delay):
-            Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
-
     def get_alert(self) -> Alert:
+        """
+        Retrieves the first alert from the database that has not ended.
+        """
         return self._db_session.query(Alert).filter_by(end_time=None).first()
 
     def create_alert(self) -> Alert:
+        """
+        Creates an alert by querying the database for an active arm,
+        setting the start time to the current time, and initializing an empty list of sensors.
+        The alert is then added to the database and returned.
+        """
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         start_time = datetime.now()
         alert = Alert(arm=arm, start_time=start_time, sensors=[])
@@ -123,6 +131,10 @@ class SensorAlert(Thread):
         return alert
 
     def add_sensor_to_alert(self, alert, start_time, delay):
+        """
+        Adds a sensor to the given alert with the specified start time and delay.
+        If the sensor is already added to the alert, it will not be added again.
+        """
         sensor = self._db_session.query(Sensor).get(self._sensor_id)
         already_added = any(
             alert_sensor.sensor.id == sensor.id

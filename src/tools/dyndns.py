@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-from dotenv import load_dotenv
-load_dotenv()
-load_dotenv("secrets.env")
-
 import json
 import logging
+import os
+import sys
 from copy import copy
 from ipaddress import ip_address
-
 from noipy.main import execute_update
+from dotenv import load_dotenv
+
+import argparse
 import requests
+
+load_dotenv()
+load_dotenv("secrets.env")
+sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from models import Option
 from monitor.database import Session
@@ -66,13 +70,13 @@ class DynDns:
         try:
             current_ip = get_dns_records(hostname=noip_config["hostname"])["Answer"][0]["data"]
         except KeyError as error:
-            self._logger.error("Faield to query IP Address! %s", error)
+            self._logger.error("Failed to query IP Address! %s", error)
             return False
 
         # Getting public IP
-        new_ip = requests.get("http://ifconfig.me/ip").text.strip()
+        new_ip = requests.get("http://checkip.amazonaws.com/").text.strip()
         try:
-            # converting the address to string for comparision
+            # converting the address to string for comparison
             new_ip = format(ip_address(new_ip))
         except ValueError:
             self._logger.info("Invalid IP address: %s", new_ip)
@@ -115,7 +119,22 @@ class DynDns:
         return {}
 
 
-if __name__ == "__main__":
-    logging.basicConfig(format="%(asctime)-15s %(message)s", level=logging.INFO)
+def main():
+    parser = argparse.ArgumentParser(description="Update IP address at DNS provider")
+    parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
+    parser.add_argument("-f", "--force", action="store_true", help="force update")
 
-    DynDns(logging.getLogger("argus_noip")).update_ip()
+    args = parser.parse_args()
+
+    logging.basicConfig(format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO)
+
+    dyndns = DynDns(logging.getLogger("argus_noip"))
+    dyndns.update_ip(force=args.force)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+

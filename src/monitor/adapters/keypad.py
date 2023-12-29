@@ -14,6 +14,7 @@ from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
 from monitor.storage import States
+from monitor.adapters import KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
 from monitor.adapters.mock.keypad import MockKeypad
 from monitor.broadcast import Broadcaster
@@ -42,11 +43,6 @@ COMMUNICATION_PERIOD = 0.2  # sec
 
 
 class KeypadHandler(Thread):
-    # pins
-    DATA_PIN0 = 6
-    DATA_PIN1 = 5
-    DATA_PIN2 = 0
-
     def __init__(self, broadcaster: Broadcaster):
         super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
         self._logger = logging.getLogger(LOG_ADKEYPAD)
@@ -93,17 +89,17 @@ class KeypadHandler(Thread):
 
         # check if running on Raspberry
         if os.environ.get("USE_SIMULATOR", "true").lower() == "true":
-            self._keypad = MockKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+            self._keypad = MockKeypad(KEYBUS_PIN1, KEYBUS_PIN0)
             keypad_settings.type.name = "MOCK"
             # see data.py -=> env_test_01
             keypad = db_session.query(Keypad).filter_by(type_id=3).first()
             if keypad:
                 self._keypad._id = keypad.id
         elif keypad_settings.type.name == "DSC":
-            self._keypad = DSCKeypad(KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN0)
+            self._keypad = DSCKeypad(KEYBUS_PIN1, KEYBUS_PIN0)
             self._keypad._id = keypad_settings.id
         elif keypad_settings.type.name == "WIEGAND":
-            self._keypad = WiegandKeypad(KeypadHandler.DATA_PIN0, KeypadHandler.DATA_PIN1, KeypadHandler.DATA_PIN2)
+            self._keypad = WiegandKeypad(KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2)
             self._keypad._id = keypad_settings.id
         else:
             self._logger.error("Unknown keypad type: %s", keypad_settings.type.name)
