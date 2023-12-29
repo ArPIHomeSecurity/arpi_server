@@ -30,6 +30,7 @@ python-socketio = "==5.10.0"
 pytz = "==2021.1"
 pywiegand="==0.4.3"
 stringcase = "==1.2.0"
+simple-websocket = "==1.0.0"
 
 [dev-packages]
 flake8 = "*"
