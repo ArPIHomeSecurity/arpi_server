@@ -9,6 +9,7 @@ from time import sleep
 
 from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
 from monitor.alert import SensorAlert
+from monitor.history import SensorsHistory
 
 from monitor.storage import States
 from monitor.adapters.power import PowerAdapter
@@ -80,11 +81,12 @@ class Monitor(Thread):
         self._sensorAdapter = SensorAdapter()
         self._powerAdapter = PowerAdapter()
         self._broadcaster = broadcaster
+        self._actions = Queue()
+        self._alerting_sensors = set()
+        self._sensors_history = None
         self._sensors = None
         self._power_source = None
         self._db_session = None
-        self._alerting_sensors = set()
-        self._actions = Queue()
         self._delay_timer = None
 
         States.set(States.MONITORING_STATE, MONITORING_STARTUP)
@@ -159,8 +161,8 @@ class Monitor(Thread):
         Check if there are areas with more than one state.
         """
         count = self._db_session.query(Area.arm_state) \
-            .filter(Area.arm_state!=ARM_DISARM) \
-            .filter(Area.deleted==False) \
+            .filter(Area.arm_state != ARM_DISARM) \
+            .filter(Area.deleted == False) \
             .distinct(Area.arm_state) \
             .count()
         self._logger.debug("Are areas mixed state %s", count > 1)
@@ -378,6 +380,8 @@ class Monitor(Thread):
         # !!! delete old sensors before load again
         self._sensors = []
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
+        # TODO: move to config
+        self._sensors_history = SensorsHistory(len(self._sensors), int(environ["SAMPLE_RATE"]) * 10, 70)
         self._logger.debug("Sensors reloaded!")
 
         if len(self._sensors) > self._sensorAdapter.channel_count:
@@ -478,7 +482,6 @@ class Monitor(Thread):
     def scan_sensors(self):
         """
         Checking for alerting sensors if armed
-        TODO: merge with handle_alerts?
         """
         changes = False
         found_alert = False
@@ -504,6 +507,8 @@ class Monitor(Thread):
 
             if sensor.alert and sensor.enabled:
                 found_alert = True
+
+        self._sensors_history.add_states([sensor.alert for sensor in self._sensors])
 
         if changes:
             self._db_session.commit()
@@ -577,9 +582,11 @@ class Monitor(Thread):
                 arm = self._db_session.query(Arm).filter_by(disarm=None).first()
             self._logger.debug("Arm: %s", arm)
 
-        for sensor in self._sensors:
+        for idx, sensor in enumerate(self._sensors):
             # add new alert, enabled sensors to the alert
-            if sensor.alert and sensor.id not in self._alerting_sensors and sensor.enabled:
+            if (self._sensors_history.is_sensor_alerting(idx) and
+                    sensor.id not in self._alerting_sensors and
+                    sensor.enabled):
                 alert_type = Monitor.get_alert_type(sensor, current_monitoring)
                 delay = Monitor.get_sensor_delay(sensor, current_monitoring)
 
@@ -605,7 +612,7 @@ class Monitor(Thread):
                     self._logger.debug("Can't start alert")
 
             # stop alert of sensor
-            elif not sensor.alert and sensor.id in self._alerting_sensors:
+            elif not self._sensors_history.is_sensor_alerting(idx) and sensor.id in self._alerting_sensors:
                 self._logger.debug("Stop alerting sensor id: %s", sensor.id)
                 alert_sensor = self._db_session.query(AlertSensor).filter_by(sensor_id=sensor.id, end_time=None).first()
                 if alert_sensor is not None:
