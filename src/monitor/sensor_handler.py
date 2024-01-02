@@ -21,6 +21,7 @@ from constants import (
 from models import AlertSensor, Arm, Sensor
 from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
+from monitor.communication.mqtt import MQTTClient
 from monitor.database import Session
 from monitor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
@@ -49,6 +50,9 @@ class SensorHandler:
         self._sensors_history = None
         self._sensors = None
 
+        self._mqtt_client = MQTTClient()
+        self._mqtt_client.connect()
+
     def calibrate_sensors(self):
         self._logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
@@ -72,6 +76,11 @@ class SensorHandler:
         # !!! delete old sensors before load again
         self._sensors = []
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
+
+        for sensor in self._sensors:
+            self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.description)
+            self._mqtt_client.publish_sensor_state(sensor.description, False)
+
         # TODO: move to config
         self._sensors_history = SensorsHistory(
             len(self._sensors), int(environ["SAMPLE_RATE"]) * 10, 70
@@ -166,10 +175,12 @@ class SensorHandler:
                         value,
                     )
                     sensor.alert = True
+                    self._mqtt_client.publish_sensor_state(sensor.description, True)
                     changes = True
             elif sensor.alert:
                 self._logger.debug("Cleared alert on channel: %s", sensor.channel)
                 sensor.alert = False
+                self._mqtt_client.publish_sensor_state(sensor.description, False)
                 changes = True
 
             if sensor.alert and sensor.enabled:
