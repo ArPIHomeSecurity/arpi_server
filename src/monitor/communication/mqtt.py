@@ -6,7 +6,7 @@ from enum import Enum
 import socket
 import paho.mqtt.client as mqtt
 
-from constants import LOG_MQTT
+from constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
 
 
 def sanitize(name):
@@ -28,13 +28,17 @@ SENSOR_DEVICE_MAPPING = {
     "Break": "glass_break",
 }
 
+HOME_ASSISTANT_PREFIX = "homeassistant"
+SENSOR_CONFIG_TOPIC = HOME_ASSISTANT_PREFIX + "/binary_sensor/%s/config"
+SENSOR_STATE_TOPIC = HOME_ASSISTANT_PREFIX + "/binary_sensor/%s/state"
+AREA_CONFIG_TOPIC = HOME_ASSISTANT_PREFIX + "/alarm_control_panel/arpi_%s/config"
+AREA_STATE_TOPIC = HOME_ASSISTANT_PREFIX + "/alarm_control_panel/arpi_%s/state"
+
 
 class MQTTClient:
     """
     Class for publishing and subscribing to MQTT topics.
     """
-
-    HOME_ASSISTANT_PREFIX = "homeassistant"
 
     def __init__(self):
         self._logger = logging.getLogger(LOG_MQTT)
@@ -82,29 +86,82 @@ class MQTTClient:
     def _on_message(self, client, userdata, msg):
         self._logger.debug("Received MQTT message on topic %s: %s", msg.topic, msg.payload)
 
+    def publish_area_config(self, name="arpi"):
+        if self._client is None:
+            return
+
+        topic_prefix = AREA_CONFIG_TOPIC % sanitize(name)
+        config = json.dumps(
+            {
+                "name": f"ArPI {name}",
+                "supported_features": ["arm_home", "arm_away"],
+                "state_topic": AREA_STATE_TOPIC % sanitize(name),
+                "command_topic": f"{topic_prefix}/state/set"
+            }
+        )
+
+        topic = f"{topic_prefix}/config"
+        self._logger.debug("Publishing MQTT config %s=%s", topic, config)
+        self._client.publish(topic, config, qos=1, retain=True)
+
+    def delete_area_config(self, name):
+        if self._client is None:
+            return
+
+        topic = AREA_CONFIG_TOPIC % sanitize(name)
+        self._logger.debug("Deleting MQTT config %s", topic)
+        self._client.publish(topic, "", qos=1, retain=True)
+
+    def publish_area_state(self, name, state):
+        if self._client is None:
+            return
+
+        topic = AREA_STATE_TOPIC % sanitize(name)
+        if state == ARM_AWAY:
+            payload = "armed_away"
+        elif state == ARM_STAY:
+            payload = "armed_home"
+        elif state == ARM_DISARM:
+            payload = "disarmed"
+        else:
+            self._logger.error("Unknown state %s", state)
+            return
+
+        self._logger.debug("Publishing MQTT state %s=%s", topic, payload)
+        self._client.publish(topic, payload, qos=1, retain=True)
+
     def publish_sensor_config(self, id, type, name):
         if self._client is None:
             return
 
+        topic_prefix = SENSOR_CONFIG_TOPIC % sanitize(name)
         config = json.dumps(
             {
                 "name": None,
                 "device_class": SENSOR_DEVICE_MAPPING[type],
-                "state_topic": f"homeassistant/binary_sensor/{sanitize(name)}/state",
+                "state_topic": SENSOR_STATE_TOPIC % sanitize(name),
                 "unique_id": f"sensor{id}",
                 "device": {"identifiers": [id], "name": name},
             }
         )
 
-        topic = f"{self.HOME_ASSISTANT_PREFIX}/binary_sensor/{sanitize(name)}/config"
+        topic = f"{topic_prefix}/config"
         self._logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
+
+    def delete_sensor_config(self, name):
+        if self._client is None:
+            return
+
+        topic = SENSOR_CONFIG_TOPIC % sanitize(name)
+        self._logger.debug("Deleting MQTT config %s", topic)
+        self._client.publish(topic, "", qos=1, retain=True)
 
     def publish_sensor_state(self, name, state: bool):
         if self._client is None:
             return
 
-        topic = f"{self.HOME_ASSISTANT_PREFIX}/binary_sensor/{sanitize(name)}/state"
+        topic = SENSOR_STATE_TOPIC % sanitize(name)
         payload = SensorState.ON.value if state else SensorState.OFF.value
         self._logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)

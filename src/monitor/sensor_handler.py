@@ -41,11 +41,11 @@ class SensorHandler:
     Handles the sensor monitoring and alerting.
     """
 
-    def __init__(self, broadcaster):
+    def __init__(self, session, broadcaster):
         self._logger = logging.getLogger(LOG_MONITOR)
+        self._db_session = session
         self._broadcaster = broadcaster
         self._sensor_adapter = SensorAdapter()
-        self._db_session = Session()
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
@@ -78,8 +78,11 @@ class SensorHandler:
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
 
         for sensor in self._sensors:
-            self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.description)
-            self._mqtt_client.publish_sensor_state(sensor.description, False)
+            if not sensor.deleted:
+                self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.description)
+                self._mqtt_client.publish_sensor_state(sensor.description, False)
+            else:
+                self._mqtt_client.delete_sensor_config(sensor.id)
 
         # TODO: move to config
         self._sensors_history = SensorsHistory(

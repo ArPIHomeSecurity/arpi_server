@@ -8,6 +8,7 @@ from threading import Thread, Timer
 from time import sleep
 
 from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
+from monitor.area_handler import AreaHandler
 from monitor.sensor_handler import SensorHandler
 from monitor.alert import SensorAlert
 
@@ -41,7 +42,6 @@ from constants import (
 from monitor.database import Session
 from monitor.socket_io import (
     send_alert_state,
-    send_area_state,
     send_power_state,
     send_syren_state
 )
@@ -70,6 +70,7 @@ class Monitor(Thread):
         self._db_session = None
         self._delay_timer = None
         self._sensor_handler = None
+        self._area_handler = None
 
         States.set(States.MONITORING_STATE, MONITORING_STARTUP)
         States.set(States.ARM_STATE, ARM_DISARM)
@@ -79,7 +80,8 @@ class Monitor(Thread):
     def run(self):
         self._logger.info("Monitoring started")
         self._db_session = Session()
-        self._sensor_handler = SensorHandler(self._broadcaster)
+        self._area_handler = AreaHandler(session=self._db_session)
+        self._sensor_handler = SensorHandler(session=self._db_session, broadcaster=self._broadcaster)
 
         # wait some seconds to build up socket IO connection before emit messages
         sleep(5)
@@ -92,6 +94,7 @@ class Monitor(Thread):
         send_syren_state(None)
         States.set(States.ARM_STATE, ARM_DISARM)
 
+        self._area_handler.publish_areas()
         self._sensor_handler.load_sensors()
 
         while True:
@@ -128,6 +131,7 @@ class Monitor(Thread):
                     )
                     continue
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
+                    self._area_handler.publish_areas()
                     self._sensor_handler.load_sensors()
 
             self.check_power()
@@ -140,30 +144,6 @@ class Monitor(Thread):
         self._db_session.close()
         self._logger.info("Monitoring stopped")
 
-    def are_areas_mixed_state(self) -> bool:
-        """
-        Check if there are areas with more than one state.
-        """
-        count = self._db_session.query(Area.arm_state) \
-            .filter(Area.arm_state != ARM_DISARM) \
-            .filter(Area.deleted == False) \
-            .distinct(Area.arm_state) \
-            .count()
-        self._logger.debug("Are areas mixed state %s", count > 1)
-        return count > 1
-
-    def get_areas_state(self):
-        """
-        Get the state of the areas.
-        """
-        if self.are_areas_mixed_state():
-            self._logger.debug("Areas state %s", ARM_MIXED)
-            return ARM_MIXED
-
-        state = self._db_session.query(Area).distinct(Area.arm_state).first().arm_state
-        self._logger.debug("Areas state %s", state)
-        return state
-
     def arm_monitoring(self, arm_type, user_id, keypad_id, delay, area_id):
         """
         Arm the monitoring system to the given state (away, stay).
@@ -172,14 +152,14 @@ class Monitor(Thread):
 
         if area_id is None:
             # arm the system and all the areas
-            self.change_areas_arm(arm_type)
+            self._area_handler.change_areas_arm(arm_type)
             self.arm_system(arm_type, user_id, keypad_id, delay)
         else:
-            self.change_area_arm(arm_type, area_id)
+            self._area_handler.change_area_arm(arm_type, area_id)
             if States.get(States.ARM_STATE) == ARM_DISARM:
-                self.arm_system(self.get_areas_state(), user_id=user_id, delay=False, keypad_id=None)
+                self.arm_system(self._area_handler.get_areas_state(), user_id=user_id, delay=False, keypad_id=None)
             else:
-                areas_state = self.get_areas_state()
+                areas_state = self._area_handler.get_areas_state()
                 # send always notification
                 States.set(States.ARM_STATE, areas_state)
 
@@ -204,36 +184,6 @@ class Monitor(Thread):
         else:
             States.set(States.MONITORING_STATE, MONITORING_ARMED)
 
-    def change_areas_arm(self, arm_type):
-        """
-        Change the arm state of all the areas.
-        Skip deleted areas or areas without a sensor.
-        """
-        self._logger.info("Arming areas to %s", arm_type)
-        self._db_session.query(Area) \
-            .filter(Area.deleted == False) \
-            .filter(Area.sensors.any()) \
-            .update({"arm_state": arm_type})
-        self._db_session.commit()
-
-    def change_area_arm(self, arm_type, area_id=None):
-        """
-        Change the arm state of the given area.
-        """
-        self._logger.info("Arming area: %s to %s", area_id, arm_type)
-        area = self._db_session.query(Area).get(area_id)
-        if area is None and not area.deleted:
-            self._logger.error("Area not found or deleted")
-            return
-
-        if area.sensors == []:
-            self._logger.error("Area has no sensors")
-            return
-
-        area.arm_state = arm_type
-        send_area_state(area.serialized)
-        self._db_session.commit()
-
     def disarm_monitoring(self, user_id, keypad_id, area_id):
         """
         Disarm the monitoring system.
@@ -242,18 +192,18 @@ class Monitor(Thread):
 
         if area_id is not None:
             # arm the system and the area
-            self.change_area_arm(ARM_DISARM, area_id)
-            if self.get_areas_state() == ARM_DISARM:
+            self._area_handler.change_area_arm(ARM_DISARM, area_id)
+            if self._area_handler.get_areas_state() == ARM_DISARM:
                 self.disarm_system(user_id, keypad_id)
             else:
-                areas_state = self.get_areas_state()
+                areas_state = self._area_handler.get_areas_state()
                 if areas_state != States.get(States.ARM_STATE):
                     States.set(States.ARM_STATE, areas_state)
 
                 self.update_arm(arm_type=ARM_DISARM, user_id=user_id, keypad_id=keypad_id)
         else:
             # disarm system and all the areas
-            self.change_areas_arm(ARM_DISARM)
+            self._area_handler.change_areas_arm(ARM_DISARM)
             self.disarm_system(user_id, keypad_id)
 
     def disarm_system(self, user_id, keypad_id):
