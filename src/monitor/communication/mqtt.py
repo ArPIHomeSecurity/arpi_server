@@ -1,10 +1,18 @@
 import json
 import logging
 import os
+import socket
+import ssl
+import sys
 
 from enum import Enum
-import socket
+
 import paho.mqtt.client as mqtt
+
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv("secrets.env")
+sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
 
@@ -51,16 +59,24 @@ class MQTTClient:
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
-        username = os.environ.get("MQTT_BROKER_USERNAME", "")
-        password = os.environ.get("MQTT_BROKER_PASSWORD", "")
+        username = os.environ.get("ARGUS_MQTT_USERNAME", "")
+        password = os.environ.get("ARGUS_MQTT_PASSWORD", "")
         if username:
+            self._logger.debug("Using password authentication user: %s password length = %s",
+                               username,
+                               len(password))
             self._client.username_pw_set(username, password)
 
-        if os.environ.get("MQTT_BROKER_TLS_ENABLED", "false").lower() in ("true", "1"):
-            self._client.tls_set()
+        if os.environ.get("ARGUS_MQTT_TLS_ENABLED", "false").lower() in ("true", "1"):
+            self._logger.debug("Using TLS")
+            self._client.tls_set(cert_reqs=ssl.CERT_NONE)
 
-        host = os.environ["MQTT_BROKER_HOST"]
-        port = int(os.environ["MQTT_BROKER_PORT"])
+        if os.environ.get("ARGUS_MQTT_TLS_INSECURE", "false").lower() in ("true", "1"):
+            self._logger.debug("Using TLS insecure")
+            self._client.tls_insecure_set(True)
+
+        host = os.environ["ARGUS_MQTT_HOST"]
+        port = int(os.environ["ARGUS_MQTT_PORT"])
         self._logger.debug("Connecting to MQTT broker at %s:%s", host, port)
         try:
             self._client.connect(host, port, 60)
@@ -70,6 +86,10 @@ class MQTTClient:
             self._client = None
         except ConnectionRefusedError:
             self._logger.error("Failed to connect to MQTT broker at %s:%s", host, port)
+            self._client.disconnect()
+            self._client = None
+        except ssl.SSLCertVerificationError as error:
+            self._logger.error("Failed to connect to MQTT broker with TLS! %s", error)
             self._client.disconnect()
             self._client = None
         except Exception as e:

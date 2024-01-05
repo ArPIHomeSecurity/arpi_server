@@ -1,5 +1,5 @@
 [Unit]
-Description=Argus webapplication
+Description=Argus REST API service
 After=network.target
  
 [Service]

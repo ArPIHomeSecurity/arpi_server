@@ -1,7 +1,7 @@
 bind = "localhost:8081"
 workers = 2
 threads = 10
-umask = "0117"
+umask = 0o0117
 errorlog = "-"
 capture_output = True
 loglevel = "info"
