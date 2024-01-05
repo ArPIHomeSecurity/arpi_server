@@ -20,7 +20,7 @@ class AreaHandler:
         """
         Load all the areas from the database.
         """
-        areas = self._db_session.query(Area).filter(Area.deleted == False).all()
+        areas = self._db_session.query(Area).all()
 
         for area in areas:
             if not area.deleted:
@@ -28,7 +28,7 @@ class AreaHandler:
                 self._mqtt_client.publish_area_state(area.name, area.arm_state)
                 send_area_state(area.serialized)
             else:
-                self._mqtt_client.delete_area_config(area.name)
+                self._mqtt_client.delete_area(area.name)
 
     def change_area_arm(self, arm_type, area_id=None):
         """

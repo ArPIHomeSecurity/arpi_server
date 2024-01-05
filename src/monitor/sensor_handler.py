@@ -73,16 +73,15 @@ class SensorHandler:
         # TODO: wait a little bit to see status for debug
         sleep(3)
 
-        # !!! delete old sensors before load again
-        self._sensors = []
-        self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
-
-        for sensor in self._sensors:
+        for sensor in self._db_session.query(Sensor).all():
             if not sensor.deleted:
                 self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.description)
                 self._mqtt_client.publish_sensor_state(sensor.description, False)
             else:
-                self._mqtt_client.delete_sensor_config(sensor.id)
+                self._mqtt_client.delete_sensor(sensor.description)
+
+        self._sensors = []
+        self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
 
         # TODO: move to config
         self._sensors_history = SensorsHistory(
