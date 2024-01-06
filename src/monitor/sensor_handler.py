@@ -51,7 +51,7 @@ class SensorHandler:
         self._sensors = None
 
         self._mqtt_client = MQTTClient()
-        self._mqtt_client.connect()
+        self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
         self._logger.info("Initialize sensor references...")
@@ -85,7 +85,7 @@ class SensorHandler:
 
         # TODO: move to config
         self._sensors_history = SensorsHistory(
-            len(self._sensors), int(environ["SAMPLE_RATE"]) * 10, 70
+            len(self._sensors), int(environ["SAMPLE_RATE"]) * 1, 100
         )
         self._logger.debug("Sensors reloaded!")
 
@@ -296,6 +296,7 @@ class SensorHandler:
         """
         self._logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
+        self._mqtt_client.close()
         self._db_session.close()
 
     @staticmethod

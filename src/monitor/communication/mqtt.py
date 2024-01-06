@@ -4,7 +4,7 @@ import os
 import socket
 import ssl
 import sys
-from  unicodedata import normalize
+from unicodedata import normalize
 
 from enum import Enum
 
@@ -52,9 +52,12 @@ class MQTTClient:
         self._logger = logging.getLogger(LOG_MQTT)
         self._client = None
 
-    def connect(self):
+    def connect(self, client_id=None):
+        """
+        Connect to MQTT broker.
+        """
 
-        self._client = mqtt.Client()
+        self._client = mqtt.Client(client_id=client_id)
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
@@ -79,7 +82,7 @@ class MQTTClient:
         port = int(os.environ["ARGUS_MQTT_PORT"])
         self._logger.debug("Connecting to MQTT broker at %s:%s", host, port)
         try:
-            self._client.connect(host, port, 60)
+            self._client.connect(host, port, keepalive=60)
         except socket.gaierror:
             self._logger.error("Failed to resolve MQTT broker hostname %s", host)
             self._client.disconnect()
@@ -95,30 +98,60 @@ class MQTTClient:
         except Exception as e:
             self._logger.exception("Failed to connect to MQTT broker: %s", e)
 
+        self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
+        self._client.loop_start()
+
+    def close(self):
+        """
+        Close connection to MQTT broker.
+        """
+        if self._client is not None:
+            self._client.disconnect()
+            self._client = None
+
     def _on_connect(self, client, userdata, flags, rc):
+        """
+        Callback when connected to MQTT broker.
+        """
         self._logger.debug("Connected with result code: %s", rc)
 
     def _on_disconnect(self, client, userdata, rc):
-        self._logger.debug("Disconnected from MQTT broker with result code: %s", rc)
+        """
+        Callback when disconnected from MQTT broker.
+        """
+        if rc != 0:
+            self._logger.warn("Disconnected from MQTT broker with result code: %s, will auto-reconnect", rc)
+            return
+
+        self._logger.info("Disconnected from MQTT broker")
         self._client.disconnect()
         self._client = None
 
     def _on_message(self, client, userdata, msg):
+        """
+        Callback when message received from MQTT broker.
+        """
         self._logger.debug("Received MQTT message on topic %s: %s", msg.topic, msg.payload)
 
     def _delete_object(self, topic_prefix):
+        """
+        Delete the MQTT object (config and state) with the given prefix.
+        """
         self._logger.debug("Deleting MQTT prefix %s", topic_prefix)
         self._client.publish(f"{topic_prefix}/config", "", qos=1, retain=False)
         self._client.publish(f"{topic_prefix}/state", "", qos=1, retain=False)
 
     def publish_area_config(self, name="arpi"):
+        """
+        Publish the MQTT HomeAssistant config for the given area.
+        """
         if self._client is None:
             return
 
         topic_prefix = AREA_TOPIC_PREFIX + sanitize(name)
         config = json.dumps(
             {
-                "name": None,
+                "name": f"ArPI {name}",
                 "supported_features": ["arm_home", "arm_away"],
                 "state_topic": f"{topic_prefix}/state",
                 "command_topic": f"{topic_prefix}/state/set"
@@ -130,12 +163,18 @@ class MQTTClient:
         self._client.publish(topic, config, qos=1, retain=True)
 
     def delete_area(self, name):
+        """
+        Delete the MQTT HomeAssistant config/state for the given area.
+        """
         if self._client is None:
             return
 
         self._delete_object(f"{AREA_TOPIC_PREFIX}{sanitize(name)}")
 
     def publish_area_state(self, name, state):
+        """
+        Publish the MQTT HomeAssistant state for the given area.
+        """
         if self._client is None:
             return
 
@@ -154,6 +193,9 @@ class MQTTClient:
         self._client.publish(topic, payload, qos=1, retain=True)
 
     def publish_sensor_config(self, id, type, name):
+        """
+        Publish the MQTT HomeAssistant config for the given sensor.
+        """
         if self._client is None:
             return
 
@@ -173,12 +215,18 @@ class MQTTClient:
         self._client.publish(topic, config, qos=1, retain=True)
 
     def delete_sensor(self, name):
+        """
+        Delete the MQTT HomeAssistant config/state for the given sensor.
+        """
         if self._client is None:
             return
 
         self._delete_object(f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}")
 
     def publish_sensor_state(self, name, state: bool):
+        """
+        Publish the MQTT HomeAssistant state for the given sensor.
+        """
         if self._client is None:
             return
 

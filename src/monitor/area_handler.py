@@ -13,7 +13,7 @@ class AreaHandler:
         self._db_session = session
 
         self._mqtt_client = MQTTClient()
-        self._mqtt_client.connect()
+        self._mqtt_client.connect(client_id="arpi_area")
         self._logger.debug("AreaHandler initialized")
 
     def publish_areas(self):
