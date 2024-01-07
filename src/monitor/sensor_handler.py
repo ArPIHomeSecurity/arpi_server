@@ -31,6 +31,11 @@ MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3
 TOLERANCE = float(environ["TOLERANCE"])
 
+# alert time window length in seconds
+ALERT_WINDOW = int(environ.get("ALERT_TIME_WINDOW", 1))
+# threshold in the percent of high values in the time window (0-100)
+ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", 100))
+
 
 def is_close(a, b, tolerance=0.0):
     return abs(a - b) < tolerance
@@ -83,9 +88,8 @@ class SensorHandler:
         self._sensors = []
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
 
-        # TODO: move to config
         self._sensors_history = SensorsHistory(
-            len(self._sensors), int(environ["SAMPLE_RATE"]) * 1, 100
+            len(self._sensors), int(environ["SAMPLE_RATE"]) * ALERT_WINDOW, ALERT_THRESHOLD
         )
         self._logger.debug("Sensors reloaded!")
 
@@ -214,6 +218,13 @@ class SensorHandler:
             self._logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
+            # alert under threshold
+            if (not self._sensors_history.is_sensor_alerting(idx) and
+                    self._sensors_history.has_sensor_any_alert(idx) and
+                    sensor.id not in self._alerting_sensors and
+                    current_monitoring == MONITORING_ARMED):
+                self._logger.warn("Sensor %s (CH%02d) has suppressed alert!", sensor.id, sensor.channel)
+
             # add new alert, enabled sensors to the alert
             if (
                 self._sensors_history.is_sensor_alerting(idx)

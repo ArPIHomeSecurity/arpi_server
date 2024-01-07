@@ -27,11 +27,20 @@ class SensorHistory:
         if len(self._states) > self._size:
             self._states.pop(0)
 
-    def alert_states(self):
+    def get_states(self):
+        return self._states
+
+    def alert_states_length(self):
         return len([e for e in self._states if e])
 
     def alert_above_threshold(self):
-        return (self.alert_states() / len(self._states)) * 100 >= self._threshold
+        """
+        Checks if the percentage of alert states is above the threshold.
+
+        Returns:
+            bool: True if the percentage of alert states is above the threshold, False otherwise.
+        """
+        return (self.alert_states_length() / len(self._states)) * 100 >= self._threshold
 
 
 class SensorsHistory:
@@ -48,11 +57,6 @@ class SensorsHistory:
             raise ValueError(f"Invalid sensor index {idx}")
         self._sensors[idx].add(state)
 
-    def get_states(self, idx):
-        if idx >= len(self._sensors):
-            raise ValueError(f"Invalid sensor index {idx}")
-        return self._sensors[idx].alert_states()
-
     def is_sensor_alerting(self, idx):
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
@@ -61,7 +65,7 @@ class SensorsHistory:
     def has_sensor_any_alert(self, idx):
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
-        return any(self.get_states(idx))
+        return any(self._sensors[idx].get_states())
 
     def add_states(self, states):
         if len(states) != len(self._sensors):
