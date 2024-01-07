@@ -12,6 +12,5 @@ __pycache__
 /.settings
 
 test_data
-channels.json
-power.json
+simulator.json
 textual.log
