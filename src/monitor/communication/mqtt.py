@@ -124,8 +124,9 @@ class MQTTClient:
             return
 
         self._logger.info("Disconnected from MQTT broker")
-        self._client.disconnect()
-        self._client = None
+        if self._client is not None:
+            self._client.disconnect()
+            self._client = None
 
     def _on_message(self, client, userdata, msg):
         """
