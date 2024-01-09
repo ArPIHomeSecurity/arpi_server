@@ -18,7 +18,38 @@ POWER_HIGH = 1
 class SimulatorApp(App):
     """Simulate status of sensors and power for argus"""
 
-    CSS_PATH = "simulator.tcss"
+    CSS = """
+    Screen {
+        overflow: auto;
+    }
+
+    #simulator {
+        layout: grid;
+        grid-size: 4;
+        grid-gutter: 1 2;
+        grid-columns: 1fr;
+        grid-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+        margin: 1 2;
+        min-height: 25;
+        min-width: 26;
+        height: 100%;
+    }
+
+    Button {
+        width: 100%;
+        height: 100%;
+    }
+
+    .button {
+        background: green 60%;
+        color: white 100%;
+    }
+
+    .button-pressed {
+        background: red 50%;
+        color: black 100%;
+    }
+    """
 
     outputs = {
         "CH01": CHANNEL_LOW,
