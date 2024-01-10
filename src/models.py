@@ -150,6 +150,7 @@ class Sensor(BaseModel):
     alerts = relationship("AlertSensor", back_populates="sensor")
 
     ui_order = Column(Integer, nullable=True)
+    ui_hidden = Column(Boolean, nullable=False, default=False)
 
     def __init__(self, channel, sensor_type, area, zone=None, description=None, enabled=True):
         self.channel = channel
@@ -172,7 +173,7 @@ class Sensor(BaseModel):
                 "zone_id",
                 "area_id",
                 "type_id",
-                "ui_order"
+                "ui_hidden"
             ), data)
 
     @property
@@ -187,7 +188,8 @@ class Sensor(BaseModel):
                 "area_id",
                 "type_id",
                 "enabled",
-                "ui_order"
+                "ui_order",
+                "ui_hidden"
             ))
         )
 
