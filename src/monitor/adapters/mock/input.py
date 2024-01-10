@@ -23,6 +23,9 @@ class SimulatorBasedMockInput(object):
             with open(self._input_file) as channels_file:
                 channels_data = json.load(channels_file)
                 self._logger.debug("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
+                # simulate random noise
+                # if time() % 10 > 5:
+                #     return 0
                 return channels_data[self._channel]
             
     @property
