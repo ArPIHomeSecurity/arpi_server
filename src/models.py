@@ -149,6 +149,8 @@ class Sensor(BaseModel):
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
 
+    ui_order = Column(Integer, nullable=True)
+
     def __init__(self, channel, sensor_type, area, zone=None, description=None, enabled=True):
         self.channel = channel
         self.zone = zone
@@ -163,12 +165,30 @@ class Sensor(BaseModel):
         if data["channel"] != self.channel:
             self.reference_value = None
 
-        return self.update_record(("channel", "enabled", "description", "zone_id", "area_id", "type_id"), data)
+        return self.update_record((
+                "channel",
+                "enabled",
+                "description",
+                "zone_id",
+                "area_id",
+                "type_id",
+                "ui_order"
+            ), data)
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "area_id", "type_id", "enabled"))
+            self.serialize_attributes((
+                "id",
+                "channel",
+                "alert",
+                "description",
+                "zone_id",
+                "area_id",
+                "type_id",
+                "enabled",
+                "ui_order"
+            ))
         )
 
     @validates("name")

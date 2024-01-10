@@ -20,9 +20,16 @@ def view_sensors():
     current_app.logger.debug("Request->alerting: %s", request.args.get("alerting"))
     if not request.args.get("alerting"):
         return jsonify(
-            [i.serialized for i in db.session.query(Sensor).filter_by(deleted=False).order_by(Sensor.channel.asc())]
+            [
+                i.serialized
+                for i in db.session.query(Sensor)
+                .filter_by(deleted=False)
+                .order_by(Sensor.channel.asc())
+            ]
         )
-    return jsonify([i.serialized for i in db.session.query(Sensor).filter_by(alert=True).all()])
+    return jsonify(
+        [i.serialized for i in db.session.query(Sensor).filter_by(alert=True).all()]
+    )
 
 
 @sensor_blueprint.route("/api/sensors/", methods=["POST"])
@@ -103,7 +110,30 @@ def sensor_types():
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
-            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), enabled=True, alert=True).first() is not None
+            db.session.query(Sensor)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True)
+            .first()
+            is not None
         )
     else:
-        return jsonify(db.session.query(Sensor).filter_by(enabled=True, alert=True).first() is not None)
+        return jsonify(
+            db.session.query(Sensor).filter_by(enabled=True, alert=True).first()
+            is not None
+        )
+
+
+@sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
+@registered
+@restrict_host
+def reorder_sensors():
+    """
+    Change only the ui_order of the sensors
+    """
+    for sensor_data in request.json:
+        db.session.query(Sensor)\
+            .get(sensor_data["id"])\
+            .update_record(["ui_order"], sensor_data)
+
+    db.session.commit()
+
+    return make_response("", 200)
