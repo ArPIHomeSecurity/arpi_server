@@ -86,7 +86,7 @@ class SensorHandler:
                 )
                 return True
 
-        self._logger.info("No uninitialized sensors found")
+        self._logger.info("No uncalibrated sensors found")
         return False
 
     def load_sensors(self):
