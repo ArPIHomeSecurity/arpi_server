@@ -1,3 +1,6 @@
+"""
+Sensor monitoring and alerting.
+"""
 import logging
 from datetime import datetime as dt, timedelta
 from os import environ
@@ -22,7 +25,6 @@ from models import AlertSensor, Arm, Sensor
 from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
-from monitor.database import Session
 from monitor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import States
@@ -38,12 +40,15 @@ ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", 100))
 
 
 def is_close(a, b, tolerance=0.0):
+    """
+    Check if two values are close enough.
+    """
     return abs(a - b) < tolerance
 
 
 class SensorHandler:
     """
-    Handles the sensor monitoring and alerting.
+    Handles the sensors monitoring and alerting.
     """
 
     def __init__(self, session, broadcaster):
@@ -59,6 +64,9 @@ class SensorHandler:
         self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
+        """
+        Calibrate the sensors: update the reference value of the sensors.
+        """
         self._logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
         if len(new_references) == self._sensor_adapter.channel_count:
@@ -67,11 +75,24 @@ class SensorHandler:
         else:
             self._logger.error("Error measure values! %s", new_references)
 
-    def has_uninitialized_sensor(self):
-        return any(sensor.reference_value is None for sensor in self._sensors)
+    def has_uncalibrated_sensor(self):
+        """
+        Check if there is any sensor without reference value.
+        """
+        for sensor in self._sensors:
+            if sensor.reference_value is None and sensor.channel != -1:
+                self._logger.info(
+                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.description
+                )
+                return True
+
+        self._logger.info("No uninitialized sensors found")
+        return False
 
     def load_sensors(self):
-        """Load the sensors from the db in the thread to avoid session problems"""
+        """
+        Load the sensors from the db in the thread to avoid session problems.
+        """
         States.set(States.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
@@ -80,7 +101,9 @@ class SensorHandler:
 
         for sensor in self._db_session.query(Sensor).all():
             if not sensor.deleted:
-                self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.description)
+                self._mqtt_client.publish_sensor_config(
+                    sensor.id, sensor.type.name, sensor.description
+                )
                 self._mqtt_client.publish_sensor_state(sensor.description, False)
             else:
                 self._mqtt_client.delete_sensor(sensor.description)
@@ -89,7 +112,9 @@ class SensorHandler:
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
 
         self._sensors_history = SensorsHistory(
-            len(self._sensors), int(environ["SAMPLE_RATE"]) * ALERT_WINDOW, ALERT_THRESHOLD
+            len(self._sensors),
+            int(environ["SAMPLE_RATE"]) * ALERT_WINDOW,
+            ALERT_THRESHOLD,
         )
         self._logger.debug("Sensors reloaded!")
 
@@ -105,7 +130,7 @@ class SensorHandler:
             self._logger.info("Invalid channel configuration")
             self._sensors = []
             States.set(States.MONITORING_STATE, MONITORING_INVALID_CONFIG)
-        elif self.has_uninitialized_sensor():
+        elif self.has_uncalibrated_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
             States.set(States.MONITORING_STATE, MONITORING_READY)
@@ -115,22 +140,26 @@ class SensorHandler:
         send_sensors_state(False)
 
     def validate_sensor_config(self):
-        self._logger.debug("Validating config...")
+        """
+        Validate the sensor configuration.
+        * check if there is any sensor with the same channel
+        """
+        self._logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
             if sensor.channel in channels:
-                self._logger.debug(f"Channel already in use: {sensor.channel}")
+                self._logger.debug("Channel already in use: %s", sensor.channel)
                 return False
             else:
                 channels.add(sensor.channel)
-                self._logger.debug(f"Channel added: {sensor.channel}")
+                self._logger.debug("Channel added: %s", sensor.channel)
 
         self._logger.debug("Channels: %s", channels)
         return True
 
     def measure_sensor_references(self):
         """
-        Retrieves a list of vales messuared on the all the channels.
+        Retrieves a list of vales measured on the all the channels.
         """
         measurements = []
         for _ in range(MEASUREMENT_CYCLES):
@@ -149,9 +178,12 @@ class SensorHandler:
         return list(references.values())
 
     def save_sensor_references(self, references):
+        """
+        Save the reference values to the database.
+        """
         for sensor in self._sensors:
-            # skip sensors without a channel
-            if sensor.channel == -1:
+            # skip sensors without a channel or already calibrated
+            if sensor.channel == -1 or sensor.reference_value is not None:
                 continue
 
             sensor.reference_value = references[sensor.channel]
@@ -171,7 +203,6 @@ class SensorHandler:
 
             value = self._sensor_adapter.get_value(sensor.channel)
 
-            # self._logger.debug("Sensor({}): R:{} -> V:{}".format(sensor.channel, sensor.reference_value, value))
             if not is_close(value, sensor.reference_value, TOLERANCE):
                 if not sensor.alert:
                     self._logger.debug(
@@ -219,11 +250,17 @@ class SensorHandler:
 
         for idx, sensor in enumerate(self._sensors):
             # alert under threshold
-            if (not self._sensors_history.is_sensor_alerting(idx) and
-                    self._sensors_history.has_sensor_any_alert(idx) and
-                    sensor.id not in self._alerting_sensors and
-                    current_monitoring == MONITORING_ARMED):
-                self._logger.warn("Sensor %s (CH%02d) has suppressed alert!", sensor.id, sensor.channel)
+            if (
+                not self._sensors_history.is_sensor_alerting(idx)
+                and self._sensors_history.has_sensor_any_alert(idx)
+                and sensor.id not in self._alerting_sensors
+                and current_monitoring == MONITORING_ARMED
+            ):
+                self._logger.warning(
+                    "Sensor %s (CH%02d) has suppressed alert!",
+                    sensor.id,
+                    sensor.channel,
+                )
 
             # add new alert, enabled sensors to the alert
             if (
