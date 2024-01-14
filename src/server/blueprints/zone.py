@@ -64,3 +64,20 @@ def zone(zone_id):
         db.session.commit()
         return process_ipc_response(IPCClient().update_configuration())
     return make_response(jsonify({"error": "Unknown action"}), 400)
+
+
+@zone_blueprint.route("/api/zones/reorder", methods=["PUT"])
+@registered
+@restrict_host
+def reorder_zones():
+    """
+    Change only the ui_order of the zones
+    """
+    for zone_data in request.json:
+        db.session.query(Zone).get(zone_data["id"]).update_record(
+            ["ui_order"], zone_data
+        )
+
+    db.session.commit()
+
+    return make_response("", 200)

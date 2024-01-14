@@ -95,9 +95,9 @@ def put_disarm():
 @area_blueprint.route("/api/areas/reorder", methods=["PUT"])
 @registered
 @restrict_host
-def reorder_zones():
+def reorder_areas():
     """
-    Change only the ui_order of the zones
+    Change only the ui_order of the areas
     """
     for area_data in request.json:
         db.session.query(Area).get(area_data["id"]).update_record(

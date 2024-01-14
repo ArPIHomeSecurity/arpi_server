@@ -401,6 +401,9 @@ class Zone(BaseModel):
     away_arm_delay = Column(Integer, default=None, nullable=True)
     stay_arm_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
+
+    ui_order = Column(Integer, nullable=True)
+
     sensors = relationship("Sensor", back_populates="zone")
 
     def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
@@ -436,7 +439,8 @@ class Zone(BaseModel):
                 "away_alert_delay",
                 "stay_alert_delay",
                 "away_arm_delay",
-                "stay_arm_delay"
+                "stay_arm_delay",
+                "ui_order"
             ))
         )
 
