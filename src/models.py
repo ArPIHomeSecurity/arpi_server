@@ -149,6 +149,9 @@ class Sensor(BaseModel):
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
 
+    ui_order = Column(Integer, nullable=True)
+    ui_hidden = Column(Boolean, nullable=False, default=False)
+
     def __init__(self, channel, sensor_type, area, zone=None, description=None, enabled=True):
         self.channel = channel
         self.zone = zone
@@ -163,12 +166,31 @@ class Sensor(BaseModel):
         if data["channel"] != self.channel:
             self.reference_value = None
 
-        return self.update_record(("channel", "enabled", "description", "zone_id", "area_id", "type_id"), data)
+        return self.update_record((
+                "channel",
+                "enabled",
+                "description",
+                "zone_id",
+                "area_id",
+                "type_id",
+                "ui_hidden"
+            ), data)
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "area_id", "type_id", "enabled"))
+            self.serialize_attributes((
+                "id",
+                "channel",
+                "alert",
+                "description",
+                "zone_id",
+                "area_id",
+                "type_id",
+                "enabled",
+                "ui_order",
+                "ui_hidden"
+            ))
         )
 
     @validates("name")
@@ -379,6 +401,9 @@ class Zone(BaseModel):
     away_arm_delay = Column(Integer, default=None, nullable=True)
     stay_arm_delay = Column(Integer, default=None, nullable=True)
     deleted = Column(Boolean, default=False)
+
+    ui_order = Column(Integer, nullable=True)
+
     sensors = relationship("Sensor", back_populates="zone")
 
     def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
@@ -391,12 +416,32 @@ class Zone(BaseModel):
         self.stay_arm_delay = stay_arm_delay
 
     def update(self, data):
-        return self.update_record(("name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"), data)
+        return self.update_record((
+                "name",
+                "description",
+                "disarmed_delay",
+                "away_alert_delay",
+                "stay_alert_delay",
+                "away_arm_delay",
+                "stay_arm_delay"
+            ),
+            data
+        )
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay"))
+            self.serialize_attributes((
+                "id",
+                "name",
+                "description",
+                "disarmed_delay",
+                "away_alert_delay",
+                "stay_alert_delay",
+                "away_arm_delay",
+                "stay_arm_delay",
+                "ui_order"
+            ))
         )
 
     @validates("disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay")
@@ -422,6 +467,8 @@ class Area(BaseModel):
     arm_state = Column(Enum(ArmStates), nullable=False)
     deleted = Column(Boolean, default=False)
 
+    ui_order = Column(Integer, nullable=True)
+
     sensors = relationship("Sensor", back_populates="area")
 
     def __init__(self, name="area"):
@@ -431,7 +478,7 @@ class Area(BaseModel):
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "name", "arm_state"))
+            self.serialize_attributes(("id", "name", "arm_state", "ui_order"))
         )
 
     def update(self, data):

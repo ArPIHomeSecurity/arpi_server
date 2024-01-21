@@ -122,22 +122,27 @@ class Certbot:
 
     def _switch2certbot(self):
         """
-        Changes the symlink for nginx using the certbot certificates instead of the self-signed
+        Changes the symlinks using the certbot certificates instead of the self-signed
         """
-        self._logger.info("Switch nginx to use certbot certificates")
-        Path("/usr/local/nginx/conf/snippets/certificates.conf").unlink()
-        symlink(
-            "/usr/local/nginx/conf/snippets/certbot-signed.conf", "/usr/local/nginx/conf/snippets/certificates.conf"
+        self._replace_configuration(
+            "/usr/local/nginx/conf/snippets/certificates.conf",
+            "/usr/local/nginx/conf/snippets/certbot-signed.conf",
+        )
+        self._replace_configuration(
+            "/etc/mosquitto/conf.d/ssl.conf",
+            "/etc/mosquitto/configs-available/ssl-certbot.conf",
         )
 
-    def restart_nginx(self):
-        """f = 
-        Restarts the nginx-1.12.2 service with DBUS
-        """
-        self._logger.info("Restarting NGINX")
+    def _replace_configuration(self, used_config, new_config):
+        self._logger.info("Updating configuration %s with %s", used_config, new_config)
+        Path(used_config).unlink()
+        symlink(new_config, used_config)
+
+    def _restart_systemd_sevice(self, service_name):
+        self._logger.info("Restarting '%s' with DBUS", service_name)
         bus = SystemBus()
         systemd = bus.get(".systemd1")
-        systemd.RestartUnit("nginx.service", "fail")
+        systemd.RestartUnit(service_name, "fail")
 
     def check_domain_changed(self):
         """
@@ -194,7 +199,8 @@ class Certbot:
                 self._logger.info("Certbot certificate exists and no change of domain")
                 self._renew_certificate()
 
-            self.restart_nginx()
+            self._restart_systemd_sevice("mosquitto.service")
+            self._restart_systemd_sevice("nginx.service")
         else:
             # if certificate doesn't exist generate one
             self._logger.info("No certbot certificate found")
@@ -206,7 +212,8 @@ class Certbot:
                 ):
                     self._logger.info("NGINX uses self-signed certificates")
                     self._switch2certbot()
-                    self.restart_nginx()
+                    self._restart_systemd_sevice("mosquitto.service")
+                    self._restart_systemd_sevice("nginx.service")
                 elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
                     "/usr/local/nginx/conf/snippets/certbot-signed.conf"
                 ):

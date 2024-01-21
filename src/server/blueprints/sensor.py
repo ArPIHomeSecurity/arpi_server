@@ -20,9 +20,16 @@ def view_sensors():
     current_app.logger.debug("Request->alerting: %s", request.args.get("alerting"))
     if not request.args.get("alerting"):
         return jsonify(
-            [i.serialized for i in db.session.query(Sensor).filter_by(deleted=False).order_by(Sensor.channel.asc())]
+            [
+                i.serialized
+                for i in db.session.query(Sensor)
+                .filter_by(deleted=False)
+                .order_by(Sensor.channel.asc())
+            ]
         )
-    return jsonify([i.serialized for i in db.session.query(Sensor).filter_by(alert=True).all()])
+    return jsonify(
+        [i.serialized for i in db.session.query(Sensor).filter_by(alert=True).all()]
+    )
 
 
 @sensor_blueprint.route("/api/sensors/", methods=["POST"])
@@ -33,7 +40,7 @@ def create_sensor():
     zone = db.session.query(Zone).get(request.json["zoneId"])
     area = db.session.query(Area).get(request.json["areaId"])
     sensor_type = db.session.query(SensorType).get(data["typeId"])
-    sensor = Sensor(
+    db_sensor = Sensor(
         channel=data["channel"],
         zone=zone,
         area=area,
@@ -41,25 +48,27 @@ def create_sensor():
         description=data["description"],
         enabled=data["enabled"],
     )
-    db.session.add(sensor)
+    db.session.add(db_sensor)
     db.session.commit()
 
     return process_ipc_response(IPCClient().update_configuration())
 
 
+@sensor_blueprint.route("/api/sensor/<int:sensor_id>/reset-reference", methods=["PUT"])
 @sensor_blueprint.route("/api/sensors/reset-references", methods=["PUT"])
 @authenticated()
 @restrict_host
-def sensors_reset_references():
-    if request.method == "PUT":
-        for sensor in db.session.query(Sensor).all():
-            sensor.reference_value = None
+def sensors_reset_references(sensor_id=None):
+    if sensor_id:
+        db_sensor = db.session.query(Sensor).get(sensor_id)
+        db_sensor.reference_value = None
+    else:
+        for db_sensor in db.session.query(Sensor).all():
+            db_sensor.reference_value = None
 
-        db.session.commit()
+    db.session.commit()
 
-        return process_ipc_response(IPCClient().update_configuration())
-
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+    return process_ipc_response(IPCClient().update_configuration())
 
 
 @sensor_blueprint.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
@@ -67,21 +76,21 @@ def sensors_reset_references():
 @restrict_host
 def sensor(sensor_id):
     if request.method == "GET":
-        sensor = db.session.query(Sensor).filter_by(id=sensor_id, deleted=False).first()
-        if sensor:
-            return jsonify(sensor.serialized)
+        db_sensor = db.session.query(Sensor).filter_by(id=sensor_id, deleted=False).first()
+        if db_sensor:
+            return jsonify(db_sensor.serialized)
         return jsonify({"error": "Sensor not found"}), (404)
     elif request.method == "DELETE":
-        sensor = db.session.query(Sensor).get(sensor_id)
-        sensor.deleted = True
+        db_sensor = db.session.query(Sensor).get(sensor_id)
+        db_sensor.deleted = True
         db.session.commit()
         return process_ipc_response(IPCClient().update_configuration())
     elif request.method == "PUT":
-        sensor = db.session.query(Sensor).get(sensor_id)
-        if not sensor:
+        db_sensor = db.session.query(Sensor).get(sensor_id)
+        if not db_sensor:
             return jsonify({"error": "Sensor not found"}), (404)
 
-        if not sensor.update(request.json):
+        if not db_sensor.update(request.json):
             return make_response("", 204)
 
         db.session.commit()
@@ -103,7 +112,30 @@ def sensor_types():
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
-            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), enabled=True, alert=True).first() is not None
+            db.session.query(Sensor)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True)
+            .first()
+            is not None
         )
     else:
-        return jsonify(db.session.query(Sensor).filter_by(enabled=True, alert=True).first() is not None)
+        return jsonify(
+            db.session.query(Sensor).filter_by(enabled=True, alert=True).first()
+            is not None
+        )
+
+
+@sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
+@registered
+@restrict_host
+def reorder_sensors():
+    """
+    Change only the ui_order of the sensors
+    """
+    for sensor_data in request.json:
+        db.session.query(Sensor)\
+            .get(sensor_data["id"])\
+            .update_record(["ui_order"], sensor_data)
+
+    db.session.commit()
+
+    return make_response("", 200)

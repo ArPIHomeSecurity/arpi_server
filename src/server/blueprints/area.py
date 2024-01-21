@@ -5,7 +5,7 @@ from models import Area
 from constants import ROLE_USER
 
 from server.database import db
-from server.decorators import authenticated, restrict_host
+from server.decorators import authenticated, restrict_host, registered
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
 
@@ -16,7 +16,15 @@ area_blueprint = Blueprint("area", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_areas():
-    return jsonify([i.serialized for i in db.session.query(Area).filter_by(deleted=False).order_by(Area.id.asc()).all()])
+    return jsonify(
+        [
+            i.serialized
+            for i in db.session.query(Area)
+            .filter_by(deleted=False)
+            .order_by(Area.id.asc())
+            .all()
+        ]
+    )
 
 
 @area_blueprint.route("/api/areas/", methods=["POST"])
@@ -66,18 +74,36 @@ def area(area_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_arm():
-    return process_ipc_response(IPCClient().arm(
-        arm_type=request.args.get("type"),
-        user_id=request.environ["requester_id"],
-        area_id=request.args["area_id"]
-    ))
+    return process_ipc_response(
+        IPCClient().arm(
+            arm_type=request.args.get("type"),
+            user_id=request.environ["requester_id"],
+            area_id=request.args["area_id"],
+        )
+    )
 
 
 @area_blueprint.route("/api/area/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_disarm():
-    return process_ipc_response(IPCClient().disarm(
-        request.environ["requester_id"],
-        request.args["area_id"]
-    ))
+    return process_ipc_response(
+        IPCClient().disarm(request.environ["requester_id"], request.args["area_id"])
+    )
+
+
+@area_blueprint.route("/api/areas/reorder", methods=["PUT"])
+@registered
+@restrict_host
+def reorder_areas():
+    """
+    Change only the ui_order of the areas
+    """
+    for area_data in request.json:
+        db.session.query(Area).get(area_data["id"]).update_record(
+            ["ui_order"], area_data
+        )
+
+    db.session.commit()
+
+    return make_response("", 200)
