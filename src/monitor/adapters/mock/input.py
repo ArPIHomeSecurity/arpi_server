@@ -12,7 +12,6 @@ class SimulatorBasedMockInput(object):
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._channel = channel
         self._logger.debug("Created mock input %s on channel %s", self.__class__, self._channel)
-        self._input_file = ""
 
     @property
     def value(self):
@@ -20,7 +19,8 @@ class SimulatorBasedMockInput(object):
         lock = threading.Lock()
 
         with lock:
-            with open(self._input_file) as channels_file:
+            # write+create if not exists
+            with open("simulator_input.json") as channels_file:
                 channels_data = json.load(channels_file)
                 self._logger.debug("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
                 # simulate random noise
@@ -55,7 +55,6 @@ class Channels(SimulatorBasedMockInput):
 
     def __init__(self, channel=None, pull_up=None):
         super().__init__(channel=Channels.CHANNEL_MAPPING[channel])
-        self._input_file = "simulator.json"
 
     def close(self):
         pass
@@ -65,4 +64,3 @@ class Power(SimulatorBasedMockInput):
 
     def __init__(self, channel=None):
         super().__init__(channel="POWER")
-        self._input_file = "simulator.json"

@@ -13,7 +13,7 @@ from constants import LOG_ALERT, THREAD_ALERT
 
 # check if using the simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.relay import RelayAdapter
+    from monitor.adapters.output import OutputAdapter
 else:
     from monitor.adapters.mock.relay import RelayAdapter
 
@@ -90,7 +90,7 @@ class Syren(Thread):
     def __init__(self, config):
         super(Syren, self).__init__(name=THREAD_ALERT)
         self._logger = logging.getLogger(LOG_ALERT)
-        self._relay_adapter = RelayAdapter()
+        self._output_adapter = OutputAdapter()
         self._alert = None
         self._syren_config = config
 
@@ -117,7 +117,7 @@ class Syren(Thread):
         now = time()
         start_time = time()
         syren_is_on = (DELAY == 0)
-        self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
+        self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
         send_syren_state(syren_is_on)
         while (
             not self._stop_event.is_set()
@@ -127,18 +127,18 @@ class Syren(Thread):
                 self._logger.info("Syren turned on after delay")
                 # turn on the syren
                 syren_is_on = True
-                self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
+                self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
                 send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
             elif syren_is_on and now - start_time > STOP_TIME:
-                self._logger.info("Syren stopped after time")
+                self._logger.info("Syren stopped after %d seconds", STOP_TIME)
                 break
 
             now = time()
 
         # turn off the syren
         syren_is_on = None
-        self._relay_adapter.control_relay(self.SYREN_RELAY_ID, syren_is_on)
+        self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
         send_syren_state(syren_is_on)
         self._logger.info("Syren stopped")
 

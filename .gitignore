@@ -11,5 +11,5 @@ __pycache__
 /.settings
 
 test_data
-simulator.json
+simulator*.json
 textual.log

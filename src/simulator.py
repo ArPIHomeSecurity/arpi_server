@@ -73,7 +73,7 @@ class SimulatorApp(App):
     def save_output(self):
         lock = threading.Lock()
         with lock:
-            with open('simulator.json', 'w', encoding='utf-8') as outfile:
+            with open('simulator_input.json', 'w', encoding='utf-8') as outfile:
                 json.dump(self.outputs, outfile)
 
     def compose(self) -> ComposeResult:

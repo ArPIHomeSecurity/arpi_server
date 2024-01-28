@@ -1,3 +1,6 @@
+"""
+Monitoring the sensors and manage alerting.
+"""
 import contextlib
 from datetime import datetime as dt
 import logging
@@ -7,16 +10,6 @@ from queue import Empty, Queue
 from threading import Thread, Timer
 from time import sleep
 
-from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
-from monitor.area_handler import AreaHandler
-from monitor.sensor_handler import SensorHandler
-from monitor.alert import SensorAlert
-
-from monitor.storage import States
-from monitor.adapters.power import PowerAdapter
-from monitor.broadcast import Broadcaster
-from monitor.notifications.notifier import Notifier
-from monitor.syren import Syren
 from constants import (
     ARM_MIXED,
     ARM_AWAY,
@@ -39,7 +32,17 @@ from constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
+from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
+from monitor.area_handler import AreaHandler
+from monitor.sensor_handler import SensorHandler
+from monitor.alert import SensorAlert
+from monitor.storage import States
+from monitor.adapters.power import PowerAdapter
+from monitor.broadcast import Broadcaster
+from monitor.notifications.notifier import Notifier
+from monitor.syren import Syren
 from monitor.database import Session
+from monitor.output.handler import OutputHandler
 from monitor.socket_io import (
     send_alert_state,
     send_power_state,
@@ -166,6 +169,9 @@ class Monitor(Thread):
         self.update_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
 
     def arm_system(self, arm_type, user_id, keypad_id, delay):
+        """
+        Arm only the system.
+        """
         self._logger.info("Arming system to %s", arm_type)
 
         # get max delay of arm
@@ -183,6 +189,9 @@ class Monitor(Thread):
             self._delay_timer.start()
         else:
             States.set(States.MONITORING_STATE, MONITORING_ARMED)
+
+            # update output channel
+            OutputHandler.send_system_armed()
 
     def disarm_monitoring(self, user_id, keypad_id, area_id):
         """
@@ -233,6 +242,9 @@ class Monitor(Thread):
         ):
             States.set(States.ARM_STATE, ARM_DISARM)
             States.set(States.MONITORING_STATE, MONITORING_READY)
+            
+            # update output channel
+            OutputHandler.send_system_disarmed()
 
         self.stop_alert(disarm)
 

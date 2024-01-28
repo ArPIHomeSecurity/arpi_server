@@ -1,14 +1,14 @@
 
 import logging
 
-from constants import LOG_ADRELAYS
+from constants import LOG_ADOUTPUT
 
 
 class RelayAdapter:
     _states = [0, 0, 0, 0, 0, 0, 0, 0]
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_ADRELAYS)
+        self._logger = logging.getLogger(LOG_ADOUTPUT)
 
     def setup(self):
         self._logger.debug("Relay adapter setup finished")

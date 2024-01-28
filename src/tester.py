@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 from monitor.adapters.power import PowerAdapter
 from monitor.adapters.sensor import SensorAdapter
-from monitor.adapters.relay import RelayAdapter
+from monitor.adapters.output import OutputAdapter
 
 
 def test_sensor_adapter():
@@ -43,8 +43,8 @@ def test_power_adapter():
         sleep(1)
 
 
-def test_relay_adapter():
-    adapter = RelayAdapter()
+def test_output_adapter():
+    adapter = OutputAdapter()
 
     faults = adapter._read_faults()
     logging.info("Faults: %s", faults)
@@ -53,13 +53,13 @@ def test_relay_adapter():
     # create array with size OUTPUT_COUNT and fill it with zeros
     outputs = [0] * OUTPUT_COUNT
     for i in range(OUTPUT_COUNT):
-        adapter.control_relay(i, 1)
+        adapter.control_channel(i, 1)
         outputs[i] = 1
         logging.info("Outputs: %s", outputs)
         sleep(1)
 
     for i in range(OUTPUT_COUNT):
-        adapter.control_relay(i, 0)
+        adapter.control_channel(i, 0)
         outputs[i] = 0
         logging.info("Outputs: %s", outputs)
         sleep(1)

@@ -11,6 +11,7 @@ from monitor.adapters.keypad import KeypadHandler
 from monitor.monitor import Monitor
 from monitor.notifications.notifier import Notifier
 from monitor.logging import print_logging
+from monitor.output.handler import OutputHandler
 
 
 logger = logging.getLogger(LOG_SERVICE)
@@ -59,13 +60,16 @@ class BackgroundService(Thread):
         notifier = Notifier(self._broadcaster)
         notifier.start()
 
+        output_handler = OutputHandler(broadcaster=self._broadcaster)
+        output_handler.start()
+
         keypad = KeypadHandler(self._broadcaster)
         keypad.start()
 
         ipc_server = IPCServer(self._stop_service, self._broadcaster)
         ipc_server.start()
 
-        self._threads = (monitor, ipc_server, notifier, keypad)
+        self._threads = (monitor, ipc_server, notifier, output_handler, keypad)
 
     def _stop_threads(self):
         self._logger.info("Stopping threads...")

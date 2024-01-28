@@ -1,13 +1,21 @@
+"""
+Manage areas
+"""
+
 import logging
 
-from constants import ARM_DISARM, ARM_MIXED, LOG_MONITOR
+from constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
 from models import Area
 from monitor.communication.mqtt import MQTTClient
-from monitor.database import Session
 from monitor.socket_io import send_area_state
+from .output.handler import OutputHandler
 
 
 class AreaHandler:
+    """
+    Class for managing areas
+    """
+
     def __init__(self, session):
         self._logger = logging.getLogger(LOG_MONITOR)
         self._db_session = session
@@ -43,6 +51,12 @@ class AreaHandler:
         if area.sensors == []:
             self._logger.error("Area has no sensors")
             return
+
+        # update output channel
+        if arm_type in (ARM_AWAY, ARM_STAY):
+            OutputHandler.send_area_armed(area)
+        elif arm_type == ARM_DISARM:
+            OutputHandler.send_area_disarmed(area)
 
         area.arm_state = arm_type
         self._mqtt_client.publish_area_state(area.name, area.arm_state)
@@ -81,9 +95,18 @@ class AreaHandler:
         Skip deleted areas or areas without a sensor.
         """
         self._logger.info("Arming areas to %s", arm_type)
-        self._db_session.query(Area).filter(Area.deleted == False).filter(
+        areas = self._db_session.query(Area).filter(Area.deleted == False).filter(
             Area.sensors.any()
-        ).update({"arm_state": arm_type})
+        )
+
+        for area in areas:
+            area.update({"arm_state": arm_type})
+            # update output channel
+            if arm_type in (ARM_AWAY, ARM_STAY):
+                OutputHandler.send_area_armed(area)
+            elif arm_type == ARM_DISARM:
+                OutputHandler.send_area_disarmed(area)
+
         self._db_session.commit()
 
         self.publish_areas()

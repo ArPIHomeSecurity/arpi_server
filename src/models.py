@@ -17,12 +17,22 @@ from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
-from constants import ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY, ARM_AWAY, ARM_STAY, ARM_DISARM, ARM_MIXED
+from constants import (
+    ALERT_AWAY,
+    ALERT_SABOTAGE,
+    ALERT_STAY,
+    ARM_AWAY,
+    ARM_STAY,
+    ARM_DISARM,
+    ARM_MIXED,
+)
 from tools.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):
-    return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        (f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")
+    ).hexdigest()
 
 
 def convert2camel(data):
@@ -51,7 +61,6 @@ class ArmStates(str, enum.Enum):
             return ArmStates.DISARM
 
 
-
 metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
@@ -72,7 +81,10 @@ class BaseModel(Base):
         """
         Define a base way to jsonify models, dealing with datetime objects
         """
-        return {column: value.strftime("%Y-%m-%d") if isinstance(value, date) else value for column, value in self.__dict__.items()}
+        return {
+            column: value.strftime("%Y-%m-%d") if isinstance(value, date) else value
+            for column, value in self.__dict__.items()
+        }
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -118,7 +130,9 @@ class SensorType(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= SensorType.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        assert (
+            0 <= len(name) <= SensorType.NAME_LENGTH
+        ), f"Incorrect name field length ({len(name)})"
         return name
 
 
@@ -152,7 +166,9 @@ class Sensor(BaseModel):
     ui_order = Column(Integer, nullable=True)
     ui_hidden = Column(Boolean, nullable=False, default=False)
 
-    def __init__(self, channel, sensor_type, area, zone=None, description=None, enabled=True):
+    def __init__(
+        self, channel, sensor_type, area, zone=None, description=None, enabled=True
+    ):
         self.channel = channel
         self.zone = zone
         self.area = area
@@ -166,41 +182,50 @@ class Sensor(BaseModel):
         if data["channel"] != self.channel:
             self.reference_value = None
 
-        return self.update_record((
+        return self.update_record(
+            (
                 "channel",
                 "enabled",
                 "description",
                 "zone_id",
                 "area_id",
                 "type_id",
-                "ui_hidden"
-            ), data)
+                "ui_hidden",
+            ),
+            data,
+        )
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes((
-                "id",
-                "channel",
-                "alert",
-                "description",
-                "zone_id",
-                "area_id",
-                "type_id",
-                "enabled",
-                "ui_order",
-                "ui_hidden"
-            ))
+            self.serialize_attributes(
+                (
+                    "id",
+                    "channel",
+                    "alert",
+                    "description",
+                    "zone_id",
+                    "area_id",
+                    "type_id",
+                    "enabled",
+                    "ui_order",
+                    "ui_hidden",
+                )
+            )
         )
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= SensorType.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        assert (
+            0 <= len(name) <= SensorType.NAME_LENGTH
+        ), f"Incorrect name field length ({len(name)})"
         return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
-        assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+        assert (
+            -1 <= channel <= int(os.environ["INPUT_NUMBER"])
+        ), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
         return channel
 
 
@@ -240,11 +265,17 @@ class Alert(BaseModel):
         return convert2camel(
             {
                 "id": self.id,
-                "alert_type": Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE,
-                "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
-                "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
-                            if self.end_time
-                            else None,
+                "alert_type": (
+                    Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE
+                ),
+                "start_time": self.start_time.replace(
+                    microsecond=0, tzinfo=None
+                ).isoformat(sep=" "),
+                "end_time": (
+                    self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+                    if self.end_time
+                    else None
+                ),
                 "silent": self.silent,
                 "sensors": [alert_sensor.serialized for alert_sensor in self.sensors],
             }
@@ -255,6 +286,7 @@ class AlertSensor(BaseModel):
     """
     Storing the state of the sensors when the alert started.
     """
+
     __tablename__ = "alert_sensor"
     alert_id = Column(Integer, ForeignKey("alert.id"), primary_key=True)
     sensor_id = Column(Integer, ForeignKey("sensor.id"), primary_key=True)
@@ -277,13 +309,26 @@ class AlertSensor(BaseModel):
 
     @property
     def serialized(self):
-        return convert2camel(self.serialize_attributes(("sensor_id", "channel", "type_id", "description", "start_time", "end_time", "delay")))
+        return convert2camel(
+            self.serialize_attributes(
+                (
+                    "sensor_id",
+                    "channel",
+                    "type_id",
+                    "description",
+                    "start_time",
+                    "end_time",
+                    "delay",
+                )
+            )
+        )
 
 
 class Arm(BaseModel):
     """
     Storing arm events.
     """
+
     __tablename__ = "arm"
     id = Column(Integer, primary_key=True)
     type = Column(Enum(ArmStates), nullable=False)
@@ -313,6 +358,7 @@ class Disarm(BaseModel):
     """
     Storing disarm events.
     """
+
     __tablename__ = "disarm"
     id = Column(Integer, primary_key=True)
     time = Column(DateTime(timezone=True))
@@ -341,6 +387,7 @@ class ArmSensor(BaseModel):
     """
     Storing the state of the sensors when an arm is changed.
     """
+
     __tablename__ = "arm_sensor"
     id = Column(Integer, primary_key=True)
     arm_id = Column(Integer, ForeignKey("arm.id"))
@@ -355,7 +402,17 @@ class ArmSensor(BaseModel):
     sensor = relationship("Sensor")
     arm = relationship("Arm", back_populates="sensors")
 
-    def __init__(self, arm_id, sensor_id, channel, type_id, description, timestamp, delay, enabled):
+    def __init__(
+        self,
+        arm_id,
+        sensor_id,
+        channel,
+        type_id,
+        description,
+        timestamp,
+        delay,
+        enabled,
+    ):
         self.arm_id = arm_id
         self.sensor_id = sensor_id
         self.channel = channel
@@ -375,13 +432,23 @@ class ArmSensor(BaseModel):
             description=sensor.description,
             timestamp=timestamp,
             delay=delay,
-            enabled=sensor.enabled
+            enabled=sensor.enabled,
         )
 
     @property
     def serialized(self):
-        return convert2camel(self.serialize_attributes(
-            ("sensor_id", "channel", "type_id", "description", "timestamp", "delay", "enabled"))
+        return convert2camel(
+            self.serialize_attributes(
+                (
+                    "sensor_id",
+                    "channel",
+                    "type_id",
+                    "description",
+                    "timestamp",
+                    "delay",
+                    "enabled",
+                )
+            )
         )
 
 
@@ -406,7 +473,16 @@ class Zone(BaseModel):
 
     sensors = relationship("Sensor", back_populates="zone")
 
-    def __init__(self, name="zone", disarmed_delay=None, away_alert_delay=0, stay_alert_delay=0, away_arm_delay=0, stay_arm_delay=0, description="Default zone"):
+    def __init__(
+        self,
+        name="zone",
+        disarmed_delay=None,
+        away_alert_delay=0,
+        stay_alert_delay=0,
+        away_arm_delay=0,
+        stay_arm_delay=0,
+        description="Default zone",
+    ):
         self.name = name
         self.description = description
         self.disarmed_delay = disarmed_delay
@@ -416,23 +492,8 @@ class Zone(BaseModel):
         self.stay_arm_delay = stay_arm_delay
 
     def update(self, data):
-        return self.update_record((
-                "name",
-                "description",
-                "disarmed_delay",
-                "away_alert_delay",
-                "stay_alert_delay",
-                "away_arm_delay",
-                "stay_arm_delay"
-            ),
-            data
-        )
-
-    @property
-    def serialized(self):
-        return convert2camel(
-            self.serialize_attributes((
-                "id",
+        return self.update_record(
+            (
                 "name",
                 "description",
                 "disarmed_delay",
@@ -440,18 +501,44 @@ class Zone(BaseModel):
                 "stay_alert_delay",
                 "away_arm_delay",
                 "stay_arm_delay",
-                "ui_order"
-            ))
+            ),
+            data,
         )
 
-    @validates("disarmed_delay", "away_alert_delay", "stay_alert_delay", "away_arm_delay", "stay_arm_delay")
+    @property
+    def serialized(self):
+        return convert2camel(
+            self.serialize_attributes(
+                (
+                    "id",
+                    "name",
+                    "description",
+                    "disarmed_delay",
+                    "away_alert_delay",
+                    "stay_alert_delay",
+                    "away_arm_delay",
+                    "stay_arm_delay",
+                    "ui_order",
+                )
+            )
+        )
+
+    @validates(
+        "disarmed_delay",
+        "away_alert_delay",
+        "stay_alert_delay",
+        "away_arm_delay",
+        "stay_arm_delay",
+    )
     def validates_away_alert_delay(self, key, delay):
         assert delay and delay >= 0 or not delay, "Delay is positive integer (>= 0)"
         return delay
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        assert (
+            0 <= len(name) <= Zone.NAME_LENGTH
+        ), f"Incorrect name field length ({len(name)})"
         return name
 
 
@@ -469,6 +556,7 @@ class Area(BaseModel):
 
     ui_order = Column(Integer, nullable=True)
 
+    output = relationship("Output", back_populates="area")
     sensors = relationship("Sensor", back_populates="area")
 
     def __init__(self, name="area"):
@@ -498,7 +586,9 @@ class User(BaseModel):
     name = Column(String(NAME_LENGTH), nullable=False)
     email = Column(String(EMAIL_LENGTH), nullable=True)
     role = Column(String(12), nullable=False)
-    registration_code = Column(String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
+    registration_code = Column(
+        String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True
+    )
     registration_expiry = Column(DateTime(timezone=True))
     card_registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
@@ -519,7 +609,9 @@ class User(BaseModel):
         fields = ("name", "email", "role", "comment")
         access_code = data.get("accessCode", "")
         if access_code:
-            assert len(access_code) >= 4 and len(access_code) <= 12, "Access code length (>=4, <=12)"
+            assert (
+                len(access_code) >= 4 and len(access_code) <= 12
+            ), "Access code length (>=4, <=12)"
             assert access_code.isdigit(), "Access code only number"
             data["accessCode"] = hash_code(access_code)
             if not data.get("fourkeyCode", None):
@@ -536,7 +628,10 @@ class User(BaseModel):
         return self.update_record(fields, data)
 
     def set_card_registration(self):
-        self.update_record(("card_registration_expiry"), {"card_registration_expiry": dt.now() + timedelta(seconds=60)})
+        self.update_record(
+            ("card_registration_expiry"),
+            {"card_registration_expiry": dt.now() + timedelta(seconds=60)},
+        )
 
     def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
@@ -550,7 +645,10 @@ class User(BaseModel):
 
         if self.update_record(
             ("registration_code", "registration_expiry"),
-            {"registration_code": hash_code(registration_code), "registration_expiry": registration_expiry},
+            {
+                "registration_code": hash_code(registration_code),
+                "registration_expiry": registration_expiry,
+            },
         ):
             return registration_code
 
@@ -563,9 +661,11 @@ class User(BaseModel):
                 "email": self.email,
                 "has_registration_code": bool(self.registration_code),
                 "has_card": bool(self.cards),
-                "registration_expiry": self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
-                if self.registration_expiry
-                else None,
+                "registration_expiry": (
+                    self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
+                    if self.registration_expiry
+                    else None
+                ),
                 "role": self.role,
                 "comment": self.comment,
             }
@@ -573,12 +673,16 @@ class User(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect user name field length ({len(name)})"
+        assert (
+            0 < len(name) <= User.NAME_LENGTH
+        ), f"Incorrect user name field length ({len(name)})"
         return name
 
     @validates("email")
     def validates_email(self, key, email):
-        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect email field length ({len(email)})"
+        assert (
+            0 <= len(email) <= User.EMAIL_LENGTH
+        ), f"Incorrect email field length ({len(email)})"
         if len(email):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
@@ -656,17 +760,33 @@ class Option(BaseModel):
     @property
     def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
-        replace_keys(filtered_value, {"smtp_password": "******", "replace_empty": False})
+        replace_keys(
+            filtered_value, {"smtp_password": "******", "replace_empty": False}
+        )
         replace_keys(filtered_value, {"password": "******", "replace_empty": False})
-        return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
+        return convert2camel(
+            {"name": self.name, "section": self.section, "value": filtered_value}
+        )
 
     @validates("name", "section")
     def validates_name(self, key, value):
-        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(value)})"
+        assert (
+            0 < len(value) <= Option.OPTION_LENGTH
+        ), f"Incorrect name field length ({len(value)})"
         if key == "name":
-            assert value in ("notifications", "network", "syren"), f"Unknown option ({value})"
+            assert value in (
+                "notifications",
+                "network",
+                "syren",
+            ), f"Unknown option ({value})"
         elif key == "section":
-            assert value in ("smtp", "gsm", "subscriptions", "dyndns", "access"), f"Unknown section ({value})"
+            assert value in (
+                "smtp",
+                "gsm",
+                "subscriptions",
+                "dyndns",
+                "access",
+            ), f"Unknown section ({value})"
         return value
 
 
@@ -710,3 +830,68 @@ class KeypadType(BaseModel):
     @property
     def serialized(self):
         return convert2camel(self.serialize_attributes(("id", "name", "description")))
+
+
+class OutputTriggerType(str, enum.Enum):
+    AREA = "area"
+    SYSTEM = "system"
+    BUTTON = "button"
+
+
+class ButtonType(str, enum.Enum):
+    SWITCH = "switch"
+    IMPULSE = "impulse"
+
+
+class Output(BaseModel):
+    """Model for output table"""
+
+    __tablename__ = "output"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(16), nullable=True)
+    description = Column(String, nullable=True)
+    channel = Column(Integer, nullable=False)
+    trigger_type = Column(
+        Enum(
+            OutputTriggerType.AREA.value,
+            OutputTriggerType.SYSTEM.value,
+            OutputTriggerType.BUTTON.value,
+            name="output_trigger_type",
+        ),
+        nullable=False,
+    )
+    area_id = Column(Integer, ForeignKey("area.id"), nullable=True)
+    button_type = Column(
+        Enum(
+            ButtonType.IMPULSE.value, ButtonType.SWITCH.value, name="output_button_type"
+        ),
+        nullable=True,
+    )
+    delay = Column(Integer, default=0)
+    duration = Column(Integer, default=0)
+    default_state = Column(Boolean, default=False)
+    enabled = Column(Boolean, default=True)
+
+    area = relationship("Area", back_populates="output")
+
+    def __init__(self, channel, description=None, enabled=True):
+        self.channel = channel
+        self.description = description
+        self.enabled = enabled
+
+    def update(self, data):
+        return self.update_record(("channel", "description", "enabled"), data)
+
+    @property
+    def serialized(self):
+        return convert2camel(
+            self.serialize_attributes(("id", "channel", "description", "enabled"))
+        )
+
+    @validates("channel")
+    def validates_channel(self, key, channel):
+        assert (
+            0 <= channel <= int(os.environ["OUTPUT_NUMBER"])
+        ), f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+        return channel
