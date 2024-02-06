@@ -124,7 +124,8 @@ class OutputHandler(Thread):
         # initialize output default states
         adapter = OutputAdapter()
         for output in self._outputs:
-            adapter.control_channel(output.channel, output.default_state)
+            if output.channel is not None:
+                adapter.control_channel(output.channel, output.default_state)
 
         db_session.close()
 

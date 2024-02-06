@@ -14,6 +14,7 @@ from server.blueprints.config import config_blueprint
 from server.blueprints.generic import generic_blueprint
 from server.blueprints.keypad import keypad_blueprint
 from server.blueprints.monitor import monitor_blueprint
+from server.blueprints.output import output_blueprint
 from server.blueprints.power import power_blueprint
 from server.blueprints.sensor import sensor_blueprint
 from server.blueprints.user import user_blueprint
@@ -59,6 +60,7 @@ app.register_blueprint(config_blueprint)
 app.register_blueprint(generic_blueprint)
 app.register_blueprint(keypad_blueprint)
 app.register_blueprint(monitor_blueprint)
+app.register_blueprint(output_blueprint)
 app.register_blueprint(power_blueprint)
 app.register_blueprint(sensor_blueprint)
 app.register_blueprint(user_blueprint)

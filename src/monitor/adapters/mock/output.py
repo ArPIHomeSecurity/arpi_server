@@ -30,7 +30,7 @@ class OutputAdapter(object):
         Control output by channel number
         """
         self._logger.debug("Control channel %d to %d", channel, state)
-        if channel < 0 or channel > OUTPUT_NUMBER - 1:
+        if channel is not None and (channel < 0 or channel > OUTPUT_NUMBER - 1):
             raise ValueError(
                 f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
             )

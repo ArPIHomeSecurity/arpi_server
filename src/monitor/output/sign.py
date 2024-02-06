@@ -38,7 +38,7 @@ class OutputSign(Thread):
             "Output sign on channel '%s' triggered (%d / %d)",
             OUTPUT_NAMES[self._channel],
             self._delay or 0,
-            self._duration or 0,
+            self._duration,
         )
 
         now = start_time = time()
@@ -60,7 +60,7 @@ class OutputSign(Thread):
                     "on" if output_state else "off",
                 )
             elif (
-                self._duration is not None
+                self._duration > -1
                 and start_time + self._delay + self._duration <= now
                 and output_state != self._default_state
             ):
@@ -73,11 +73,11 @@ class OutputSign(Thread):
 
             self._output_adapter.control_channel(self._channel, output_state)
             if (
-                self._duration is None
+                self._duration == -1
                 and start_time + self._delay <= now
                 and output_state != self._default_state
             ) or (
-                self._duration is not None
+                self._duration > -1
                 and start_time + self._delay + self._duration <= now
             ):
                 self._logger.debug("No duration, break loop after delay")

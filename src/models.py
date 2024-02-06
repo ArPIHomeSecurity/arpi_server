@@ -833,12 +833,20 @@ class KeypadType(BaseModel):
 
 
 class OutputTriggerType(str, enum.Enum):
+    """
+    Output trigger type
+    """
+
     AREA = "area"
     SYSTEM = "system"
     BUTTON = "button"
 
 
 class ButtonType(str, enum.Enum):
+    """
+    Button type
+    """
+
     SWITCH = "switch"
     IMPULSE = "impulse"
 
@@ -851,7 +859,7 @@ class Output(BaseModel):
     id = Column(Integer, primary_key=True)
     name = Column(String(16), nullable=True)
     description = Column(String, nullable=True)
-    channel = Column(Integer, nullable=False)
+    channel = Column(Integer, default=None, nullable=True)
     trigger_type = Column(
         Enum(
             OutputTriggerType.AREA.value,
@@ -869,29 +877,82 @@ class Output(BaseModel):
         nullable=True,
     )
     delay = Column(Integer, default=0)
-    duration = Column(Integer, default=0)
+    duration = Column(Integer, default=0, nullable=False)
     default_state = Column(Boolean, default=False)
+    ui_order = Column(Integer, nullable=True)
     enabled = Column(Boolean, default=True)
 
     area = relationship("Area", back_populates="output")
 
-    def __init__(self, channel, description=None, enabled=True):
-        self.channel = channel
+    def __init__(
+        self,
+        name,
+        description,
+        channel,
+        trigger_type,
+        area_id,
+        delay,
+        duration,
+        default_state,
+        enabled,
+    ):
+        self.name = name
         self.description = description
+        self.channel = channel
+        self.trigger_type = trigger_type
+        self.area_id = area_id
+        self.delay = delay
+        self.duration = duration
+        self.default_state = default_state
         self.enabled = enabled
 
     def update(self, data):
-        return self.update_record(("channel", "description", "enabled"), data)
+        return self.update_record(
+            (
+                "name",
+                "description",
+                "channel",
+                "trigger_type",
+                "area_id",
+                "delay",
+                "duration",
+                "default_state",
+                "enabled",
+                "ui_order",
+            ),
+            data,
+        )
 
     @property
     def serialized(self):
         return convert2camel(
-            self.serialize_attributes(("id", "channel", "description", "enabled"))
+            self.serialize_attributes(
+                (
+                    "id",
+                    "name",
+                    "description",
+                    "channel",
+                    "trigger_type",
+                    "area_id",
+                    "button_type",
+                    "delay",
+                    "duration",
+                    "default_state",
+                    "enabled",
+                    "ui_order",
+                )
+            )
         )
 
     @validates("channel")
     def validates_channel(self, key, channel):
-        assert (
-            0 <= channel <= int(os.environ["OUTPUT_NUMBER"])
-        ), f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+        if channel is not None:
+            assert (
+                0 <= channel <= int(os.environ["OUTPUT_NUMBER"])
+            ), f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
         return channel
+
+    @validates("duration")
+    def validates_duration(self, key, duration):
+        assert duration >= -1, "Duration must be >= -1"
+        return duration
