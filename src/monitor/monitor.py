@@ -32,7 +32,7 @@ from constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
-from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates
+from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates, Output
 from monitor.area_handler import AreaHandler
 from monitor.sensor_handler import SensorHandler
 from monitor.alert import SensorAlert
@@ -329,6 +329,12 @@ class Monitor(Thread):
             self._db_session.add(disarm)
             self._logger.debug("Cleared arm (id=%s)", arm.id)
             changed = True
+
+        for output in self._db_session.query(Output).all():
+            if output.state:
+                output.state = False
+                self._logger.debug("Cleared output (id=%s)", output.id)
+                changed = True
 
         if changed:
             self._logger.debug("Saved to database")

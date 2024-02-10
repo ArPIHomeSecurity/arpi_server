@@ -10,8 +10,10 @@ from time import sleep
 
 from constants import (
     LOG_IPC,
+    MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
+    MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
     MONITOR_REGISTER_CARD,
     POWER_GET_STATE,
@@ -31,6 +33,7 @@ from constants import (
 from monitor.storage import States
 from monitor.alert import Syren
 from monitor.notifications.notifier import Notifier
+from monitor.output.handler import OutputHandler
 from tools.clock import Clock
 from tools.connection import SecureConnection
 from tools.ssh import SSH
@@ -137,6 +140,10 @@ class IPCServer(Thread):
             if not Clock().set_clock(message):
                 return_value["result"] = False
                 return_value["message"] = "Failed to update date/time and zone"
+        elif message["action"] == MONITOR_ACTIVATE_OUTPUT:
+            OutputHandler.send_button_pressed(message["output_id"])
+        elif message["action"] == MONITOR_DEACTIVATE_OUTPUT:
+            OutputHandler.send_button_released(message["output_id"])
         else:
             return_value["result"] = False
             return_value["message"] = f"Unknown command: {message}"

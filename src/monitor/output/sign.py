@@ -86,7 +86,7 @@ class OutputSign(Thread):
             now = time()
 
         self._logger.debug("Waiting for stop event")
-        if self._stop_event.wait():
+        if self._duration == -1 and self._stop_event.wait():
             self._logger.debug(
                 "Output sign on channel '%s' turned off", OUTPUT_NAMES[self._channel]
             )

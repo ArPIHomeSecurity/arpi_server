@@ -842,15 +842,6 @@ class OutputTriggerType(str, enum.Enum):
     BUTTON = "button"
 
 
-class ButtonType(str, enum.Enum):
-    """
-    Button type
-    """
-
-    SWITCH = "switch"
-    IMPULSE = "impulse"
-
-
 class Output(BaseModel):
     """Model for output table"""
 
@@ -860,6 +851,7 @@ class Output(BaseModel):
     name = Column(String(16), nullable=True)
     description = Column(String, nullable=True)
     channel = Column(Integer, default=None, nullable=True)
+    state = Column(Boolean, default=False, nullable=False)
     trigger_type = Column(
         Enum(
             OutputTriggerType.AREA.value,
@@ -870,12 +862,6 @@ class Output(BaseModel):
         nullable=False,
     )
     area_id = Column(Integer, ForeignKey("area.id"), nullable=True)
-    button_type = Column(
-        Enum(
-            ButtonType.IMPULSE.value, ButtonType.SWITCH.value, name="output_button_type"
-        ),
-        nullable=True,
-    )
     delay = Column(Integer, default=0)
     duration = Column(Integer, default=0, nullable=False)
     default_state = Column(Boolean, default=False)
@@ -912,6 +898,7 @@ class Output(BaseModel):
                 "name",
                 "description",
                 "channel",
+                "state",
                 "trigger_type",
                 "area_id",
                 "delay",
@@ -932,9 +919,9 @@ class Output(BaseModel):
                     "name",
                     "description",
                     "channel",
+                    "state",
                     "trigger_type",
                     "area_id",
-                    "button_type",
                     "delay",
                     "duration",
                     "default_state",

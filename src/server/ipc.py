@@ -7,8 +7,10 @@ from constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_IPC,
+    MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
+    MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
     MONITOR_REGISTER_CARD,
     POWER_GET_STATE,
@@ -107,6 +109,12 @@ class IPCClient(object):
         message = {"action": MONITOR_SET_CLOCK}
         message = {**message, **settings}
         return self._send_message(message)
+
+    def activate_output(self, output_id):
+        return self._send_message({"action": MONITOR_ACTIVATE_OUTPUT, "output_id": output_id})
+    
+    def deactivate_output(self, output_id):
+        return self._send_message({"action": MONITOR_DEACTIVATE_OUTPUT, "output_id": output_id})
 
     def _send_message(self, message):
         if self._socket:

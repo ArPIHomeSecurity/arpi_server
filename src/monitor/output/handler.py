@@ -69,28 +69,6 @@ class OutputHandler(Thread):
         )
 
     @classmethod
-    def send_button_on(cls, output_id: int):
-        """
-        Send signal when manual switch on
-        """
-        cls._notifications.put(
-            Notification(
-                type=TriggerSource.BUTTON, state=EventType.START, output_id=output_id
-            )
-        )
-
-    @classmethod
-    def send_button_off(cls, output_id: int):
-        """
-        Send signal when manual switch off
-        """
-        cls._notifications.put(
-            Notification(
-                type=TriggerSource.BUTTON, state=EventType.STOP, output_id=output_id
-            )
-        )
-
-    @classmethod
     def send_button_pressed(cls, output_id: int):
         """
         Send signal when manual impulse
@@ -98,6 +76,17 @@ class OutputHandler(Thread):
         cls._notifications.put(
             Notification(
                 type=TriggerSource.BUTTON, state=EventType.START, output_id=output_id
+            )
+        )
+
+    @classmethod
+    def send_button_released(cls, output_id: int):
+        """
+        Send signal when manual impulse released
+        """
+        cls._notifications.put(
+            Notification(
+                type=TriggerSource.BUTTON, state=EventType.STOP, output_id=output_id
             )
         )
 
@@ -175,16 +164,22 @@ class OutputHandler(Thread):
                 )
                 continue
 
-            # stop previous sign on the same channel, if any
-            stop_event = self._signs.pop(output.channel, None)
-            if stop_event is not None:
-                self._logger.debug(
-                    "Stopping previous sign on channel %s", OUTPUT_NAMES[output.channel]
-                )
-                stop_event.set()
-
             # start new sign
             if notification.state == EventType.START and output.enabled:
+                # stop previous sign on the same channel, if any
+                stop_event = self._signs.pop(output.channel, None)
+                if stop_event is not None:
+                    self._logger.debug(
+                        "Stopping previous sign on channel %s",
+                        OUTPUT_NAMES[output.channel],
+                    )
+                    stop_event.set()
+
+                self._logger.debug(
+                    "Starting new sign on channel %s for event %s",
+                    OUTPUT_NAMES[output.channel],
+                    notification,
+                )
                 stop_event = Event()
                 sign = OutputSign(
                     stop_event,
@@ -195,6 +190,8 @@ class OutputHandler(Thread):
                 )
                 self._signs[output.channel] = stop_event
                 sign.start()
+            elif notification.state == EventType.STOP:
+                self._signs.pop(output.channel, None).set()
 
     def get_output(self, output_id: int = None, area_id: int = None) -> Output:
         """

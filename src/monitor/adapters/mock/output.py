@@ -8,6 +8,7 @@ import os
 import threading
 
 from constants import LOG_ADOUTPUT
+from monitor.output import OUTPUT_NAMES
 
 
 OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
@@ -38,20 +39,27 @@ class OutputAdapter(object):
         with _lock:
             with open("simulator_output.json", "r", encoding="utf-8") as channels_file:
                 try:
-                    self._states = json.load(channels_file)
-                    self._states[channel] = 1 if state else 0
+                    tmp_states = json.load(channels_file)
+                    for idx in range(OUTPUT_NUMBER):
+                        self._states[idx] = tmp_states[OUTPUT_NAMES[idx]]
                 except json.decoder.JSONDecodeError:
                     self._logger.warning(
-                        "Output file is invalid!\n%s", channels_file.read()
+                        "Output file is invalid (=> overwriting)!\n%s",
+                        channels_file.read(),
                     )
 
+        self._states[channel] = 1 if state else 0
         self._write_states()
 
     def _write_states(self):
         with _lock:
             with open("simulator_output.json", "w", encoding="utf-8") as channels_file:
                 # write the state to the file
-                channels_file.write(json.dumps(self._states))
+                states = {
+                    OUTPUT_NAMES[idx]: self._states[idx]
+                    for idx, state in enumerate(self._states)
+                }
+                channels_file.write(json.dumps(states))
 
 
 # initialize output file

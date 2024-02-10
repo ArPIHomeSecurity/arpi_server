@@ -35,7 +35,7 @@ def create_output():
         delay=data["delay"],
         duration=data["duration"],
         default_state=data["defaultState"],
-        enabled=data["enabled"]
+        enabled=data["enabled"],
     )
     db.session.add(output)
     db.session.commit()
@@ -48,9 +48,7 @@ def create_output():
 @restrict_host
 def manage_output(output_id):
     if request.method == "GET":
-        db_output = (
-            db.session.query(Output).filter_by(id=output_id).first()
-        )
+        db_output = db.session.query(Output).filter_by(id=output_id).first()
         if db_output:
             return jsonify(db_output.serialized)
         return jsonify({"error": "Output not found"}), 404
@@ -72,6 +70,33 @@ def manage_output(output_id):
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
+
+@output_blueprint.route("/api/output/<int:output_id>/activate", methods=["PUT"])
+@authenticated()
+@restrict_host
+def activate_output(output_id):
+    db_output = db.session.query(Output).get(output_id)
+    if not db_output:
+        return jsonify({"error": "Output not found"}), 404
+
+    db_output.update({"state": True})
+    db.session.commit()
+
+    return process_ipc_response(IPCClient().activate_output(output_id))
+
+# decativate_output
+@output_blueprint.route("/api/output/<int:output_id>/deactivate", methods=["PUT"])
+@authenticated()
+@restrict_host
+def deactivate_output(output_id):
+    db_output = db.session.query(Output).get(output_id)
+    if not db_output:
+        return jsonify({"error": "Output not found"}), 404
+
+    db_output.update({"state": False})
+    db.session.commit()
+
+    return process_ipc_response(IPCClient().deactivate_output(output_id))
 
 @output_blueprint.route("/api/output/reorder", methods=["PUT"])
 @registered

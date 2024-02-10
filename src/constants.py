@@ -64,6 +64,8 @@ MONITOR_REGISTER_CARD = "monitor_register_card"
 MONITOR_STOP = "monitor_stop"
 MONITOR_SYNC_CLOCK = "monitor_sync_clock"
 MONITOR_SET_CLOCK = "monitor_set_clock"
+MONITOR_ACTIVATE_OUTPUT = "activate_output"
+MONITOR_DEACTIVATE_OUTPUT = "deactivate_output"
 
 UPDATE_SECURE_CONNECTION = "monitor_update_secure_connection"
 POWER_GET_STATE = "power_get_state"
