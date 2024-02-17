@@ -28,7 +28,7 @@ class Syren(Thread):
     DELAY = 0           # default delay 0 seconds
     STOP_TIME = 600     # default stop 10 minutes
 
-    SYREN_RELAY_ID = 0
+    SYREN_CHANNEL = 0
 
     _is_running = False
     _stop_event = Event()
@@ -117,7 +117,7 @@ class Syren(Thread):
         now = time()
         start_time = time()
         syren_is_on = (DELAY == 0)
-        self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
+        self._output_adapter.control_channel(self.SYREN_CHANNEL, syren_is_on)
         send_syren_state(syren_is_on)
         while (
             not self._stop_event.is_set()
@@ -127,7 +127,7 @@ class Syren(Thread):
                 self._logger.info("Syren turned on after delay")
                 # turn on the syren
                 syren_is_on = True
-                self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
+                self._output_adapter.control_channel(self.SYREN_CHANNEL, syren_is_on)
                 send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
             elif syren_is_on and now - start_time > STOP_TIME:
@@ -138,7 +138,7 @@ class Syren(Thread):
 
         # turn off the syren
         syren_is_on = None
-        self._output_adapter.control_channel(self.SYREN_RELAY_ID, syren_is_on)
+        self._output_adapter.control_channel(self.SYREN_CHANNEL, False)
         send_syren_state(syren_is_on)
         self._logger.info("Syren stopped")
 

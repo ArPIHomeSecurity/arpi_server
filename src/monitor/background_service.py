@@ -2,7 +2,7 @@
 import logging
 import sys
 
-from threading import Thread
+from threading import Thread, Event
 
 from constants import LOG_SERVICE, MONITOR_STOP
 from monitor.broadcast import Broadcaster
@@ -18,11 +18,15 @@ logger = logging.getLogger(LOG_SERVICE)
 
 
 class BackgroundService(Thread):
-    def __init__(self, stop_event):
+    """
+    The main background service of the application which monitors the health of the threads
+    and restarts them if necessary.
+    """
+    def __init__(self, stop_event: Event):
         super().__init__(name="HealthCheck")
-        self._threads = None
-        self._stop_service = stop_event
-        self._broadcaster = None
+        self._threads: [] = None
+        self._stop_event = stop_event
+        self._broadcaster: Broadcaster = None
         self._logger = logging.getLogger(LOG_SERVICE)
 
     def run(self):
@@ -34,8 +38,9 @@ class BackgroundService(Thread):
 
         self._start_threads()
 
-        while not self._stop_service.wait(timeout=1):
-            print_logging()
+        while not self._stop_event.wait(timeout=1):
+            # print the logging configuration for debugging
+            # print_logging()
 
             self._logger.debug("Health check of threads: %s", [t.name for t in self._threads])
             for thread in self._threads:
@@ -52,7 +57,7 @@ class BackgroundService(Thread):
 
     def _start_threads(self):
         self._logger.info("Starting threads...")
-        self._stop_service.clear()
+        self._stop_event.clear()
         self._broadcaster = Broadcaster()
         monitor = Monitor(self._broadcaster)
         monitor.start()
@@ -66,18 +71,21 @@ class BackgroundService(Thread):
         keypad = KeypadHandler(self._broadcaster)
         keypad.start()
 
-        ipc_server = IPCServer(self._stop_service, self._broadcaster)
+        ipc_server = IPCServer(self._stop_event, self._broadcaster)
         ipc_server.start()
 
-        self._threads = (monitor, ipc_server, notifier, output_handler, keypad)
+        self._threads = [monitor, ipc_server, notifier, output_handler, keypad]
 
     def _stop_threads(self):
         self._logger.info("Stopping threads...")
         self._broadcaster.send_message(message={"action": MONITOR_STOP})
-        self._stop_service.set()
+        self._stop_event.set()
 
         # wait for all threads to stop
         for thread in self._threads:
             self._logger.debug("Stopping thread: %s", thread.name)
             thread.join()
             self._logger.info("Stopped thread: %s", thread.name)
+            thread = None
+
+        self._threads = None

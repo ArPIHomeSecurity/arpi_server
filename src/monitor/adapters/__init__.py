@@ -1,5 +1,9 @@
+"""
+Definition of the GPIO pins used by the monitor
+for communication with the ArPI board.
+"""
 
-# Channel pins
+# Input channel pins
 CH01_PIN = 19
 CH02_PIN = 20
 CH03_PIN = 26
@@ -16,9 +20,6 @@ CH13_PIN = 23
 CH14_PIN = 24
 CH15_PIN = 25
 
-# Power pins
-POWER_PIN = 8
-
 CHANNEL_GPIO_PINS = [
     CH01_PIN,
     CH02_PIN,
@@ -34,16 +35,18 @@ CHANNEL_GPIO_PINS = [
     CH12_PIN,
     CH13_PIN,
     CH14_PIN,
-    CH15_PIN
+    CH15_PIN,
 ]
 
-# Relay pins
+# Power pin
+POWER_PIN = 8
+
+# Output channel pins - SPI communication
 LATCH_PIN = 27
 ENABLE_PIN = 22
 CLOCK_PIN = 11
 DATA_IN_PIN = 10
 DATA_OUT_PIN = 9
-
 
 # Wiegand pins
 KEYBUS_PIN0 = 18

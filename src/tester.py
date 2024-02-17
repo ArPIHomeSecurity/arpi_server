@@ -3,10 +3,10 @@
 import logging
 import os
 
-from logging import basicConfig, INFO, DEBUG
 from time import sleep
 
 import argparse
+from typing import List
 from dotenv import load_dotenv
 
 from monitor.adapters.power import PowerAdapter
@@ -15,9 +15,13 @@ from monitor.adapters.output import OutputAdapter
 
 
 def test_sensor_adapter():
+    """
+    Check the state of the sensor inputs and mark the ones that changed.
+    """
     adapter = SensorAdapter()
 
-    correct_channel = [False] * os.environ["INPUT_NUMBER"]
+    # mark channels as correct if they changed
+    correct_channels = [False] * int(os.environ["INPUT_NUMBER"])
     previous = []
     for _ in range(99):
         values = adapter.get_values()
@@ -27,15 +31,18 @@ def test_sensor_adapter():
         if previous:
             for idx, value in enumerate(values):
                 if value != previous[idx]:
-                    correct_channel[idx] = True
+                    correct_channels[idx] = True
 
         previous = values
 
-    for idx, correct in enumerate(correct_channel):
+    for idx, correct in enumerate(correct_channels):
         logging.info("Channel CH%02d %s", idx+1, u"\u2705" if correct else u"\u274C")
 
 
 def test_power_adapter():
+    """
+    Check the power source type.
+    """
     adapter = PowerAdapter()
 
     for _ in range(9):
@@ -44,39 +51,46 @@ def test_power_adapter():
 
 
 def test_output_adapter():
+    """
+    Control the output channels.
+    """
     adapter = OutputAdapter()
 
-    faults = adapter._read_faults()
-    logging.info("Faults: %s", faults)
-
     OUTPUT_COUNT = 8
-    # create array with size OUTPUT_COUNT and fill it with zeros
     outputs = [0] * OUTPUT_COUNT
     for i in range(OUTPUT_COUNT):
-        adapter.control_channel(i, 1)
+        adapter.control_channel(i, True)
         outputs[i] = 1
         logging.info("Outputs: %s", outputs)
         sleep(1)
 
     for i in range(OUTPUT_COUNT):
-        adapter.control_channel(i, 0)
+        adapter.control_channel(i, False)
         outputs[i] = 0
         logging.info("Outputs: %s", outputs)
         sleep(1)
+
+
+def list_adapters() -> List[str]:
+    adapters = []
+    for g in globals():
+        if g.startswith("test_") and g.endswith("_adapter"):
+            adapters.append(g.replace("test_", "").replace("_adapter", ""))
+    return adapters
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Testing script for adapters which control the hardware components"
     )
-    parser.add_argument("adapter", choices=["power", "sensor", "relay"])
+    parser.add_argument("adapter", choices=list_adapters())
     parser.add_argument("-v", "--verbose", action="store_true")
 
     args = parser.parse_args()
     if args.verbose:
-        basicConfig(format="%(message)s", level=DEBUG)
+        logging.basicConfig(format="%(message)s", level=logging.DEBUG)
     else:
-        basicConfig(format="%(message)s", level=INFO)
+        logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     test_function = f"test_{args.adapter}_adapter"
     globals()[test_function]()

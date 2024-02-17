@@ -66,9 +66,9 @@ class Monitor(Thread):
         """
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
-        self._powerAdapter = PowerAdapter()
         self._broadcaster = broadcaster
         self._actions = Queue()
+        self._powerAdapter = PowerAdapter()
         self._power_source = None
         self._db_session = None
         self._delay_timer = None
@@ -145,6 +145,7 @@ class Monitor(Thread):
 
         self.stop_alert(None)
         self._db_session.close()
+        self._powerAdapter.cleanup()
         self._logger.info("Monitoring stopped")
 
     def arm_monitoring(self, arm_type, user_id, keypad_id, delay, area_id):

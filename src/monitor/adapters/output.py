@@ -4,7 +4,7 @@ Control the outputs
 
 import logging
 import os
-import threading
+from threading import Lock
 
 from enum import Enum
 from typing import List
@@ -13,6 +13,8 @@ from monitor.adapters import LATCH_PIN, ENABLE_PIN, CLOCK_PIN, DATA_IN_PIN, DATA
 from constants import LOG_ADOUTPUT
 
 from gpiozero import DigitalOutputDevice, DigitalInputDevice
+
+from monitor.output import OUTPUT_NAMES
 
 OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
 
@@ -37,42 +39,35 @@ class Commands(Enum):
     PWM_START = [1, 6, 6, 3]
 
 
-class OutputAdapter:
+state_lock = Lock()
+
+
+class OutputAdapter():
     """
     Singleton class for controlling outputs with DRV8860
     """
 
-    _instance = None
-    _lock = threading.Lock()
-    _states = [0] * OUTPUT_NUMBER
-
-    def __new__(cls, *args, **kwargs):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls, *args, **kwargs)
-                cls._instance.setup()
-        return cls._instance
+    _states = [0] * int(OUTPUT_NUMBER)
+    _logger = logging.getLogger(LOG_ADOUTPUT)
+    _latch = DigitalOutputDevice(LATCH_PIN)
+    _enable = DigitalOutputDevice(ENABLE_PIN)
+    _clock = DigitalOutputDevice(CLOCK_PIN)
+    _data_in = DigitalOutputDevice(DATA_IN_PIN)
+    _data_out = DigitalInputDevice(DATA_OUT_PIN)
 
     def __init__(self):
-        self._latch = None
-        self._enable = None
-        self._clock = None
-        self._data_in = None
-        self._data_out = None
-        self._logger = None
+        self._logger.debug(
+            "Digital devices: %s",
+            [self._latch, self._enable, self._clock, self._data_in, self._data_out],
+        )
+        self._latch.on()
+        self._enable.off()
+        self._clock.off()
 
-    def setup(self):
-        self._logger = logging.getLogger(LOG_ADOUTPUT)
+        self._reset_errors()
+
+    def _reset_errors(self):
         try:
-            self._latch = DigitalOutputDevice(LATCH_PIN)
-            self._enable = DigitalOutputDevice(ENABLE_PIN)
-            self._clock = DigitalOutputDevice(CLOCK_PIN)
-            self._data_in = DigitalOutputDevice(DATA_IN_PIN)
-            self._data_out = DigitalInputDevice(DATA_OUT_PIN)
-            self._latch.on()
-            self._enable.off()
-            self._clock.off()
-
             faults = self._read_faults()
             if any(faults):
                 self._logger.warning("Faults detected: %s", faults)
@@ -82,36 +77,9 @@ class OutputAdapter:
                     self._logger.error("Cannot reset faults: %s", faults)
                     raise FaultException("Cannot reset faults")
 
-            self._logger.debug("Output adapter setup finished")
+            self._logger.debug("Successfully reset faults")
         except Exception as error:
-            self._logger.error("Cannot setup output adapter! %s", error)
-
-    def control_channel(self, channel: int, state: bool):
-        """
-        Control output by channel number
-        """
-        if channel < 0 or channel > OUTPUT_NUMBER - 1:
-            raise ValueError(
-                f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
-            )
-
-        # set the state by channel
-        self._states[channel] = 1 if state else 0
-        self._logger.debug("Control channel %d to %d, %s", channel, state, self._states)
-        self._write_states()
-
-    def _write_states(self):
-        self._enable.off()
-        self._latch.off()
-        self._clock.off()
-
-        for state in self._states:
-            self._data_in.value = state
-            self._clock.on()
-            self._clock.off()
-
-        self._latch.on()
-        self._enable.on()
+            self._logger.error("Cannot reset faults! %s", error)
 
     def _read_faults(self) -> List[int]:
         self._enable.off()
@@ -143,13 +111,59 @@ class OutputAdapter:
         self._latch.on()
         self._enable.on()
 
-    def cleanup(self):
-        self._latch.close()
-        self._enable.close()
-        self._clock.close()
-        self._data_in.close()
-        # self._data_out.close()
-        self._logger.debug("Output adapter cleanup finished")
+    def control_channel(self, channel: int, state: bool):
+        """
+        Control output by channel number
+        """
+        self._logger.debug(
+            "Control channel %d for %s to %r", channel, OUTPUT_NAMES[channel], state
+        )
+        if channel < 0 or channel > OUTPUT_NUMBER - 1:
+            raise ValueError(
+                f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
+            )
 
-    def __del__(self):
-        self.cleanup()
+        # set the state by channel
+        with state_lock:
+            self._states[channel] = 1 if state else 0
+
+        self._write_states()
+
+    def _write_states(self):
+        self._enable.off()
+        self._latch.off()
+        self._clock.off()
+        self._data_in.off()
+
+        for state in self._states:
+            self._clock.off()
+            if state:
+                self._data_in.on()
+            else:
+                self._data_in.off()
+            self._clock.on()
+
+        self._clock.off()
+        self._latch.on()
+        self._enable.on()
+
+    def _cleanup(self):
+        """
+        Cleanup the output adapter
+        """
+        if self._latch:
+            self._latch.close()
+            self._latch = None
+        if self._enable:
+            self._enable.close()
+            self._enable = None
+        if self._clock:
+            self._clock.close()
+            self._clock = None
+        if self._data_in:
+            self._data_in.close()
+            self._data_in = None
+        if self._data_out:
+            self._data_out.close()
+            self._data_out = None
+        self._logger.debug("Output adapter cleanup finished")

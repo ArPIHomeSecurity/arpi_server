@@ -1,4 +1,7 @@
 from monitor.service import start_background_service, stop_background_service
+from monitor.logging import initialize_logging
+
+initialize_logging()
 
 
 def post_worker_init(worker):

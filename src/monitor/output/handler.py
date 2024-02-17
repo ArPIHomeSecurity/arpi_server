@@ -111,6 +111,7 @@ class OutputHandler(Thread):
         self._outputs = db_session.query(Output).all()
 
         # initialize output default states
+        self._logger.info("Initializing outputs from database")
         adapter = OutputAdapter()
         for output in self._outputs:
             if output.channel is not None:

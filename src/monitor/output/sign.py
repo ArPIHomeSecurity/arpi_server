@@ -77,8 +77,7 @@ class OutputSign(Thread):
                 and start_time + self._delay <= now
                 and output_state != self._default_state
             ) or (
-                self._duration > -1
-                and start_time + self._delay + self._duration <= now
+                self._duration > -1 and start_time + self._delay + self._duration <= now
             ):
                 self._logger.debug("No duration, break loop after delay")
                 break
