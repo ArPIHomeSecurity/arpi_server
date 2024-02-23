@@ -16,6 +16,7 @@ from monitor.database import Session
 from monitor.output import OUTPUT_NAMES
 from monitor.output.notification import Notification, EventType, TriggerSource
 from monitor.output.sign import OutputSign
+from monitor.socket_io import send_output_state
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitor.adapters.output import OutputAdapter
@@ -116,6 +117,7 @@ class OutputHandler(Thread):
         for output in self._outputs:
             if output.channel is not None:
                 adapter.control_channel(output.channel, output.default_state)
+                send_output_state(output.id, False)
 
         db_session.close()
 
@@ -184,10 +186,7 @@ class OutputHandler(Thread):
                 stop_event = Event()
                 sign = OutputSign(
                     stop_event,
-                    output.channel,
-                    output.default_state,
-                    output.delay,
-                    output.duration,
+                    output
                 )
                 self._signs[output.channel] = stop_event
                 sign.start()

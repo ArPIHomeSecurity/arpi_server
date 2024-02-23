@@ -97,9 +97,8 @@ def send_card_registered():
     send_message("card_registered", True)
 
 
-def send_output_state(output_state):
-    send_message("output_state_change", output_state)
-
+def send_output_state(output_id, output_state):
+    send_message("output_state_change", {"id": output_id, "state": output_state})
 
 def send_message(message_type, message):
     logging.getLogger(LOG_SOCKETIO).debug("Sending message: %s -> %s", message_type, message)

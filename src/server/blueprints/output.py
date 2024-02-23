@@ -84,7 +84,7 @@ def activate_output(output_id):
 
     return process_ipc_response(IPCClient().activate_output(output_id))
 
-# decativate_output
+
 @output_blueprint.route("/api/output/<int:output_id>/deactivate", methods=["PUT"])
 @authenticated()
 @restrict_host
@@ -97,6 +97,7 @@ def deactivate_output(output_id):
     db.session.commit()
 
     return process_ipc_response(IPCClient().deactivate_output(output_id))
+
 
 @output_blueprint.route("/api/output/reorder", methods=["PUT"])
 @registered
