@@ -9,6 +9,7 @@ from threading import Thread
 from time import time
 
 from constants import LOG_OUTPUT
+from models import Output
 from monitor.output import OUTPUT_NAMES
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
@@ -41,17 +42,11 @@ class OutputSign(Thread):
             self._duration,
         )
 
-        now = start_time = time()
-        if self._delay == 0:
-            # set it to active state
-            output_state = not self._default_state
-            self._output_adapter.control_channel(self._channel, output_state)
-        else:
-            # set it to inactive state
-            output_state = self._default_state
-
-        while not self._stop_event.is_set() and not self._stop_event.wait(timeout=1):
+        start_time = time()
+        output_state = self._default_state
+        while not self._stop_event.is_set():
             # if after delay and still in default state, set it to active state
+            now = time()
             if start_time + self._delay <= now and output_state == self._default_state:
                 output_state = not self._default_state
                 self._logger.debug(
@@ -60,7 +55,7 @@ class OutputSign(Thread):
                     "on" if output_state else "off",
                 )
             elif (
-                self._duration > -1
+                self._duration > Output.ENDLESS_DURATION
                 and start_time + self._delay + self._duration <= now
                 and output_state != self._default_state
             ):
@@ -72,26 +67,39 @@ class OutputSign(Thread):
                 output_state = self._default_state
 
             self._output_adapter.control_channel(self._channel, output_state)
+
             if (
-                self._duration == -1
+                self._duration == Output.ENDLESS_DURATION
                 and start_time + self._delay <= now
                 and output_state != self._default_state
-            ) or (
-                self._duration > -1 and start_time + self._delay + self._duration <= now
             ):
                 self._logger.debug("No duration, break loop after delay")
                 break
 
-            now = time()
+            if (
+                self._duration > Output.ENDLESS_DURATION
+                and start_time + self._delay + self._duration <= now
+            ):
+                self._logger.debug("Duration expired, break loop")
+                break
 
-        self._logger.debug("Waiting for stop event")
-        if self._duration == -1 and self._stop_event.wait():
-            self._logger.debug(
-                "Output sign on channel '%s' turned off", OUTPUT_NAMES[self._channel]
-            )
-            output_state = self._default_state
-            self._output_adapter.control_channel(self._channel, output_state)
+            if self._stop_event.wait(timeout=1):
+                output_state = self._default_state
+                self._logger.debug(
+                    "Output sign on channel '%s' turned off on stop event",
+                    OUTPUT_NAMES[self._channel]
+                )
+                self._output_adapter.control_channel(self._channel, output_state)
 
+        if self._duration == Output.ENDLESS_DURATION:
+            self._logger.debug("Waiting for stop event")
+            self._stop_event.wait()
+
+        output_state = self._default_state
+        self._output_adapter.control_channel(self._channel, output_state)
+        self._logger.debug(
+            "Output sign on channel '%s' turned off", OUTPUT_NAMES[self._channel]
+        )
         self._logger.debug(
             "Output sign exited on channel '%s'", OUTPUT_NAMES[self._channel]
         )

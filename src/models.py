@@ -847,6 +847,8 @@ class Output(BaseModel):
 
     __tablename__ = "output"
 
+    ENDLESS_DURATION = 0
+
     id = Column(Integer, primary_key=True)
     name = Column(String(16), nullable=True)
     description = Column(String, nullable=True)
@@ -941,5 +943,5 @@ class Output(BaseModel):
 
     @validates("duration")
     def validates_duration(self, key, duration):
-        assert duration >= -1, "Duration must be >= -1"
+        assert duration >= 0, "Duration is positive integer (>= 0)"
         return duration

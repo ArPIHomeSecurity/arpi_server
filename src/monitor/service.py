@@ -6,6 +6,7 @@ from signal import SIGTERM, signal, Signals
 
 from constants import LOG_SERVICE
 from monitor.background_service import BackgroundService
+from monitor.logging import initialize_logging
 from monitor.socket_io import socketio_app
 from tools.ssh import SSH
 
@@ -39,13 +40,13 @@ def stop_background_service(remove_app=True):
     logger.debug("Stopping background service")
     stop_event.set()
     if remove_app:
-        global socketio_app
         if socketio_app:
             print(socketio_app.wsgi_app.wsgi_app.__dict__)
             del socketio_app
 
 
 def create_app():
+    initialize_logging()
     start_background_service()
     return socketio_app
 
