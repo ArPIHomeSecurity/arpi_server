@@ -191,7 +191,14 @@ class OutputHandler(Thread):
                 self._signs[output.channel] = stop_event
                 sign.start()
             elif notification.state == EventType.STOP:
-                self._signs.pop(output.channel, None).set()
+                stop_event = self._signs.pop(output.channel, None)
+                if stop_event is not None:
+                    self._logger.debug(
+                        "Stopping sign on channel %s for event %s",
+                        OUTPUT_NAMES[output.channel],
+                        notification,
+                    )
+                    stop_event.set()
 
     def get_output(self, output_id: int = None, area_id: int = None) -> Output:
         """

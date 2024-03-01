@@ -15,7 +15,7 @@ from constants import LOG_ALERT, THREAD_ALERT
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitor.adapters.output import OutputAdapter
 else:
-    from monitor.adapters.mock.relay import RelayAdapter
+    from monitor.adapters.mock.output import OutputAdapter
 
 
 class Syren(Thread):
