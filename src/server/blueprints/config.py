@@ -51,7 +51,7 @@ def option_put(option, section) -> Response:
         if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
             return process_ipc_response(IPCClient().update_ssh())
 
-    return make_response("", 204)
+    return make_response("", 200)
 
 
 @config_blueprint.route("/api/config/test_email", methods=["GET"])

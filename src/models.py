@@ -786,6 +786,7 @@ class Option(BaseModel):
                 "subscriptions",
                 "dyndns",
                 "access",
+                "timing",
             ), f"Unknown section ({value})"
         return value
 
