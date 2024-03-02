@@ -61,12 +61,9 @@ class SensorAlert(Thread):
         self._broadcaster = broadcaster
 
     def run(self):
-        self._db_session = Session()
 
         start_time = datetime.now()
-
         self._logger.debug("Alert prepared in arm state: %s", self._alert_type)
-
         self._logger.info(
             "Alert prepared on sensor (id:%s) with %s seconds delay",
             self._sensor_id,
@@ -88,7 +85,8 @@ class SensorAlert(Thread):
                           self._delay)
 
         new_alert = False
-        alert = self.get_alert()
+        db_session = Session()
+        alert = db_session.query(Alert).filter_by(end_time=None).first()
         if alert is None:
             alert = self.create_alert()
             new_alert = True
@@ -110,12 +108,6 @@ class SensorAlert(Thread):
         else:
             States.set(States.MONITORING_STATE, MONITORING_ALERT)
             self._broadcaster.send_message({"action": MONITORING_ALERT})
-
-    def get_alert(self) -> Alert:
-        """
-        Retrieves the first alert from the database that has not ended.
-        """
-        return self._db_session.query(Alert).filter_by(end_time=None).first()
 
     def create_alert(self) -> Alert:
         """

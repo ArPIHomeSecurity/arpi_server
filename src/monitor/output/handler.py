@@ -167,17 +167,17 @@ class OutputHandler(Thread):
                 )
                 continue
 
+            stop_event = self._signs.pop(output.channel, None)
+            if stop_event is not None:
+                self._logger.debug(
+                    "Stopping sign on channel %s for event %s",
+                    OUTPUT_NAMES[output.channel],
+                    notification,
+                )
+                stop_event.set()
+
             # start new sign
             if notification.state == EventType.START and output.enabled:
-                # stop previous sign on the same channel, if any
-                stop_event = self._signs.pop(output.channel, None)
-                if stop_event is not None:
-                    self._logger.debug(
-                        "Stopping previous sign on channel %s",
-                        OUTPUT_NAMES[output.channel],
-                    )
-                    stop_event.set()
-
                 self._logger.debug(
                     "Starting new sign on channel %s for event %s",
                     OUTPUT_NAMES[output.channel],
@@ -190,15 +190,10 @@ class OutputHandler(Thread):
                 )
                 self._signs[output.channel] = stop_event
                 sign.start()
+            # stop existing sign
             elif notification.state == EventType.STOP:
-                stop_event = self._signs.pop(output.channel, None)
-                if stop_event is not None:
-                    self._logger.debug(
-                        "Stopping sign on channel %s for event %s",
-                        OUTPUT_NAMES[output.channel],
-                        notification,
-                    )
-                    stop_event.set()
+                pass
+                
 
     def get_output(self, output_id: int = None, area_id: int = None) -> Output:
         """
