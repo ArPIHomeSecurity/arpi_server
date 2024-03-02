@@ -25,7 +25,7 @@ from models import AlertSensor, Arm, Sensor
 from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
-from monitor.history import SensorsHistory
+from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import States
 

@@ -34,7 +34,7 @@ from constants import (
 )
 from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates, Output
 from monitor.area_handler import AreaHandler
-from monitor.sensor_handler import SensorHandler
+from monitor.sensor.handler import SensorHandler
 from monitor.alert import SensorAlert
 from monitor.storage import States
 from monitor.adapters.power import PowerAdapter
