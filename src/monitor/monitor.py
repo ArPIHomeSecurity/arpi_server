@@ -103,7 +103,7 @@ class Monitor(Thread):
         while True:
             with contextlib.suppress(Empty):
                 message = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
-                self._logger.debug(f"Action: {message}")
+                self._logger.debug("Action: %s", message)
                 if message["action"] == MONITOR_STOP:
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:

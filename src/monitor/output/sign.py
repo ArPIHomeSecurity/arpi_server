@@ -6,7 +6,7 @@ import logging
 import os
 from queue import Queue
 from threading import Thread
-from time import time
+from time import sleep, time
 
 from constants import LOG_OUTPUT
 from models import Output
@@ -31,6 +31,9 @@ class OutputSign(Thread):
         self._output_adapter = OutputAdapter()
         self._actions = Queue()
         self._logger = logging.getLogger(LOG_OUTPUT)
+
+        # set as daemon to avoid blocking the application
+        self.daemon = True
 
     def run(self):
         channel = self._output.channel
@@ -99,7 +102,10 @@ class OutputSign(Thread):
         if duration == Output.ENDLESS_DURATION:
             self._logger.debug("Waiting for stop event")
             self._stop_event.wait()
+            start_time = time()
 
+        # stop delay
+        sleep(delay)
         output_state = default_state
         self._output_adapter.control_channel(channel, output_state)
         self._logger.debug(

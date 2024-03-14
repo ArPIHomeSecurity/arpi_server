@@ -124,7 +124,6 @@ class OutputHandler(Thread):
         self._logger.debug("Loaded %s outputs", len(self._outputs))
 
     def run(self) -> None:
-        self._stop_event = Event()
         self.load_outputs()
         while True:
             message = None
@@ -134,13 +133,15 @@ class OutputHandler(Thread):
             if message is not None:
                 # handle monitoring and notification actions
                 if message["action"] == MONITOR_STOP:
-                    self._stop_event.set()
                     break
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self.load_outputs()
 
             if not self._notifications.empty():
                 self.process_notifications()
+
+        for stop_event in self._signs.values():
+            stop_event.set()
 
         self._logger.info("Output Handler stopped")
 
@@ -184,16 +185,12 @@ class OutputHandler(Thread):
                     notification,
                 )
                 stop_event = Event()
-                sign = OutputSign(
-                    stop_event,
-                    output
-                )
+                sign = OutputSign(stop_event, output)
                 self._signs[output.channel] = stop_event
                 sign.start()
             # stop existing sign
             elif notification.state == EventType.STOP:
                 pass
-                
 
     def get_output(self, output_id: int = None, area_id: int = None) -> Output:
         """
