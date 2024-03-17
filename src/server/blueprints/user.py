@@ -7,6 +7,7 @@ from flask.helpers import make_response
 from flask import jsonify, request, current_app
 from jose import jwt
 
+from constants import ROLE_USER
 from models import User, hash_code
 from server.database import db
 from server.decorators import authenticated, generate_user_token, registered, restrict_host
@@ -16,17 +17,20 @@ from server.tools import process_ipc_response
 user_blueprint = Blueprint("user", __name__)
 
 
-@user_blueprint.route("/api/users", methods=["GET", "POST"])
+@user_blueprint.route("/api/users", methods=["GET"])
+@authenticated(role=ROLE_USER)
+@restrict_host
+def get_users():
+    return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
+
+@user_blueprint.route("/api/users", methods=["POST"])
 @authenticated()
 @restrict_host
-def users():
-    if request.method == "GET":
-        return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
-    elif request.method == "POST":
-        data = request.json
-        user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
-        db.session.add(user)
-        db.session.commit()
+def post_user():
+    data = request.json
+    user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
+    db.session.add(user)
+    db.session.commit()
 
     return jsonify(None)
 

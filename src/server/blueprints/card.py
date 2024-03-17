@@ -2,6 +2,8 @@ from flask import jsonify, request
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
 
+from constants import ROLE_USER
+
 from models import Card
 from server.database import db
 from server.decorators import authenticated, restrict_host
@@ -10,9 +12,9 @@ card_blueprint = Blueprint("card", __name__)
 
 
 @card_blueprint.route("/api/cards", methods=["GET"])
-@authenticated()
+@authenticated(role=ROLE_USER)
 @restrict_host
-def cards():
+def get_cards():
     return jsonify([i.serialized for i in db.session.query(Card).order_by(Card.description).all()])
 
 
