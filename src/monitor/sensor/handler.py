@@ -257,9 +257,10 @@ class SensorHandler:
                 and current_monitoring == MONITORING_ARMED
             ):
                 self._logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert!",
-                    sensor.id,
+                    "Sensor %s (CH%02d) has suppressed alert! (%r)",
+                    sensor.description,
                     sensor.channel,
+                    self._sensors_history.get_states(idx),
                 )
 
             # add new alert, enabled sensors to the alert
