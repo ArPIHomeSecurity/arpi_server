@@ -120,6 +120,7 @@ class IPCServer(Thread):
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
             SSH().update_ssh_service()
+            SSH().update_access_from_router()
         elif message["action"] == SEND_TEST_SMS:
             succeeded, results = Notifier.send_test_sms()
             return_value["result"] = succeeded

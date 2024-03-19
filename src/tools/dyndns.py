@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import logging
 import os
 import sys
@@ -12,13 +11,13 @@ from dotenv import load_dotenv
 from noipy.main import execute_update
 from psycopg2 import OperationalError
 
+
 load_dotenv()
 load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_DYNDNS
-from models import Option
-from monitor.database import Session
+from monitor.config_helper import load_dyndns_config
 from tools.dictionary import filter_keys
 
 
@@ -48,7 +47,6 @@ class DynDns:
 
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
-        self._db_session = Session()
 
     def update_ip(self, force=False):
         """
@@ -56,27 +54,29 @@ class DynDns:
         Update the IP address at DNSprovider if it's necessary.
         :param force: force the update
         """
-        noip_config = (
-            self._db_session.query(Option)
-            .filter_by(name="network", section="dyndns")
-            .first()
-        )
-        if noip_config:
-            noip_config = json.loads(noip_config.value)
+        dyndns_config = load_dyndns_config()
 
-        if not noip_config:
-            self._logger.error("Missing dyndns settings!")
+        if not dyndns_config:
+            self._logger.info("No dynamic dns configuration found")
             return
 
-        noip_config["force"] = force
-        tmp_config = copy(noip_config)
+        if not dyndns_config.provider:
+            self._logger.info("No dynamic dns provider found")
+            return False
+
+        dyndns_config["force"] = force
+        tmp_config = copy(dyndns_config)
         filter_keys(tmp_config, ["password"])
         self._logger.info("Update dynamics DNS provider with options: %s", tmp_config)
+
+        if not dyndns_config["provider"]:
+            self._logger.error("Missing provider!")
+            return False
 
         # DNS lookup IP from hostname
         response = None
         try:
-            response = get_dns_records(hostname=noip_config["hostname"])
+            response = get_dns_records(hostname=dyndns_config["hostname"])
             current_ip = response["Answer"][0]["data"]
         except KeyError as key_error:
             self._logger.error(
@@ -109,8 +109,8 @@ class DynDns:
 
         if (new_ip != current_ip) or force:
             self._logger.info("IP: '%s' => '%s'", current_ip, new_ip)
-            noip_config["ip"] = new_ip
-            result = self.save_ip(noip_config)
+            dyndns_config["ip"] = new_ip
+            result = self.save_ip(dyndns_config)
             self._logger.info("Update result: '%s'", result)
             return True
         else:

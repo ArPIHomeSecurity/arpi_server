@@ -1,35 +1,25 @@
 #!/usr/bin/env python3
 import argparse
-import json
+from dataclasses import asdict
 import logging
 import os
 import subprocess
 import sys
 
 from cryptography import x509
-from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
 from os import symlink
 from pathlib import Path, PosixPath
 from pydbus import SystemBus
 
+
 load_dotenv()
 load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
 
-from models import Option
 from constants import LOG_SC_CERTBOT
-from monitor.database import Session
+from monitor.config_helper import load_dyndns_config
 from tools.dictionary import filter_keys
-
-
-@dataclass
-class NoIPConfig:
-    username: str
-    password: str
-    hostname: str
-    provider: str
-    restrict_host: str
 
 
 class Certbot:
@@ -37,7 +27,6 @@ class Certbot:
 
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_SC_CERTBOT)
-        self._db_session = Session()
 
     def _generate_certificate(self):
         """
@@ -45,12 +34,17 @@ class Certbot:
 
         Returns: True if the certificate was generated, False otherwise
         """
-        self._logger.info("Generating certbot certificate")
-        noip_config = self._load_config()
-        if noip_config is None:
+        self._logger.info("Generating certbot certificate...")
+        dyndns_config = load_dyndns_config()
+        if dyndns_config is None:
+            self._logger.info("No dynamic dns configuration found")
             return False
 
-        tmp_config = asdict(noip_config)
+        if not dyndns_config.provider:
+            self._logger.info("No dynamic dns provider found")
+            return False
+
+        tmp_config = asdict(dyndns_config)
         filter_keys(tmp_config, ["password"])
         self._logger.info("Generate certificate with options: %s", tmp_config)
 
@@ -67,10 +61,11 @@ class Certbot:
                     "--quiet",
                     "--cert-name", Certbot.CERT_NAME,
                     "--email",
-                    noip_config.username,
-                    f'-d {noip_config.hostname}',
+                    dyndns_config.username,
+                    f'-d {dyndns_config.hostname}',
                 ],
                 capture_output=True,
+                shell=True,
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -81,14 +76,6 @@ class Certbot:
             self._logger.error("Missing file! %s", error)
 
         return False
-
-    def _load_config(self) -> NoIPConfig:
-        noip_data = self._db_session.query(Option).filter_by(name="network", section="dyndns").first()
-        if noip_data:
-            noip_config = json.loads(noip_data.value)
-            return NoIPConfig(**noip_config)
-        else:
-            self._logger.error("Missing dyndns settings!")
 
     def _renew_certificate(self):
         """
@@ -108,6 +95,7 @@ class Certbot:
                     "--cert-name", Certbot.CERT_NAME
                 ],
                 capture_output=True,
+                shell=True,
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -160,14 +148,14 @@ class Certbot:
                 cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
                 self._logger.debug("Domain in certificate: %s", cert_domain)
 
-        noip_config = self._load_config()
-        if noip_config and noip_config.hostname == cert_domain:
+        dyndns_config = load_dyndns_config()
+        if dyndns_config and dyndns_config.hostname == cert_domain:
             self._logger.info("Domain not changed")
             return False
 
-        self._logger.info("Domain changed: %s => %s", cert_domain, noip_config.hostname)
+        self._logger.info("Domain changed: %s => %s", cert_domain, dyndns_config.hostname)
         return True
-    
+
     def _delete_certificate(self):
         """
         Replaces the certificate with letsencrypt
