@@ -60,8 +60,8 @@ class SSH:
         except GLib.Error as error:
             self._logger.error("Failed: %s", error)
 
-    def update_access_for_local_network(self):
-        self._logger.info("Updating access for local network")
+    def update_access_local_network(self):
+        self._logger.info("Updating SSH access...")
         ssh_config = load_ssh_config()
         if not ssh_config:
             self._logger.info("Missing ssh settings!")
@@ -70,7 +70,7 @@ class SSH:
         cidr = os.environ.get("SSH_LOCAL_NETWORK", self._get_local_ip())
         ip_range = ip_network(cidr, False)
         local_network = f"{ip_range.network_address}/{ip_range.netmask}"
-        if ssh_config.ssh_from_local_network:
+        if ssh_config.ssh_restrict_local_network:
             self._update_access_cidr(local_network, True)
         else:
             self._update_access_cidr(local_network, False)
@@ -83,16 +83,15 @@ class SSH:
         return os.popen('ip addr show wlan0').read().split("inet ")[1].split(" brd")[0]
 
     def _update_access_cidr(self, network, enable: bool):
-        self._logger.info("Updating access for %s to %s", network, enable)
+        self._logger.info("Restrict SSH access only for %s to %s", network, enable)
 
         if enable:
-            # allow access for cidr with hosts.allow
-            # replace line starting with sshd: with sshd: network or add new line
             os.system("sed -i '/sshd:/d' /etc/hosts.allow")
             os.system(f"echo 'sshd: {network}' >> /etc/hosts.allow")
+            os.system("echo 'sshd: ALL' >> /etc/hosts.deny")
         else:
-            # remove access for cidr with hosts.allow
             os.system("sed -i '/sshd:/d' /etc/hosts.allow")
+            os.system("sed -i '/sshd: ALL/d' /etc/hosts.deny")
 
 
 def main():
@@ -110,16 +109,16 @@ def main():
         help="Disable SSH"
     )
     args.add_argument(
-        "--enable-access-from-local-network",
+        "--allow-local-networks",
         action="store_true",
         default=None,
-        help="Enable access from local network",
+        help="Restrict SSH access only from local network",
     )
     args.add_argument(
-        "--disable-access-from-local-network",
+        "--allow-any-networks",
         action="store_true",
         default=None,
-        help="Disable access from local network"
+        help="Allow SSH access from all networks"
     )
     args.add_argument(
         "--get-local-ip",
@@ -140,10 +139,10 @@ def main():
     if args.enable_ssh is not None:
         update_ssh_service(args.enable_ssh)
 
-    if args.enable_access_from_local_network is not None:
-        update_access_from_local_network(True)
-    if args.disable_access_from_local_network is not None:
-        update_access_from_local_network(False)
+    if args.allow_local_networks is not None:
+        update_access_local_network(True)
+    if args.allow_any_networks is not None:
+        update_access_local_network(False)
 
 
 def update_ssh_service(enabled: bool):
@@ -162,7 +161,7 @@ def update_ssh_service(enabled: bool):
         logging.info("SSH is disabled")
 
 
-def update_access_from_local_network(enabled: bool):
+def update_access_local_network(enabled: bool):
     """
     Update access from router
     """
@@ -171,11 +170,11 @@ def update_access_from_local_network(enabled: bool):
     ip_range = ip_network(cidr, False)
     local_network = f"{ip_range.network_address}/{ip_range.netmask}"
     if enabled:
-        logging.info("Enabling access for local network")
+        logging.info("Allow SSH access only from local network")
         ssh._update_access_cidr(local_network, True)
         logging.info("Access from router is enabled")
     else:
-        logging.info("Disabling access for local network")
+        logging.info("Allow SSH access from any networks")
         ssh._update_access_cidr(local_network, False)
         logging.info("Access from router is disabled")
 
