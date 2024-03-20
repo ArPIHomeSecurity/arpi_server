@@ -17,7 +17,10 @@ class DyndnsConfig:
 
 
 def load_dyndns_config() -> DyndnsConfig:
-    dyndns_data = Session().query(Option).filter_by(name="network", section="dyndns").first()
+    session = Session()
+    dyndns_data = session.query(Option).filter_by(name="network", section="dyndns").first()
+    session.close()
+
     if dyndns_data:
         noip_config = json.loads(dyndns_data.value)
         return DyndnsConfig(**noip_config)
@@ -26,11 +29,13 @@ def load_dyndns_config() -> DyndnsConfig:
 @dataclass
 class SshConfig:
     ssh: bool
-    ssh_from_router: bool
+    ssh_from_local_network: bool
 
 
 def load_ssh_config() -> SshConfig:
-    ssh_config = Session().query(Option).filter_by(name="network", section="access").first()
+    session = Session()
+    ssh_config = session.query(Option).filter_by(name="network", section="access").first()
+    session.close()
 
     if ssh_config:
         ssh_config = json.loads(ssh_config.value)

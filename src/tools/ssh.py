@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import subprocess
+from ipaddress import ip_network
 import logging
 import os
 import sys
@@ -60,46 +60,39 @@ class SSH:
         except GLib.Error as error:
             self._logger.error("Failed: %s", error)
 
-    def update_access_from_router(self):
-        self._logger.info("Updating access from router")
+    def update_access_for_local_network(self):
+        self._logger.info("Updating access for local network")
         ssh_config = load_ssh_config()
         if not ssh_config:
             self._logger.info("Missing ssh settings!")
             return
 
-        router_ip = os.environ.get("SSH_ROUTER_IP", self._get_router_local_ip())
-        if ssh_config.ssh_from_router:
-            self._update_access_for_ip(router_ip, True)
+        cidr = os.environ.get("SSH_LOCAL_NETWORK", self._get_local_ip())
+        ip_range = ip_network(cidr, False)
+        local_network = f"{ip_range.network_address}/{ip_range.netmask}"
+        if ssh_config.ssh_from_local_network:
+            self._update_access_cidr(local_network, True)
         else:
-            self._update_access_for_ip(router_ip, False)
+            self._update_access_cidr(local_network, False)
 
-    def _get_router_local_ip(self) -> str:
+    def _get_local_ip(self) -> str:
         """
-        Get the local IP of the router with "route" command
+        Get the local IP of the device in CIDR format.
+        IP/prefix
         """
-        routes = subprocess.check_output(["route", "-n"]).decode("utf-8")
-        DESTINATION = 0
-        GATEWAY = 1
-        FLAGS = 3
-        for line in routes.splitlines():
-            fields = line.strip().split()
-            if fields[DESTINATION] != '0.0.0.0' or "G" not in fields[FLAGS]:
-                # If not default route or not RTF_GATEWAY, skip it
-                continue
+        return os.popen('ip addr show wlan0').read().split("inet ")[1].split(" brd")[0]
 
-            return fields[GATEWAY]
-
-    def _update_access_for_ip(self, ip, enable: bool):
-        self._logger.info("Updating access for %s to %s", ip, enable)
-
-        rule = f"rule family='ipv4' source address='{ip}' reject"
+    def _update_access_cidr(self, network, enable: bool):
+        self._logger.info("Updating access for %s to %s", network, enable)
 
         if enable:
-            cmd = f'firewall-cmd --zone=public --remove-rich-rule="{rule}"'
-            subprocess.run(cmd, check=True, shell=True)
+            # allow access for cidr with hosts.allow
+            # replace line starting with sshd: with sshd: network or add new line
+            os.system("sed -i '/sshd:/d' /etc/hosts.allow")
+            os.system(f"echo 'sshd: {network}' >> /etc/hosts.allow")
         else:
-            cmd = f'firewall-cmd --zone=public --add-rich-rule="{rule}"'
-            subprocess.run(cmd, check=True, shell=True)
+            # remove access for cidr with hosts.allow
+            os.system("sed -i '/sshd:/d' /etc/hosts.allow")
 
 
 def main():
@@ -117,39 +110,40 @@ def main():
         help="Disable SSH"
     )
     args.add_argument(
-        "--enable-access-from-router",
+        "--enable-access-from-local-network",
         action="store_true",
         default=None,
-        help="Enable access from router",
+        help="Enable access from local network",
     )
     args.add_argument(
-        "--disable-access-from-router",
+        "--disable-access-from-local-network",
         action="store_true",
         default=None,
-        help="Disable access from router",
+        help="Disable access from local network"
     )
     args.add_argument(
-        "--get-router-ip",
+        "--get-local-ip",
         action="store_true",
         default=None,
-        help="Get router IP",
+        help="Get local IP"
     )
 
     args = args.parse_args()
 
-    if args.get_router_ip:
+    logging.basicConfig(level=logging.INFO)
+    print(args)
+
+    if args.get_local_ip:
         ssh = SSH()
-        print(ssh._get_router_local_ip())
+        print(ssh._get_local_ip())
 
-    if args.enable_ssh == True:
-        update_ssh_service(True)
-    elif args.disable_ssh == False:
-        update_ssh_service(False)
+    if args.enable_ssh is not None:
+        update_ssh_service(args.enable_ssh)
 
-    if args.enable_access_from_router == True:
-        update_access_from_router(True)
-    elif args.disable_access_from_router == False:
-        update_access_from_router(False)
+    if args.enable_access_from_local_network is not None:
+        update_access_from_local_network(True)
+    if args.disable_access_from_local_network is not None:
+        update_access_from_local_network(False)
 
 
 def update_ssh_service(enabled: bool):
@@ -168,18 +162,21 @@ def update_ssh_service(enabled: bool):
         logging.info("SSH is disabled")
 
 
-def update_access_from_router(enabled: bool):
+def update_access_from_local_network(enabled: bool):
     """
     Update access from router
     """
     ssh = SSH()
+    cidr = ssh._get_local_ip()
+    ip_range = ip_network(cidr, False)
+    local_network = f"{ip_range.network_address}/{ip_range.netmask}"
     if enabled:
-        logging.info("Enabling access from router")
-        ssh._update_access_for_ip(ssh._get_router_local_ip(), True)
+        logging.info("Enabling access for local network")
+        ssh._update_access_cidr(local_network, True)
         logging.info("Access from router is enabled")
     else:
-        logging.info("Disabling access from router")
-        ssh._update_access_for_ip(ssh._get_router_local_ip(), False)
+        logging.info("Disabling access for local network")
+        ssh._update_access_cidr(local_network, False)
         logging.info("Access from router is disabled")
 
 
