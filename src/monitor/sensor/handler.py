@@ -110,13 +110,17 @@ class SensorHandler:
 
         self._sensors = []
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
+        self._logger.debug("Sensors reloaded!")
 
         self._sensors_history = SensorsHistory(
             len(self._sensors),
             int(environ["SAMPLE_RATE"]) * ALERT_WINDOW,
             ALERT_THRESHOLD,
         )
-        self._logger.debug("Sensors reloaded!")
+
+        for idx, sensor in enumerate(self._sensors):
+            if sensor.monitor_size is not None and sensor.monitor_threshold is not None:
+                self._sensors_history.set_monitoring(idx, sensor.monitor_size, sensor.monitor_threshold)
 
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(

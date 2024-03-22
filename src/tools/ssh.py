@@ -15,7 +15,6 @@ load_dotenv()
 load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
 
-from models import Option
 from constants import LOG_SC_ACCESS
 from monitor.config_helper import load_ssh_config
 from monitor.database import Session

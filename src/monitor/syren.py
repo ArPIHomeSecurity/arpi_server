@@ -1,11 +1,11 @@
-import json
 import logging
 import os
 
 from threading import Thread, Event
 from time import time
 
-from models import Alert, Option
+from models import Alert
+from monitor.config_helper import SyrenConfig, load_syren_config
 from monitor.database import Session
 from monitor.socket_io import send_syren_state
 
@@ -41,16 +41,22 @@ class Syren(Thread):
 
         Priority: parameters < database settings < code defaults
         """
-        logging.getLogger(LOG_ALERT).debug("Starting syren...")
+        logger = logging.getLogger(LOG_ALERT)
+        logger.debug("Starting syren...")
 
-        config = Syren.load_syren_config()
+        config = load_syren_config()
+        if config is None:
+            logging.info("Missing ssh settings!")
+            config = SyrenConfig(cls.SILENT, cls.DELAY, cls.STOP_TIME)
+
         if silent is not None:
-            config["silent"] = silent
+            config.silent = silent
         if delay is not None:
-            config["delay"] = delay
+            config.delay = delay
         if stop_time is not None:
-            config["stop_time"] = stop_time
-        logging.getLogger(LOG_ALERT).info("Using syren config: %s )!", config)
+            config.stop_time = stop_time
+
+        logger.info("Using syren config: %s )!", config)
 
         if not cls._is_running:
             cls._stop_event.clear()
@@ -58,7 +64,7 @@ class Syren(Thread):
             alert.start()
             cls._is_running = True
         else:
-            logging.getLogger(LOG_ALERT).warning("Syren is already in use!")
+            logger.warning("Syren is already in use!")
 
     @classmethod
     def stop_syren(cls):
@@ -70,57 +76,34 @@ class Syren(Thread):
         cls._is_running = False
         send_syren_state(None)
 
-    @staticmethod
-    def load_syren_config():
-        """
-        Loads the syren configuration from the database or uses the default settings.
-        """
-        db_session = Session()
-        syren_config = (
-            db_session.query(Option).filter_by(name="syren", section="timing").first()
-        )
-
-        if syren_config:
-            syren_config = json.loads(syren_config.value)
-            logging.getLogger(LOG_ALERT).debug(
-                "Loaded syren config from database: %s )!", syren_config
-            )
-        else:
-            logging.getLogger(LOG_ALERT).warning(
-                "Missing syren settings (using defaults: %s / %s )!",
-                Syren.STOP_TIME,
-                Syren.DELAY,
-            )
-
-        syren_config["silent"] = syren_config.get("silent", Syren.SILENT)
-        syren_config["delay"] = syren_config.get("delay", Syren.DELAY)
-        syren_config["stop_time"] = syren_config.get("stop_time", Syren.STOP_TIME)
-
-        return syren_config
-
-    def __init__(self, config):
+    def __init__(self, config: SyrenConfig):
         super(Syren, self).__init__(name=THREAD_ALERT)
         self._logger = logging.getLogger(LOG_ALERT)
         self._output_adapter = OutputAdapter()
         self._alert = None
-        self._syren_config = config
+        self._config = config
 
     def run(self):
         db_session = Session()
-
-        SILENT = self._syren_config["silent"]
-
         alert = db_session.query(Alert).filter_by(end_time=None).first()
+
+        silent_arm = self._config.silent
+        silent_sensor = all([sensor.silent for sensor in alert.sensors])
+        silent_alert = silent_arm or silent_sensor
+
         if alert:
-            alert.silent = SILENT
+            alert.silent = silent_alert
             db_session.commit()
 
-        if SILENT:
+        self._logger.debug("silent alert = silent arm or silent sensor => %s = %s or %s",
+                           silent_alert, silent_arm, silent_sensor)
+        if silent_alert:
             self._logger.info("Syren is in silent mode")
+            send_syren_state(False)
             return
 
-        DELAY = self._syren_config["delay"]
-        STOP_TIME = self._syren_config["stop_time"]
+        DELAY = self._config.delay
+        STOP_TIME = self._config.stop_time
 
         start_time = time()
         syren_is_on = DELAY == 0

@@ -85,13 +85,13 @@ class SensorAlert(Thread):
                           self._delay)
 
         new_alert = False
-        db_session = Session()
-        alert = db_session.query(Alert).filter_by(end_time=None).first()
+        session = Session()
+        alert = session.query(Alert).filter_by(end_time=None).first()
         if alert is None:
-            alert = self.create_alert()
+            alert = self.create_alert(session)
             new_alert = True
 
-        self.add_sensor_to_alert(alert=alert, start_time=start_time, delay=self._delay)
+        self.add_sensor_to_alert(session=session, alert=alert, start_time=start_time, delay=self._delay)
 
         # send notification only on the first sensor alert
         if new_alert:
@@ -101,6 +101,8 @@ class SensorAlert(Thread):
             ]
             Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
 
+        session.close()
+
         Syren.start_syren()
         if self._alert_type == ALERT_SABOTAGE:
             States.set(States.MONITORING_STATE, MONITORING_SABOTAGE)
@@ -109,25 +111,25 @@ class SensorAlert(Thread):
             States.set(States.MONITORING_STATE, MONITORING_ALERT)
             self._broadcaster.send_message({"action": MONITORING_ALERT})
 
-    def create_alert(self) -> Alert:
+    def create_alert(self, session) -> Alert:
         """
         Creates an alert by querying the database for an active arm,
         setting the start time to the current time, and initializing an empty list of sensors.
         The alert is then added to the database and returned.
         """
-        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+        arm = session.query(Arm).filter_by(disarm=None).first()
         start_time = datetime.now()
         alert = Alert(arm=arm, start_time=start_time, sensors=[])
-        self._db_session.add(alert)
-        self._db_session.commit()
+        session.add(alert)
+        session.commit()
         return alert
 
-    def add_sensor_to_alert(self, alert, start_time, delay):
+    def add_sensor_to_alert(self, session, alert: Alert, start_time, delay):
         """
         Adds a sensor to the given alert with the specified start time and delay.
         If the sensor is already added to the alert, it will not be added again.
         """
-        sensor = self._db_session.query(Sensor).get(self._sensor_id)
+        sensor = session.query(Sensor).get(self._sensor_id)
         already_added = any(
             alert_sensor.sensor.id == sensor.id
             for alert_sensor in alert.sensors
@@ -141,13 +143,18 @@ class SensorAlert(Thread):
         alert_sensor = AlertSensor(
             channel=sensor.channel,
             type_id=sensor.type_id,
+            name=sensor.name,
             description=sensor.description,
             start_time=start_time,
-            delay=delay
+            delay=delay,
+            silent=sensor.silent_alarm,
+            suppression=f"{sensor.monitor_size}/{sensor.monitor_threshold}"
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)
-        self._db_session.commit()
+        alert.silent = all([item.silent for item in alert.sensors])
+        send_syren_state(not alert.silent)
+        session.commit()
         self._logger.debug("Added sensor by id: %s", self._sensor_id)
 
         send_alert_state(alert.serialized)

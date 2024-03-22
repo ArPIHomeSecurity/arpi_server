@@ -10,11 +10,7 @@ class SensorHistory:
     is alarming or not according to a given threshold.
     """
 
-    # defaults for immediate alerting as normal behaviour
-    DEFAULT_THRESHOLD = 100
-    DEFAULT_SIZE = 1
-
-    def __init__(self, size=DEFAULT_SIZE, threshold=DEFAULT_THRESHOLD):
+    def __init__(self, size, threshold):
         if 0 > threshold > 100:
             raise ValueError("Threshold must be between 0 and 100")
         self._threshold = threshold
@@ -23,7 +19,23 @@ class SensorHistory:
         self._size = size
         self._states = [False for _ in range(size)]
 
-    def add(self, state: bool):
+    def set_monitoring(self, size: int, threshold: int):
+        """
+        Set the monitoring parameters for the sensor history.
+
+        Args:
+            size (int): The number of states to keep in the history.
+            threshold (int): The percentage of alert states to consider the sensor alerting.
+        """
+        if 0 > threshold > 100:
+            raise ValueError("Threshold must be between 0 and 100")
+        self._threshold = threshold
+        if size < 1:
+            raise ValueError("Size must be greater than 0")
+        self._size = size
+        self._states = [False for _ in range(size)]
+
+    def add_state(self, state: bool):
         """
         Adds the given state to the sensor history.
 
@@ -66,10 +78,25 @@ class SensorsHistory:
     """
     Tracking the history of N sensors.
     """
+    DEFAULT_SIZE = 1
+    DEFAULT_THRESHOLD = 100
 
-    def __init__(self, sensor_count, size, threshold) -> None:
+    def __init__(self, sensor_count, size=DEFAULT_SIZE, threshold=DEFAULT_THRESHOLD) -> None:
         self._sensors = [SensorHistory(size, threshold) for _ in range(sensor_count)]
         self._logger = logging.getLogger(LOG_MONITOR)
+
+    def set_monitoring(self, idx: int, size: int, threshold: int):
+        """
+        Set the monitoring parameters for the sensor at the given index.
+
+        Args:
+            idx (int): The index of the sensor.
+            size (int): The number of states to keep in the history.
+            threshold (int): The percentage of alert states to consider the sensor alerting.
+        """
+        if idx >= len(self._sensors):
+            raise ValueError(f"Invalid sensor index {idx}")
+        self._sensors[idx].set_monitoring(size, threshold)
 
     def add_state(self, idx: int, state: bool):
         """
@@ -81,7 +108,7 @@ class SensorsHistory:
         """
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
-        self._sensors[idx].add(state)
+        self._sensors[idx].add_state(state)
 
     def is_sensor_alerting(self, idx) -> bool:
         """
@@ -123,7 +150,7 @@ class SensorsHistory:
             return
 
         for idx, sensor in enumerate(self._sensors):
-            sensor.add(states[idx])
+            sensor.add_state(states[idx])
 
     def get_states(self, idx) -> List[bool]:
         """

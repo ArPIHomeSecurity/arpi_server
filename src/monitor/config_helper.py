@@ -1,4 +1,3 @@
-
 import json
 
 from dataclasses import dataclass
@@ -18,7 +17,9 @@ class DyndnsConfig:
 
 def load_dyndns_config() -> DyndnsConfig:
     session = Session()
-    dyndns_data = session.query(Option).filter_by(name="network", section="dyndns").first()
+    dyndns_data = (
+        session.query(Option).filter_by(name="network", section="dyndns").first()
+    )
     session.close()
 
     if dyndns_data:
@@ -34,9 +35,30 @@ class SshConfig:
 
 def load_ssh_config() -> SshConfig:
     session = Session()
-    ssh_config = session.query(Option).filter_by(name="network", section="access").first()
+    ssh_config = (
+        session.query(Option).filter_by(name="network", section="access").first()
+    )
     session.close()
 
     if ssh_config:
         ssh_config = json.loads(ssh_config.value)
         return SshConfig(**ssh_config)
+
+
+@dataclass
+class SyrenConfig:
+    silent: bool
+    delay: int
+    stop_time: int
+
+
+def load_syren_config() -> SyrenConfig:
+    session = Session()
+    syren_config = (
+        session.query(Option).filter_by(name="syren", section="timing").first()
+    )
+    session.close()
+
+    if syren_config:
+        syren_config = json.loads(syren_config.value)
+        return SyrenConfig(**syren_config)
