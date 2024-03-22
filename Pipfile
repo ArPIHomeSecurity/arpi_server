@@ -37,8 +37,6 @@ stringcase = "==1.2.0"
 
 [dev-packages]
 black = "*"
-cryptography = "*"
-flake8 = "*"
 flask-cors = "*"
 pyfiglet = "*"
 rope = "*"
