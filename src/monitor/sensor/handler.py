@@ -125,7 +125,7 @@ class SensorHandler:
             self._sensors_history = SensorsHistory(
                 len(self._sensors),
                 size=1,
-                threshold=alert_sensitivity.monitor_threshold,
+                threshold=100,
             )
         else:
             # general sensitivity of the sensors
@@ -140,7 +140,7 @@ class SensorHandler:
                 if sensor.monitor_period is None:
                     # instant alert
                     self._sensors_history.set_sensitivity(
-                        idx, 1, sensor.monitor_threshold
+                        idx, 1, 100
                     )
                 else:
                     self._sensors_history.set_sensitivity(

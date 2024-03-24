@@ -835,6 +835,7 @@ class Option(BaseModel):
                 "notifications",
                 "network",
                 "syren",
+                "alert",
             ), f"Unknown option ({value})"
         elif key == "section":
             assert value in (
@@ -844,6 +845,7 @@ class Option(BaseModel):
                 "dyndns",
                 "access",
                 "timing",
+                "sensitivity",
             ), f"Unknown section ({value})"
         return value
 
