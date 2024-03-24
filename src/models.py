@@ -146,14 +146,14 @@ class Sensor(BaseModel):
     __tablename__ = "sensor"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(16), nullable=True)
-    description = Column(String, nullable=False)
+    name = Column(String(16), nullable=False)
+    description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
 
     reference_value = Column(Float, nullable=True)
-    silent_alarm = Column(Boolean, default=False)
-    monitor_size = Column(Integer, default=1)
-    monitor_threshold = Column(Integer, default=100)
+    silent_alarm = Column(Boolean, nullable=False, default=False)
+    monitor_period = Column(Integer, nullable=True, default=None)
+    monitor_threshold = Column(Integer, nullable=True, default=100)
 
     alert = Column(Boolean, default=False)
     enabled = Column(Boolean, default=True)
@@ -173,14 +173,28 @@ class Sensor(BaseModel):
     ui_hidden = Column(Boolean, nullable=False, default=False)
 
     def __init__(
-        self, channel, sensor_type, area, zone=None, description=None, enabled=True
+        self,
+        channel,
+        sensor_type,
+        area,
+        name,
+        zone=None,
+        description=None,
+        enabled=True,
+        silent_alarm=False,
+        monitor_period=None,
+        monitor_threshold=None,
     ):
         self.channel = channel
         self.zone = zone
         self.area = area
         self.type = sensor_type
+        self.name = name
         self.description = description
         self.enabled = enabled
+        self.silent_alarm = silent_alarm
+        self.monitor_period = monitor_period
+        self.monitor_threshold = monitor_threshold
         self.deleted = False
 
     def update(self, data):
@@ -192,12 +206,13 @@ class Sensor(BaseModel):
             (
                 "channel",
                 "enabled",
+                "name",
                 "description",
                 "zone_id",
                 "area_id",
                 "type_id",
                 "ui_hidden",
-                "monitor_size",
+                "monitor_period",
                 "monitor_threshold",
                 "silent_alarm",
             ),
@@ -219,7 +234,7 @@ class Sensor(BaseModel):
                     "type_id",
                     "enabled",
                     "silent_alarm",
-                    "monitor_size",
+                    "monitor_period",
                     "monitor_threshold",
                     "ui_order",
                     "ui_hidden",
@@ -312,12 +327,24 @@ class AlertSensor(BaseModel):
     end_time = Column(DateTime(timezone=True))
     delay = Column(Integer)
     silent = Column(Boolean, nullable=False)
-    suppression = Column(String, nullable=False, default="")
+    monitor_period = Column(Integer, nullable=True)
+    monitor_threshold = Column(Integer, nullable=True)
 
     sensor = relationship("Sensor", back_populates="alerts")
     alert = relationship("Alert", back_populates="sensors")
 
-    def __init__(self, channel, type_id, name, description, start_time, delay, silent, suppression):
+    def __init__(
+        self,
+        channel,
+        type_id,
+        name,
+        description,
+        start_time,
+        delay,
+        silent,
+        monitor_period,
+        monitor_threshold,
+    ):
         self.channel = channel
         self.type_id = type_id
         self.name = name
@@ -325,7 +352,8 @@ class AlertSensor(BaseModel):
         self.start_time = start_time
         self.delay = delay
         self.silent = silent
-        self.suppression = suppression
+        self.monitor_period = monitor_period
+        self.monitor_threshold = monitor_threshold
 
     @property
     def serialized(self):
@@ -341,7 +369,8 @@ class AlertSensor(BaseModel):
                     "end_time",
                     "delay",
                     "silent",
-                    "suppression",
+                    "monitor_period",
+                    "monitor_threshold",
                 )
             )
         )
@@ -417,6 +446,7 @@ class ArmSensor(BaseModel):
     sensor_id = Column(Integer, ForeignKey("sensor.id"))
     channel = Column(Integer, nullable=False)
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
+    name = Column(String(16), nullable=False)
     description = Column(String, nullable=False)
     timestamp = Column(DateTime(timezone=True))
     delay = Column(Integer, nullable=True)
@@ -431,6 +461,7 @@ class ArmSensor(BaseModel):
         sensor_id,
         channel,
         type_id,
+        name,
         description,
         timestamp,
         delay,
@@ -440,6 +471,7 @@ class ArmSensor(BaseModel):
         self.sensor_id = sensor_id
         self.channel = channel
         self.type_id = type_id
+        self.name = name
         self.description = description
         self.timestamp = timestamp
         self.delay = delay
@@ -452,6 +484,7 @@ class ArmSensor(BaseModel):
             sensor_id=sensor.id,
             channel=sensor.channel,
             type_id=sensor.type_id,
+            name=sensor.name,
             description=sensor.description,
             timestamp=timestamp,
             delay=delay,
@@ -466,6 +499,7 @@ class ArmSensor(BaseModel):
                     "sensor_id",
                     "channel",
                     "type_id",
+                    "name",
                     "description",
                     "timestamp",
                     "delay",

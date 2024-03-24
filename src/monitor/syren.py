@@ -100,6 +100,7 @@ class Syren(Thread):
         if silent_alert:
             self._logger.info("Syren is in silent mode")
             send_syren_state(False)
+            Syren._is_running = False
             return
 
         DELAY = self._config.delay

@@ -119,8 +119,8 @@ class SensorHandler:
         )
 
         for idx, sensor in enumerate(self._sensors):
-            if sensor.monitor_size is not None and sensor.monitor_threshold is not None:
-                self._sensors_history.set_monitoring(idx, sensor.monitor_size, sensor.monitor_threshold)
+            if sensor.monitor_period is not None and sensor.monitor_threshold is not None:
+                self._sensors_history.set_monitoring(idx, sensor.monitor_period, sensor.monitor_threshold)
 
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(

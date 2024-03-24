@@ -148,12 +148,12 @@ class SensorAlert(Thread):
             start_time=start_time,
             delay=delay,
             silent=sensor.silent_alarm,
-            suppression=f"{sensor.monitor_size}/{sensor.monitor_threshold}"
+            monitor_period=sensor.monitor_period,
+            monitor_threshold=sensor.monitor_threshold or 100
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)
         alert.silent = all([item.silent for item in alert.sensors])
-        send_syren_state(not alert.silent)
         session.commit()
         self._logger.debug("Added sensor by id: %s", self._sensor_id)
 

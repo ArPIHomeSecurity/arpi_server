@@ -8,7 +8,7 @@ from sqlalchemy.dialects import postgresql
 from constants import ROLE_USER, ARM_DISARM
 from models import Arm, Disarm
 from server.database import db
-from server.decorators import authenticated, registered, restrict_host
+from server.decorators import authenticated, restrict_host
 
 arm_blueprint = Blueprint("arm", __name__)
 
