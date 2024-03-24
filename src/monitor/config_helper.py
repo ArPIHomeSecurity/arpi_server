@@ -16,17 +16,10 @@ class DyndnsConfig:
 
 
 def load_dyndns_config() -> DyndnsConfig:
-    session = Session()
-    dyndns_data = (
-        session.query(Option).filter_by(name="network", section="dyndns").first()
-    )
-    session.close()
-
-    if dyndns_data:
-        noip_config = json.loads(dyndns_data.value)
-        return DyndnsConfig(**noip_config)
+    return load_config("network", "dyndns", DyndnsConfig)
 
 
+#####################
 @dataclass
 class SshConfig:
     ssh: bool
@@ -34,17 +27,10 @@ class SshConfig:
 
 
 def load_ssh_config() -> SshConfig:
-    session = Session()
-    ssh_config = (
-        session.query(Option).filter_by(name="network", section="access").first()
-    )
-    session.close()
-
-    if ssh_config:
-        ssh_config = json.loads(ssh_config.value)
-        return SshConfig(**ssh_config)
+    return load_config("network", "access", SshConfig)
 
 
+#####################
 @dataclass
 class SyrenConfig:
     silent: bool
@@ -53,12 +39,36 @@ class SyrenConfig:
 
 
 def load_syren_config() -> SyrenConfig:
-    session = Session()
-    syren_config = (
-        session.query(Option).filter_by(name="syren", section="timing").first()
-    )
-    session.close()
+    return load_config("syren", "timing", SyrenConfig)
 
-    if syren_config:
-        syren_config = json.loads(syren_config.value)
-        return SyrenConfig(**syren_config)
+
+#####################
+@dataclass
+class AlertSensitivityConfig:
+    monitor_period: int
+    monitor_threshold: int
+
+
+def load_alert_sensitivity_config(session=None) -> AlertSensitivityConfig:
+    return load_config("alert", "sensitivity", AlertSensitivityConfig, session)
+
+
+#####################
+def load_config(name, section, config_type, session=None):
+    """
+    Generic function to load a config from the database and return it as a dataclass
+    """
+
+    new_session = False
+    if session is None:
+        new_session = True
+        session = Session()
+
+    config = session.query(Option).filter_by(name=name, section=section).first()
+
+    if new_session:
+        session.close()
+
+    if config:
+        config = json.loads(config.value)
+        return config_type(**config)

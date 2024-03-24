@@ -100,9 +100,10 @@ class Monitor(Thread):
         self._area_handler.publish_areas()
         self._sensor_handler.load_sensors()
 
+        message_wait_time = 1 / int(environ["SAMPLE_RATE"])
         while True:
             with contextlib.suppress(Empty):
-                message = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
+                message = self._actions.get(True, message_wait_time)
                 self._logger.debug("Action: %s", message)
                 if message["action"] == MONITOR_STOP:
                     break

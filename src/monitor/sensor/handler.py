@@ -1,6 +1,7 @@
 """
 Sensor monitoring and alerting.
 """
+
 import logging
 from datetime import datetime as dt, timedelta
 from os import environ
@@ -25,6 +26,7 @@ from models import AlertSensor, Arm, Sensor
 from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
+from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import States
@@ -112,15 +114,40 @@ class SensorHandler:
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
-        self._sensors_history = SensorsHistory(
-            len(self._sensors),
-            int(environ["SAMPLE_RATE"]) * ALERT_WINDOW,
-            ALERT_THRESHOLD,
-        )
+        alert_sensitivity = load_alert_sensitivity_config(self._db_session)
+        if alert_sensitivity is None:
+            self._logger.info("Alert sensitivity config not found!")
+            alert_sensitivity = AlertSensitivityConfig(None, None)
+
+        sample_rate = int(environ["SAMPLE_RATE"])
+        if alert_sensitivity.monitor_period is None:
+            # instant alerts
+            self._sensors_history = SensorsHistory(
+                len(self._sensors),
+                size=1,
+                threshold=alert_sensitivity.monitor_threshold,
+            )
+        else:
+            # general sensitivity of the sensors
+            self._sensors_history = SensorsHistory(
+                len(self._sensors),
+                size=int(sample_rate * alert_sensitivity.monitor_period),
+                threshold=alert_sensitivity.monitor_threshold,
+            )
 
         for idx, sensor in enumerate(self._sensors):
-            if sensor.monitor_period is not None and sensor.monitor_threshold is not None:
-                self._sensors_history.set_monitoring(idx, sensor.monitor_period, sensor.monitor_threshold)
+            if sensor.monitor_threshold is not None:
+                if sensor.monitor_period is None:
+                    # instant alert
+                    self._sensors_history.set_sensitivity(
+                        idx, 1, sensor.monitor_threshold
+                    )
+                else:
+                    self._sensors_history.set_sensitivity(
+                        idx,
+                        int(sample_rate * sensor.monitor_period),
+                        sensor.monitor_threshold,
+                    )
 
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(
@@ -275,6 +302,7 @@ class SensorHandler:
             ):
                 alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
                 delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
+                sensitivity = self._sensors_history.get_sensitivity(idx)
 
                 # do not start alert if in delay
                 if (
@@ -304,9 +332,14 @@ class SensorHandler:
                     alert_type,
                 )
                 if alert_type is not None and delay is not None:
+                    self._logger.debug(
+                        "Start alerting on sensor with history: %s => %s",
+                        sensor,
+                        self._sensors_history.get_states(idx),
+                    )
                     self._alerting_sensors.add(sensor.id)
                     SensorAlert.start_alert(
-                        sensor.id, delay, alert_type, self._broadcaster
+                        sensor.id, delay, alert_type, sensitivity, self._broadcaster
                     )
                 else:
                     self._logger.debug("Can't start alert")

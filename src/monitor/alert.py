@@ -4,6 +4,7 @@ from datetime import datetime
 from threading import Thread, Event
 
 from models import Alert, AlertSensor, Arm, Disarm, Sensor
+from monitor.config_helper import AlertSensitivityConfig
 from monitor.storage import States
 from monitor.broadcast import Broadcaster
 from monitor.database import Session
@@ -16,7 +17,7 @@ from constants import (
     MONITORING_ALERT_DELAY,
     MONITORING_SABOTAGE,
     LOG_ALERT,
-    THREAD_ALERT
+    THREAD_ALERT,
 )
 
 
@@ -28,9 +29,16 @@ class SensorAlert(Thread):
     _stop_event = Event()
 
     @classmethod
-    def start_alert(cls, sensor_id, delay, alert_type, broadcaster: Broadcaster):
+    def start_alert(
+        cls,
+        sensor_id,
+        delay,
+        alert_type,
+        sensitivity: AlertSensitivityConfig,
+        broadcaster: Broadcaster,
+    ):
         cls._stop_event.clear()
-        SensorAlert(sensor_id, delay, alert_type, broadcaster).start()
+        SensorAlert(sensor_id, delay, alert_type, sensitivity, broadcaster).start()
 
     @classmethod
     def stop_alerts(cls, disarm: Disarm):
@@ -49,7 +57,14 @@ class SensorAlert(Thread):
             Notifier.notify_alert_stopped(alert.id, alert.end_time)
             logging.getLogger(LOG_ALERT).info("Alerts stopped")
 
-    def __init__(self, sensor_id, delay, alert_type, broadcaster: Broadcaster):
+    def __init__(
+        self,
+        sensor_id,
+        delay,
+        alert_type,
+        sensitivity: AlertSensitivityConfig,
+        broadcaster: Broadcaster,
+    ):
         """
         Constructor
         """
@@ -58,6 +73,7 @@ class SensorAlert(Thread):
         self._sensor_id = sensor_id
         self._delay = delay
         self._alert_type = alert_type
+        self._sensitivity = sensitivity
         self._broadcaster = broadcaster
 
     def run(self):
@@ -75,14 +91,18 @@ class SensorAlert(Thread):
             self._broadcaster.send_message({"action": MONITORING_ALERT_DELAY})
 
         if self._stop_event.wait(self._delay):
-            self._logger.info("Sensor (%s) alert stopped before %s seconds delay",
-                              self._sensor_id,
-                              self._delay)
+            self._logger.info(
+                "Sensor (%s) alert stopped before %s seconds delay",
+                self._sensor_id,
+                self._delay,
+            )
             return
 
-        self._logger.info("Alert started sensor (id:%s) after %s seconds delay",
-                          self._sensor_id,
-                          self._delay)
+        self._logger.info(
+            "Alert started sensor (id:%s) after %s seconds delay",
+            self._sensor_id,
+            self._delay,
+        )
 
         new_alert = False
         session = Session()
@@ -91,7 +111,9 @@ class SensorAlert(Thread):
             alert = self.create_alert(session)
             new_alert = True
 
-        self.add_sensor_to_alert(session=session, alert=alert, start_time=start_time, delay=self._delay)
+        self.add_sensor_to_alert(
+            session=session, alert=alert, start_time=start_time, delay=self._delay
+        )
 
         # send notification only on the first sensor alert
         if new_alert:
@@ -99,7 +121,9 @@ class SensorAlert(Thread):
                 f"{item.sensor.description}(id:{item.sensor.id}/CH{(item.sensor.channel+1):02d})"
                 for item in alert.sensors
             ]
-            Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
+            Notifier.notify_alert_started(
+                alert.id, sensor_descriptions, alert.start_time
+            )
 
         session.close()
 
@@ -131,8 +155,7 @@ class SensorAlert(Thread):
         """
         sensor = session.query(Sensor).get(self._sensor_id)
         already_added = any(
-            alert_sensor.sensor.id == sensor.id
-            for alert_sensor in alert.sensors
+            alert_sensor.sensor.id == sensor.id for alert_sensor in alert.sensors
         )
 
         # we can't add a sensor twice to the same alert, check database AlertSensor schema
@@ -148,8 +171,8 @@ class SensorAlert(Thread):
             start_time=start_time,
             delay=delay,
             silent=sensor.silent_alarm,
-            monitor_period=sensor.monitor_period,
-            monitor_threshold=sensor.monitor_threshold or 100
+            monitor_period=self._sensitivity.monitor_period,
+            monitor_threshold=self._sensitivity.monitor_threshold,
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)

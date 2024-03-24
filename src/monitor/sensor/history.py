@@ -1,7 +1,9 @@
 import logging
+import os
 from typing import List
 
 from constants import LOG_MONITOR
+from monitor.config_helper import AlertSensitivityConfig
 
 
 class SensorHistory:
@@ -19,7 +21,7 @@ class SensorHistory:
         self._size = size
         self._states = [False for _ in range(size)]
 
-    def set_monitoring(self, size: int, threshold: int):
+    def set_sensitivity(self, size: int, threshold: int):
         """
         Set the monitoring parameters for the sensor history.
 
@@ -72,6 +74,21 @@ class SensorHistory:
             bool: True if the percentage of alert states is above the threshold, False otherwise.
         """
         return (self.alert_states_length() / len(self._states)) * 100 >= self._threshold
+    
+    def get_sensitivity(self) -> AlertSensitivityConfig:
+        """
+        Returns the sensitivity configuration of the sensor history.
+
+        Returns:
+            AlertSensitivityConfig: The sensitivity configuration of the sensor history.
+        """
+        sample_rate = int(os.environ["SAMPLE_RATE"])
+        period = int(self._size / sample_rate)
+        if sample_rate == 1:
+            period = None
+        if period == 0:
+            period = None
+        return AlertSensitivityConfig(period, self._threshold)
 
 
 class SensorsHistory:
@@ -85,7 +102,7 @@ class SensorsHistory:
         self._sensors = [SensorHistory(size, threshold) for _ in range(sensor_count)]
         self._logger = logging.getLogger(LOG_MONITOR)
 
-    def set_monitoring(self, idx: int, size: int, threshold: int):
+    def set_sensitivity(self, idx: int, size: int, threshold: int):
         """
         Set the monitoring parameters for the sensor at the given index.
 
@@ -96,7 +113,7 @@ class SensorsHistory:
         """
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
-        self._sensors[idx].set_monitoring(size, threshold)
+        self._sensors[idx].set_sensitivity(size, threshold)
 
     def add_state(self, idx: int, state: bool):
         """
@@ -164,3 +181,16 @@ class SensorsHistory:
         if idx >= len(self._sensors):
             return []
         return self._sensors[idx].get_states()
+
+    def get_sensitivity(self, idx) -> AlertSensitivityConfig:
+        """
+        Returns the sensitivity configuration of the sensor at the given index.
+
+        Args:
+            idx (int): The index of the sensor.
+        Returns:
+            AlertSensitivityConfig: The sensitivity configuration of the sensor.
+        """
+        if idx >= len(self._sensors):
+            return None
+        return self._sensors[idx].get_sensitivity()
