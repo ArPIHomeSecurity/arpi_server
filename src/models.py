@@ -326,7 +326,7 @@ class AlertSensor(BaseModel):
     start_time = Column(DateTime(timezone=True))
     end_time = Column(DateTime(timezone=True))
     delay = Column(Integer)
-    silent = Column(Boolean, nullable=False)
+    silent = Column(Boolean, nullable=True)
     monitor_period = Column(Integer, nullable=True)
     monitor_threshold = Column(Integer, nullable=True)
 

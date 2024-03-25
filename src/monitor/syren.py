@@ -87,16 +87,53 @@ class Syren(Thread):
         db_session = Session()
         alert = db_session.query(Alert).filter_by(end_time=None).first()
 
-        silent_arm = self._config.silent
-        silent_sensor = all([sensor.silent for sensor in alert.sensors])
-        silent_alert = silent_arm or silent_sensor
+        # We need to decide if the syren should be silent or not.
+
+        # The inputs are the syren configuration and the sensors configuration.
+        # Both can have 3 state:
+        # * None: no information, use the syren as default behavior
+        # * False: loud mode, force using syren (higher priority)
+        # * True: silent mode, allow not using syren
+        sensor_silent_alert = None
+        for sensor in alert.sensors:
+            if sensor.silent is None:
+                continue
+            if sensor.silent == False:
+                sensor_silent_alert = False
+                break
+            if sensor.silent == True:
+                sensor_silent_alert = sensor_silent_alert and True if sensor_silent_alert is not None else True
+
+        syren_silent_alert = self._config.silent
+
+        silent_alert = False
+        if syren_silent_alert == None:
+            # use sensor configuration if no syren configuration
+            # if no sensor configuration, use default silent=False
+            silent_alert = (
+                sensor_silent_alert if sensor_silent_alert is not None else False
+            )
+        elif syren_silent_alert == False:
+            # force using syren
+            silent_alert = False
+        elif syren_silent_alert == True:
+            # use syren configuration if sensor configuration is not set
+            # otherwise use sensor configuration
+            # sensor silent=False will override syren silent=True
+            silent_alert = (
+                sensor_silent_alert if sensor_silent_alert is not None else True
+            )
 
         if alert:
             alert.silent = silent_alert
             db_session.commit()
 
-        self._logger.debug("silent alert = silent arm or silent sensor => %s = %s or %s",
-                           silent_alert, silent_arm, silent_sensor)
+        self._logger.info(
+            "Silent alert = %s <= Syren silent = %s, Sensor silent = %s",
+            silent_alert,
+            syren_silent_alert,
+            sensor_silent_alert,
+        )
         if silent_alert:
             self._logger.info("Syren is in silent mode")
             send_syren_state(False)

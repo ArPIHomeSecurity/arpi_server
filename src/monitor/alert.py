@@ -170,7 +170,7 @@ class SensorAlert(Thread):
             description=sensor.description,
             start_time=start_time,
             delay=delay,
-            silent=sensor.silent_alarm,
+            silent=sensor.silent_alert,
             monitor_period=self._sensitivity.monitor_period,
             monitor_threshold=self._sensitivity.monitor_threshold,
         )
