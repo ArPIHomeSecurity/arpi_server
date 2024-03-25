@@ -151,7 +151,7 @@ class Sensor(BaseModel):
     channel = Column(Integer, nullable=True)
 
     reference_value = Column(Float, nullable=True)
-    silent_alarm = Column(Boolean, nullable=False, default=False)
+    silent_alert = Column(Boolean, nullable=True, default=None)
     monitor_period = Column(Integer, nullable=True, default=None)
     monitor_threshold = Column(Integer, nullable=True, default=100)
 
@@ -181,7 +181,7 @@ class Sensor(BaseModel):
         zone=None,
         description=None,
         enabled=True,
-        silent_alarm=False,
+        silent_alert=False,
         monitor_period=None,
         monitor_threshold=None,
     ):
@@ -192,7 +192,7 @@ class Sensor(BaseModel):
         self.name = name
         self.description = description
         self.enabled = enabled
-        self.silent_alarm = silent_alarm
+        self.silent_alert = silent_alert
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
         self.deleted = False
@@ -214,7 +214,7 @@ class Sensor(BaseModel):
                 "ui_hidden",
                 "monitor_period",
                 "monitor_threshold",
-                "silent_alarm",
+                "silent_alert",
             ),
             data,
         )
@@ -233,7 +233,7 @@ class Sensor(BaseModel):
                     "area_id",
                     "type_id",
                     "enabled",
-                    "silent_alarm",
+                    "silent_alert",
                     "monitor_period",
                     "monitor_threshold",
                     "ui_order",

@@ -174,7 +174,7 @@ def env_test_01():
         zone=z3,
         name="Garage",
         description="Garage movement sensor",
-        silent_alarm=True,
+        silent_alert=True,
     )
     s2 = Sensor(
         channel=1,
