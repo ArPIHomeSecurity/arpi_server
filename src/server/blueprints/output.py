@@ -79,9 +79,6 @@ def activate_output(output_id):
     if not db_output:
         return jsonify({"error": "Output not found"}), 404
 
-    db_output.update({"state": True})
-    db.session.commit()
-
     return process_ipc_response(IPCClient().activate_output(output_id))
 
 
@@ -92,9 +89,6 @@ def deactivate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
     if not db_output:
         return jsonify({"error": "Output not found"}), 404
-
-    db_output.update({"state": False})
-    db.session.commit()
 
     return process_ipc_response(IPCClient().deactivate_output(output_id))
 

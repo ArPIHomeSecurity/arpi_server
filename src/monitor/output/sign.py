@@ -10,6 +10,7 @@ from time import sleep, time
 
 from constants import LOG_OUTPUT
 from models import Output
+from monitor.database import Session
 from monitor.output import OUTPUT_NAMES
 from monitor.socket_io import send_output_state
 
@@ -36,11 +37,15 @@ class OutputSign(Thread):
         self.daemon = True
 
     def run(self):
+        session = Session()
         channel = self._output.channel
         delay = self._output.delay
         duration = self._output.duration
         default_state = self._output.default_state
 
+        # update state in database
+        session.query(Output).filter_by(id=self._output.id).update({"state": True})
+        session.commit()
         send_output_state(self._output.id, True)
 
         self._logger.info(
@@ -112,4 +117,8 @@ class OutputSign(Thread):
             "Output sign on channel '%s' turned off", OUTPUT_NAMES[channel]
         )
         self._logger.debug("Output sign exited on channel '%s'", OUTPUT_NAMES[channel])
+
+        # update state in database
+        session.query(Output).filter_by(id=self._output.id).update({"state": False})
+        session.commit()        
         send_output_state(self._output.id, False)
