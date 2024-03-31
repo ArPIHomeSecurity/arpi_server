@@ -89,8 +89,8 @@ def env_live_01():
     z6 = Zone(
         name="Tamper",
         disarmed_delay=0,
-        away_alert_delay=None,
-        stay_alert_delay=None,
+        away_alert_delay=0,
+        stay_alert_delay=0,
         description="Sabotage alert",
     )
     session.add_all([z1, z2, z3, z4, z5, z6])
@@ -99,20 +99,54 @@ def env_live_01():
     session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
-    s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, description="Garage")
-    s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, description="Hall")
-    s3 = Sensor(
-        channel=2, sensor_type=SENSOR_TYPES[2], zone=z5, description="Front door"
+    area = Area(name="House")
+    session.add(area)
+    print(" - Created area")
+
+    s1 = Sensor(
+        channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, description="Garage", area=area
     )
-    s4 = Sensor(channel=3, sensor_type=SENSOR_TYPES[0], zone=z3, description="Kitchen")
+    s2 = Sensor(
+        channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, description="Hall", area=area
+    )
+    s3 = Sensor(
+        channel=2,
+        sensor_type=SENSOR_TYPES[2],
+        zone=z5,
+        description="Front door",
+        area=area,
+    )
+    s4 = Sensor(
+        channel=3,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z3,
+        description="Kitchen",
+        area=area,
+    )
     s5 = Sensor(
-        channel=4, sensor_type=SENSOR_TYPES[0], zone=z1, description="Living room"
+        channel=4,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z1,
+        description="Living room",
+        area=area,
     )
     s6 = Sensor(
-        channel=5, sensor_type=SENSOR_TYPES[0], zone=z4, description="Children's room"
+        channel=5,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z4,
+        description="Children's room",
+        area=area,
     )
-    s7 = Sensor(channel=6, sensor_type=SENSOR_TYPES[0], zone=z4, description="Bedroom")
-    s8 = Sensor(channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, description="Tamper")
+    s7 = Sensor(
+        channel=6,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z4,
+        description="Bedroom",
+        area=area,
+    )
+    s8 = Sensor(
+        channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, description="Tamper", area=area
+    )
     session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
     print(" - Created sensors")
 
@@ -139,8 +173,8 @@ def env_test_01():
     z2 = Zone(
         name="Tamper",
         disarmed_delay=0,
-        away_alert_delay=None,
-        stay_alert_delay=None,
+        away_alert_delay=0,
+        stay_alert_delay=0,
         description="Sabotage alert",
     )
     z3 = Zone(
