@@ -40,6 +40,7 @@ def stop_background_service(remove_app=True):
     logger.debug("Stopping background service")
     stop_event.set()
     if remove_app:
+        global socketio_app
         if socketio_app:
             print(socketio_app.wsgi_app.wsgi_app.__dict__)
             del socketio_app
