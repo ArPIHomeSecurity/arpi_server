@@ -45,6 +45,7 @@ def create_sensor():
         zone=zone,
         area=area,
         sensor_type=sensor_type,
+        name=data["name"],
         description=data["description"],
         enabled=data["enabled"],
     )
