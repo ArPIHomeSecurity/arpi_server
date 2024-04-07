@@ -54,6 +54,10 @@ def env_prod():
     session.add_all([k1])
     print(" - Created keypads")
 
+    a1 = Area(name="House")
+    session.add(a1)
+    print(" - Created area")
+
     session.commit()
 
 
@@ -104,48 +108,48 @@ def env_live_01():
     print(" - Created area")
 
     s1 = Sensor(
-        channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, description="Garage", area=area
+        channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, name="Garage", area=area
     )
     s2 = Sensor(
-        channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, description="Hall", area=area
+        channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, name="Hall", area=area
     )
     s3 = Sensor(
         channel=2,
         sensor_type=SENSOR_TYPES[2],
         zone=z5,
-        description="Front door",
+        name="Front door",
         area=area,
     )
     s4 = Sensor(
         channel=3,
         sensor_type=SENSOR_TYPES[0],
         zone=z3,
-        description="Kitchen",
+        name="Kitchen",
         area=area,
     )
     s5 = Sensor(
         channel=4,
         sensor_type=SENSOR_TYPES[0],
         zone=z1,
-        description="Living room",
+        name="Living room",
         area=area,
     )
     s6 = Sensor(
         channel=5,
         sensor_type=SENSOR_TYPES[0],
         zone=z4,
-        description="Children's room",
+        name="Children's room",
         area=area,
     )
     s7 = Sensor(
         channel=6,
         sensor_type=SENSOR_TYPES[0],
         zone=z4,
-        description="Bedroom",
+        name="Bedroom",
         area=area,
     )
     s8 = Sensor(
-        channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, description="Tamper", area=area
+        channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, name="Tamper", area=area
     )
     session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
     print(" - Created sensors")
