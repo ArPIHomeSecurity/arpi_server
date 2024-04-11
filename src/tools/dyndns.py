@@ -3,11 +3,13 @@ import argparse
 import logging
 import os
 import sys
-from copy import copy
+
+from dataclasses import asdict
 from ipaddress import ip_address
 
 import requests
 from dotenv import load_dotenv
+
 from noipy.main import execute_update
 from psycopg2 import OperationalError
 
@@ -17,7 +19,7 @@ load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_DYNDNS
-from monitor.config_helper import load_dyndns_config
+from monitor.config_helper import load_dyndns_config, DyndnsConfig
 from tools.dictionary import filter_keys
 
 
@@ -64,19 +66,18 @@ class DynDns:
             self._logger.info("No dynamic dns provider found")
             return False
 
-        dyndns_config["force"] = force
-        tmp_config = copy(dyndns_config)
+        tmp_config = asdict(dyndns_config)
         filter_keys(tmp_config, ["password"])
         self._logger.info("Update dynamics DNS provider with options: %s", tmp_config)
 
-        if not dyndns_config["provider"]:
+        if not dyndns_config.provider:
             self._logger.error("Missing provider!")
             return False
 
         # DNS lookup IP from hostname
         response = None
         try:
-            response = get_dns_records(hostname=dyndns_config["hostname"])
+            response = get_dns_records(hostname=dyndns_config.hostname)
             current_ip = response["Answer"][0]["data"]
         except KeyError as key_error:
             self._logger.error(
@@ -109,7 +110,7 @@ class DynDns:
 
         if (new_ip != current_ip) or force:
             self._logger.info("IP: '%s' => '%s'", current_ip, new_ip)
-            dyndns_config["ip"] = new_ip
+            dyndns_config.ip = new_ip
             result = self.save_ip(dyndns_config)
             self._logger.info("Update result: '%s'", result)
             return True
@@ -119,7 +120,7 @@ class DynDns:
 
         return True
 
-    def save_ip(self, noip_config):
+    def save_ip(self, noip_config: DyndnsConfig):
         """
         Save IP to the DNS provider
         :param noip_config: dictionary of settings (provider, username, password, hostname, ip)
@@ -131,11 +132,11 @@ class DynDns:
         args = Arguments()
         args.store = False
         try:
-            args.provider = noip_config["provider"]
-            args.usertoken = noip_config["username"]
-            args.password = noip_config["password"].replace(".duckdns.org", "")
-            args.hostname = noip_config["hostname"]
-            args.ip = noip_config["ip"]
+            args.provider = noip_config.provider
+            args.usertoken = noip_config.username
+            args.password = noip_config.password.replace(".duckdns.org", "")
+            args.hostname = noip_config.hostname
+            args.ip = noip_config.ip
             return execute_update(args)
         except KeyError as key_error:
             self._logger.error("Failed to update NOIP provider! (%s)", key_error)
