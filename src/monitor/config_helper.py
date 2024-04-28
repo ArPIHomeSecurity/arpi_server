@@ -22,8 +22,9 @@ def load_dyndns_config() -> DyndnsConfig:
 #####################
 @dataclass
 class SshConfig:
-    ssh: bool
-    ssh_restrict_local_network: bool
+    service_enabled: bool = False
+    restrict_local_network: bool = False
+    password_authentication_enabled: bool = True
 
 
 def load_ssh_config() -> SshConfig:

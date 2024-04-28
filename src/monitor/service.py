@@ -8,7 +8,7 @@ from constants import LOG_SERVICE
 from monitor.background_service import BackgroundService
 from monitor.logging import initialize_logging
 from monitor.socket_io import socketio_app
-from tools.ssh import SSH
+from tools.ssh_service import SSHService
 
 
 stop_event = Event()
@@ -29,7 +29,7 @@ def start_background_service():
         return
 
     if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
-        SSH().update_ssh_service()
+        SSHService().update_service_state()
 
     service = BackgroundService(stop_event)
     service.start()

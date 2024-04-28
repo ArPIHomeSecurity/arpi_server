@@ -17,59 +17,40 @@ sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_ACCESS
 from monitor.config_helper import load_ssh_config
-from monitor.database import Session
 
 
-class SSH:
+class SSHService:
     def __init__(self):
-        super(SSH, self).__init__()
+        super(SSHService, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
-        self._db_session = Session()
         self._bus = SystemBus()
+        self._ssh_config = load_ssh_config()
+        if not self._ssh_config:
+            self._logger.warning("Missing ssh settings!")
 
-    def update_ssh_service(self):
-        ssh_config = load_ssh_config()
+    def update_service_state(self):
+        self._logger.info("Updating SSH service state...")
+        self._enable_service(self._ssh_config.service_enabled)
 
-        if not ssh_config:
-            self._logger.info("Missing ssh settings!")
-            return
-
-        if ssh_config.ssh:
-            self.start_ssh()
-        else:
-            self.stop_ssh()
-
-    def start_ssh(self):
-        self._logger.info("Starting SSH")
+    def _enable_service(self, enable: bool):
         systemd = self._bus.get(".systemd1")
-
         try:
-            systemd.StartUnit("ssh.service", "fail")
-            systemd[".Manager"].EnableUnitFiles(["ssh.service"], False, True)
-        except GLib.Error as error:
-            self._logger.error("Failed: %s", error)
-
-    def stop_ssh(self):
-        self._logger.info("Stopping SSH")
-        systemd = self._bus.get(".systemd1")
-
-        try:
-            systemd.StopUnit("ssh.service", "fail")
-            systemd[".Manager"].DisableUnitFiles(["ssh.service"], False)
+            if enable:
+                systemd.StartUnit("ssh.service", "fail")
+                systemd[".Manager"].EnableUnitFiles(["ssh.service"], False, True)
+            else:
+                systemd.StopUnit("ssh.service", "fail")
+                systemd[".Manager"].DisableUnitFiles(["ssh.service"], False)
         except GLib.Error as error:
             self._logger.error("Failed: %s", error)
 
     def update_access_local_network(self):
         self._logger.info("Updating SSH access...")
-        ssh_config = load_ssh_config()
-        if not ssh_config:
-            self._logger.info("Missing ssh settings!")
-            return
 
         cidr = os.environ.get("SSH_LOCAL_NETWORK", self._get_local_ip())
         ip_range = ip_network(cidr, False)
         local_network = f"{ip_range.network_address}/{ip_range.netmask}"
-        if ssh_config.ssh_restrict_local_network:
+        if self._ssh_config.restrict_local_network:
             self._update_access_cidr(local_network, True)
         else:
             self._update_access_cidr(local_network, False)
@@ -79,7 +60,7 @@ class SSH:
         Get the local IP of the device in CIDR format.
         IP/prefix
         """
-        return os.popen('ip addr show wlan0').read().split("inet ")[1].split(" brd")[0]
+        return os.popen("ip addr show wlan0").read().split("inet ")[1].split(" brd")[0]
 
     def _update_access_cidr(self, network, enable: bool):
         self._logger.info("Restrict SSH access only for %s to %s", network, enable)
@@ -96,16 +77,10 @@ class SSH:
 def main():
     args = argparse.ArgumentParser(description="SSH service")
     args.add_argument(
-        "--enable-ssh",
-        action="store_true",
-        default=None,
-        help="Enable SSH"
+        "--enable-ssh", action="store_true", default=None, help="Enable SSH"
     )
     args.add_argument(
-        "--disable-ssh",
-        action="store_true",
-        default=None,
-        help="Disable SSH"
+        "--disable-ssh", action="store_true", default=None, help="Disable SSH"
     )
     args.add_argument(
         "--allow-local-networks",
@@ -117,13 +92,10 @@ def main():
         "--allow-any-networks",
         action="store_true",
         default=None,
-        help="Allow SSH access from all networks"
+        help="Allow SSH access from all networks",
     )
     args.add_argument(
-        "--get-local-ip",
-        action="store_true",
-        default=None,
-        help="Get local IP"
+        "--get-local-ip", action="store_true", default=None, help="Get local IP"
     )
 
     args = args.parse_args()
@@ -132,7 +104,7 @@ def main():
     print(args)
 
     if args.get_local_ip:
-        ssh = SSH()
+        ssh = SSHService()
         print(ssh._get_local_ip())
 
     if args.enable_ssh is not None:
@@ -148,15 +120,15 @@ def update_ssh_service(enabled: bool):
     """
     Update SSH service status
     """
-    ssh = SSH()
+    ssh = SSHService()
     logging.info("Updating SSH service")
     if enabled:
         logging.info("Enabling SSH")
-        ssh.start_ssh()
+        ssh._enable_service(True)
         logging.info("SSH is enabled")
     else:
         logging.info("Disabling SSH")
-        # ssh.stop_ssh()
+        ssh._enable_service(False)
         logging.info("SSH is disabled")
 
 
@@ -164,7 +136,7 @@ def update_access_local_network(enabled: bool):
     """
     Update access from router
     """
-    ssh = SSH()
+    ssh = SSHService()
     cidr = ssh._get_local_ip()
     ip_range = ip_network(cidr, False)
     local_network = f"{ip_range.network_address}/{ip_range.netmask}"

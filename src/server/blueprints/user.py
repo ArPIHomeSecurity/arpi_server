@@ -26,10 +26,10 @@ def get_users():
 @user_blueprint.route("/api/users", methods=["POST"])
 @authenticated()
 @restrict_host
-def post_user():
+def create_user():
     data = request.json
-    user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
-    db.session.add(user)
+    db_user: User = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
+    db.session.add(db_user)
     db.session.commit()
 
     return jsonify(None)
@@ -39,29 +39,22 @@ def post_user():
 @authenticated()
 @restrict_host
 def user(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if not db_user:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
     if request.method == "GET":
-        user = db.session.query(User).get(user_id)
-        if user:
-            return jsonify(user.serialized)
-
-        return make_response(jsonify({"error": "User not found"}), 404)
+        return jsonify(db_user.serialized)
     elif request.method == "PUT":
-        user = db.session.query(User).get(user_id)
-        if user:
-            if not user.update(request.json):
-                return make_response("", 204)
+        if not db_user.update(request.json):
+            return make_response("", 204)
 
-            db.session.commit()
-            return jsonify(None)
-        return make_response(jsonify({"error": "User not found"}), 404)
+        db.session.commit()
+        return jsonify(None)
     elif request.method == "DELETE":
-        user = db.session.query(User).get(user_id)
-        if user:
-            db.session.delete(user)
-            db.session.commit()
-            return jsonify(None)
-        else:
-            return make_response(jsonify({"error": "User not found"}), 404)
+        db.session.delete(db_user)
+        db.session.commit()
+        return jsonify(None)
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
@@ -76,22 +69,22 @@ def registration_code(user_id):
     )
 
     if request.method == "GET":
-        user = db.session.query(User).get(user_id)
-        if user:
-            if user.registration_code:
+        db_user: User = db.session.query(User).get(user_id)
+        if db_user:
+            if db_user.registration_code:
                 return make_response(jsonify({"error": "Already has registration code"}), 400)
 
             expiry = int(request.args.get("expiry")) if request.args.get("expiry") else None
-            code = user.add_registration_code(expiry=expiry)
+            code = db_user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
-        user = db.session.query(User).get(user_id)
-        if user:
-            user.registration_code = None
-            user.registration_expiry = None
+        db_user: User = db.session.query(User).get(user_id)
+        if db_user:
+            db_user.registration_code = None
+            db_user.registration_expiry = None
             db.session.commit()
             return jsonify(None)
         else:
@@ -110,21 +103,21 @@ def register_device():
     )
 
     if request.json["registration_code"]:
-        user = (
+        db_user: User = (
             db.session.query(User)
             .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
             .first()
         )
 
-        if user:
-            if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
+        if db_user:
+            if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
                 return make_response(
                     jsonify({"error": "Failed to register device", "reason": "Expired registration code"}), 400
                 )
 
-            user.registration_code = None
+            db_user.registration_code = None
             db.session.commit()
-            token = {"ip": remote_ip, "origin": request.environ["HTTP_ORIGIN"], "user_id": user.id}
+            token = {"ip": remote_ip, "origin": request.environ["HTTP_ORIGIN"], "user_id": db_user.id}
             return jsonify({"device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")})
         else:
             return make_response(jsonify({"error": "Failed to register device", "reason": "User not found"}), 400)
@@ -140,12 +133,12 @@ def authenticate():
 
     # device token must be valid because of the @registered decorator
     device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
-    user = db.session.query(User).get(device_token["user_id"])
-    if user and user.access_code == hash_code(request.json["access_code"]):
+    db_user: User = db.session.query(User).get(device_token["user_id"])
+    if db_user and db_user.access_code == hash_code(request.json["access_code"]):
         return jsonify({
-            "user_token": generate_user_token(user.id, user.name, user.role, request.environ["HTTP_ORIGIN"]),
+            "user_token": generate_user_token(db_user.id, db_user.name, db_user.role, request.environ["HTTP_ORIGIN"]),
         })
-    elif not user:
+    elif not db_user:
         current_app.logger.warn("Invalid user id %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
 
@@ -156,10 +149,10 @@ def authenticate():
 @authenticated()
 @restrict_host
 def register_card(user_id):
-    for user in db.session.query(User).all():
-        user.card_registration_expiry = None
-    user = db.session.query(User).get(user_id)
-    user.set_card_registration()
+    for db_user in db.session.query(User).all():
+        db_user.card_registration_expiry = None
+    db_user: User = db.session.query(User).get(user_id)
+    db_user.set_card_registration()
     db.session.commit()
 
     return process_ipc_response(IPCClient().register_card())
@@ -167,5 +160,17 @@ def register_card(user_id):
 
 @user_blueprint.route("/api/user/<int:user_id>/cards", methods=["GET"])
 def cards(user_id):
-    user = db.session.query(User).get(user_id)
-    return jsonify([i.serialized for i in user.cards])
+    db_user: User = db.session.query(User).get(user_id)
+    return jsonify([i.serialized for i in db_user.cards])
+
+
+# has key
+# check if the user has ssh public key by user id from the argus authorized_keys file
+
+# generate key
+# generate ssh key pair of user by user id and return the private key
+# add the public key to the argus authorized_keys file
+# parameters: user id, key type, format, passphrase
+
+# register key
+# register the public key received as payload to the argus authorized_keys file

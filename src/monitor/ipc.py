@@ -36,7 +36,7 @@ from monitor.notifications.notifier import Notifier
 from monitor.output.handler import OutputHandler
 from tools.clock import Clock
 from tools.connection import SecureConnection
-from tools.ssh import SSH
+from tools.ssh_service import SSHService
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -119,8 +119,8 @@ class IPCServer(Thread):
             SecureConnection(self._stop_event).run()
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
-            SSH().update_ssh_service()
-            SSH().update_access_local_network()
+            SSHService().update_service_state()
+            SSHService().update_access_local_network()
         elif message["action"] == SEND_TEST_SMS:
             succeeded, results = Notifier.send_test_sms()
             return_value["result"] = succeeded
