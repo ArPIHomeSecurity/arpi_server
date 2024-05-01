@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
+from enum import Enum
 import logging
 import os
+import re
 import subprocess
 import sys
 
@@ -20,6 +22,12 @@ from monitor.config_helper import load_ssh_config
 AUTHORIZED_KEYS_PATH = "~/.ssh/authorized_keys"
 
 
+class KeyTypes(str, Enum):
+    RSA = "rsa"
+    ECDSA = "ecdsa"
+    ED25519 = "ed25519"
+
+
 class SSHKeyManager:
 
     def __init__(self) -> None:
@@ -31,12 +39,12 @@ class SSHKeyManager:
             self._logger.warning("Missing ssh settings!")
 
     def generate_ssh_keys(
-        self, key_type: str, key_name: str, passphrase: str = ""
+        self, key_type: KeyTypes, key_name: str, passphrase: str = ""
     ) -> tuple[str, str]:
         """
         Generate SSH keys
         """
-        self._logger.info("Generating SSH keys")
+        self._logger.info("Generating SSH keys %s with name %s", key_type, key_name)
         key_path = "/tmp/id_rsa"
 
         if os.path.exists(key_path):
@@ -44,15 +52,11 @@ class SSHKeyManager:
         if os.path.exists(f"{key_path}.pub"):
             os.remove(f"{key_path}.pub")
 
-        if key_type == "ecdsa":
-            os.system(
-                f"ssh-keygen -q -t {key_type} -b 521 -f {key_path} -C {key_name} -N '{passphrase}'"
-            )
-        elif key_type == "rsa":
+        if key_type == KeyTypes.RSA.value:
             os.system(
                 f"ssh-keygen -q -t {key_type} -b 4096 -f {key_path} -C {key_name} -N '{passphrase}'"
             )
-        elif key_type == "ed25519":
+        elif key_type == KeyTypes.ED25519.value:
             os.system(
                 f"ssh-keygen -q -t {key_type} -f {key_path} -C {key_name} -N '{passphrase}'"
             )
@@ -122,7 +126,7 @@ class SSHKeyManager:
         """
         Check if key exists in authorized_keys
         """
-        self._logger.debug("Checking if key with name %s exists", key_name)
+        self._logger.error("Checking if key with name %s exists", key_name)
         with open(self.authorized_keys_path, "r", encoding="utf-8") as key_file:
             for line in key_file:
                 if key_name in line:
@@ -130,6 +134,7 @@ class SSHKeyManager:
                     return True
 
         self._logger.debug("Key with name %s does not exist", key_name)
+        return False
 
     def update_password_authentication(self):
         """
@@ -153,6 +158,26 @@ class SSHKeyManager:
                 'sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication no/g" /etc/ssh/sshd_config'
             )
 
+    @staticmethod
+    def get_key_name(user_id: int, user_name: str):
+        """
+        Convert user name to key name
+        """
+        # Remove trailing and leading whitespace
+        s = user_name.strip()
+
+        # Remove non-word characters (everything except numbers and letters)
+        s = re.sub(r'\W', '_', s)
+
+        # Replace all runs of whitespace with a single underscore
+        s = re.sub(r'\s+', '_', s)
+
+        s += f"_{user_id}"
+
+        # add hostname
+        s += f"@{os.uname().nodename}"
+
+        return s
 
 def main():
     parser = argparse.ArgumentParser(description="Manage SSH keys.")

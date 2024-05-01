@@ -7,12 +7,18 @@ from flask.helpers import make_response
 from flask import jsonify, request, current_app
 from jose import jwt
 
-from constants import ROLE_USER
+from constants import ROLE_ADMIN, ROLE_USER
 from models import User, hash_code
 from server.database import db
-from server.decorators import authenticated, generate_user_token, registered, restrict_host
+from server.decorators import (
+    authenticated,
+    generate_user_token,
+    registered,
+    restrict_host,
+)
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
+from tools.ssh_keymanager import SSHKeyManager
 
 user_blueprint = Blueprint("user", __name__)
 
@@ -21,14 +27,19 @@ user_blueprint = Blueprint("user", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_users():
-    return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
+    return jsonify(
+        [i.serialized for i in db.session.query(User).order_by(User.role).all()]
+    )
+
 
 @user_blueprint.route("/api/users", methods=["POST"])
 @authenticated()
 @restrict_host
 def create_user():
     data = request.json
-    db_user: User = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
+    db_user: User = User(
+        name=data["name"], role=data["role"], access_code=data["accessCode"]
+    )
     db.session.add(db_user)
     db.session.commit()
 
@@ -59,22 +70,31 @@ def user(user_id):
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
-@user_blueprint.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
+@user_blueprint.route(
+    "/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"]
+)
 @authenticated()
 @restrict_host
 def registration_code(user_id):
     remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     current_app.logger.debug(
-        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.get_json(silent=True)
+        "Input from '%s' on '%s': '%s'",
+        remote_ip,
+        request.environ.get("HTTP_ORIGIN", ""),
+        request.get_json(silent=True),
     )
 
     if request.method == "GET":
         db_user: User = db.session.query(User).get(user_id)
         if db_user:
             if db_user.registration_code:
-                return make_response(jsonify({"error": "Already has registration code"}), 400)
+                return make_response(
+                    jsonify({"error": "Already has registration code"}), 400
+                )
 
-            expiry = int(request.args.get("expiry")) if request.args.get("expiry") else None
+            expiry = (
+                int(request.args.get("expiry")) if request.args.get("expiry") else None
+            )
             code = db_user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
@@ -99,30 +119,67 @@ def register_device():
     current_app.logger.debug("Authenticating...")
     remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     current_app.logger.debug(
-        "Input from '%s' on '%s': '%s'", remote_ip, request.environ.get("HTTP_ORIGIN", ""), request.json
+        "Input from '%s' on '%s': '%s'",
+        remote_ip,
+        request.environ.get("HTTP_ORIGIN", ""),
+        request.json,
     )
 
     if request.json["registration_code"]:
         db_user: User = (
             db.session.query(User)
-            .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
+            .filter_by(
+                registration_code=hash_code(request.json["registration_code"].upper())
+            )
             .first()
         )
 
         if db_user:
-            if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
+            if (
+                db_user.registration_expiry
+                and dt.now(tzlocal()) > db_user.registration_expiry
+            ):
                 return make_response(
-                    jsonify({"error": "Failed to register device", "reason": "Expired registration code"}), 400
+                    jsonify(
+                        {
+                            "error": "Failed to register device",
+                            "reason": "Expired registration code",
+                        }
+                    ),
+                    400,
                 )
 
             db_user.registration_code = None
             db.session.commit()
-            token = {"ip": remote_ip, "origin": request.environ["HTTP_ORIGIN"], "user_id": db_user.id}
-            return jsonify({"device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")})
+            token = {
+                "ip": remote_ip,
+                "origin": request.environ["HTTP_ORIGIN"],
+                "user_id": db_user.id,
+            }
+            return jsonify(
+                {
+                    "device_token": jwt.encode(
+                        token, os.environ.get("SECRET"), algorithm="HS256"
+                    )
+                }
+            )
         else:
-            return make_response(jsonify({"error": "Failed to register device", "reason": "User not found"}), 400)
+            return make_response(
+                jsonify(
+                    {"error": "Failed to register device", "reason": "User not found"}
+                ),
+                400,
+            )
 
-    return make_response(jsonify({"error": "Failed to register device", "reason": "Missing registration code"}), 400)
+    return make_response(
+        jsonify(
+            {
+                "error": "Failed to register device",
+                "reason": "Missing registration code",
+            }
+        ),
+        400,
+    )
 
 
 @user_blueprint.route("/api/user/authenticate", methods=["POST"])
@@ -132,12 +189,21 @@ def authenticate():
     current_app.logger.debug("Authenticating...")
 
     # device token must be valid because of the @registered decorator
-    device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
+    device_token = jwt.decode(
+        request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256"
+    )
     db_user: User = db.session.query(User).get(device_token["user_id"])
     if db_user and db_user.access_code == hash_code(request.json["access_code"]):
-        return jsonify({
-            "user_token": generate_user_token(db_user.id, db_user.name, db_user.role, request.environ["HTTP_ORIGIN"]),
-        })
+        return jsonify(
+            {
+                "user_token": generate_user_token(
+                    db_user.id,
+                    db_user.name,
+                    db_user.role,
+                    request.environ["HTTP_ORIGIN"],
+                ),
+            }
+        )
     elif not db_user:
         current_app.logger.warn("Invalid user id %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
@@ -164,13 +230,71 @@ def cards(user_id):
     return jsonify([i.serialized for i in db_user.cards])
 
 
-# has key
-# check if the user has ssh public key by user id from the argus authorized_keys file
+@user_blueprint.route("/api/user/<int:user_id>/has_ssh_key", methods=["GET"])
+@authenticated(ROLE_ADMIN)
+@restrict_host
+def has_ssh_key(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if db_user:
+        key_manager = SSHKeyManager()
+        key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
+        current_app.logger.debug("Checking key for user %s", key_name)
+        key_exists = key_manager.check_key_exists(key_name)
+        return jsonify(key_exists)
 
-# generate key
-# generate ssh key pair of user by user id and return the private key
-# add the public key to the argus authorized_keys file
-# parameters: user id, key type, format, passphrase
+    return make_response(jsonify({"error": "User not found"}), 404)
 
-# register key
-# register the public key received as payload to the argus authorized_keys file
+
+@user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["DELETE"])
+@authenticated(ROLE_ADMIN)
+@restrict_host
+def delete_ssh_key(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if db_user:
+        key_manager = SSHKeyManager()
+        key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
+        current_app.logger.debug("Deleting key for user %s", key_name)
+        key_manager.remove_public_key(key_name)
+        return jsonify(True)
+
+    return make_response(jsonify({"error": "User not found"}), 404)
+
+
+@user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["POST"])
+@authenticated(ROLE_ADMIN)
+@restrict_host
+def generate_ssh_key(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if db_user:
+        key_manager = SSHKeyManager()
+        key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
+        current_app.logger.debug("Generating key for user %s", key_name)
+        private_key, public_key = key_manager.generate_ssh_keys(
+            key_type=request.json["keyType"],
+            key_name=key_name,
+            passphrase=request.json["passphrase"],
+        )
+
+        # add public key to authorized_keys
+        key_manager.set_public_key(public_key, key_name)
+
+        return jsonify(private_key)
+
+    return make_response(jsonify({"error": "User not found"}), 404)
+
+@user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["PUT"])
+@authenticated(ROLE_ADMIN)
+@restrict_host
+def set_public_key(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if db_user:
+        key_manager = SSHKeyManager()
+        key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
+        current_app.logger.debug("Generating key for user %s", key_name)
+
+        # add public key to authorized_keys
+        key_manager.set_public_key(request.json["publicKey"], key_name)
+
+        return jsonify(True)
+
+    return make_response(jsonify({"error": "User not found"}), 404)
