@@ -1,6 +1,9 @@
+"""
+This module provides helper functions to load configuration settings from the database.
+"""
 import json
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from models import Option
 from monitor.database import Session
@@ -8,16 +11,19 @@ from monitor.database import Session
 
 @dataclass
 class DyndnsConfig:
-    username: str
-    password: str
-    hostname: str
-    provider: str
-    restrict_host: str
+    username: str = None
+    password: str = None
+    hostname: str = None
+    provider: str = None
+    restrict_host: str = False
 
 
-def load_dyndns_config() -> DyndnsConfig:
-    return load_config("network", "dyndns", DyndnsConfig)
+def load_dyndns_config(cleanup=False, session=None) -> DyndnsConfig:
+    c = load_config("network", "dyndns", DyndnsConfig) or DyndnsConfig()
+    if cleanup:
+        save_config("network", "dyndns", asdict(c))
 
+    return c
 
 #####################
 @dataclass
@@ -27,31 +33,40 @@ class SshConfig:
     password_authentication_enabled: bool = True
 
 
-def load_ssh_config() -> SshConfig:
-    return load_config("network", "access", SshConfig)
+def load_ssh_config(cleanup=False, session=None) -> SshConfig:
+    c = load_config("network", "access", SshConfig) or SshConfig()
+    if cleanup:
+        save_config("network", "access", asdict(c))
+    return c
 
 
 #####################
 @dataclass
 class SyrenConfig:
-    silent: bool
-    delay: int
-    stop_time: int
+    silent: bool = False
+    delay: int = 0
+    stop_time: int = 0
 
 
-def load_syren_config() -> SyrenConfig:
-    return load_config("syren", "timing", SyrenConfig)
+def load_syren_config(cleanup=False, session=None) -> SyrenConfig:
+    c = load_config("syren", "timing", SyrenConfig) or SyrenConfig()
+    if cleanup:
+        save_config("syren", "timing", asdict(c))
+    return c
 
 
 #####################
 @dataclass
 class AlertSensitivityConfig:
-    monitor_period: int
-    monitor_threshold: int
+    monitor_period: int = 1
+    monitor_threshold: int = 0
 
 
-def load_alert_sensitivity_config(session=None) -> AlertSensitivityConfig:
-    return load_config("alert", "sensitivity", AlertSensitivityConfig, session)
+def load_alert_sensitivity_config(cleanup=False, session=None) -> AlertSensitivityConfig:
+    c= load_config("alert", "sensitivity", AlertSensitivityConfig, session) or AlertSensitivityConfig()
+    if cleanup:
+        save_config("alert", "sensitivity", asdict(c), session)
+    return c
 
 
 #####################
@@ -72,4 +87,31 @@ def load_config(name, section, config_type, session=None):
 
     if config:
         config = json.loads(config.value)
-        return config_type(**config)
+        try:
+            return config_type(**config)
+        except TypeError:
+            pass
+
+    return None
+
+
+def save_config(name: str, section: str, value: dict, session=None):
+    """
+    Generic function to save a config to the database
+    """
+    new_session = False
+    if session is None:
+        new_session = True
+        session = Session()
+
+    config = session.query(Option).filter_by(name=name, section=section).first()
+    if not config:
+        config = Option(name=name, section=section, value=json.dumps(value))
+        session.add(config)
+    else:
+        config.value = json.dumps(value)
+
+    session.commit()
+
+    if new_session:
+        session.close()

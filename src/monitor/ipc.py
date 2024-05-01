@@ -90,7 +90,7 @@ class IPCServer(Thread):
         if not path.exists(path.dirname(filename)):
             self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(path.dirname(filename))
-            with open(MONITOR_INPUT_SOCKET, "w"):
+            with open(MONITOR_INPUT_SOCKET, "w", encoding="utf-8"):
                 pass
             self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
 
@@ -119,8 +119,10 @@ class IPCServer(Thread):
             SecureConnection(self._stop_event).run()
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
-            SSHService().update_service_state()
-            SSHService().update_access_local_network()
+            ssh = SSHService()
+            ssh.update_service_state()
+            ssh.update_access_local_network()
+            ssh.update_password_authentication()
         elif message["action"] == SEND_TEST_SMS:
             succeeded, results = Notifier.send_test_sms()
             return_value["result"] = succeeded

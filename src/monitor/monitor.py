@@ -33,9 +33,15 @@ from constants import (
     THREAD_MONITOR,
 )
 from models import Alert, Arm, Disarm, Sensor, AlertSensor, Area, ArmSensor, ArmStates, Output
-from monitor.area_handler import AreaHandler
-from monitor.sensor.handler import SensorHandler
 from monitor.alert import SensorAlert
+from monitor.area_handler import AreaHandler
+from monitor.config_helper import (
+    load_alert_sensitivity_config,
+    load_dyndns_config,
+    load_ssh_config,
+    load_syren_config
+)
+from monitor.sensor.handler import SensorHandler
 from monitor.storage import States
 from monitor.adapters.power import PowerAdapter
 from monitor.broadcast import Broadcaster
@@ -68,7 +74,7 @@ class Monitor(Thread):
         self._logger = logging.getLogger(LOG_MONITOR)
         self._broadcaster = broadcaster
         self._actions = Queue()
-        self._powerAdapter = PowerAdapter()
+        self._power_adapter = PowerAdapter()
         self._power_source = None
         self._db_session = None
         self._delay_timer = None
@@ -146,7 +152,7 @@ class Monitor(Thread):
 
         self.stop_alert(None)
         self._db_session.close()
-        self._powerAdapter.cleanup()
+        self._power_adapter.cleanup()
         self._logger.info("Monitoring stopped")
 
     def arm_monitoring(self, arm_type, user_id, keypad_id, delay, area_id):
@@ -284,7 +290,7 @@ class Monitor(Thread):
 
     def check_power(self):
         # load the value once from the adapter
-        new_power_source = self._powerAdapter.source_type
+        new_power_source = self._power_adapter.source_type
         if new_power_source == PowerAdapter.SOURCE_BATTERY:
             States.set(States.POWER_STATE, POWER_SOURCE_BATTERY)
             self._logger.debug("System works from battery")
@@ -337,6 +343,12 @@ class Monitor(Thread):
                 output.state = False
                 self._logger.debug("Cleared output (id=%s)", output.id)
                 changed = True
+
+        # overwrite invalid values in the database with default values
+        load_ssh_config(cleanup=True, session=self._db_session)
+        load_syren_config(cleanup=True, session=self._db_session)
+        load_alert_sensitivity_config(cleanup=True, session=self._db_session)
+        load_dyndns_config(cleanup=True, session=self._db_session)
 
         if changed:
             self._logger.debug("Saved to database")

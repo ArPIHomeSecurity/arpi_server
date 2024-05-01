@@ -37,10 +37,6 @@ class Certbot:
         """
         self._logger.info("Generating certbot certificate...")
         dyndns_config = load_dyndns_config()
-        if dyndns_config is None:
-            self._logger.info("No dynamic dns configuration found")
-            return False
-
         if not dyndns_config.provider:
             self._logger.info("No dynamic dns provider found")
             return False
@@ -206,10 +202,10 @@ class Certbot:
                 else:
                     self._logger.error("Failed detecting certificate configuration")
             else:
-                self._logger.error("No certbot certificate found")
+                self._logger.warning("No certbot certificate found")
 
         # check if full_certificate file changed in the past 10 mins
-        if full_certificate.stat().st_mtime > time() - 600:
+        if full_certificate.exists() and full_certificate.stat().st_mtime > time() - 600:
             self._logger.info("Certificate renewed")
             self._restart_systemd_service("mosquitto.service")
             self._restart_systemd_service("nginx.service")

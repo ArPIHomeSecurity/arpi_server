@@ -16,7 +16,6 @@ load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_ACCESS
-from monitor.config_helper import load_ssh_config
 
 
 AUTHORIZED_KEYS_PATH = "~/.ssh/authorized_keys"
@@ -34,9 +33,6 @@ class SSHKeyManager:
         super(SSHKeyManager, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
         self.authorized_keys_path = os.path.expanduser(AUTHORIZED_KEYS_PATH)
-        self._ssh_config = load_ssh_config()
-        if not self._ssh_config:
-            self._logger.warning("Missing ssh settings!")
 
     def generate_ssh_keys(
         self, key_type: KeyTypes, key_name: str, passphrase: str = ""
@@ -136,28 +132,6 @@ class SSHKeyManager:
         self._logger.debug("Key with name %s does not exist", key_name)
         return False
 
-    def update_password_authentication(self):
-        """
-        Update password authentication
-        """
-        self._logger.info("Updating password authentication")
-        self._enable_password_authentication(self._ssh_config.password_authentication_enabled)
-
-    def _enable_password_authentication(self, enable: bool):
-        """
-        Enable password authentication
-        """
-        if enable:
-            self._logger.info("Enabling password authentication")
-            os.system(
-                'sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication yes/g" /etc/ssh/sshd_config'
-            )
-        else:
-            self._logger.info("Disabling password authentication")
-            os.system(
-                'sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication no/g" /etc/ssh/sshd_config'
-            )
-
     @staticmethod
     def get_key_name(user_id: int, user_name: str):
         """
@@ -219,12 +193,6 @@ def main():
 
     if args.remove_key and args.key_name:
         manager.remove_public_key(args.key_name)
-
-    if args.enable_password:
-        manager._enable_password_authentication(True)
-    elif args.disable_password:
-        manager._enable_password_authentication(False)
-
 
 if __name__ == "__main__":
     try:
