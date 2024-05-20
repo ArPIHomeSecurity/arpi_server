@@ -19,13 +19,16 @@ clock_blueprint = Blueprint("clock", __name__)
 def get_clock():
     clock = Clock()
     result = {
-        "system": dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "hw": clock.gettime_hw(),
         "timezone": clock.get_timezone(),
+        "system": dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "hw": clock.get_time_hw(),
+        "network": clock.get_time_ntp(),
+        "uptime": clock.get_uptime(),
+        "uptime_server": clock.get_service_uptime("argus_server.service"),
+        "uptime_monitor": clock.get_service_uptime("argus_monitor.service"),
+        "uptime_nginx": clock.get_service_uptime("nginx.service"),
     }
 
-    network = clock.gettime_ntp()
-    result["network"] = network or None
     return jsonify(result)
 
 

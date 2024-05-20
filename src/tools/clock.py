@@ -20,7 +20,7 @@ class Clock:
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_CLOCK)
 
-    def gettime_ntp(self, addr="0.pool.ntp.org"):
+    def get_time_ntp(self, addr="0.pool.ntp.org"):
         # http://code.activestate.com/recipes/117211-simple-very-sntp-client/
         import socket
         import struct
@@ -37,7 +37,7 @@ class Clock:
         except socket.gaierror:
             pass
 
-    def gettime_hw(self):
+    def get_time_hw(self):
         try:
             result = re.search("RTC time: [a-zA-Z]{0,4} ([0-9\\-: ]*)", check_output("timedatectl").decode("utf-8"))
             if result:
@@ -49,15 +49,42 @@ class Clock:
         full_path = os.readlink("/etc/localtime")
         return full_path.replace("/usr/share/zoneinfo/", "")
 
+    def get_uptime(self):
+        """
+        Get the uptime of the system in seconds
+        """
+        try:
+            return int(float(check_output("cat /proc/uptime", shell=True).decode("utf-8").split(" ")[0]))
+        except CalledProcessError:
+            return None
+        
+    def get_service_uptime(self, service):
+        """
+        Get the uptime of a systemd service in seconds
+        """
+        try:
+            uptime = check_output(f"systemctl show -p ActiveEnterTimestamp {service}", shell=True).decode("utf-8")
+            # remove the "ActiveEnterTimestamp=" part
+            uptime = uptime.split("=")[1]
+            # remove timezone and day
+            uptime = uptime.split(" ")[1:3]
+            # parse the uptime to float from iso datetime string
+            uptime = dt.fromisoformat(" ".join(uptime)).timestamp()
+            # get elapsed time in seconds
+            uptime = dt.now().timestamp() - uptime
+            return int(float(uptime))
+        except Exception:  # pylint: disable=broad-except
+            return None
+
     def sync_clock(self):
-        network = self.gettime_ntp()
+        network = self.get_time_ntp()
 
         if network is not None:
             self._logger.info("Network time: {} => writing to hw clock".format(network))
             run(["date", "--set={}".format(network)])
             run(["/sbin/hwclock", "-w", "--verbose"])
         else:
-            hw = self.gettime_hw()
+            hw = self.get_time_hw()
             if hw:
                 self._logger.info("HW clock time: {} => wrinting to system clock".format(hw))
                 run(["date", "--set={}".format(hw)])
