@@ -26,7 +26,7 @@ class KeypadBase(ABC):
     """Base class for the keypads"""
 
     def __init__(self):
-        self._id = None
+        self.id = None
         self._armed = False
         self._keys = []
         self._card = None

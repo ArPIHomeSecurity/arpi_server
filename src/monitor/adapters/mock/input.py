@@ -31,6 +31,9 @@ class SimulatorBasedMockInput(object):
     @property
     def is_pressed(self):
         return self.value == 1
+    
+    def close(self):
+        self._logger.debug("Closing mock input %s on channel %s", self.__class__, self._channel)
 
 
 class Channels(SimulatorBasedMockInput):

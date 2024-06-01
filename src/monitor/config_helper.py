@@ -45,7 +45,7 @@ def load_ssh_config(cleanup=False, session=None) -> SshConfig:
 class SyrenConfig:
     silent: bool = False
     delay: int = 0
-    stop_time: int = 0
+    duration: int = 0
 
 
 def load_syren_config(cleanup=False, session=None) -> SyrenConfig:

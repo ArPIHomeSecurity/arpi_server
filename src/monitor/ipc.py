@@ -30,7 +30,7 @@ from constants import (
     SEND_TEST_SYREN,
     UPDATE_SSH,
 )
-from monitor.storage import States
+from monitor.storage import State, States
 from monitor.alert import Syren
 from monitor.notifications.notifier import Notifier
 from monitor.output.handler import OutputHandler
@@ -109,11 +109,11 @@ class IPCServer(Thread):
             self._logger.info("IPC action received: %s", message["action"])
             self._broadcaster.send_message(message=message)
         elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": States.get(States.ARM_STATE)}
+            return_value["value"] = {"type": States.get(State.ARM)}
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": States.get(States.MONITORING_STATE)}
+            return_value["value"] = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": States.get(States.POWER_STATE)}
+            return_value["value"] = {"state": States.get(State.POWER)}
         elif message["action"] == UPDATE_SECURE_CONNECTION:
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
@@ -183,6 +183,6 @@ class IPCServer(Thread):
 
     def test_syren(self, duration=5):
         self._logger.debug("Testing syren %ss...", duration)
-        Syren.start_syren(silent=False, delay=0, stop_time=duration)
+        Syren.start_syren(silent=False, delay=0, duration=duration)
         sleep(duration)
         Syren.stop_syren()

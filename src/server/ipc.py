@@ -60,7 +60,7 @@ class IPCClient(object):
                 "action": MONITOR_ARM_STAY,
                 "user_id": user_id,
                 "area_id": area_id,
-                "delay": False
+                "use_delay": False
             })
         else:
             print(f"Unknown arm type: {arm_type}")

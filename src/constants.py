@@ -104,6 +104,7 @@ MONITORING_ALERT_DELAY = "monitoring_alert_delay"
 MONITORING_ALERT = "monitoring_alert"
 MONITORING_SABOTAGE = "monitoring_sabotage"
 MONITORING_ERROR = "monitoring_error"
+MONITORING_STOPPED = "monitoring_stopped"
 
 POWER_SOURCE_NETWORK = "network"
 POWER_SOURCE_BATTERY = "battery"

@@ -26,7 +26,7 @@ class Syren(Thread):
     # default config
     SILENT = False  # alarm type not silent
     DELAY = 0  # default delay 0 seconds
-    STOP_TIME = 0  # default stop never
+    DURATION = 0  # default stop never
 
     SYREN_CHANNEL = 0
 
@@ -35,7 +35,7 @@ class Syren(Thread):
     _alert: Alert = None
 
     @classmethod
-    def start_syren(cls, silent=None, delay=None, stop_time=None):
+    def start_syren(cls, silent=None, delay=None, duration=None):
         """
         Starts the syren with a configuration.
 
@@ -47,14 +47,14 @@ class Syren(Thread):
         config = load_syren_config()
         if config is None:
             logging.info("Missing ssh settings!")
-            config = SyrenConfig(cls.SILENT, cls.DELAY, cls.STOP_TIME)
+            config = SyrenConfig(cls.SILENT, cls.DELAY, cls.DURATION)
 
         if silent is not None:
             config.silent = silent
         if delay is not None:
             config.delay = delay
-        if stop_time is not None:
-            config.stop_time = stop_time
+        if duration is not None:
+            config.duration = duration
 
         logger.info("Using syren config: %s )!", config)
 
@@ -141,7 +141,7 @@ class Syren(Thread):
             return
 
         DELAY = self._config.delay
-        STOP_TIME = self._config.stop_time
+        DURATION = self._config.duration
 
         start_time = time()
         syren_is_on = DELAY == 0
@@ -158,8 +158,8 @@ class Syren(Thread):
                 self._output_adapter.control_channel(self.SYREN_CHANNEL, syren_is_on)
                 send_syren_state(syren_is_on)
                 self._logger.info("Syren started")
-            elif syren_is_on and STOP_TIME > 0 and now - start_time > STOP_TIME:
-                self._logger.info("Syren stopped after %d seconds", STOP_TIME)
+            elif syren_is_on and DURATION > 0 and now - start_time > DURATION:
+                self._logger.info("Syren stopped after %d seconds", DURATION)
                 break
 
             if self._stop_event.wait(timeout=1):

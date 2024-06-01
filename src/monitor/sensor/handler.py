@@ -20,6 +20,7 @@ from constants import (
     MONITORING_ARMED,
     MONITORING_INVALID_CONFIG,
     MONITORING_READY,
+    MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
 from models import AlertSensor, Arm, Sensor
@@ -29,7 +30,7 @@ from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
-from monitor.storage import States
+from monitor.storage import State, States
 
 MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3
@@ -95,11 +96,13 @@ class SensorHandler:
         """
         Load the sensors from the db in the thread to avoid session problems.
         """
-        States.set(States.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
-        send_sensors_state(None)
 
-        # TODO: wait a little bit to see status for debug
-        sleep(3)
+        monitoring_state = States.get(State.MONITORING)
+        if monitoring_state == MONITORING_STARTUP:
+            monitoring_state = MONITORING_READY
+
+        States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
+        send_sensors_state(None)
 
         for sensor in self._db_session.query(Sensor).all():
             if not sensor.deleted:
@@ -114,7 +117,7 @@ class SensorHandler:
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
-        alert_sensitivity = load_alert_sensitivity_config(self._db_session)
+        alert_sensitivity = load_alert_sensitivity_config(session=self._db_session)
         if alert_sensitivity is None:
             self._logger.info("Alert sensitivity config not found!")
             alert_sensitivity = AlertSensitivityConfig(None, None)
@@ -149,6 +152,9 @@ class SensorHandler:
                         sensor.monitor_threshold,
                     )
 
+        # keep config update state
+        sleep(2)
+
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(
                 "Invalid number of sensors to monitor (Found=%s > Max=%s)",
@@ -156,17 +162,17 @@ class SensorHandler:
                 self._sensor_adapter.channel_count,
             )
             self._sensors = []
-            States.set(States.MONITORING_STATE, MONITORING_INVALID_CONFIG)
+            States.set(State.MONITORING, MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
             self._logger.info("Invalid channel configuration")
             self._sensors = []
-            States.set(States.MONITORING_STATE, MONITORING_INVALID_CONFIG)
+            States.set(State.MONITORING, MONITORING_INVALID_CONFIG)
         elif self.has_uncalibrated_sensor():
             self._logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
-            States.set(States.MONITORING_STATE, MONITORING_READY)
+            States.set(State.MONITORING, monitoring_state)
         else:
-            States.set(States.MONITORING_STATE, MONITORING_READY)
+            States.set(State.MONITORING, monitoring_state)
 
         send_sensors_state(False)
 
@@ -267,7 +273,7 @@ class SensorHandler:
         """
 
         # save current state to avoid concurrency
-        current_monitoring = States.get(States.MONITORING_STATE)
+        current_monitoring = States.get(State.MONITORING)
         now = dt.now()
         self._logger.debug("Checking sensors in %s", current_monitoring)
 
@@ -342,7 +348,7 @@ class SensorHandler:
                         sensor.id, delay, alert_type, sensitivity, self._broadcaster
                     )
                 else:
-                    self._logger.debug("Can't start alert")
+                    self._logger.debug("Don not start alert on sensor: %s", sensor.id)
 
             # stop alert of sensor
             elif (
@@ -383,7 +389,6 @@ class SensorHandler:
         self._logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
         self._mqtt_client.close()
-        self._db_session.close()
 
     @staticmethod
     def get_alert_type(sensor, monitoring_state):

@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 
@@ -14,10 +15,12 @@ from tools.ssh_service import SSHService
 stop_event = Event()
 logger = logging.getLogger(LOG_SERVICE)
 
+background_service = BackgroundService(stop_event)
+
 
 def signal_term_handler(signal_number, frame):
     logger.debug("Received signal (%s)", Signals(signal_number).name)
-    stop_background_service(remove_app=False)
+    stop_background_service()
 
 
 def start_background_service():
@@ -31,27 +34,20 @@ def start_background_service():
     if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
         SSHService().update_service_state()
 
-    service = BackgroundService(stop_event)
-    service.start()
+    background_service.start()
     os.environ["MONITOR_RUNNING"] = "true"
 
 
-def stop_background_service(remove_app=True):
+def stop_background_service():
     logger.debug("Stopping background service")
     stop_event.set()
-    if remove_app:
-        global socketio_app
-        if socketio_app:
-            print(socketio_app.wsgi_app.wsgi_app.__dict__)
-            del socketio_app
+
+    if background_service:
+        background_service.join()
 
 
 def create_app():
     initialize_logging()
     start_background_service()
+    atexit.register(stop_background_service)
     return socketio_app
-
-
-if __name__ == "__main__":
-    start_background_service()
-    socketio_app.run(threaded=True, port=8081, use_reloader=False, debug=True)

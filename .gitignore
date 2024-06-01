@@ -13,3 +13,5 @@ __pycache__
 test_data
 simulator*.json
 textual.log
+
+status.json
