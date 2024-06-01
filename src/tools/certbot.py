@@ -62,7 +62,8 @@ class Certbot:
                     f'-d {dyndns_config.hostname}',
                 ],
                 capture_output=True,
-                shell=True,
+                shell=False,
+                check=False
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -92,7 +93,8 @@ class Certbot:
                     "--cert-name", Certbot.CERT_NAME
                 ],
                 capture_output=True,
-                shell=True,
+                shell=False,
+                check=False
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
