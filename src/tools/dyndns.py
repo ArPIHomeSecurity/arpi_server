@@ -57,11 +57,6 @@ class DynDns:
         :param force: force the update
         """
         dyndns_config = load_dyndns_config()
-
-        if not dyndns_config:
-            self._logger.info("No dynamic dns configuration found")
-            return
-
         if not dyndns_config.provider:
             self._logger.info("No dynamic dns provider found")
             return False

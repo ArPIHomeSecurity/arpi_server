@@ -10,11 +10,18 @@ def initialize_logging():
     """
     Initialize logging for the application
     """
-    formatter = NotTooLongStringFormatter(
-        "%(asctime)s-[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s",
-        ["threadName"],
-        11
-    )
+    if os.environ.get("FLASK_ENV") == "development":
+        formatter = NotTooLongStringFormatter(
+            "%(asctime)s-[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s",
+            ["threadName"],
+            11
+        )
+    else:
+        formatter = NotTooLongStringFormatter(
+            "[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s",
+            ["threadName"],
+            11
+        )
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)

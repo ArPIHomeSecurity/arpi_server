@@ -1,6 +1,7 @@
 bind = "localhost:8081"
 workers = 2
 threads = 10
+timeout = 120
 umask = 0o0117
 errorlog = "-"
 capture_output = True

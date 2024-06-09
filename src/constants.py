@@ -48,7 +48,7 @@ LOGGING_MODULES = [
     (LOG_SC_DYNDNS, INFO),
     (LOG_SC_ACCESS, INFO),
     (LOG_CLOCK, INFO),
-    (LOG_OUTPUT, DEBUG),
+    (LOG_OUTPUT, INFO),
 ]
 
 # INTERNAL CONSTANTS
@@ -104,6 +104,7 @@ MONITORING_ALERT_DELAY = "monitoring_alert_delay"
 MONITORING_ALERT = "monitoring_alert"
 MONITORING_SABOTAGE = "monitoring_sabotage"
 MONITORING_ERROR = "monitoring_error"
+MONITORING_STOPPED = "monitoring_stopped"
 
 POWER_SOURCE_NETWORK = "network"
 POWER_SOURCE_BATTERY = "battery"

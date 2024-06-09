@@ -5,7 +5,7 @@ from threading import Thread, Event
 
 from models import Alert, AlertSensor, Arm, Disarm, Sensor
 from monitor.config_helper import AlertSensitivityConfig
-from monitor.storage import States
+from monitor.storage import States, State
 from monitor.broadcast import Broadcaster
 from monitor.database import Session
 from monitor.notifications.notifier import Notifier
@@ -87,7 +87,7 @@ class SensorAlert(Thread):
         )
 
         if self._delay > 0:
-            States.set(States.MONITORING_STATE, MONITORING_ALERT_DELAY)
+            States.set(State.MONITORING, MONITORING_ALERT_DELAY)
             self._broadcaster.send_message({"action": MONITORING_ALERT_DELAY})
 
         if self._stop_event.wait(self._delay):
@@ -129,10 +129,10 @@ class SensorAlert(Thread):
 
         Syren.start_syren()
         if self._alert_type == ALERT_SABOTAGE:
-            States.set(States.MONITORING_STATE, MONITORING_SABOTAGE)
+            States.set(State.MONITORING, MONITORING_SABOTAGE)
             self._broadcaster.send_message({"action": MONITORING_SABOTAGE})
         else:
-            States.set(States.MONITORING_STATE, MONITORING_ALERT)
+            States.set(State.MONITORING, MONITORING_ALERT)
             self._broadcaster.send_message({"action": MONITORING_ALERT})
 
     def create_alert(self, session) -> Alert:

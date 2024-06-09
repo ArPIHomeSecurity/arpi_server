@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import sys
+from time import time
 
 from cryptography import x509
 from dotenv import load_dotenv
@@ -36,10 +37,6 @@ class Certbot:
         """
         self._logger.info("Generating certbot certificate...")
         dyndns_config = load_dyndns_config()
-        if dyndns_config is None:
-            self._logger.info("No dynamic dns configuration found")
-            return False
-
         if not dyndns_config.provider:
             self._logger.info("No dynamic dns provider found")
             return False
@@ -65,7 +62,8 @@ class Certbot:
                     f'-d {dyndns_config.hostname}',
                 ],
                 capture_output=True,
-                shell=True,
+                shell=False,
+                check=False
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -95,7 +93,8 @@ class Certbot:
                     "--cert-name", Certbot.CERT_NAME
                 ],
                 capture_output=True,
-                shell=True,
+                shell=False,
+                check=False
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -126,7 +125,7 @@ class Certbot:
         Path(used_config).unlink()
         symlink(new_config, used_config)
 
-    def _restart_systemd_sevice(self, service_name):
+    def _restart_systemd_service(self, service_name):
         self._logger.info("Restarting '%s' with DBUS", service_name)
         bus = SystemBus()
         systemd = bus.get(".systemd1")
@@ -187,8 +186,6 @@ class Certbot:
                 self._logger.info("Certbot certificate exists and no change of domain")
                 self._renew_certificate()
 
-            self._restart_systemd_sevice("mosquitto.service")
-            self._restart_systemd_sevice("nginx.service")
         else:
             # if certificate doesn't exist generate one
             self._logger.info("No certbot certificate found")
@@ -200,8 +197,6 @@ class Certbot:
                 ):
                     self._logger.info("NGINX uses self-signed certificates")
                     self._switch2certbot()
-                    self._restart_systemd_sevice("mosquitto.service")
-                    self._restart_systemd_sevice("nginx.service")
                 elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
                     "/usr/local/nginx/conf/snippets/certbot-signed.conf"
                 ):
@@ -209,7 +204,13 @@ class Certbot:
                 else:
                     self._logger.error("Failed detecting certificate configuration")
             else:
-                self._logger.error("No certbot certificate found")
+                self._logger.warning("No certbot certificate found")
+
+        # check if full_certificate file changed in the past 10 mins
+        if full_certificate.exists() and full_certificate.stat().st_mtime > time() - 600:
+            self._logger.info("Certificate renewed")
+            self._restart_systemd_service("mosquitto.service")
+            self._restart_systemd_service("nginx.service")
 
 
 def main():

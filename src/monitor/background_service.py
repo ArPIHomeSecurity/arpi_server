@@ -24,7 +24,7 @@ class BackgroundService(Thread):
     """
     def __init__(self, stop_event: Event):
         super().__init__(name="HealthCheck")
-        self._threads: [] = None
+        self._threads: list = None
         self._stop_event = stop_event
         self._broadcaster: Broadcaster = None
         self._logger = logging.getLogger(LOG_SERVICE)
@@ -38,6 +38,7 @@ class BackgroundService(Thread):
 
         self._start_threads()
 
+        exit_code = 0
         while not self._stop_event.wait(timeout=1):
             # print the logging configuration for debugging
             # print_logging()
@@ -46,14 +47,14 @@ class BackgroundService(Thread):
             for thread in self._threads:
                 if not thread.is_alive():
                     self._logger.error("Thread crashed: %s", thread.name)
-                    # restart the threads
+                    exit_code = 1
+                    # stop all threads and systemd will restart the service
                     self._stop_threads()
-                    self._start_threads()
                     break
 
         self._stop_threads()
         logger.info("Health checker stopped")
-        sys.exit(0)
+        sys.exit(exit_code)
 
     def _start_threads(self):
         self._logger.info("Starting threads...")
@@ -82,7 +83,7 @@ class BackgroundService(Thread):
         self._stop_event.set()
 
         # wait for all threads to stop
-        for thread in self._threads:
+        for thread in self._threads or []:
             self._logger.debug("Stopping thread: %s", thread.name)
             thread.join()
             self._logger.info("Stopped thread: %s", thread.name)
