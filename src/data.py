@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,7 +10,7 @@ import argparse
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, Keypad, KeypadType, Sensor, SensorType, User, Zone
+from models import Area, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
 from monitor.database import Session
 from models import metadata
 
@@ -57,6 +58,15 @@ def env_prod():
     a1 = Area(name="House")
     session.add(a1)
     print(" - Created area")
+
+    access_config = {
+        "service_enabled": True,
+        "restrict_local_network": False,
+        "password_authentication_enabled": True
+    }
+    ssh_access = Option(name="network", section="access", value=json.dumps(access_config))
+    session.add(ssh_access)
+    print(" - Created access options")
 
     session.commit()
 
