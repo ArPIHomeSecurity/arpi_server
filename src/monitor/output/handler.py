@@ -117,7 +117,7 @@ class OutputHandler(Thread):
         for output in self._outputs:
             if output.channel is not None:
                 adapter.control_channel(output.channel, output.default_state)
-                send_output_state(output.id, False)
+                send_output_state(output.id, output.state)
 
         db_session.close()
 
