@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3d1ec654bb6454cf42e7ea7d762d6380da7259723fcd7fa6a3cc43e14812e8ae"
+            "sha256": "9da716e9f4b17d473ab2abd886f2dc4b4495aa798ef39cffba9b45bba0109561"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -589,11 +589,11 @@
         },
         "python-gsmmodem-new": {
             "hashes": [
-                "sha256:81f25e8d88f3126615e689af9fd668d4bf7bdea13cbb0a5ca9f6adf273c84388",
-                "sha256:d9e7132d7bae010f4d4828bc4f45e900904dda5b049ee64595d008a0030e9485"
+                "sha256:369d33c2763fd0046f671a827e7d28c5955a82a48bc8abf408b7c65b68774c45",
+                "sha256:a991b3f1b2a78b2c2ebf70c46ec399c241dbaafeb84c22e5583dfcb92238194b"
             ],
             "index": "pypi",
-            "version": "==0.12"
+            "version": "==0.13.0"
         },
         "python-jose": {
             "hashes": [

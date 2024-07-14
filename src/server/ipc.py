@@ -7,23 +7,24 @@ from constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_IPC,
+    MAKE_TEST_CALL,
     MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
+    MONITOR_GET_ARM,
+    MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
-    POWER_GET_STATE,
     MONITOR_SET_CLOCK,
     MONITOR_SYNC_CLOCK,
     MONITOR_UPDATE_CONFIG,
-    UPDATE_SECURE_CONNECTION,
     MONITOR_UPDATE_KEYPAD,
-    MONITOR_GET_STATE,
-    MONITOR_GET_ARM,
+    POWER_GET_STATE,
     SEND_TEST_EMAIL,
     SEND_TEST_SMS,
     SEND_TEST_SYREN,
+    UPDATE_SECURE_CONNECTION,
     UPDATE_SSH,
 )
 
@@ -98,6 +99,9 @@ class IPCClient(object):
 
     def send_test_sms(self):
         return self._send_message({"action": SEND_TEST_SMS})
+    
+    def make_test_call(self):
+        return self._send_message({"action": MAKE_TEST_CALL})
 
     def send_test_syren(self, duration):
         return self._send_message({"action": SEND_TEST_SYREN, "duration": duration})

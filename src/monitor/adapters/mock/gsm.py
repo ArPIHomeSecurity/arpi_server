@@ -1,6 +1,8 @@
 import logging
+from time import sleep
 
 from constants import LOG_ADGSM
+from monitor.adapters.gsm import CallType
 
 
 class GSM(object):
@@ -26,8 +28,19 @@ class GSM(object):
         return True
 
     def send_SMS(self, phone_number, message):
+        sleep(7)
         self._logger.info('Message sent to %s: "%s"', phone_number, message)
         return True
+
+    def call(self, phone_number, call_type: CallType):
+        sleep(3)
+        self._logger.info('Calling (%s) number: %s', call_type, phone_number)
+        return False
+
+    @property
+    def incoming_dtmf(self):
+        # return None
+        return "1"
 
     def destroy(self):
         pass

@@ -2,8 +2,11 @@ import logging
 import os
 import sys
 
-from constants import LOGGING_MODULES
+from constants import LOGGING_MODULES, TRACE
+from monitor.logger import ArgusLogger
 from tools.formatter import NotTooLongStringFormatter
+
+
 
 
 def initialize_logging():
@@ -23,24 +26,22 @@ def initialize_logging():
             11
         )
 
+    logging.addLevelName(TRACE, "TRACE")
+
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.DEBUG)
+    console_handler.setLevel(TRACE)
 
     # file_handler = logging.FileHandler("monitoring.log")
     # file_handler.setFormatter(formatter)
 
     for name, level in LOGGING_MODULES:
         logger = logging.getLogger(name)
+        logger.__class__ = ArgusLogger
         logger.setLevel(level)
         logger.handlers.clear()
         # logger.addHandler(file_handler)
         logger.addHandler(console_handler)
-
-    logging.getLogger("SocketIOServer").setLevel(logging.INFO)
-    logging.getLogger("gsmmodem.modem.GsmModem").setLevel(logging.ERROR)
-    logging.getLogger("gsmmodem.serial_comms.SerialComms").setLevel(logging.ERROR)
-    # logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
 
     os.environ["LOGGING_INITIALIZED"] = "true"
 

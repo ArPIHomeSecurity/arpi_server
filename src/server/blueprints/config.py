@@ -73,6 +73,14 @@ def test_sms():
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
+@config_blueprint.route("/api/config/test_call", methods=["GET"])
+@authenticated()
+@restrict_host
+def test_call():
+    if request.method == "GET":
+        return process_ipc_response(IPCClient().make_test_call())
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
 @config_blueprint.route("/api/config/test_syren", methods=["GET"])
 @authenticated()

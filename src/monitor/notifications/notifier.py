@@ -10,11 +10,13 @@ from threading import Thread
 from time import sleep, time
 
 from models import Option
+from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
 from monitor.broadcast import Broadcaster
-from constants import LOG_NOTIFIER, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
+from constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import Session
 from monitor.notifications.notification import Notification, NotificationType
+from tools.queries import get_user_with_access_code
 
 
 # check if running on Raspberry
@@ -37,12 +39,19 @@ class Subscriptions:
     """
     Table Option/notifications/subscriptions
     """
+    call1: Subscription = None
+    call2: Subscription = None
     sms1: Subscription = None
     sms2: Subscription = None
     email1: Subscription = None
     email2: Subscription = None
 
     def __post_init__(self):
+        """
+        Convert database data to Subscription object
+        """
+        self.call1 = Subscription(**self.call1) if self.call1 else Subscription()
+        self.call2 = Subscription(**self.call2) if self.call2 else Subscription()
         self.sms1 = Subscription(**self.sms1) if self.sms1 else Subscription()
         self.sms2 = Subscription(**self.sms2) if self.sms2 else Subscription()
         self.email1 = Subscription(**self.email1) if self.email1 else Subscription()
@@ -85,7 +94,7 @@ class Notifier(Thread):
     DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     MAX_RETRY = 5
-    RETRY_WAIT = 30
+    RETRY_WAIT = 10
 
     _notifications = Queue()
 
@@ -195,6 +204,30 @@ class Notifier(Thread):
         gsm.destroy()
         return True, messages
 
+    @staticmethod
+    def make_test_call():
+        logging.getLogger(LOG_NOTIFIER).debug("Doing test call")
+        options = Notifier.load_options()
+        gsm = GSM(
+            pin_code=options.gsm.pin_code,
+            port=os.environ["GSM_PORT"],
+            baud=os.environ["GSM_PORT_BAUD"]
+        )
+
+        messages = {}
+        if not gsm.setup():
+            messages["connection"] = False
+            return False, messages
+
+        if options.gsm.phone_number_1:
+            messages["phone1"] = gsm.call(options.gsm.phone_number_1, CallType.TEST)
+
+        if options.gsm.phone_number_2:
+            messages["phone2"] = gsm.call(options.gsm.phone_number_2, CallType.TEST)
+
+        gsm.destroy()
+        return True, messages
+
     def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
         self._actions = Queue()
@@ -244,7 +277,6 @@ class Notifier(Thread):
                 port=os.environ["GSM_PORT"],
                 baud=os.environ["GSM_PORT_BAUD"]
             )
-            self._gsm.setup()
         else:
             self._logger.debug("GSM disabled")
             self.destroy_gsm()
@@ -261,7 +293,6 @@ class Notifier(Thread):
                 username=self._options.smtp.smtp_username,
                 password=self._options.smtp.smtp_password,
             )
-            self._smtp.setup()
         else:
             self._logger.debug("SMTP disabled")
             self.destroy_smtp()
@@ -296,7 +327,11 @@ class Notifier(Thread):
                 data = json.loads(section.value) if section else {}
                 value = section_class(**data)
                 setattr(options, section_name, value)
-                logger.debug("Loaded options for section: %s => %s", section_name, getattr(options, section_name))
+                logger.debug(
+                    "Loaded options for section: %s => %s",
+                    section_name,
+                    getattr(options, section_name)
+                )
             except (TypeError, json.JSONDecodeError) as error:
                 logger.warning("Failed to load options for section: %s! %s", section_name, error)
                 setattr(options, section_name, section_class())
@@ -307,73 +342,159 @@ class Notifier(Thread):
     def process_notifications(self):
         notification: Notification = self._notifications.get(block=False)
 
+        # check elapsed time since last try
         if notification.last_try + Notifier.RETRY_WAIT < time():
-            self.send_message(notification)
+            self.execute_notification(notification)
             notification.last_try = time()
             notification.retry += 1
 
-        if not notification.processed:
-            # send failed
-            if notification.retry >= Notifier.MAX_RETRY:
-                self._logger.debug("Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification)
-            else:
-                # sending message failed put back to message queue
-                self._notifications.put(notification)
+        if notification.processed:
+            self._logger.debug("Processed notification: %s", notification)
+            return
 
-    def send_message(self, notification: Notification):
+        # send failed
+        if notification.retry >= Notifier.MAX_RETRY:
+            # stop retrying
+            self._logger.debug(
+                "Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification
+            )
+        else:
+            # sending message failed put back to message queue
+            self._notifications.put(notification)
+
+    def handle_call_feedback(self, feedback: str) -> bool:
+        db_session = Session()
+        user = get_user_with_access_code(db_session, feedback)
+        if user:
+            self._logger.info("Disarming based on dmtf code of user %s", user.name)
+            self._broadcaster.send_message(message={
+                "action": MONITOR_DISARM,
+                "user_id": user.id
+            })
+            db_session.close()
+            return True
+        else:
+            self._logger.debug("No user found for feedback...")
+
+        user = get_user_with_access_code(db_session, feedback)
+        if user:
+            self._logger.info("Disarming based on dmtf code of user %s", user.name)
+            self._broadcaster.send_message(message={
+                "action": MONITOR_DISARM,
+                "user_id": user.id
+            })
+            db_session.close()
+            return True
+        else:
+            self._logger.debug("No user found for feedback...")
+
+        db_session.close()
+        return False
+
+
+    def execute_notification(self, notification: Notification):
         self._logger.info("Sending message: %s", notification)
-        try:
-            self.notify_SMS(notification)
-            self.notify_email(notification)
-        except (KeyError, TypeError) as error:
-            self._logger.exception("Failed to send message: '%s'! (%s)", notification, error)
-        except Exception:
-            self._logger.exception("Sending message failed!")
 
-    def notify_SMS(self, notification: Notification):
-        template = notification.get_sms_template()
-        self._logger.info("Options: %s => %s", self._options.subscriptions.sms1, getattr(self._options.subscriptions.sms1, notification.type, False))
-        if (getattr(self._options.subscriptions.sms1, notification.type, False) and
-                notification.sms_sent1 == False and
-                self._gsm):
-            notification.sms_sent1 = self._gsm.send_SMS(
-                self._options.gsm.phone_number_1,
-                template.format(**asdict(notification))
-            )
-        else:
-            notification.sms_sent1 = None
+        # execute all actions in priority order
+        # TODO: consider moving it to the database to allow dynamic configuration
+        alert_chain = [
+            Notifier.send_email_1,
+            Notifier.send_email_2,
+            Notifier.send_SMS_1,
+            Notifier.send_SMS_2,
+            Notifier.call_1,
+            Notifier.call_2
+        ]
+        for action in alert_chain:
+            try:
+                action(self, notification)
+            except (KeyError, TypeError) as error:
+                self._logger.exception("Failed to send message: '%s'! (%s)", notification, error)
+            except Exception:
+                self._logger.exception("Sending message failed!")
 
-        template = notification.get_sms_template()
-        if (getattr(self._options.subscriptions.sms2, notification.type, False) and
-                notification.sms_sent2 == False and
-                self._gsm):
-            notification.sms_sent2 = self._gsm.send_SMS(
-                self._options.gsm.phone_number_2,
-                template.format(**asdict(notification))
-            )
-        else:
-            notification.sms_sent2 = None
-
-    def notify_email(self, notification: Notification):
-        template = notification.get_email_template()
-        if (getattr(self._options.subscriptions.email1, notification.type, False) and
-                notification.email1_sent is False and
-                self._smtp):
-            notification.email1_sent = self._smtp.send_email(
-                to_address=self._options.smtp.email_address_1,
-                subject=notification.get_email_subject(),
-                content=template.format(**asdict(notification))
-            )
+    def send_email_1(self, notification: Notification):
+        if self._smtp and getattr(self._options.subscriptions.email1, notification.type, False):
+            if notification.email1_sent is False:
+                template = notification.get_email_template()
+                notification.email1_sent = self._smtp.send_email(
+                    to_address=self._options.smtp.email_address_1,
+                    subject=notification.get_email_subject(),
+                    content=template.format(**asdict(notification))
+                )
         else:
             notification.email1_sent = None
 
-        if (getattr(self._options.subscriptions.email2, notification.type, False) and
-                notification.email2_sent is False and
-                self._smtp):
-            notification.email2_sent = self._smtp.send_email(
-                to_address=self._options.smtp.email_address_2,
-                subject=notification.get_email_subject(),
-                content=template.format(**asdict(notification))
-            )
+    def send_email_2(self, notification: Notification):
+        if self._smtp and getattr(self._options.subscriptions.email2, notification.type, False):
+            if notification.email2_sent is False:
+                template = notification.get_email_template()
+                notification.email2_sent = self._smtp.send_email(
+                    to_address=self._options.smtp.email_address_2,
+                    subject=notification.get_email_subject(),
+                    content=template.format(**asdict(notification))
+                )
         else:
             notification.email2_sent = None
+
+    def send_SMS_1(self, notification: Notification):
+        if self._gsm and getattr(self._options.subscriptions.sms1, notification.type, False):
+            if notification.sms_sent1 is False:
+                template = notification.get_sms_template()
+                notification.sms_sent1 = self._gsm.send_SMS(
+                    self._options.gsm.phone_number_1,
+                    template.format(**asdict(notification))
+                )
+        else:
+            notification.sms_sent1 = None
+
+    def send_SMS_2(self, notification: Notification):
+        if self._gsm and getattr(self._options.subscriptions.sms2, notification.type, False):
+            if notification.sms_sent2 is False:
+                template = notification.get_sms_template()
+                notification.sms_sent2 = self._gsm.send_SMS(
+                    self._options.gsm.phone_number_2,
+                    template.format(**asdict(notification))
+                )
+        else:
+            notification.sms_sent2 = None
+
+    def call_1(self, notification: Notification):
+        if self._gsm and getattr(self._options.subscriptions.call1, notification.type, False):
+            if notification.call1_sent is False:
+                notification.call1_sent = self._gsm.call(
+                    self._options.gsm.phone_number_1, CallType.ALERT
+                )
+                feedback = self._gsm.incoming_dtmf
+
+                # if the user pressed 1 (acknowledge) then we don't need to call the second number
+                if feedback == CALL_ACKNOWLEDGED:
+                    self._logger.info("Phone 1 acknowledged the alert")
+                    notification.call1_sent = True
+                    notification.call2_sent = None
+                elif feedback:
+                    if self.handle_call_feedback(feedback):
+                        notification.call2_sent = None
+
+        else:
+            notification.call1_sent = None
+
+    def call_2(self, notification: Notification):
+        if self._gsm and getattr(self._options.subscriptions.call2, notification.type, False):
+            if notification.call2_sent is False:
+                notification.call2_sent = self._gsm.call(
+                    self._options.gsm.phone_number_2, CallType.ALERT
+                )
+                feedback = self._gsm.incoming_dtmf
+
+                # if the user pressed 1 (acknowledge) then we don't need to call the second number
+                self._logger.trace("Phone 2 feedback: %s", feedback)
+                if feedback == CALL_ACKNOWLEDGED:
+                    self._logger.info("Phone 2 acknowledged the alert")
+                    notification.call2_sent = True
+                    notification.call1_sent = None
+                elif feedback:
+                    if self.handle_call_feedback(feedback):
+                        notification.call1_sent = None
+        else:
+            notification.call2_sent = None

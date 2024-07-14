@@ -208,9 +208,9 @@ class DSCKeypad(KeypadBase):
         else:
             method()
 
-        do_keybus_query = False
+        make_keybus_query = False
         try:
-            do_keybus_query = self._line.conversation[4]["received"] == UNKNOWN_COMMAND
+            make_keybus_query = self._line.conversation[4]["received"] == UNKNOWN_COMMAND
         except IndexError:
             pass
 
@@ -220,7 +220,7 @@ class DSCKeypad(KeypadBase):
         sent_bytes = len(self._line.conversation) - 1  # remove 9. bit
         self.print_communication()
 
-        if do_keybus_query:
+        if make_keybus_query:
             self.send_keybus_query()
             sent_bytes += len(self._line.conversation) - 1  # remove 9. bit
             self.print_communication()

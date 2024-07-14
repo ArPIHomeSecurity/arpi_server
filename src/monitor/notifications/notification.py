@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+import logging
 from typing import Optional, List
 
+from constants import LOG_NOTIFIER
 from monitor.notifications.templates import (
     ALERT_STARTED_EMAIL,
     ALERT_STARTED_SMS,
@@ -29,11 +31,13 @@ class Notification:
     retry: int = 0
     last_try: float = 0.0
 
-    # True = sent, False = sending failed, None = no need to send (not subscribed)
+    # True = sent, False = not sent, None = no need to send (not subscribed)
     sms_sent1: Optional[bool] = False
     sms_sent2: Optional[bool] = False
     email1_sent: Optional[bool] = False
     email2_sent: Optional[bool] = False
+    call1_sent: Optional[bool] = False
+    call2_sent: Optional[bool] = False
 
     def get_sms_template(self):
         mapping = {
@@ -46,7 +50,7 @@ class Notification:
         try:
             return mapping[self.type]
         except KeyError:
-            self._logger.error("Unknown notification type!")
+            logging.getLogger(LOG_NOTIFIER).error("Unknown notification type!")
 
     def get_email_template(self):
         mapping = {
@@ -74,5 +78,7 @@ class Notification:
             (self.sms_sent1 is None or self.sms_sent1) and
             (self.sms_sent2 is None or self.sms_sent2) and
             (self.email1_sent is None or self.email1_sent) and
-            (self.email2_sent is None or self.email2_sent)
+            (self.email2_sent is None or self.email2_sent) and
+            (self.call1_sent is None or self.call1_sent) and
+            (self.call2_sent is None or self.call2_sent)
         )

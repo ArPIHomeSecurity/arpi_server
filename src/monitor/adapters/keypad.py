@@ -10,7 +10,6 @@ from time import time
 from sqlalchemy.engine import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
-from sqlalchemy.sql.sqltypes import Boolean
 
 from models import Arm, Card, Keypad, User, hash_code
 from monitor.storage import States, State
@@ -33,7 +32,7 @@ from constants import (
     THREAD_KEYPAD,
 )
 from monitor.socket_io import send_card_registered
-from tools.queries import get_alert_delay, get_arm_delay
+from tools.queries import get_alert_delay, get_arm_delay, get_user_with_access_code
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitor.adapters.keypads.dsc import DSCKeypad
@@ -67,7 +66,7 @@ class KeypadHandler(Thread):
                     database=os.environ.get("DB_SCHEMA", None)
                 )
             except KeyError:
-                self._logger.error("Database connnection not configured")
+                self._logger.error("Database connection not configured")
                 return
 
             engine = create_engine(url)
@@ -207,7 +206,7 @@ class KeypadHandler(Thread):
             self._keypad.start_delay(dt.now(), alert_delay)
 
     def handle_access_code(self, presses):
-        user = self.get_user_by_access_code(presses)
+        user = get_user_with_access_code(self.get_database_session(), presses)
         if user:
             self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
@@ -251,15 +250,6 @@ class KeypadHandler(Thread):
             })
         else:
             self._logger.error("Unknown function: %s", function)
-
-    def get_user_by_access_code(self, code) -> Boolean:
-        db_session = self.get_database_session()
-        users = db_session.query(User).all()
-        db_session.close()
-
-        code_hash = hash_code(code)
-        self._logger.debug("User access code %s/%s in %s", code, code_hash, [u.fourkey_code for u in users])
-        return next(filter(lambda u: u.fourkey_code == code_hash, users), None)
 
     def get_card_by_number(self, number) -> Card:
         db_session = self.get_database_session()
