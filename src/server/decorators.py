@@ -118,12 +118,12 @@ def authenticated(role=ROLE_ADMIN):
                         role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,)
                     ):
                         logger.info(
-                            "Operation %s not permitted for user='%s/%s' from %s",
-                            request,
+                            "Operation %s not permitted for user='%s/%s' on origin=%s from %s",
+                            request.path,
                             user_token["name"],
                             user_token["role"],
                             user_token["origin"],
-                            remote_address,
+                            remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
 
@@ -137,10 +137,10 @@ def authenticated(role=ROLE_ADMIN):
                     )
                     return response
                 except jose.exceptions.JWTError:
-                    logger.warn("Bad token (%s) from %s", raw_token, remote_address)
+                    logger.warning("Bad token (%s) from %s", raw_token, remote_address)
                     return jsonify({"error": "operation not permitted (wrong token)"}), 403
             else:
-                logger.warn("Request without authentication info from %s", remote_address)
+                logger.warning("Request without authentication info from %s", remote_address)
                 return jsonify({"error": "operation not permitted (missing token)"}), 403
 
         return check_access
