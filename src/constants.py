@@ -80,6 +80,8 @@ SEND_TEST_EMAIL = "send_test_email"
 SEND_TEST_SMS = "send_test_sms"
 SEND_TEST_SYREN = "send_test_syren"
 MAKE_TEST_CALL = "make_test_call"
+GET_SMS_MESSAGES = "get_sms_messages"
+DELETE_SMS_MESSAGE = "delete_sms_message"
 
 """---------------------------------------------------------------"""
 # CONSTANTS USED ALSO BY THE WEB APPLICATION

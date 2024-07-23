@@ -205,6 +205,49 @@ class Notifier(Thread):
         return True, messages
 
     @staticmethod
+    def get_sms_messages():
+        logging.getLogger(LOG_NOTIFIER).debug("Getting SMS messages")
+        options = Notifier.load_options()
+        gsm = GSM(
+            pin_code=options.gsm.pin_code,
+            port=os.environ["GSM_PORT"],
+            baud=os.environ["GSM_PORT_BAUD"]
+        )
+
+        if not gsm.setup():
+            return False, []
+
+        messages = []
+        for sms in gsm.get_sms_messages() or []:
+            messages.append({
+                "idx": sms.index,
+                "number": sms.number,
+                "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "text": sms.text
+            })
+
+        gsm.destroy()
+        return True, messages
+
+    @staticmethod
+    def delete_sms_message(message_id):
+        logging.getLogger(LOG_NOTIFIER).debug("Deleting SMS messages")
+        options = Notifier.load_options()
+        gsm = GSM(
+            pin_code=options.gsm.pin_code,
+            port=os.environ["GSM_PORT"],
+            baud=os.environ["GSM_PORT_BAUD"]
+        )
+
+        if not gsm.setup():
+            return False
+
+        result = gsm.delete_sms_message(message_id)
+
+        gsm.destroy()
+        return result
+
+    @staticmethod
     def make_test_call():
         logging.getLogger(LOG_NOTIFIER).debug("Doing test call")
         options = Notifier.load_options()

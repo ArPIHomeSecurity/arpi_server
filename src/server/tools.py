@@ -21,8 +21,11 @@ def process_ipc_response(ipc_response):
     if "message" in ipc_response:
         response["message"] = ipc_response["message"]
 
-    response |= ipc_response.get("value", {})
-    response |= ipc_response.get("other", {})
+    try:
+        response |= ipc_response.get("value", {})
+        response |= ipc_response.get("other", {})
+    except TypeError as error:
+        logging.error("Failed to merge response values: %s! %s - %s", error, response, ipc_response)
 
     logging.info("Code: %s", return_code)
     logging.info("Response: %s", response)

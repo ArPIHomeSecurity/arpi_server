@@ -6,7 +6,7 @@ from time import sleep
 
 from serial.serialutil import PortNotOpenError
 
-from gsmmodem.modem import GsmModem, Call
+from gsmmodem.modem import GsmModem, Call, ReceivedSms
 from gsmmodem.exceptions import (
     PinRequiredError,
     IncorrectPinError,
@@ -33,10 +33,13 @@ class CallResult(Enum):
     BUSY = 4
     FAILED = 5
 
+
 CALL_ACKNOWLEDGED = "1"
+
 
 class GSM:
 
+    CONNECTS = 0
     RETRY_GAP_SECONDS = 5
     MAX_RETRY = 5
 
@@ -51,6 +54,10 @@ class GSM:
         self._modem = None
 
     def setup(self):
+        if GSM.CONNECTS > 0:
+            self._logger.warning("Connection already established! %s", GSM.CONNECTS)
+        GSM.CONNECTS += 1
+
         if not self._pin_code:
             self._logger.warning("Pin code not defined")
 
@@ -157,6 +164,43 @@ class GSM:
 
         self._logger.debug("SMS sent")
         return True
+
+    def get_sms_messages(self) -> list[ReceivedSms]:
+        if not self._modem:
+            self.setup()
+
+        if not self._modem:
+            return False
+
+        try:
+            self._logger.info("Reading SMS messages...")
+            messages = self._modem.listStoredSms()
+            self._logger.debug("SMS messages received: %s", len(messages))
+            return messages
+        except TimeoutException:
+            self._logger.error("Failed to read messages: the operation timed out")
+            return []
+        except (CmsError, CmeError) as error:
+            self._logger.error("Failed to read messages: %s", error)
+            return []
+
+    def delete_sms_message(self, message_id):
+        if not self._modem:
+            self.setup()
+
+        if not self._modem:
+            return False
+
+        try:
+            self._logger.info("Deleting SMS message: %s", message_id)
+            self._modem.deleteStoredSms(index=message_id)
+            self._logger.debug("SMS message deleted")
+            return True
+        except TimeoutException:
+            self._logger.error("Failed to delete message: the operation timed out")
+            return False
+        except (CmsError, CmeError) as error:
+            self._logger.error("Failed to delete message: %s", error)
 
     def call(self, phone_number, call_type: CallType) -> bool:
         if not phone_number:
@@ -317,3 +361,4 @@ class GSM:
             self._logger.debug("Closing modem")
             self._modem.close()
             self._modem = None
+            GSM.CONNECTS -= 1
