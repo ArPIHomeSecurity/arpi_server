@@ -122,7 +122,7 @@ class SSHKeyManager:
         """
         Check if key exists in authorized_keys
         """
-        self._logger.error("Checking if key with name %s exists", key_name)
+        self._logger.debug("Checking if key with name %s exists", key_name)
         with open(self.authorized_keys_path, "r", encoding="utf-8") as key_file:
             for line in key_file:
                 if key_name in line:
