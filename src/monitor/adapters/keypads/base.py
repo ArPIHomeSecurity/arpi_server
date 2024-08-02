@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+import logging
 import os
 from sqlalchemy.engine import create_engine
 
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
 
+from constants import LOG_ADKEYPAD
 from monitor.adapters.keypads.delay import DelayPhase, Handler
 
 
@@ -33,6 +35,7 @@ class KeypadBase(ABC):
         self._function: Action = None
         self._delay: Handler = None
         self._db_session = None
+        self._logger = logging.getLogger(LOG_ADKEYPAD)
 
     def get_last_key(self):
         return self._keys.pop(0) if self._keys else None
@@ -57,6 +60,9 @@ class KeypadBase(ABC):
             return Action.FUNCTION
 
     def initialise(self):
+        pass
+
+    def beeps(self, count, beep, mute):
         pass
 
     @abstractmethod
@@ -98,7 +104,7 @@ class KeypadBase(ABC):
                 database=os.environ.get("DB_SCHEMA", None),
             )
         except KeyError:
-            self._logger.error("Database connnection not configured")
+            self._logger.error("Database connection not configured")
             return
 
         engine = create_engine(uri)

@@ -2,7 +2,7 @@ import logging
 import os
 
 from threading import Thread, Event
-from time import time
+from time import time, sleep
 
 from models import Alert
 from monitor.config_helper import SyrenConfig, load_syren_config
@@ -85,7 +85,14 @@ class Syren(Thread):
 
     def run(self):
         db_session = Session()
-        alert = db_session.query(Alert).filter_by(end_time=None).first()
+        alert = None
+        # in some cases the alert is not immediately available
+        # may be it's related to session management
+        for _ in range(3):
+            alert = db_session.query(Alert).filter_by(end_time=None).first()
+            if alert:
+                break
+            sleep(0.2)
 
         # We need to decide if the syren should be silent or not.
 
@@ -95,41 +102,43 @@ class Syren(Thread):
         # * False: loud mode, force using syren (higher priority)
         # * True: silent mode, allow not using syren
         sensor_silent_alert = None
-        for sensor in alert.sensors:
-            if sensor.silent is None:
-                continue
-            if sensor.silent == False:
-                sensor_silent_alert = False
-                break
-            if sensor.silent == True:
-                sensor_silent_alert = sensor_silent_alert and True if sensor_silent_alert is not None else True
+        # we should have an alert at this point, but it's not always there
+        if alert is None:
+            self._logger.warning("No alert found, using syren configuration")
+        else:
+            for sensor in alert.sensors:
+                if sensor.silent is None:
+                    continue
+                if not sensor.silent:
+                    sensor_silent_alert = False
+                    break
+                if sensor.silent:
+                    sensor_silent_alert = (
+                        sensor_silent_alert and True if sensor_silent_alert is not None else True
+                    )
 
         syren_silent_alert = self._config.silent
 
         silent_alert = False
-        if syren_silent_alert == None:
+        if syren_silent_alert is None:
             # use sensor configuration if no syren configuration
             # if no sensor configuration, use default silent=False
-            silent_alert = (
-                sensor_silent_alert if sensor_silent_alert is not None else False
-            )
-        elif syren_silent_alert == False:
-            # force using syren
-            silent_alert = False
-        elif syren_silent_alert == True:
+            silent_alert = sensor_silent_alert if sensor_silent_alert is not None else False
+        elif syren_silent_alert:
             # use syren configuration if sensor configuration is not set
             # otherwise use sensor configuration
             # sensor silent=False will override syren silent=True
-            silent_alert = (
-                sensor_silent_alert if sensor_silent_alert is not None else True
-            )
+            silent_alert = sensor_silent_alert if sensor_silent_alert is not None else True
+        elif not syren_silent_alert:
+            # force using syren
+            silent_alert = False
 
         if alert:
             alert.silent = silent_alert
             db_session.commit()
 
         self._logger.info(
-            "Silent alert = %s <= Syren silent = %s, Sensor silent = %s",
+            "Silent alert = %s <= Syren silent = %s + Sensor silent = %s",
             silent_alert,
             syren_silent_alert,
             sensor_silent_alert,
