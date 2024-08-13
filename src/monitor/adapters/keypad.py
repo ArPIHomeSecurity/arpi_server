@@ -19,6 +19,7 @@ from monitor.adapters.mock.keypad import MockKeypad
 from monitor.broadcast import Broadcaster
 from constants import (
     ARM_AWAY,
+    ARM_DISARM,
     ARM_STAY,
     LOG_ADKEYPAD,
     MONITOR_ARM_AWAY,
@@ -146,9 +147,10 @@ class KeypadHandler(Thread):
                 elif message["action"] == MONITORING_ALERT_DELAY and self._keypad:
                     self.alert_delay()
                 elif message["action"] == MONITOR_DISARM and self._keypad:
-                    self._logger.info("Keypad disarmed")
-                    self._keypad.set_armed(False)
-                    self._keypad.stop_delay()
+                    if States.get(State.ARM) != ARM_DISARM:
+                        self._logger.info("Keypad disarmed")
+                        self._keypad.set_armed(False)
+                        self._keypad.stop_delay()
                 elif message["action"] == MONITOR_STOP:
                     break
 

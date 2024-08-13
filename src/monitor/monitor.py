@@ -234,7 +234,12 @@ class Monitor(Thread):
         """
         Disarm the monitoring system.
         """
-        self._logger.info("Disarming")
+        self._logger.info("Disarming user=%s, keypad=%s", user_id, keypad_id)
+
+        # do not disarm if the system is already disarmed
+        if States.get(State.ARM) == ARM_DISARM:
+            self._logger.info("System is already disarmed")
+            return
 
         if area_id is not None:
             # arm the system and the area
