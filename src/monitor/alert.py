@@ -41,12 +41,13 @@ class SensorAlert(Thread):
         SensorAlert(sensor_id, delay, alert_type, sensitivity, broadcaster).start()
 
     @classmethod
-    def stop_alerts(cls, disarm: Disarm):
+    def stop_alerts(cls, disarm_id: int):
         cls._stop_event.set()
         send_alert_state(None)
 
         db_session = get_database_session()
         alert = db_session.query(Alert).filter_by(end_time=None).first()
+        disarm = db_session.query(Disarm).get(disarm_id)
         if alert:
             alert.end_time = datetime.now()
             alert.disarm = disarm

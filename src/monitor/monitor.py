@@ -287,7 +287,7 @@ class Monitor(Thread):
             # update output channel
             OutputHandler.send_system_disarmed()
 
-        self.stop_alert(disarm)
+        self.stop_alert(disarm.id)
 
     def update_arm(self, arm_type, user_id, keypad_id):
         """
@@ -348,5 +348,5 @@ class Monitor(Thread):
 
     def stop_alert(self, disarm: Disarm):
         self._sensor_handler.on_alert_stopped()
-        SensorAlert.stop_alerts(disarm)
+        SensorAlert.stop_alerts(disarm_id)
         Syren.stop_syren()
