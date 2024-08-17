@@ -42,7 +42,8 @@ def stop_background_service():
     logger.debug("Stopping background service")
     stop_event.set()
 
-    if background_service:
+    # check if the background service is running
+    if background_service and background_service.is_alive():
         background_service.join()
 
 

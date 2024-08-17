@@ -6,7 +6,7 @@ import json
 from dataclasses import asdict, dataclass
 
 from models import Option
-from monitor.database import Session
+from monitor.database import get_database_session
 
 
 @dataclass
@@ -78,7 +78,7 @@ def load_config(name, section, config_type, session=None):
     new_session = False
     if session is None:
         new_session = True
-        session = Session()
+        session = get_database_session()
 
     config = session.query(Option).filter_by(name=name, section=section).first()
 
@@ -102,7 +102,7 @@ def save_config(name: str, section: str, value: dict, session=None):
     new_session = False
     if session is None:
         new_session = True
-        session = Session()
+        session = get_database_session()
 
     config = session.query(Option).filter_by(name=name, section=section).first()
     if not config:

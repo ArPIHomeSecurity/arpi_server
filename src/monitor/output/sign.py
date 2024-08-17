@@ -10,7 +10,7 @@ from time import sleep, time
 
 from constants import LOG_OUTPUT
 from models import Output
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
 from monitor.socket_io import send_output_state
 
@@ -37,7 +37,7 @@ class OutputSign(Thread):
         self.daemon = True
 
     def run(self):
-        session = Session()
+        session = get_database_session()
         channel = self._output.channel
         delay = self._output.delay
         duration = self._output.duration

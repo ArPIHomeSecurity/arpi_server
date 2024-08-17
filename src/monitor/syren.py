@@ -6,7 +6,7 @@ from time import time, sleep
 
 from models import Alert
 from monitor.config_helper import SyrenConfig, load_syren_config
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.socket_io import send_syren_state
 
 from constants import LOG_ALERT, THREAD_ALERT
@@ -84,7 +84,7 @@ class Syren(Thread):
         self._config = config
 
     def run(self):
-        db_session = Session()
+        db_session = get_database_session()
         alert = None
         # in some cases the alert is not immediately available
         # may be it's related to session management

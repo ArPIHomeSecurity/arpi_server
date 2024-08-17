@@ -11,7 +11,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
 from models import Area, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
-from monitor.database import Session
+from monitor.database import get_database_session
 from models import metadata
 
 
@@ -22,7 +22,7 @@ SENSOR_TYPES = [
     SensorType(4, name="Break", description="Detect glass break"),
 ]
 
-session = Session()
+session = get_database_session()
 
 
 def cleanup():

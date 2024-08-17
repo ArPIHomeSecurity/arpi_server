@@ -49,7 +49,7 @@ from monitor.adapters.power import PowerAdapter
 from monitor.broadcast import Broadcaster
 from monitor.notifications.notifier import Notifier
 from monitor.syren import Syren
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_power_state, send_syren_state
 from tools.queries import get_arm_delay
@@ -85,7 +85,7 @@ class Monitor(Thread):
         self._logger.info("Monitoring started")
 
         # create the database session in the thread
-        self._db_session = Session()
+        self._db_session = get_database_session()
 
         # cleanup the database
         self.cleanup_database()

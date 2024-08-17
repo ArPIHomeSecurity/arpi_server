@@ -7,7 +7,7 @@ from models import Alert, AlertSensor, Arm, Disarm, Sensor
 from monitor.config_helper import AlertSensitivityConfig
 from monitor.storage import States, State
 from monitor.broadcast import Broadcaster
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
 from monitor.socket_io import send_syren_state, send_alert_state
 from monitor.syren import Syren
@@ -45,7 +45,7 @@ class SensorAlert(Thread):
         cls._stop_event.set()
         send_alert_state(None)
 
-        db_session = Session()
+        db_session = get_database_session()
         alert = db_session.query(Alert).filter_by(end_time=None).first()
         if alert:
             alert.end_time = datetime.now()
@@ -105,7 +105,7 @@ class SensorAlert(Thread):
         )
 
         new_alert = False
-        session = Session()
+        session = get_database_session()
         alert = session.query(Alert).filter_by(end_time=None).first()
         if alert is None:
             alert = self.create_alert(session)

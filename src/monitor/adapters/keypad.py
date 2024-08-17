@@ -1,39 +1,26 @@
 import contextlib
 import logging
 import os
-
 from datetime import datetime as dt
 from queue import Empty, Queue
 from threading import Thread
 from time import time
 
-from sqlalchemy.engine import create_engine
-from sqlalchemy.engine.url import URL
-from sqlalchemy.orm.session import sessionmaker
-
+from constants import (ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_ADKEYPAD,
+                       MONITOR_ARM_AWAY, MONITOR_ARM_STAY, MONITOR_DISARM,
+                       MONITOR_REGISTER_CARD, MONITOR_STOP,
+                       MONITOR_UPDATE_KEYPAD, MONITORING_ALERT,
+                       MONITORING_ALERT_DELAY, THREAD_KEYPAD)
 from models import Arm, Card, Keypad, User, hash_code
-from monitor.storage import States, State
 from monitor.adapters import KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
 from monitor.adapters.mock.keypad import MockKeypad
 from monitor.broadcast import Broadcaster
-from constants import (
-    ARM_AWAY,
-    ARM_DISARM,
-    ARM_STAY,
-    LOG_ADKEYPAD,
-    MONITOR_ARM_AWAY,
-    MONITOR_ARM_STAY,
-    MONITOR_DISARM,
-    MONITOR_REGISTER_CARD,
-    MONITOR_STOP,
-    MONITOR_UPDATE_KEYPAD,
-    MONITORING_ALERT,
-    MONITORING_ALERT_DELAY,
-    THREAD_KEYPAD,
-)
+from monitor.database import get_database_session
 from monitor.socket_io import send_card_registered
-from tools.queries import get_alert_delay, get_arm_delay, get_user_with_access_code
+from monitor.storage import State, States
+from tools.queries import (get_alert_delay, get_arm_delay,
+                           get_user_with_access_code)
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitor.adapters.keypads.dsc import DSCKeypad
@@ -54,31 +41,9 @@ class KeypadHandler(Thread):
 
         self._broadcaster.register_queue(id(self), self._actions)
 
-    def get_database_session(self):
-        if not self._db_session:
-            url = None
-            try:
-                url = URL.create(
-                    drivername="postgresql+psycopg2",
-                    username=os.environ.get("DB_USER", None),
-                    password=os.environ.get("DB_PASSWORD", None),
-                    host=os.environ.get("DB_HOST", None),
-                    port=os.environ.get("DB_PORT", None),
-                    database=os.environ.get("DB_SCHEMA", None)
-                )
-            except KeyError:
-                self._logger.error("Database connection not configured")
-                return
-
-            engine = create_engine(url)
-            Session = sessionmaker(bind=engine)
-            self._db_session = Session()
-
-        return self._db_session
-
     def configure(self):
         self._logger.debug("Configure keypad")
-        db_session = self.get_database_session()
+        db_session = get_database_session()
         keypad_settings = db_session.query(Keypad).first()
 
         if keypad_settings is None or not keypad_settings.enabled:
@@ -183,7 +148,7 @@ class KeypadHandler(Thread):
                     self._logger.error("Unknown keypad action: %s", action)
 
     def arm_keypad(self, arm_type, delay):
-        arm_delay = get_arm_delay(self.get_database_session(), arm_type) if delay else 0
+        arm_delay = get_arm_delay(get_database_session(), arm_type) if delay else 0
         self._logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
         self._keypad.set_armed(True)
 
@@ -191,7 +156,7 @@ class KeypadHandler(Thread):
         # synchronizing the two threads
         arm = None
         while not arm:
-            arm = self.get_database_session().query(Arm).filter_by(disarm=None).first()
+            arm = get_database_session().query(Arm).filter_by(disarm=None).first()
         self._logger.debug("Arm: %s", arm)
 
         if arm_delay is not None and arm_delay > 0:
@@ -199,7 +164,7 @@ class KeypadHandler(Thread):
 
     def alert_delay(self):
         arm_type = States.get(State.ARM)
-        alert_delay = get_alert_delay(self.get_database_session(), arm_type)
+        alert_delay = get_alert_delay(get_database_session(), arm_type)
         self._logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
 
         # TODO: for now we don't have a reference time as for delayed arm
@@ -208,7 +173,7 @@ class KeypadHandler(Thread):
             self._keypad.start_delay(dt.now(), alert_delay)
 
     def handle_access_code(self, presses):
-        user = get_user_with_access_code(self.get_database_session(), presses)
+        user = get_user_with_access_code(get_database_session(), presses)
         if user:
             self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
@@ -254,7 +219,7 @@ class KeypadHandler(Thread):
             self._logger.error("Unknown function: %s", function)
 
     def get_card_by_number(self, number) -> Card:
-        db_session = self.get_database_session()
+        db_session = get_database_session()
         users = db_session.query(User).all()
 
         cards = []
@@ -268,7 +233,7 @@ class KeypadHandler(Thread):
 
     def register_card(self, card):
         """Find the first user from the database with valid card registration"""
-        db_session = self.get_database_session()
+        db_session = get_database_session()
         users = db_session.query(User).filter(User.card_registration_expiry >= 'NOW()').all()
         if users:
             card = Card(card, users[0].id)

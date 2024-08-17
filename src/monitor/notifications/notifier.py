@@ -14,7 +14,7 @@ from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
 from monitor.broadcast import Broadcaster
 from constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
 from monitor.adapters.smtp import SMTPSender
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.notifications.notification import Notification, NotificationType
 from tools.queries import get_user_with_access_code
 
@@ -353,7 +353,7 @@ class Notifier(Thread):
     @staticmethod
     def load_options() -> NotifierOptions:
         logger = logging.getLogger(LOG_NOTIFIER)
-        db_session = Session()
+        db_session = get_database_session()
         sections = {
             "subscriptions": Subscriptions,
             "smtp": SMTPOption,
@@ -406,7 +406,7 @@ class Notifier(Thread):
             self._notifications.put(notification)
 
     def handle_call_feedback(self, feedback: str) -> bool:
-        db_session = Session()
+        db_session = get_database_session()
         user = get_user_with_access_code(db_session, feedback)
         if user:
             self._logger.info("Disarming based on dmtf code of user %s", user.name)

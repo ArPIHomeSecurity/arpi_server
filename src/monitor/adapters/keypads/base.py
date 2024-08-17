@@ -1,11 +1,6 @@
+import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-import logging
-import os
-from sqlalchemy.engine import create_engine
-
-from sqlalchemy.engine.url import URL
-from sqlalchemy.orm.session import sessionmaker
 
 from constants import LOG_ADKEYPAD
 from monitor.adapters.keypads.delay import DelayPhase, Handler
@@ -34,7 +29,6 @@ class KeypadBase(ABC):
         self._card = None
         self._function: Action = None
         self._delay: Handler = None
-        self._db_session = None
         self._logger = logging.getLogger(LOG_ADKEYPAD)
 
     def get_last_key(self):
@@ -88,28 +82,6 @@ class KeypadBase(ABC):
     @abstractmethod
     def communicate(self):
         pass
-
-    def get_database_session(self):
-        if self._db_session:
-            return self._db_session
-
-        uri = None
-        try:
-            uri = URL(
-                drivername="postgresql+psycopg2",
-                username=os.environ.get("DB_USER", None),
-                password=os.environ.get("DB_PASSWORD", None),
-                host=os.environ.get("DB_HOST", None),
-                port=os.environ.get("DB_PORT", None),
-                database=os.environ.get("DB_SCHEMA", None),
-            )
-        except KeyError:
-            self._logger.error("Database connection not configured")
-            return
-
-        engine = create_engine(uri)
-        self._db_session = sessionmaker(bind=engine)()
-        return self._db_session
 
     def manage_delay(self):
         if self._delay:

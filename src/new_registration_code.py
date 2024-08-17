@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv("secrets.env")
 
+
+# pylint: disable=wrong-import-position,wrong-import-order
 import contextlib
 import logging
 
@@ -13,7 +15,7 @@ from logging import basicConfig
 from time import sleep
 
 from models import User
-from monitor.database import Session
+from monitor.database import get_database_session
 
 
 description = """
@@ -22,7 +24,7 @@ Adding new registration code to restore access for a given user.
 Executing without a user id you will get a list of users.
 """
 
-session = Session()
+session = get_database_session()
 
 basicConfig(level=logging.INFO, format="%(message)s")
 
