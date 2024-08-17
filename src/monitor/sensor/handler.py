@@ -13,7 +13,7 @@ from constants import (
     ALERT_STAY,
     ARM_AWAY,
     ARM_STAY,
-    LOG_MONITOR,
+    LOG_SENSORS,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_ARM_DELAY,
@@ -55,7 +55,7 @@ class SensorHandler:
     """
 
     def __init__(self, session, broadcaster):
-        self._logger = logging.getLogger(LOG_MONITOR)
+        self._logger = logging.getLogger(LOG_SENSORS)
         self._db_session = session
         self._broadcaster = broadcaster
         self._sensor_adapter = SensorAdapter()
@@ -275,7 +275,7 @@ class SensorHandler:
         # save current state to avoid concurrency
         current_monitoring = States.get(State.MONITORING)
         now = dt.now()
-        self._logger.debug("Checking sensors in %s", current_monitoring)
+        self._logger.trace("Checking sensors in %s", current_monitoring)
 
         arm: Arm = None
         if current_monitoring == MONITORING_ARM_DELAY:
@@ -347,8 +347,11 @@ class SensorHandler:
                     SensorAlert.start_alert(
                         sensor.id, delay, alert_type, sensitivity, self._broadcaster
                     )
-                else:
-                    self._logger.debug("Don not start alert on sensor: %s", sensor.id)
+                
+                if alert_type is None:
+                    self._logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
+                if delay is None:
+                    self._logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
 
             # stop alert of sensor
             elif (
@@ -426,7 +429,7 @@ class SensorHandler:
             ):
                 return ALERT_STAY
         else:
-            logging.getLogger(LOG_MONITOR).error("Unknown monitoring state")
+            logging.getLogger(LOG_SENSORS).error("Unknown monitoring state")
 
     @staticmethod
     def get_sensor_delay(sensor: Sensor, monitoring_state):
@@ -434,7 +437,7 @@ class SensorHandler:
         Identify the delay based on the sensor and the monitoring state.
         """
         # sabotage has higher priority
-        logger = logging.getLogger(LOG_MONITOR)
+        logger = logging.getLogger(LOG_SENSORS)
         delay = None
         if monitoring_state == MONITORING_READY:
             if sensor.zone.disarmed_delay is not None:
