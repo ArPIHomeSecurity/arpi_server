@@ -93,7 +93,7 @@ class KeypadHandler(Thread):
         register_card = False
         while True:
             with contextlib.suppress(Empty):
-                self._logger.debug("Wait for command...")
+                self._logger.trace("Wait for command...")
                 message = self._actions.get(timeout=COMMUNICATION_PERIOD)
                 self._logger.debug("Command: %s", message)
 

@@ -172,7 +172,7 @@ class DSCKeypad(KeypadBase):
         self._lights.ready = state
 
     def communicate(self):
-        self._logger.debug("Start communication DSC...")
+        self._logger.trace("Start communication DSC...")
         # send partition status info in every roud
         self.send_command(self.send_partition_status)
 

@@ -37,7 +37,7 @@ class SensorAdapter(object):
             return 0
 
         value = int(self._channels[channel].value)
-        self._logger.debug("Value[CH%02d]: %s", channel+1, value)
+        self._logger.trace("Value[CH%02d]: %s", channel+1, value)
         return value
 
     def get_values(self):

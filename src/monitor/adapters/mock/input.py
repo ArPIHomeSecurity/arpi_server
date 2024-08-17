@@ -22,7 +22,7 @@ class SimulatorBasedMockInput(object):
             # write+create if not exists
             with open("simulator_input.json") as channels_file:
                 channels_data = json.load(channels_file)
-                self._logger.debug("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
+                self._logger.trace("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
                 # simulate random noise
                 # if time() % 10 > 5:
                 #     return 0
