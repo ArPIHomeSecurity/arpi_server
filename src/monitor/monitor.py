@@ -238,7 +238,10 @@ class Monitor(Thread):
         self._logger.info("Disarming user=%s, keypad=%s", user_id, keypad_id)
 
         # do not disarm if the system is already disarmed
-        if States.get(State.ARM) == ARM_DISARM:
+        if (
+            States.get(State.ARM) == ARM_DISARM and
+            States.get(State.MONITORING) != MONITORING_SABOTAGE
+        ):
             self._logger.info("System is already disarmed")
             return
 

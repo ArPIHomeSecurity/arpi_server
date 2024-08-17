@@ -383,7 +383,9 @@ class SensorHandler:
         """
         Callback for the alert stopped event.
         """
-        self._alerting_sensors.clear()
+        # do not clear the alerting sensors
+        # because in sabotage mode the alert will be triggered again
+        # self._alerting_sensors.clear()
 
     def close(self):
         """
