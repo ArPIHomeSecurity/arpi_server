@@ -98,6 +98,14 @@ def send_card_registered():
     send_message("card_registered", True)
 
 
+def send_card_not_registered():
+    send_message("card_registered", False)
+
+
+def send_card_registration_expired():
+    send_message("card_registration_expired", None)
+
+
 def send_output_state(output_id, output_state):
     send_message("output_state_change", {"id": output_id, "state": output_state})
 

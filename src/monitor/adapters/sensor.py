@@ -4,7 +4,7 @@ import logging
 from monitor.adapters import CHANNEL_GPIO_PINS
 from constants import LOG_ADSENSOR
 
-# check if running on Raspberry
+# check if running with simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import DigitalInputDevice
 else:

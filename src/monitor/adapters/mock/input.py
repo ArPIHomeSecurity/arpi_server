@@ -2,7 +2,6 @@ import json
 import logging
 import threading
 
-from time import time
 from constants import LOG_ADSENSOR
 
 

@@ -1,6 +1,5 @@
 import contextlib
 import logging
-import os
 from datetime import datetime as dt
 from queue import Empty, Queue
 from threading import Thread
@@ -14,19 +13,18 @@ from constants import (ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_ADKEYPAD,
 from models import Arm, Card, Keypad, User, hash_code
 from monitor.adapters import KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
-from monitor.adapters.mock.keypad import MockKeypad
+from monitor.adapters.keypads.dsc import DSCKeypad
+from monitor.adapters.keypads.wiegand import WiegandKeypad
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
-from monitor.socket_io import send_card_registered
+from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
 from tools.queries import (get_alert_delay, get_arm_delay,
                            get_user_with_access_code)
 
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.keypads.dsc import DSCKeypad
-    from monitor.adapters.keypads.wiegand import WiegandKeypad
 
 COMMUNICATION_PERIOD = 0.2  # sec
+CARD_REGISTRATION_EXPIRY = 120  # sec
 
 
 class KeypadHandler(Thread):
@@ -52,15 +50,7 @@ class KeypadHandler(Thread):
             db_session.close()
             return
 
-        # check if running on Raspberry
-        if os.environ.get("USE_SIMULATOR", "true").lower() == "true":
-            self._keypad = MockKeypad(KEYBUS_PIN1, KEYBUS_PIN0)
-            keypad_settings.type.name = "MOCK"
-            # see data.py -=> env_test_01
-            keypad = db_session.query(Keypad).filter_by(type_id=3).first()
-            if keypad:
-                self._keypad.id = keypad.id
-        elif keypad_settings.type.name == "DSC":
+        if keypad_settings.type.name == "DSC":
             self._keypad = DSCKeypad(KEYBUS_PIN1, KEYBUS_PIN0)
             self._keypad.id = keypad_settings.id
         elif keypad_settings.type.name == "WIEGAND":
@@ -90,7 +80,7 @@ class KeypadHandler(Thread):
     def communicate(self):
         last_press = int(time())
         presses = ""
-        register_card = False
+        register_card_start = None
         while True:
             with contextlib.suppress(Empty):
                 self._logger.trace("Wait for command...")
@@ -102,7 +92,7 @@ class KeypadHandler(Thread):
                     self.configure()
                     last_press = int(time())
                 elif message["action"] == MONITOR_REGISTER_CARD:
-                    register_card = True
+                    register_card_start = time()
                 elif message["action"] == MONITOR_ARM_AWAY and self._keypad:
                     self.arm_keypad(ARM_AWAY, message.get("use_delay", True))
                 elif message["action"] == MONITOR_ARM_STAY and self._keypad:
@@ -118,6 +108,10 @@ class KeypadHandler(Thread):
                         self._keypad.stop_delay()
                 elif message["action"] == MONITOR_STOP:
                     break
+
+            if register_card_start and time() - register_card_start > CARD_REGISTRATION_EXPIRY:
+                register_card_start = None
+                send_card_not_registered()
 
             if self._keypad is not None:
                 self._keypad.communicate()
@@ -137,9 +131,9 @@ class KeypadHandler(Thread):
                         self.handle_access_code(presses)
                         presses = ""
                 elif action == Action.CARD:
-                    if register_card:
+                    if register_card_start is not None:
                         self.register_card(self._keypad.get_card())
-                        register_card = False
+                        register_card_start = None
                     else:
                         self.handle_card(self._keypad.get_card())
                 elif action == Action.FUNCTION:
@@ -183,7 +177,7 @@ class KeypadHandler(Thread):
                 "keypad_id": self._keypad.id
             })
         else:
-            self._logger.info("Invalid code")
+            self._logger.debug("Invalid code")
             self._keypad.set_error(True)
 
     def handle_card(self, card):
@@ -236,6 +230,11 @@ class KeypadHandler(Thread):
         db_session = get_database_session()
         users = db_session.query(User).filter(User.card_registration_expiry >= 'NOW()').all()
         if users:
+            if db_session.query(Card).filter_by(code=hash_code(card)).first():
+                self._logger.info("Card already registered")
+                send_card_not_registered()
+                return
+
             card = Card(card, users[0].id)
             self._logger.debug("Card created: %s", card)
             db_session.add(card)

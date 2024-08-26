@@ -19,7 +19,7 @@ from monitor.notifications.notification import Notification, NotificationType
 from tools.queries import get_user_with_access_code
 
 
-# check if running on Raspberry
+# check if running with simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from monitor.adapters.gsm import GSM
 else:

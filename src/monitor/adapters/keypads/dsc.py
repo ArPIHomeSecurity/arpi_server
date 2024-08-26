@@ -1,8 +1,12 @@
 import logging
 from datetime import datetime
+import os
 from time import sleep, time
 
-import RPi.GPIO as GPIO
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
+    import RPi.GPIO as GPIO
+else:
+    import monitor.adapters.mock.gpio as GPIO
 
 from monitor.adapters.keypads.base import KeypadBase
 from constants import LOG_ADKEYPAD
