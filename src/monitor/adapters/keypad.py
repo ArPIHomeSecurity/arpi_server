@@ -125,7 +125,7 @@ class KeypadHandler(Thread):
                 action = self._keypad.last_action()
                 if action == Action.KEY:
                     presses += self._keypad.get_last_key()
-                    self._logger.debug("Presses: '%s'", presses)
+                    self._logger.trace("Presses: '%s'", presses)
                     last_press = time()
                     if len(presses) == 4:
                         self.handle_access_code(presses)

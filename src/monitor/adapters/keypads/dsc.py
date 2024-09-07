@@ -266,7 +266,7 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_partition_status(self):
-        self._logger.debug("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
+        self._logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive([self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED])
 

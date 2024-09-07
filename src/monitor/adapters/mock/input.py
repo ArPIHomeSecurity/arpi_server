@@ -19,18 +19,21 @@ class SimulatorBasedMockInput(object):
 
         with lock:
             # write+create if not exists
-            with open("simulator_input.json") as channels_file:
-                channels_data = json.load(channels_file)
-                self._logger.trace("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
-                # simulate random noise
-                # if time() % 10 > 5:
-                #     return 0
-                return channels_data[self._channel]
-            
+            try:
+                with open("simulator_input.json") as channels_file:
+                    channels_data = json.load(channels_file)
+                    self._logger.trace("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
+                    # simulate random noise
+                    # if time() % 10 > 5:
+                    #     return 0
+                    return channels_data[self._channel]
+            except FileNotFoundError:
+                return 0
+
     @property
     def is_pressed(self):
         return self.value == 1
-    
+
     def close(self):
         self._logger.debug("Closing mock input %s on channel %s", self.__class__, self._channel)
 
