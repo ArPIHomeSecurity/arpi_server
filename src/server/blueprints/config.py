@@ -1,3 +1,4 @@
+import json
 import os
 
 from flask import jsonify, request, Response
@@ -118,3 +119,20 @@ def delete_sms_messages(message_id):
         return process_ipc_response(IPCClient().delete_sms_message(message_id))
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+
+@config_blueprint.route("/api/config/installation", methods=["GET"])
+def get_installation():
+    dyndns = db.session \
+        .query(Option) \
+        .filter_by(name="network", section="dyndns") \
+        .first()
+
+    if dyndns:
+        dyndns = json.loads(dyndns.value)
+
+        # TODO: find out if use localhost or arpi.local
+        return jsonify({
+            "primaryDomain": dyndns.get("hostname", "localhost") or "localhost",
+            "secondaryDomain": "localhost",
+        })

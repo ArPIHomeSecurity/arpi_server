@@ -693,6 +693,8 @@ class User(BaseModel):
     def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
             registration_code = str(uuid.uuid4()).upper().split("-")[-1]
+        else:
+            registration_code = registration_code.upper()
 
         registration_expiry = None
         if expiry is None:
