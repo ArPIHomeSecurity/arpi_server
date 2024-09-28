@@ -129,7 +129,7 @@ class DynDns:
         try:
             args.provider = noip_config.provider
             args.usertoken = noip_config.username
-            args.password = noip_config.password.replace(".duckdns.org", "")
+            args.password = noip_config.password
             args.hostname = noip_config.hostname
             args.ip = noip_config.ip
             return execute_update(args)
