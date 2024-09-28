@@ -158,7 +158,6 @@ def register_device():
                 "origin": request.environ["HTTP_ORIGIN"],
                 "user_id": db_user.id,
             }
-            sleep(5)
             return jsonify(
                 {
                     "device_token": jwt.encode(
