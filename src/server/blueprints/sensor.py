@@ -114,7 +114,7 @@ def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
             db.session.query(Sensor)
-            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True, deleted=False)
             .first()
             is not None
         )
