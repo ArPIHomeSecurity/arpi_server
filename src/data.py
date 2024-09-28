@@ -51,7 +51,7 @@ def env_prod():
     session.add_all([kt1, kt2])
     print(" - Created keypad types")
 
-    k1 = Keypad(keypad_type=kt1)
+    k1 = Keypad(keypad_type=kt2)
     session.add_all([k1])
     print(" - Created keypads")
 
