@@ -1,10 +1,17 @@
 
 import logging
-from re import compile
+import os
+import re
+
 from time import sleep
 
-from gpiozero import LED
-from pywiegand import WiegandReader
+
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
+    from gpiozero import LED
+    from pywiegand import WiegandReader
+else:
+    from monitor.adapters.mock.gpio import LED
+    from monitor.adapters.mock.wiegand import WiegandReader
 
 from monitor.adapters.keypads.base import Function, KeypadBase
 from constants import LOG_ADKEYPAD
@@ -14,7 +21,7 @@ from constants import LOG_ADKEYPAD
 ACTION_AWAY = "#1"
 ACTION_STAY = "#2"
 
-FUNCTION_REGEX = compile(r'([#]\d)')
+FUNCTION_REGEX = re.compile(r'([#]\d)')
 
 
 class WiegandKeypad(KeypadBase):
@@ -63,7 +70,7 @@ class WiegandKeypad(KeypadBase):
         self._logger.debug("Wiegand(Data:%s Bit count:%s)", data, pending_bits)
 
         if pending_bits in (26, 34):
-            self._card = data
+            self._card = data[0]
             self._logger.debug("Using card: %s", self._card)
         else:
             keys = data

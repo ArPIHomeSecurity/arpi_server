@@ -10,11 +10,12 @@ from flask import Flask
 from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
-from models import Option
 from constants import LOG_SOCKETIO
-from monitor.database import Session
+from models import Option
+from monitor.database import get_database_session
 
-session = Session()
+
+session = get_database_session()
 logger = logging.getLogger(LOG_SOCKETIO)
 
 noip_config = session.query(Option).filter_by(name="network", section="dyndns").first()
@@ -95,6 +96,14 @@ def send_power_state(power_state):
 
 def send_card_registered():
     send_message("card_registered", True)
+
+
+def send_card_not_registered():
+    send_message("card_registered", False)
+
+
+def send_card_registration_expired():
+    send_message("card_registration_expired", None)
 
 
 def send_output_state(output_id, output_state):

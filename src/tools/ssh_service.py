@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from gi.repository import GLib
 from pydbus import SystemBus
 
+from monitor.database import get_database_session
+
 
 load_dotenv()
 load_dotenv("secrets.env")
@@ -24,7 +26,7 @@ class SSHService:
         super(SSHService, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
         self._bus = SystemBus()
-        self._ssh_config = load_ssh_config()
+        self._ssh_config = load_ssh_config(get_database_session(new_connection=True))
 
     def update_service_state(self):
         self._logger.debug("Updating SSH service state...")

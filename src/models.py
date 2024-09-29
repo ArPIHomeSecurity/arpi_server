@@ -766,7 +766,7 @@ class Card(BaseModel):
     @staticmethod
     def generate_card_description():
         """Example: 2021-10-30_08:15_284"""
-        return f"{dt.now().isoformat().replace('T', '_')[:16]}_{str(uuid.uuid1(1000).int)[:3]}"
+        return f"{dt.now().isoformat().replace('T', ' ')[:16]} ({str(uuid.uuid1(1000).int)[:3]})"
 
     def update(self, data):
         fields = ("enabled", "description")

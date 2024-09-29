@@ -63,7 +63,7 @@ class States:
                 fcntl.flock(status_file, fcntl.LOCK_EX)
                 cls._data = json.load(status_file)
                 fcntl.flock(status_file, fcntl.LOCK_UN)
-        except FileNotFoundError:
+        except (FileNotFoundError, json.JSONDecodeError):
             cls._data = {}
 
         for key in cls._data.keys():

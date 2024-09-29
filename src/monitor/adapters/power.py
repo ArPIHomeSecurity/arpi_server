@@ -4,7 +4,7 @@ import logging
 from monitor.adapters import POWER_PIN
 from constants import LOG_ADPOWER
 
-# check if running on Raspberry
+# check if running with simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import DigitalInputDevice
 else:

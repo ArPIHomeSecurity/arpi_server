@@ -49,7 +49,7 @@ from monitor.adapters.power import PowerAdapter
 from monitor.broadcast import Broadcaster
 from monitor.notifications.notifier import Notifier
 from monitor.syren import Syren
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_power_state, send_syren_state
 from tools.queries import get_arm_delay
@@ -85,7 +85,7 @@ class Monitor(Thread):
         self._logger.info("Monitoring started")
 
         # create the database session in the thread
-        self._db_session = Session()
+        self._db_session = get_database_session()
 
         # cleanup the database
         self.cleanup_database()
@@ -136,6 +136,7 @@ class Monitor(Thread):
                 message = self._actions.get(True, message_wait_time)
                 self._logger.debug("Action: %s", message)
                 if message["action"] == MONITOR_STOP:
+                    # stop the alert without disarm
                     self.stop_alert(None)
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
@@ -234,7 +235,15 @@ class Monitor(Thread):
         """
         Disarm the monitoring system.
         """
-        self._logger.info("Disarming")
+        self._logger.info("Disarming user=%s, keypad=%s", user_id, keypad_id)
+
+        # do not disarm if the system is already disarmed
+        if (
+            States.get(State.ARM) == ARM_DISARM and
+            States.get(State.MONITORING) != MONITORING_SABOTAGE
+        ):
+            self._logger.info("System is already disarmed")
+            return
 
         if area_id is not None:
             # arm the system and the area
@@ -282,7 +291,7 @@ class Monitor(Thread):
             # update output channel
             OutputHandler.send_system_disarmed()
 
-        self.stop_alert(disarm)
+        self.stop_alert(disarm.id)
 
     def update_arm(self, arm_type, user_id, keypad_id):
         """
@@ -307,6 +316,9 @@ class Monitor(Thread):
         self._db_session.commit()
 
     def check_power(self):
+        """
+        Check the power source and send the state if it changed
+        """
         # load the value once from the adapter
         new_power_source = self._power_adapter.source_type
         if new_power_source == PowerAdapter.SOURCE_BATTERY:
@@ -314,7 +326,7 @@ class Monitor(Thread):
             self._logger.debug("System works from battery")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK:
             States.set(State.POWER, POWER_SOURCE_NETWORK)
-            self._logger.debug("System works from network")
+            self._logger.trace("System works from network")
 
         if (
             new_power_source == PowerAdapter.SOURCE_BATTERY
@@ -334,6 +346,9 @@ class Monitor(Thread):
         self._power_source = new_power_source
 
     def cleanup_database(self):
+        """
+        Cleanup invalid values in the database.
+        """
         # overwrite invalid values in the database with default values
         load_ssh_config(cleanup=True, session=self._db_session)
         load_syren_config(cleanup=True, session=self._db_session)
@@ -341,7 +356,10 @@ class Monitor(Thread):
         load_dyndns_config(cleanup=True, session=self._db_session)
         self._db_session.commit()
 
-    def stop_alert(self, disarm: Disarm):
+    def stop_alert(self, disarm_id: int):
+        """
+        Stop the alerting.
+        """
         self._sensor_handler.on_alert_stopped()
-        SensorAlert.stop_alerts(disarm)
+        SensorAlert.stop_alerts(disarm_id)
         Syren.stop_syren()

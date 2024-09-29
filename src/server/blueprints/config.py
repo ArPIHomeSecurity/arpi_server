@@ -74,11 +74,47 @@ def test_sms():
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
 
+@config_blueprint.route("/api/config/test_call", methods=["GET"])
+@authenticated()
+@restrict_host
+def test_call():
+    if request.method == "GET":
+        return process_ipc_response(IPCClient().make_test_call())
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+
 @config_blueprint.route("/api/config/test_syren", methods=["GET"])
 @authenticated()
 @restrict_host
 def test_syren():
     if request.method == "GET":
         return process_ipc_response(IPCClient().send_test_syren(int(request.args.get("duration", None))))
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+
+@config_blueprint.route("/api/config/sms", methods=["GET"])
+@authenticated()
+@restrict_host
+def get_sms_messages():
+    if request.method == "GET":
+        # get sms messages without using process_ipc_response
+        # to be able to return a list of messages instead of a dictionary
+        messages = IPCClient().get_sms_messages()
+        if messages:
+            return jsonify(messages["value"])
+
+        return jsonify(None)
+
+    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+
+@config_blueprint.route("/api/config/sms/<int:message_id>", methods=["DELETE"])
+@authenticated()
+@restrict_host
+def delete_sms_messages(message_id):
+    if request.method == "DELETE":
+        return process_ipc_response(IPCClient().delete_sms_message(message_id))
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)

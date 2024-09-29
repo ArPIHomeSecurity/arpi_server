@@ -12,7 +12,7 @@ from threading import Event, Thread
 from constants import LOG_OUTPUT, MONITOR_STOP, MONITOR_UPDATE_CONFIG
 from models import Area, Output, OutputTriggerType
 from monitor.broadcast import Broadcaster
-from monitor.database import Session
+from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
 from monitor.output.notification import Notification, EventType, TriggerSource
 from monitor.output.sign import OutputSign
@@ -108,7 +108,7 @@ class OutputHandler(Thread):
         Load outputs from database
         """
         self._logger.debug("Loading outputs from database")
-        db_session = Session()
+        db_session = get_database_session()
         self._outputs = db_session.query(Output).all()
 
         # initialize output default states
@@ -117,7 +117,7 @@ class OutputHandler(Thread):
         for output in self._outputs:
             if output.channel is not None:
                 adapter.control_channel(output.channel, output.default_state)
-                send_output_state(output.id, False)
+                send_output_state(output.id, output.state)
 
         db_session.close()
 

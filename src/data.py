@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,8 +10,8 @@ import argparse
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, Keypad, KeypadType, Sensor, SensorType, User, Zone
-from monitor.database import Session
+from models import Area, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
+from monitor.database import get_database_session
 from models import metadata
 
 
@@ -21,7 +22,7 @@ SENSOR_TYPES = [
     SensorType(4, name="Break", description="Detect glass break"),
 ]
 
-session = Session()
+session = get_database_session()
 
 
 def cleanup():
@@ -50,13 +51,22 @@ def env_prod():
     session.add_all([kt1, kt2])
     print(" - Created keypad types")
 
-    k1 = Keypad(keypad_type=kt1)
+    k1 = Keypad(keypad_type=kt2)
     session.add_all([k1])
     print(" - Created keypads")
 
     a1 = Area(name="House")
     session.add(a1)
     print(" - Created area")
+
+    access_config = {
+        "service_enabled": True,
+        "restrict_local_network": False,
+        "password_authentication_enabled": True
+    }
+    ssh_access = Option(name="network", section="access", value=json.dumps(access_config))
+    session.add(ssh_access)
+    print(" - Created access options")
 
     session.commit()
 

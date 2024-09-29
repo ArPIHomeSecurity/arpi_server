@@ -51,11 +51,11 @@ def manage_output(output_id):
         db_output = db.session.query(Output).filter_by(id=output_id).first()
         if db_output:
             return jsonify(db_output.serialized)
-        return jsonify({"error": "Output not found"}), 404
+        return make_response(jsonify({"error": "Output not found"}), 404)
     elif request.method == "PUT":
         db_output = db.session.query(Output).get(output_id)
         if not db_output:
-            return jsonify({"error": "Output not found"}), 404
+            return make_response(jsonify({"error": "Output not found"}), 404)
 
         if not db_output.update(request.json):
             return make_response("", 204)
@@ -77,7 +77,7 @@ def manage_output(output_id):
 def activate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
     if not db_output:
-        return jsonify({"error": "Output not found"}), 404
+        return make_response(jsonify({"error": "Output not found"}), 404)
 
     return process_ipc_response(IPCClient().activate_output(output_id))
 
@@ -88,7 +88,7 @@ def activate_output(output_id):
 def deactivate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
     if not db_output:
-        return jsonify({"error": "Output not found"}), 404
+        return make_response(jsonify({"error": "Output not found"}), 404)
 
     return process_ipc_response(IPCClient().deactivate_output(output_id))
 

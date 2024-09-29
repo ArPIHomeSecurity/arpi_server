@@ -80,7 +80,7 @@ def sensor(sensor_id):
         db_sensor = db.session.query(Sensor).filter_by(id=sensor_id, deleted=False).first()
         if db_sensor:
             return jsonify(db_sensor.serialized)
-        return jsonify({"error": "Sensor not found"}), (404)
+        return make_response(jsonify({"error": "Sensor not found"}), 404)
     elif request.method == "DELETE":
         db_sensor = db.session.query(Sensor).get(sensor_id)
         db_sensor.deleted = True
@@ -89,7 +89,7 @@ def sensor(sensor_id):
     elif request.method == "PUT":
         db_sensor = db.session.query(Sensor).get(sensor_id)
         if not db_sensor:
-            return jsonify({"error": "Sensor not found"}), (404)
+            return make_response(jsonify({"error": "Sensor not found"}), 404)
 
         if not db_sensor.update(request.json):
             return make_response("", 204)
@@ -114,7 +114,7 @@ def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
             db.session.query(Sensor)
-            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True, deleted=False)
             .first()
             is not None
         )

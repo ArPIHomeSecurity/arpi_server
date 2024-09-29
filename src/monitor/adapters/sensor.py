@@ -4,7 +4,7 @@ import logging
 from monitor.adapters import CHANNEL_GPIO_PINS
 from constants import LOG_ADSENSOR
 
-# check if running on Raspberry
+# check if running with simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import DigitalInputDevice
 else:
@@ -37,7 +37,7 @@ class SensorAdapter(object):
             return 0
 
         value = int(self._channels[channel].value)
-        self._logger.debug("Value[CH%02d]: %s", channel+1, value)
+        self._logger.trace("Value[CH%02d]: %s", channel+1, value)
         return value
 
     def get_values(self):

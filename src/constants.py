@@ -1,5 +1,7 @@
-from logging import INFO, DEBUG
+from logging import ERROR, INFO, DEBUG
 
+# custom logging level for logging sensitive information
+TRACE = 5
 
 # Threads and logging
 THREAD_SERVICE = "Service"
@@ -18,6 +20,7 @@ LOG_IPC = THREAD_IPC
 LOG_ALERT = THREAD_ALERT
 LOG_SOCKETIO = THREAD_SOCKETIO
 LOG_MQTT = "MQTT"
+LOG_SENSORS = "Sensors"
 LOG_NOTIFIER = THREAD_NOTIFIER
 LOG_ADSENSOR = "AD.Sensor"
 LOG_ADPOWER = "AD.Power"
@@ -38,6 +41,7 @@ LOGGING_MODULES = [
     (LOG_ALERT, INFO),
     (LOG_SOCKETIO, INFO),
     (LOG_MQTT, INFO),
+    (LOG_SENSORS, INFO),
     (LOG_NOTIFIER, INFO),
     (LOG_ADSENSOR, INFO),
     (LOG_ADOUTPUT, INFO),
@@ -49,6 +53,10 @@ LOGGING_MODULES = [
     (LOG_SC_ACCESS, INFO),
     (LOG_CLOCK, INFO),
     (LOG_OUTPUT, INFO),
+    ("gsmmodem.modem.GsmModem", ERROR),
+    ("gsmmodem.serial_comms.SerialComms", ERROR),
+    ("SocketIOServer", INFO),
+    ("sqlalchemy.engine", ERROR),
 ]
 
 # INTERNAL CONSTANTS
@@ -73,6 +81,9 @@ UPDATE_SSH = "update_ssh"
 SEND_TEST_EMAIL = "send_test_email"
 SEND_TEST_SMS = "send_test_sms"
 SEND_TEST_SYREN = "send_test_syren"
+MAKE_TEST_CALL = "make_test_call"
+GET_SMS_MESSAGES = "get_sms_messages"
+DELETE_SMS_MESSAGE = "delete_sms_message"
 
 """---------------------------------------------------------------"""
 # CONSTANTS USED ALSO BY THE WEB APPLICATION

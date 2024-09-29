@@ -1,8 +1,12 @@
 import logging
 from datetime import datetime
+import os
 from time import sleep, time
 
-import RPi.GPIO as GPIO
+if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
+    import RPi.GPIO as GPIO
+else:
+    import monitor.adapters.mock.gpio as GPIO
 
 from monitor.adapters.keypads.base import KeypadBase
 from constants import LOG_ADKEYPAD
@@ -172,7 +176,7 @@ class DSCKeypad(KeypadBase):
         self._lights.ready = state
 
     def communicate(self):
-        self._logger.debug("Start communication DSC...")
+        self._logger.trace("Start communication DSC...")
         # send partition status info in every roud
         self.send_command(self.send_partition_status)
 
@@ -208,9 +212,9 @@ class DSCKeypad(KeypadBase):
         else:
             method()
 
-        do_keybus_query = False
+        make_keybus_query = False
         try:
-            do_keybus_query = self._line.conversation[4]["received"] == UNKNOWN_COMMAND
+            make_keybus_query = self._line.conversation[4]["received"] == UNKNOWN_COMMAND
         except IndexError:
             pass
 
@@ -220,7 +224,7 @@ class DSCKeypad(KeypadBase):
         sent_bytes = len(self._line.conversation) - 1  # remove 9. bit
         self.print_communication()
 
-        if do_keybus_query:
+        if make_keybus_query:
             self.send_keybus_query()
             sent_bytes += len(self._line.conversation) - 1  # remove 9. bit
             self.print_communication()
@@ -262,7 +266,7 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_partition_status(self):
-        self._logger.debug("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
+        self._logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive([self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED])
 

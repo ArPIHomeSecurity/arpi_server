@@ -6,24 +6,27 @@ from os import environ
 from constants import (
     ARM_AWAY,
     ARM_STAY,
+    DELETE_SMS_MESSAGE,
+    GET_SMS_MESSAGES,
     LOG_IPC,
+    MAKE_TEST_CALL,
     MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
+    MONITOR_GET_ARM,
+    MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
-    POWER_GET_STATE,
     MONITOR_SET_CLOCK,
     MONITOR_SYNC_CLOCK,
     MONITOR_UPDATE_CONFIG,
-    UPDATE_SECURE_CONNECTION,
     MONITOR_UPDATE_KEYPAD,
-    MONITOR_GET_STATE,
-    MONITOR_GET_ARM,
+    POWER_GET_STATE,
     SEND_TEST_EMAIL,
     SEND_TEST_SMS,
     SEND_TEST_SYREN,
+    UPDATE_SECURE_CONNECTION,
     UPDATE_SSH,
 )
 
@@ -33,6 +36,7 @@ class IPCClient(object):
     Sending IPC messages from the REST API to the monitoring service
     """
 
+    MAX_RETRIES = 5
     _socket = None
 
     def __init__(self):
@@ -41,6 +45,7 @@ class IPCClient(object):
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
+                self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
 
@@ -98,6 +103,15 @@ class IPCClient(object):
 
     def send_test_sms(self):
         return self._send_message({"action": SEND_TEST_SMS})
+    
+    def get_sms_messages(self):
+        return self._send_message({"action": GET_SMS_MESSAGES})
+    
+    def delete_sms_message(self, message_id):
+        return self._send_message({"action": DELETE_SMS_MESSAGE, "message_id": message_id})
+
+    def make_test_call(self):
+        return self._send_message({"action": MAKE_TEST_CALL})
 
     def send_test_syren(self, duration):
         return self._send_message({"action": SEND_TEST_SYREN, "duration": duration})
@@ -120,7 +134,19 @@ class IPCClient(object):
         if self._socket:
             try:
                 self._socket.send(json.dumps(message).encode())
-                data = self._socket.recv(1024)
-                return json.loads(data.decode())
-            except ConnectionResetError:
-                self._logger.error("Sending message to monitor socket failed!")
+                retries = 0
+                data = b""
+                while retries < IPCClient.MAX_RETRIES:
+                    data += self._socket.recv(4096)
+                    try:
+                        return json.loads(data.decode())
+                    except json.JSONDecodeError:
+                        if data == b"":
+                            self._logger.error("Received empty response from monitor socket! Message: %s", message)
+                            return
+                        self._logger.warning(
+                            "Received invalid JSON (may be we need another part)! Response: %s",
+                            data
+                        )
+            except ConnectionResetError as error:
+                self._logger.error("Sending message to monitor socket failed! %s", error)

@@ -51,7 +51,7 @@ class MockKeypad(KeypadBase):
         self._logger.debug("Ready: %s", state)
 
     def communicate(self):
-        self._logger.debug("Start communication MOCK...")
+        self._logger.trace("Start communication MOCK...")
         # start 10 seconds after the start
         if time() - self._start > 10 and self._index is None:
             self._index = 0

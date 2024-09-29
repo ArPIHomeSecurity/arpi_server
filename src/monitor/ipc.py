@@ -9,25 +9,28 @@ from threading import Thread
 from time import sleep
 
 from constants import (
+    DELETE_SMS_MESSAGE,
+    GET_SMS_MESSAGES,
     LOG_IPC,
+    MAKE_TEST_CALL,
     MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
+    MONITOR_GET_ARM,
+    MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
-    POWER_GET_STATE,
     MONITOR_SET_CLOCK,
     MONITOR_SYNC_CLOCK,
     MONITOR_UPDATE_CONFIG,
-    UPDATE_SECURE_CONNECTION,
     MONITOR_UPDATE_KEYPAD,
-    THREAD_IPC,
-    MONITOR_GET_ARM,
-    MONITOR_GET_STATE,
+    POWER_GET_STATE,
     SEND_TEST_EMAIL,
     SEND_TEST_SMS,
     SEND_TEST_SYREN,
+    THREAD_IPC,
+    UPDATE_SECURE_CONNECTION,
     UPDATE_SSH,
 )
 from monitor.storage import State, States
@@ -68,7 +71,7 @@ class IPCServer(Thread):
 
     def _initialize_socket(self):
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._socket.settimeout(1.0)
+        self._socket.settimeout(60)
 
         with contextlib.suppress(OSError):
             remove(MONITOR_INPUT_SOCKET)
@@ -128,10 +131,22 @@ class IPCServer(Thread):
             return_value["result"] = succeeded
             return_value["message"] = "Error in SMS sending!" if not succeeded else ""
             return_value["other"] = results
+        elif message["action"] == GET_SMS_MESSAGES:
+            result, messages = Notifier.get_sms_messages()
+            return_value["result"] = result
+            return_value["value"] = messages
+        elif message["action"] == DELETE_SMS_MESSAGE:
+            result = Notifier.delete_sms_message(message["message_id"])
+            return_value["result"] = result
         elif message["action"] == SEND_TEST_EMAIL:
             succeeded, results = Notifier.send_test_email()
             return_value["result"] = succeeded
             return_value["message"] = "Error in email sending!" if not succeeded else ""
+            return_value["other"] = results
+        elif message["action"] == MAKE_TEST_CALL:
+            succeeded, results = Notifier.make_test_call()
+            return_value["result"] = succeeded
+            return_value["message"] = "Error in call sending!" if not succeeded else ""
             return_value["other"] = results
         elif message["action"] == SEND_TEST_SYREN:
             self.test_syren(message["duration"])
@@ -163,7 +178,11 @@ class IPCServer(Thread):
 
             # read all the parts of a messages
             while connection:
-                data = connection.recv(1024)
+                try:
+                    data = connection.recv(1024)
+                except ConnectionResetError as error:
+                    self._logger.error("Connection reset: %s", error)
+                    break
 
                 if not data:
                     break

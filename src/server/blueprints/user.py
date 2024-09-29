@@ -1,5 +1,6 @@
-from datetime import datetime as dt
 import os
+from datetime import datetime as dt
+from time import sleep
 from dateutil.tz.tz import tzlocal
 
 from flask.blueprints import Blueprint
@@ -139,6 +140,7 @@ def register_device():
                 db_user.registration_expiry
                 and dt.now(tzlocal()) > db_user.registration_expiry
             ):
+                sleep(5)
                 return make_response(
                     jsonify(
                         {
@@ -164,6 +166,7 @@ def register_device():
                 }
             )
         else:
+            sleep(5)
             return make_response(
                 jsonify(
                     {"error": "Failed to register device", "reason": "User not found"}
@@ -171,6 +174,7 @@ def register_device():
                 400,
             )
 
+    sleep(5)
     return make_response(
         jsonify(
             {
@@ -205,9 +209,11 @@ def authenticate():
             }
         )
     elif not db_user:
+        sleep(2)
         current_app.logger.warn("Invalid user id %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
 
+    sleep(2)
     return jsonify(False)
 
 
