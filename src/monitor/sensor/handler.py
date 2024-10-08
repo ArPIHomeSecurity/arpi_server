@@ -107,9 +107,9 @@ class SensorHandler:
         for sensor in self._db_session.query(Sensor).all():
             if not sensor.deleted:
                 self._mqtt_client.publish_sensor_config(
-                    sensor.id, sensor.type.name, sensor.description
+                    sensor.id, sensor.type.name, sensor.description or sensor.name
                 )
-                self._mqtt_client.publish_sensor_state(sensor.description, False)
+                self._mqtt_client.publish_sensor_state(sensor.description or sensor.name, False)
             else:
                 self._mqtt_client.delete_sensor(sensor.description)
 
