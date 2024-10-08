@@ -150,7 +150,7 @@ class SimulatorApp(App):
                         elif outputs[key] == 1:
                             checkbox.value = True
                         else:
-                            self.log.error(f"Invalid value for {key}: {outputs[key]}")
+                            raise ValueError(f"Invalid value for {key}: {outputs[key]}")
 
     @work(exclusive=True, thread=True)
     async def watch_output_states(self):
@@ -221,14 +221,14 @@ class SimulatorApp(App):
                 yield Button("Card 3", id="card-3")
 
             with Container(id="outputs"):
-                yield Checkbox("GO", id="id-GO", value=False, disabled=True)
-                yield Checkbox("R1", id="id-R1", value=False, disabled=True)
-                yield Checkbox("R0", id="id-R0", value=False, disabled=True)
-                yield Checkbox("O4", id="id-O4", value=False, disabled=True)
-                yield Checkbox("O3", id="id-O3", value=False, disabled=True)
-                yield Checkbox("O2", id="id-O2", value=False, disabled=True)
-                yield Checkbox("O1", id="id-O1", value=False, disabled=True)
-                yield Checkbox("O0", id="id-O0", value=False, disabled=True)
+                yield Checkbox("GO", id="id-GO", value=False)
+                yield Checkbox("R1", id="id-R1", value=False)
+                yield Checkbox("R0", id="id-R0", value=False)
+                yield Checkbox("O4", id="id-O4", value=False)
+                yield Checkbox("O3", id="id-O3", value=False)
+                yield Checkbox("O2", id="id-O2", value=False)
+                yield Checkbox("O1", id="id-O1", value=False)
+                yield Checkbox("O0", id="id-O0", value=False)
 
         self.watch_output_states()
 
