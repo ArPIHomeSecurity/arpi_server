@@ -83,6 +83,8 @@ class MQTTClient:
         self._logger.debug("Connecting to MQTT broker at %s:%s", host, port)
         try:
             self._client.connect(host, port, keepalive=60)
+            self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
+            self._client.loop_start()
         except socket.gaierror:
             self._logger.error("Failed to resolve MQTT broker hostname %s", host)
             self._client.disconnect()
@@ -97,9 +99,6 @@ class MQTTClient:
             self._client = None
         except Exception as e:
             self._logger.exception("Failed to connect to MQTT broker: %s", e)
-
-        self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
-        self._client.loop_start()
 
     def close(self):
         """
