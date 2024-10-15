@@ -134,23 +134,24 @@ class SimulatorApp(App):
     keypad = deepcopy(EMPTY_DATA)
 
     def read_output_states(self):
-        with suppress(FileNotFoundError):
-            with open("simulator_output.json", "r", encoding="utf-8") as outputs_file:
-                try:
-                    outputs = json.load(outputs_file)
-                except json.JSONDecodeError:
-                    self.log.error("Error decoding simulator_output.json")
-                    return
+        with open("simulator_output.json", "r", encoding="utf-8") as outputs_file:
+            try:
+                outputs = json.load(outputs_file)
+            except FileNotFoundError:
+                return
+            except json.JSONDecodeError:
+                self.log.error("Error decoding simulator_output.json")
+                return
 
-                for key in outputs:
-                    with suppress(NoMatches):
-                        checkbox = self.query_one(f"#id-{key}")
-                        if outputs[key] == 0:
-                            checkbox.value = False
-                        elif outputs[key] == 1:
-                            checkbox.value = True
-                        else:
-                            raise ValueError(f"Invalid value for {key}: {outputs[key]}")
+            for key in outputs:
+                with suppress(NoMatches):
+                    checkbox = self.query_one(f"#id-{key}")
+                    if outputs[key] == 0:
+                        checkbox.value = False
+                    elif outputs[key] == 1:
+                        checkbox.value = True
+                    else:
+                        raise ValueError(f"Invalid value for {key}: {outputs[key]}")
 
     @work(exclusive=True, thread=True)
     async def watch_output_states(self):

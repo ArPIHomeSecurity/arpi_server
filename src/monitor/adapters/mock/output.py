@@ -34,23 +34,23 @@ class OutputAdapter(object):
                 f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
             )
 
-        with open("simulator_output.json", "r", encoding="utf-8") as output_file:
-            try:
+        try:
+            with open("simulator_output.json", "r", encoding="utf-8") as output_file:
                 fcntl.flock(output_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 tmp_states = json.load(output_file)
                 fcntl.flock(output_file, fcntl.LOCK_UN)
 
                 for idx in range(OUTPUT_NUMBER):
                     self._states[idx] = tmp_states[OUTPUT_NAMES[idx]]
-            except json.decoder.JSONDecodeError:
-                self._logger.warning(
-                    "Output file is invalid (=> overwriting)!\n%s",
-                    output_file.read(),
-                )
-            except FileNotFoundError:
-                self._logger.warning("Output file not found!")
-            except OSError:
-                self._logger.warning("Failed to lock the output file!")
+        except json.decoder.JSONDecodeError:
+            self._logger.warning(
+                "Output file is invalid (=> overwriting)!\n%s",
+                output_file.read(),
+            )
+        except FileNotFoundError:
+            self._logger.warning("Output file not found!")
+        except OSError:
+            self._logger.warning("Failed to lock the output file!")
 
         self._states[channel] = 1 if state else 0
         self._write_states()

@@ -25,18 +25,15 @@ class WiegandReader:
         return True
 
     def _load(self):
-        with contextlib.suppress(FileNotFoundError):
+        with contextlib.suppress(FileNotFoundError, OSError):
             with open("simulator_keypad.json", "r+", encoding="utf-8") as keypad_file:
-                try:
-                    fcntl.flock(keypad_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    self._keypad_data = json.load(keypad_file)
-                    self._logger.trace("Loaded keypad data: %s", self._keypad_data)
-                    keypad_file.seek(0)
-                    keypad_file.truncate()
-                    json.dump(EMPTY_DATA, keypad_file)
-                    fcntl.flock(keypad_file, fcntl.LOCK_UN)
-                except OSError:
-                    pass
+                fcntl.flock(keypad_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._keypad_data = json.load(keypad_file)
+                self._logger.trace("Loaded keypad data: %s", self._keypad_data)
+                keypad_file.seek(0)
+                keypad_file.truncate()
+                json.dump(EMPTY_DATA, keypad_file)
+                fcntl.flock(keypad_file, fcntl.LOCK_UN)
 
     def get_pending_bit_count(self):
         self._load()

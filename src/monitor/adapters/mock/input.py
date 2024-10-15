@@ -15,8 +15,8 @@ class SimulatorBasedMockInput(object):
     @property
     def value(self):
         # write+create if not exists
-        with open("simulator_input.json", "r", encoding="utf-8") as input_file:
-            try:
+        try:
+            with open("simulator_input.json", "r", encoding="utf-8") as input_file:
                 fcntl.flock(input_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 channels_data = json.load(input_file)
                 fcntl.flock(input_file, fcntl.LOCK_UN)
@@ -29,8 +29,8 @@ class SimulatorBasedMockInput(object):
                 # if time() % 10 > 5:
                 #     return 0
                 return channels_data[self._channel]
-            except (OSError, FileNotFoundError, json.JSONDecodeError):
-                return 0
+        except (OSError, FileNotFoundError, json.JSONDecodeError):
+            return 0
 
     @property
     def is_pressed(self):
