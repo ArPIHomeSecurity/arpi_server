@@ -392,6 +392,7 @@ class SensorHandler:
         Close the sensor handler.
         """
         self._logger.debug("Closing sensor handler...")
+        self._sensor_adapter.close()
         self._alerting_sensors.clear()
         self._mqtt_client.close()
 

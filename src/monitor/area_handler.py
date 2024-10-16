@@ -110,3 +110,10 @@ class AreaHandler:
         self._db_session.commit()
 
         self.publish_areas()
+
+    def close(self):
+        """
+        Close the area handler.
+        """
+        self._logger.debug("Closing MQTT client...")
+        self._mqtt_client.close()

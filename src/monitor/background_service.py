@@ -1,8 +1,8 @@
 # create a thread which monitors the health of the threads
 import logging
-import sys
 
 from threading import Thread, Event
+from time import sleep, time
 
 from constants import LOG_SERVICE, MONITOR_STOP
 from monitor.broadcast import Broadcaster
@@ -15,6 +15,10 @@ from monitor.output.handler import OutputHandler
 
 
 logger = logging.getLogger(LOG_SERVICE)
+
+
+MAX_RETRIES = 3
+CRASH_TIMEOUT = 120
 
 
 class BackgroundService(Thread):
@@ -37,24 +41,37 @@ class BackgroundService(Thread):
         """
 
         self._start_threads()
+        retries = 0
+        last_crash = None
 
-        exit_code = 0
         while not self._stop_event.wait(timeout=1):
             # print the logging configuration for debugging
             # print_logging()
 
-            self._logger.debug("Health check of threads: %s", [t.name for t in self._threads])
+            self._logger.trace("Health check of threads: %s", [t.name for t in self._threads])
             for thread in self._threads:
                 if not thread.is_alive():
                     self._logger.error("Thread crashed: %s", thread.name)
-                    exit_code = 1
-                    # stop all threads and systemd will restart the service
+                    last_crash = time()
+                    retries += 1
+                    if retries > MAX_RETRIES:
+                        self._logger.error("Too many retries. Stopping the application.")
+                        return
+
                     self._stop_threads()
+                    sleep(1)
+                    self._start_threads()
                     break
 
-        self._stop_threads()
+            # reset the retries if the last crash was a long time ago
+            if last_crash and time() - last_crash > CRASH_TIMEOUT:
+                retries = 0
+                last_crash = None
+
+        if retries < MAX_RETRIES:
+            self._stop_threads()
+
         logger.info("Health checker stopped")
-        sys.exit(exit_code)
 
     def _start_threads(self):
         self._logger.info("Starting threads...")
@@ -84,8 +101,9 @@ class BackgroundService(Thread):
 
         # wait for all threads to stop
         for thread in self._threads or []:
-            self._logger.debug("Stopping thread: %s", thread.name)
-            thread.join()
+            self._logger.debug("Waiting for thread to stop: %s %s", thread.name, thread.is_alive())
+            if thread.is_alive():
+                thread.join()
             self._logger.info("Stopped thread: %s", thread.name)
             thread = None
 

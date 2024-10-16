@@ -26,6 +26,7 @@ from constants import (
     MONITORING_ALERT_DELAY,
     MONITORING_ARM_DELAY,
     MONITORING_ARMED,
+    MONITORING_ERROR,
     MONITORING_READY,
     MONITORING_SABOTAGE,
     MONITORING_STARTUP,
@@ -84,6 +85,27 @@ class Monitor(Thread):
     def run(self):
         self._logger.info("Monitoring started")
 
+        try:
+            self.do_monitoring()
+            States.set(State.MONITORING, MONITORING_STOPPED)
+            States.set(State.ARM, ARM_DISARM)
+        except Exception:  # pylint: disable=broad-except
+            self._logger.exception("Monitoring thread crashed!")
+            States.set(State.MONITORING, MONITORING_ERROR)
+            return
+        finally:
+            self._sensor_handler.close()
+            self._area_handler.close()
+            self._power_adapter.close()
+            self._db_session.close()
+            States.close()
+
+        self._logger.info("Monitoring stopped")
+
+    def do_monitoring(self):
+        """
+        Start the monitoring of the sensors and manage alerting.
+        """
         # create the database session in the thread
         self._db_session = get_database_session()
 
@@ -94,12 +116,17 @@ class Monitor(Thread):
         States.open()
         if States.get(State.MONITORING) is None:
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) != MONITORING_STOPPED:
-            self._logger.error(
-                "Monitor restarted without proper shutdown: %s", States.get(State.MONITORING)
-            )
-        else:
+        elif States.get(State.MONITORING) == MONITORING_ERROR:
+            self._logger.warning("Monitor restarted after error")
             States.set(State.MONITORING, MONITORING_STARTUP)
+        elif States.get(State.MONITORING) == MONITORING_STOPPED:
+            # restart the monitor
+            States.set(State.MONITORING, MONITORING_STARTUP)
+        else:
+            self._logger.error(
+                "Monitor restarted without proper shutdown, restoring state: %s",
+                States.get(State.MONITORING)
+            )
 
         if States.get(State.ARM) is None:
             States.set(State.ARM, ARM_DISARM)
@@ -173,14 +200,6 @@ class Monitor(Thread):
             self.check_power()
             self._sensor_handler.scan_sensors()
             self._sensor_handler.handle_alerts()
-
-        self._sensor_handler.close()
-        self._power_adapter.cleanup()
-        self._db_session.close()
-        States.set(State.MONITORING, MONITORING_STOPPED)
-        States.set(State.ARM, ARM_DISARM)
-        States.close()
-        self._logger.info("Monitoring stopped")
 
     def arm_monitoring(self, arm_type, user_id, keypad_id, use_delay, area_id):
         """

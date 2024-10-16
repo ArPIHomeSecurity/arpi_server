@@ -42,6 +42,9 @@ class WiegandKeypad(KeypadBase):
         self._beeper = LED(beeper)
         self._beeper.on()
 
+    def close(self):
+        self._beeper.close()
+
     def set_error(self, state: bool):
         self.beeps(3, 0.1, 0.1)
 

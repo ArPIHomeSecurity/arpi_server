@@ -38,15 +38,12 @@ class PowerAdapter(object):
 
         return PowerAdapter.SOURCE_BATTERY
 
-    def cleanup(self):
+    def close(self):
         """
-        Cleanup the resources
+        Close the power adapter.
         """
         self._logger.debug("Power sense cleanup...")
         if self._sense is not None:
             self._sense.close()
             self._sense = None
         self._logger.debug("Power sense cleanup done")
-
-    def __del__(self):
-        self.cleanup()
