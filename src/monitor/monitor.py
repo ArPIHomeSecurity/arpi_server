@@ -88,7 +88,6 @@ class Monitor(Thread):
         try:
             self.do_monitoring()
             States.set(State.MONITORING, MONITORING_STOPPED)
-            States.set(State.ARM, ARM_DISARM)
         except Exception:  # pylint: disable=broad-except
             self._logger.exception("Monitoring thread crashed!")
             States.set(State.MONITORING, MONITORING_ERROR)
@@ -163,8 +162,8 @@ class Monitor(Thread):
                 message = self._actions.get(True, message_wait_time)
                 self._logger.debug("Action: %s", message)
                 if message["action"] == MONITOR_STOP:
-                    # stop the alert without disarm
-                    self.stop_alert(None)
+                    if States.get(State.ARM) != ARM_DISARM:
+                        self.disarm_monitoring(None, None, None)
                     break
                 elif message["action"] == MONITOR_ARM_AWAY:
                     self.arm_monitoring(
