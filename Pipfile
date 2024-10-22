@@ -35,10 +35,9 @@ urllib3 = "<2"
 
 [dev-packages]
 black = "*"
+cryptography = "*"
 flask-cors = "*"
 rope = "*"
-textual = "==0.52.1"
-textual-dev = "*"
 
 [simulator]
 textual = "==0.52.1"

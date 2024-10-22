@@ -28,3 +28,6 @@ class LED:
 
     def off(self):
         pass
+
+    def close(self):
+        pass
