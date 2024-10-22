@@ -11,6 +11,9 @@ start-mqtt = "./scripts/start_mqtt.sh"
 start-simulator  = "textual run --dev ./src/simulator.py"
 create-package = "tar -cvzf arpi-server.tar.gz --exclude='__pycache__' etc scripts src Pipfile Pipfile.lock"
 
+[requires]
+python_version = "3.11"
+
 [packages]
 flask = "*"
 flask-migrate = "~=4.0"
@@ -27,20 +30,19 @@ python-gsmmodem-new = "==0.13"
 python-jose = "~=3.3"
 python-socketio = "~=5.11"
 pytz = ">=2024.2"
-pywiegand="==0.4.3"
 stringcase = "==1.2.0"
 urllib3 = "<2"
 
 [dev-packages]
 black = "*"
 flask-cors = "*"
-pyfiglet = "*"
 rope = "*"
 textual = "==0.52.1"
 textual-dev = "*"
 
-[requires]
-python_version = "3.11"
+[simulator]
+textual = "==0.52.1"
+textual-dev = "*"
 
-[pipenv]
-allow_prereleases = true
+[device]
+pywiegand = "==0.5.2"
