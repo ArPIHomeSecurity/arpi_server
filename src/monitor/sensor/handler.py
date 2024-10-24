@@ -28,6 +28,7 @@ from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
+from monitor.database import get_database_session
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import State, States
@@ -54,9 +55,9 @@ class SensorHandler:
     Handles the sensors monitoring and alerting.
     """
 
-    def __init__(self, session, broadcaster):
+    def __init__(self, broadcaster):
         self._logger = logging.getLogger(LOG_SENSORS)
-        self._db_session = session
+        self._db_session = get_database_session()
         self._broadcaster = broadcaster
         self._sensor_adapter = SensorAdapter()
         self._alerting_sensors = set()
@@ -104,7 +105,10 @@ class SensorHandler:
         States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
-        for sensor in self._db_session.query(Sensor).all():
+        # force reload the sensors from the database
+        self._db_session.expire_all()
+        sensors = self._db_session.query(Sensor).all()
+        for sensor in sensors:
             if not sensor.deleted:
                 self._mqtt_client.publish_sensor_config(
                     sensor.id, sensor.type.name, sensor.description or sensor.name

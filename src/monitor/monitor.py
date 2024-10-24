@@ -151,9 +151,7 @@ class Monitor(Thread):
         self._area_handler = AreaHandler(session=self._db_session)
         self._area_handler.publish_areas()
 
-        self._sensor_handler = SensorHandler(
-            session=self._db_session, broadcaster=self._broadcaster
-        )
+        self._sensor_handler = SensorHandler(broadcaster=self._broadcaster)
         self._sensor_handler.load_sensors()
 
         message_wait_time = 1 / int(environ["SAMPLE_RATE"])
