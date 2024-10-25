@@ -19,7 +19,6 @@ from constants import (
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
-    MONITOR_GET_ARM,
     MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
     MONITOR_SET_CLOCK,
@@ -116,8 +115,6 @@ class IPCServer(Thread):
             # broadcast message
             self._logger.info("IPC action received: %s", message["action"])
             self._broadcaster.send_message(message=message)
-        elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": States.get(State.ARM)}
         elif message["action"] == MONITOR_GET_STATE:
             return_value["value"] = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:

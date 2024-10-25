@@ -18,9 +18,9 @@ from monitor.adapters.keypads.wiegand import WiegandKeypad
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
-from monitor.storage import State, States
 from tools.queries import (
     get_alert_delay,
+    get_arm_state,
     get_arm_delay,
     get_user_with_access_code,
 )
@@ -103,7 +103,7 @@ class KeypadHandler(Thread):
                 elif message["action"] == MONITORING_ALERT_DELAY and self._keypad:
                     self.alert_delay()
                 elif message["action"] == MONITOR_DISARM and self._keypad:
-                    if States.get(State.ARM) != ARM_DISARM:
+                    if get_arm_state(get_database_session()) != ARM_DISARM:
                         self._logger.info("Keypad disarmed")
                         self._keypad.set_armed(False)
                         self._keypad.stop_delay()
@@ -167,7 +167,7 @@ class KeypadHandler(Thread):
 
     def alert_delay(self):
         with get_database_session() as session:
-            arm_type = States.get(State.ARM)
+            arm_type = get_arm_state(session)
             alert_delay = get_alert_delay(session, arm_type)
             self._logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
 

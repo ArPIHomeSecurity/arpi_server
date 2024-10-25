@@ -7,6 +7,8 @@ from datetime import datetime as dt, timedelta
 from os import environ
 from time import sleep
 
+from sqlalchemy import select
+
 from constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -107,17 +109,6 @@ class SensorHandler:
 
         # force reload the sensors from the database
         self._db_session.expire_all()
-        sensors = self._db_session.query(Sensor).all()
-        for sensor in sensors:
-            if not sensor.deleted:
-                self._mqtt_client.publish_sensor_config(
-                    sensor.id, sensor.type.name, sensor.description or sensor.name
-                )
-                self._mqtt_client.publish_sensor_state(sensor.description or sensor.name, False)
-            else:
-                self._mqtt_client.delete_sensor(sensor.description)
-
-        self._sensors = []
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
@@ -126,6 +117,7 @@ class SensorHandler:
             self._logger.info("Alert sensitivity config not found!")
             alert_sensitivity = AlertSensitivityConfig(None, None)
 
+        # initialize the sensors history
         sample_rate = int(environ["SAMPLE_RATE"])
         if alert_sensitivity.monitor_period is None:
             # instant alerts
@@ -142,6 +134,7 @@ class SensorHandler:
                 threshold=alert_sensitivity.monitor_threshold,
             )
 
+        # set the sensitivity of the sensors
         for idx, sensor in enumerate(self._sensors):
             if sensor.monitor_threshold is not None:
                 if sensor.monitor_period is None:
@@ -159,6 +152,7 @@ class SensorHandler:
         # keep config update state
         sleep(2)
 
+        # verify the sensor configuration
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(
                 "Invalid number of sensors to monitor (Found=%s > Max=%s)",
@@ -179,6 +173,20 @@ class SensorHandler:
             States.set(State.MONITORING, monitoring_state)
 
         send_sensors_state(False)
+
+    def publish_sensors(self):
+        """
+        Publish the sensor configuration to the MQTT.
+        """
+        sensors = self._db_session.execute(select(Sensor)).scalars().all()
+        for sensor in sensors:
+            if not sensor.deleted:
+                self._mqtt_client.publish_sensor_config(
+                    sensor.id, sensor.type.name, sensor.description or sensor.name
+                )
+                self._mqtt_client.publish_sensor_state(sensor.description or sensor.name, False)
+            else:
+                self._mqtt_client.delete_sensor(sensor.description)
 
     def validate_sensor_config(self):
         """

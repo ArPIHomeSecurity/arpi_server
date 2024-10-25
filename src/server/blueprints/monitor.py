@@ -1,11 +1,14 @@
-from flask.blueprints import Blueprint
 from flask import request
-from constants import ROLE_USER
+from flask.blueprints import Blueprint
+from flask.helpers import make_response
+from flask.json import jsonify
 
+from constants import ROLE_USER
+from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
-
+from tools.queries import get_arm_state
 
 monitor_blueprint = Blueprint("monitor", __name__)
 
@@ -14,7 +17,7 @@ monitor_blueprint = Blueprint("monitor", __name__)
 @registered
 @restrict_host
 def get_arm():
-    return process_ipc_response(IPCClient().get_arm())
+    return make_response(jsonify({"type": get_arm_state(db.session)}))
 
 
 @monitor_blueprint.route("/api/monitoring/arm", methods=["PUT"])
