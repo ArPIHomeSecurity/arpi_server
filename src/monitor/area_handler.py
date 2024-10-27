@@ -4,6 +4,8 @@ Manage areas
 
 import logging
 
+from sqlalchemy import select
+
 from constants import (
     ARM_AWAY,
     ARM_DISARM,
@@ -15,9 +17,9 @@ from constants import (
 )
 from models import Area
 from monitor.communication.mqtt import MQTTClient
+from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_area_state
 from monitor.storage import State, States
-from .output.handler import OutputHandler
 
 
 class AreaHandler:
@@ -45,9 +47,13 @@ class AreaHandler:
 
         # restore the arm state of the areas if the monitoring state is disarmed
         monitoring_state = States.get(State.MONITORING)
-        for area in self._db_session.query(Area).all():
-            if monitoring_state in disarmed_states:
+        self._db_session.expire_all()
+        for area in self._db_session.execute(
+            select(Area).filter(Area.deleted == False)
+        ).scalars().all():
+            if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
                 area.arm_state = ARM_DISARM
+                self._logger.info("Area '%s' restored to disarmed state", area.name)
 
             send_area_state(area.serialized)
 

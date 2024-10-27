@@ -127,6 +127,14 @@ class Monitor(Thread):
                 MONITORING_STARTUP,
             )
             States.set(State.MONITORING, MONITORING_STARTUP)
+        elif States.get(State.MONITORING) in (MONITORING_ARM_DELAY, MONITORING_ARMED):
+            if get_arm_state(self._db_session) == ARM_DISARM:
+                self._logger.warning(
+                    "Monitor restarted during '%s', but no areas are armed, restoring state: %s",
+                    States.get(State.MONITORING),
+                    MONITORING_READY,
+                )
+                States.set(State.MONITORING, MONITORING_READY)
         else:
             self._logger.error(
                 "Monitor restarted without proper shutdown, restoring state: %s",
