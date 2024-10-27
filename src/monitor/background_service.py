@@ -7,7 +7,7 @@ from time import sleep, time
 from constants import LOG_SERVICE, MONITOR_STOP
 from monitor.broadcast import Broadcaster
 from monitor.ipc import IPCServer
-from monitor.adapters.keypad import KeypadHandler
+from monitor.keypad_handler import KeypadHandler
 from monitor.monitor import Monitor
 from monitor.notifications.notifier import Notifier
 from monitor.logging import print_logging
