@@ -1,4 +1,8 @@
-# @Description: In memory storage for communicating between components
+"""
+Storage for the state of the system.
+
+In memory storage with a file backup.
+"""
 
 from enum import Enum
 import fcntl
@@ -18,7 +22,9 @@ class State(Enum):
 
 
 class States:
-    """Class for storing state information"""
+    """
+    Class for storing state information.
+    """
     _data = None
     _lock = Lock()
     _logger = logging.getLogger(LOG_MONITOR)

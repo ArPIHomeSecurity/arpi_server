@@ -9,10 +9,11 @@ class ArgusLogger(Logger):
 
     TODO: add logging to the database
     """
+
     def trace(self, message, *args, **kwargs):
         """
         Log 'message % args' with severity 'TRACE'.
-        
+
         Use for logging sensitive information.
         """
         self.log(TRACE, message, *args, **kwargs)

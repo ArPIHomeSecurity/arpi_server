@@ -7,8 +7,6 @@ from monitor.logger import ArgusLogger
 from tools.formatter import NotTooLongStringFormatter
 
 
-
-
 def initialize_logging():
     """
     Initialize logging for the application
@@ -17,13 +15,11 @@ def initialize_logging():
         formatter = NotTooLongStringFormatter(
             "%(asctime)s-[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s",
             ["threadName"],
-            11
+            11,
         )
     else:
         formatter = NotTooLongStringFormatter(
-            "[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s",
-            ["threadName"],
-            11
+            "[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s", ["threadName"], 11
         )
 
     logging.addLevelName(TRACE, "TRACE")
@@ -53,7 +49,10 @@ def print_logging():
     rootlogger = logging.getLogger()
     for h in rootlogger.handlers:
         if h.formatter and h.formatter._fmt.startswith("%(levelname)s"):
-            print("Loggers: name=%s, h=%s, fmt=%s" % (rootlogger.name, h, h.formatter._fmt if h.formatter else None))
+            print(
+                "Loggers: name=%s, h=%s, fmt=%s"
+                % (rootlogger.name, h, h.formatter._fmt if h.formatter else None)
+            )
 
     # get list of all logger, the handler of the loggers and their formatter
     for logger_name in logging.root.manager.loggerDict:
@@ -62,4 +61,12 @@ def print_logging():
             print("Logger: ", logger_name, logger.level, len(logger.handlers))
         for handler in logger.handlers:
             if handler.formatter and handler.formatter._fmt.startswith("%(levelname)s"):
-                print("Handler: name=%s level=%s, h=%s, fmt=%s" % (logger_name, logger.level, handler, handler.formatter._fmt if handler.formatter else None))
+                print(
+                    "Handler: name=%s level=%s, h=%s, fmt=%s"
+                    % (
+                        logger_name,
+                        logger.level,
+                        handler,
+                        handler.formatter._fmt if handler.formatter else None,
+                    )
+                )
