@@ -182,9 +182,9 @@ class SensorHandler:
         for sensor in sensors:
             if not sensor.deleted:
                 self._mqtt_client.publish_sensor_config(
-                    sensor.id, sensor.type.name, sensor.description or sensor.name
+                    sensor.id, sensor.type.name, sensor.name
                 )
-                self._mqtt_client.publish_sensor_state(sensor.description or sensor.name, False)
+                self._mqtt_client.publish_sensor_state(sensor.name, False)
             else:
                 self._mqtt_client.delete_sensor(sensor.description)
 
@@ -261,12 +261,12 @@ class SensorHandler:
                         value,
                     )
                     sensor.alert = True
-                    self._mqtt_client.publish_sensor_state(sensor.description, True)
+                    self._mqtt_client.publish_sensor_state(sensor.name, True)
                     changes = True
             elif sensor.alert:
                 self._logger.debug("Cleared alert on channel: %s", sensor.channel)
                 sensor.alert = False
-                self._mqtt_client.publish_sensor_state(sensor.description, False)
+                self._mqtt_client.publish_sensor_state(sensor.name, False)
                 changes = True
 
             if sensor.alert and sensor.enabled:
