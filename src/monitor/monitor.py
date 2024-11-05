@@ -34,6 +34,7 @@ from constants import (
     POWER_SOURCE_BATTERY,
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
+    UPDATE_SECURE_CONNECTION,
 )
 from models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
 from monitor.alert import SensorAlert
@@ -53,6 +54,7 @@ from monitor.syren import Syren
 from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
+from tools.connection import SecureConnection
 from tools.queries import get_arm_state, get_arm_delay
 
 
@@ -164,6 +166,7 @@ class Monitor(Thread):
         self._sensor_handler.publish_sensors()
 
         message_wait_time = 1 / int(environ["SAMPLE_RATE"])
+        secure_connection = None
         while True:
             with contextlib.suppress(Empty):
                 message = self._actions.get(True, message_wait_time)
@@ -204,10 +207,23 @@ class Monitor(Thread):
                     self._area_handler.publish_areas()
                     self._sensor_handler.load_sensors()
                     self._sensor_handler.publish_sensors()
+                elif message["action"] == UPDATE_SECURE_CONNECTION:
+                    self._logger.info("Update secure connection...")
+                    if secure_connection is None:
+                        States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
+                        secure_connection = SecureConnection()
+                        secure_connection.start()
 
-            self.check_power()
-            self._sensor_handler.scan_sensors()
-            self._sensor_handler.handle_alerts()
+            if secure_connection is not None and not secure_connection.is_alive():
+                secure_connection = None
+                if States.get(State.MONITORING) == MONITORING_UPDATING_CONFIG:
+                    States.set(State.MONITORING, MONITORING_READY)
+                    self._logger.info("Secure connection updated")
+
+            if secure_connection is None:
+                self.check_power()
+                self._sensor_handler.scan_sensors()
+                self._sensor_handler.handle_alerts()
 
     def arm_monitoring(self, arm_type, user_id, keypad_id, use_delay, area_id):
         """

@@ -29,7 +29,7 @@ class Certbot:
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_SC_CERTBOT)
 
-    def _generate_certificate(self):
+    def generate_certificate(self):
         """
         Generate certbot certificates with dynamic dns provider
 
@@ -47,35 +47,36 @@ class Certbot:
 
         try:
             # non interactive
-            results = subprocess.run(
+            result = subprocess.run(
                 [
                     "/usr/bin/certbot",
                     "certonly",
                     "--webroot",
-                    "--webroot-path", "/home/argus/webapplication",
+                    "--webroot-path",
+                    "/home/argus/webapplication",
                     "--agree-tos",
                     "--non-interactive",
                     "--quiet",
                     "--cert-name", Certbot.CERT_NAME,
-                    "--email",
-                    dyndns_config.username,
-                    f'-d {dyndns_config.hostname}',
+                    "--email", dyndns_config.username,
+                    "--post-hook", "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/",
+                    f"-d {dyndns_config.hostname}",
                 ],
                 capture_output=True,
                 shell=False,
-                check=False
+                check=False,
             )
-            if results.returncode:
-                self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
+            if result.returncode:
+                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
             else:
-                self._logger.info("Certificate generated")
+                self._logger.info("Certificate issued")
                 return True
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
         return False
 
-    def _renew_certificate(self):
+    def renew_certificate(self):
         """
         Renew certbot certificates
 
@@ -84,20 +85,21 @@ class Certbot:
         self._logger.info("Renew certbot certificate")
         try:
             # non interactive
-            results = subprocess.run(
+            result = subprocess.run(
                 [
                     "/usr/bin/certbot",
                     "renew",
                     "--non-interactive",
                     "--quiet",
-                    "--cert-name", Certbot.CERT_NAME
+                    "--cert-name",
+                    Certbot.CERT_NAME,
                 ],
                 capture_output=True,
                 shell=False,
-                check=False
+                check=False,
             )
-            if results.returncode:
-                self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
+            if result.returncode:
+                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
             else:
                 self._logger.info("Certificate renewed")
                 return True
@@ -106,6 +108,34 @@ class Certbot:
             self._logger.error("Missing file! %s", error)
 
         return False
+
+    def delete_certificate(self):
+        """
+        Replaces the certificate with letsencrypt
+        """
+        self._logger.info("Deleting the certificate")
+        try:
+            result = subprocess.run(
+                [
+                    "/usr/bin/certbot",
+                    "delete",  # with revoke the certificate will be renewed later
+                    "--non-interactive",
+                    "--quiet",
+                    "--cert-name",
+                    Certbot.CERT_NAME,
+                ],
+                capture_output=True,
+                shell=False,
+                check=False,
+            )
+
+            if result.returncode:
+                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
+            else:
+                self._logger.info("Certificate deleted")
+
+        except FileNotFoundError as error:
+            self._logger.error("Missing file! %s", error)
 
     def _switch2certbot(self):
         """
@@ -144,7 +174,9 @@ class Certbot:
         if cert_path.is_file():
             with open(cert_path, "rb") as cert_file:
                 cert = x509.load_pem_x509_certificate(cert_file.read())
-                cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+                cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[
+                    0
+                ].value
                 self._logger.debug("Domain in certificate: %s", cert_domain)
 
         dyndns_config = load_dyndns_config()
@@ -154,52 +186,67 @@ class Certbot:
 
         self._logger.info("Domain changed: %s => %s", cert_domain, dyndns_config.hostname)
         return True
+    
+    def check_certificate_exists(self):
+        """
+        Check if the certificate exists
 
-    def _delete_certificate(self):
+        Returns: True if the certificate exists, False otherwise
         """
-        Replaces the certificate with letsencrypt
+        self._logger.info("Checking if certificate exists")
+        full_certificate = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/fullchain.pem")
+        if full_certificate.is_file():
+            self._logger.debug("Certificate exists")
+            return True
+
+        self._logger.info("Certificate does not exist")
+        return False
+    
+    def get_certificate_timestamp(self):
         """
-        self._logger.info("Replacing certificate")
-        subprocess.run(
-            [
-                "/usr/bin/certbot",
-                "delete",
-                "--cert-name", Certbot.CERT_NAME
-            ],
-            capture_output=True,
-        )
+        Get the timestamp of the certificate
+
+        Returns: The timestamp of the certificate
+        """
+        self._logger.info("Getting certificate timestamp")
+        full_certificate = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/fullchain.pem")
+        if full_certificate.is_file():
+            return full_certificate.stat().st_mtime
+
+        return None
 
     def update_certificate(self):
         """
         Updates the certificate with letsencrypt
+
+        Returns: True if the certificate was updated, False otherwise
         """
         # check if certificate already exists
-        full_certificate = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/fullchain.pem")
-        if full_certificate.is_file():
+        if self.check_certificate_exists():
             if self.check_domain_changed():
                 self._logger.info("Certbot certificate already exists and domain changed")
                 # replace certificate
-                self._delete_certificate()
-                self._generate_certificate()
+                self.delete_certificate()
+                self.generate_certificate()
             else:
                 # if exists and domain not changed try to renew it
                 self._logger.info("Certbot certificate exists and no change of domain")
-                self._renew_certificate()
+                self.renew_certificate()
 
         else:
             # if certificate doesn't exist generate one
             self._logger.info("No certbot certificate found")
-            self._generate_certificate()
+            self.generate_certificate()
 
-            if full_certificate.is_file():
+            if self.check_certificate_exists():
                 if Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
                     "/usr/local/nginx/conf/snippets/self-signed.conf"
                 ):
                     self._logger.info("NGINX uses self-signed certificates")
                     self._switch2certbot()
-                elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
-                    "/usr/local/nginx/conf/snippets/certbot-signed.conf"
-                ):
+                elif Path(
+                    "/usr/local/nginx/conf/snippets/certificates.conf"
+                ).resolve() == PosixPath("/usr/local/nginx/conf/snippets/certbot-signed.conf"):
                     self._logger.info("Using certbot certificates")
                 else:
                     self._logger.error("Failed detecting certificate configuration")
@@ -207,20 +254,46 @@ class Certbot:
                 self._logger.warning("No certbot certificate found")
 
         # check if full_certificate file changed in the past 10 mins
-        if full_certificate.exists() and full_certificate.stat().st_mtime > time() - 600:
-            self._logger.info("Certificate renewed")
-            self._restart_systemd_service("mosquitto.service")
-            self._restart_systemd_service("nginx.service")
+        if self.check_certificate_exists():
+            if self.get_certificate_timestamp() > time() - 600:
+                self._logger.info("Certificate renewed")
+                self._restart_systemd_service("mosquitto.service")
+                self._restart_systemd_service("nginx.service")
+                return True
+        
+        return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Update certificates with certbot")
+    """
+    Main function to update certificates
+    """
+    parser = argparse.ArgumentParser(
+        description="Update the system using certificates, or manage the certificate"
+    )
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("-g", "--generate", action="store_true", help="generate the certificate")
+    group.add_argument("-r", "--renew", action="store_true", help="renew the certificate")
+    group.add_argument("-d", "--delete", action="store_true", help="delete the certificate")
     parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
     args = parser.parse_args()
 
-    logging.basicConfig(format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO
+    )
 
-    Certbot(logging.getLogger("argus_certbot")).update_certificate()
+    certbot = Certbot(logging.getLogger("argus_certbot"))
+    if args.generate:
+        certbot.generate_certificate()
+        return
+    if args.renew:
+        certbot.renew_certificate()
+        return
+    if args.delete:
+        certbot.delete_certificate()
+        return
+
+    certbot.update_certificate()
 
 
 if __name__ == "__main__":
@@ -228,4 +301,3 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
-

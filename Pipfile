@@ -16,6 +16,7 @@ python_version = "3.11"
 
 [packages]
 flask = "*"
+flask-cors = "*"
 flask-migrate = "~=4.0"
 flask-sqlalchemy = "~=3.1"
 gunicorn = ">=23.0.0"
@@ -36,7 +37,6 @@ urllib3 = "<2"
 [dev-packages]
 black = "*"
 cryptography = "*"
-flask-cors = "*"
 rope = "*"
 
 [simulator]
