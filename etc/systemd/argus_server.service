@@ -15,7 +15,7 @@ ExecStart=/home/argus/.venvs/server/bin/python -m gunicorn \
     server:app
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
-Restart=on-failure
+Restart=always
 PrivateTmp=true
 
 [Install]

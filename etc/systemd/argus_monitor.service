@@ -12,7 +12,7 @@ ExecStart=/home/argus/.venvs/server/bin/python -m gunicorn \
     -c src/monitor/gunicorn.conf.py \
     --timeout 60 \
     monitor.socket_io:socketio_app
-Restart=on-failure
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
