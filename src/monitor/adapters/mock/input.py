@@ -1,6 +1,6 @@
+import fcntl
 import json
 import logging
-import threading
 
 from constants import LOG_ADSENSOR
 
@@ -14,21 +14,23 @@ class SimulatorBasedMockInput(object):
 
     @property
     def value(self):
-
-        lock = threading.Lock()
-
-        with lock:
-            # write+create if not exists
-            try:
-                with open("simulator_input.json") as channels_file:
-                    channels_data = json.load(channels_file)
-                    self._logger.trace("Channel[%s] value simulator: %s", self._channel, channels_data.get(self._channel, 0))
-                    # simulate random noise
-                    # if time() % 10 > 5:
-                    #     return 0
-                    return channels_data[self._channel]
-            except FileNotFoundError:
-                return 0
+        # write+create if not exists
+        try:
+            with open("simulator_input.json", "r", encoding="utf-8") as input_file:
+                fcntl.flock(input_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                channels_data = json.load(input_file)
+                fcntl.flock(input_file, fcntl.LOCK_UN)
+                self._logger.trace(
+                    "Channel[%s] value simulator: %s",
+                    self._channel,
+                    channels_data.get(self._channel, 0),
+                )
+                # simulate random noise
+                # if time() % 10 > 5:
+                #     return 0
+                return channels_data[self._channel]
+        except (OSError, FileNotFoundError, json.JSONDecodeError):
+            return 0
 
     @property
     def is_pressed(self):
@@ -55,7 +57,7 @@ class Channels(SimulatorBasedMockInput):
         5:  "CH12",
         23: "CH13",
         24: "CH14",
-        25: "CH15"
+        25: "CH15",
     }
 
     def __init__(self, channel=None, pull_up=None):

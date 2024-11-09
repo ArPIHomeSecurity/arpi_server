@@ -9,6 +9,7 @@ from server.decorators import authenticated, restrict_host
 from server.database import db
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
+from tools.certbot import Certbot
 
 
 config_blueprint = Blueprint("configuration", __name__)
@@ -118,3 +119,18 @@ def delete_sms_messages(message_id):
         return process_ipc_response(IPCClient().delete_sms_message(message_id))
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+
+@config_blueprint.route("/api/config/public_access", methods=["GET"])
+@authenticated()
+@restrict_host
+def public_access():
+    """
+    Check if the public access is possible.
+    * dyndns is configured
+    * certificate exists
+    * nginx listens on port 443
+    """
+    if Certbot().check_certificate_exists():
+        return make_response(jsonify(True), 200)
+
+    return make_response(jsonify(False), 200)

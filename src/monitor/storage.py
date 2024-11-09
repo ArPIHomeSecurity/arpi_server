@@ -1,4 +1,8 @@
-# @Description: In memory storage for communicating between components
+"""
+Storage for the state of the system.
+
+In memory storage with a file backup.
+"""
 
 from enum import Enum
 import fcntl
@@ -8,19 +12,19 @@ from threading import Lock
 from typing import Optional
 
 from constants import LOG_MONITOR
-from monitor.socket_io import send_arm_state, send_system_state
+from monitor.socket_io import send_system_state
 
 
 class State(Enum):
     """Enum for the type of the state"""
-    ARM = "arm"
     MONITORING = "monitoring"
-    SYSTEM = "system"
     POWER = "power"
 
 
 class States:
-    """Class for storing state information"""
+    """
+    Class for storing state information.
+    """
     _data = None
     _lock = Lock()
     _logger = logging.getLogger(LOG_MONITOR)
@@ -48,8 +52,6 @@ class States:
             cls._data[str(key)] = value  # pylint: disable=unsupported-assignment-operation
             if key == State.MONITORING:
                 send_system_state(value)
-            elif key == State.ARM:
-                send_arm_state(value)
 
             cls._save()
 
@@ -71,8 +73,6 @@ class States:
             cls._logger.debug("Data stored: %s: %s", key, cls._data[key])
             if key == State.MONITORING:
                 send_system_state(cls._data[key])
-            elif key == State.ARM:
-                send_arm_state(cls._data[key])
 
         if not cls._data:
             cls._logger.debug("No data stored")

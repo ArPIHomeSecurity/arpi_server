@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from noipy.main import execute_update
 from psycopg2 import OperationalError
 
-
 load_dotenv()
 load_dotenv("secrets.env")
 sys.path.insert(0, os.getenv("PYTHONPATH"))
@@ -21,6 +20,7 @@ sys.path.insert(0, os.getenv("PYTHONPATH"))
 from constants import LOG_SC_DYNDNS
 from monitor.config_helper import load_dyndns_config, DyndnsConfig
 from tools.dictionary import filter_keys
+from tools.lock import file_lock
 
 
 def get_dns_records(hostname=None, record_type="A"):
@@ -50,6 +50,7 @@ class DynDns:
     def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
 
+    @file_lock("dyndns.lock", timeout=3600)
     def update_ip(self, force=False):
         """
         Compare IP address in DNS server and actual lookup result.

@@ -157,6 +157,9 @@ class DSCKeypad(KeypadBase):
         self._line = Line(clock=clock_pin, data=data_pin)
         self._start_time = None
 
+    def close(self):
+        pass
+
     def initialise(self):
         # initialize connection
         self._start_time = time()

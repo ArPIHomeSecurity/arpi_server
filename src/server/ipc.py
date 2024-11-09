@@ -15,7 +15,6 @@ from constants import (
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
-    MONITOR_GET_ARM,
     MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
     MONITOR_SET_CLOCK,
@@ -48,9 +47,6 @@ class IPCClient(object):
                 self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):
                 self._socket = None
-
-    def get_arm(self):
-        return self._send_message({"action": MONITOR_GET_ARM})
 
     def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:

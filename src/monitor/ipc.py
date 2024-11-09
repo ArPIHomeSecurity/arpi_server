@@ -1,11 +1,12 @@
 import contextlib
 import json
 import logging
+from select import select
 import socket
 from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
 from grp import getgrnam
-from threading import Thread
+from threading import Event, Thread
 from time import sleep
 
 from constants import (
@@ -18,7 +19,6 @@ from constants import (
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
-    MONITOR_GET_ARM,
     MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
     MONITOR_SET_CLOCK,
@@ -38,7 +38,6 @@ from monitor.alert import Syren
 from monitor.notifications.notifier import Notifier
 from monitor.output.handler import OutputHandler
 from tools.clock import Clock
-from tools.connection import SecureConnection
 from tools.ssh_service import SSHService
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
@@ -55,10 +54,11 @@ class IPCServer(Thread):
         MONITOR_DISARM,
         MONITOR_UPDATE_CONFIG,
         MONITOR_UPDATE_KEYPAD,
-        MONITOR_REGISTER_CARD
+        MONITOR_REGISTER_CARD,
+        UPDATE_SECURE_CONNECTION,
     ]
 
-    def __init__(self, stop_event, broadcaster):
+    def __init__(self, stop_event: Event, broadcaster):
         """
         Constructor
         """
@@ -70,15 +70,17 @@ class IPCServer(Thread):
         self._logger.info("IPC server created")
 
     def _initialize_socket(self):
-        self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._socket.settimeout(60)
+
+        _socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        _socket.settimeout(60)
+        _socket.setblocking(False)
 
         with contextlib.suppress(OSError):
             remove(MONITOR_INPUT_SOCKET)
 
         self.create_socket_file()
-        self._socket.bind(MONITOR_INPUT_SOCKET)
-        self._socket.listen(1)
+        _socket.bind(MONITOR_INPUT_SOCKET)
+        _socket.listen(1)
 
         try:
             chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
@@ -88,7 +90,12 @@ class IPCServer(Thread):
             self._logger.error("Failed to fix permission and/or owner!")
             self._logger.debug("Error: %s", error)
 
+        self._sockets = [_socket]
+
     def create_socket_file(self):
+        """
+        Create the socket file for the IPC server to listen to.
+        """
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
             self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
@@ -96,6 +103,67 @@ class IPCServer(Thread):
             with open(MONITOR_INPUT_SOCKET, "w", encoding="utf-8"):
                 pass
             self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
+
+    def run(self):
+        self._logger.info("IPC server started")
+
+        try:
+            self.communicate()
+        except Exception:
+            self._logger.exception("IPC server crashed!")
+
+        self._logger.info("IPC server stopped")
+
+    def communicate(self):
+        """
+        Communicate with the clients.
+        """
+        # read all the messages
+        while not self._stop_event.is_set():
+
+            self._logger.trace("Waiting for connection...")
+            readable, _, exceptional = select(self._sockets, [], self._sockets, 1)
+
+            for read_socket in readable:
+                if read_socket is self._sockets[0]:
+                    connection, _ = self._sockets[0].accept()
+                    self._sockets.append(connection)
+                else:
+                    self.process_data(read_socket)
+
+            for exc_socket in exceptional:
+                self._logger.error("Exceptional socket: %s", exc_socket)
+                self._sockets.remove(exc_socket)
+                exc_socket.close()
+
+        with contextlib.suppress(FileNotFoundError):
+            remove(MONITOR_INPUT_SOCKET)
+
+    def process_data(self, connection):
+        """
+        Process the data received from the client and send the response.
+        """
+        try:
+            data = connection.recv(1024)
+        except ConnectionResetError as error:
+            self._logger.error("Connection reset: %s", error)
+            return
+
+        if not data:
+            self._logger.debug("No data received")
+            self._sockets.remove(connection)
+            connection.close()
+            return
+
+        self._logger.debug("Received action: '%s'", data)
+
+        response = self.handle_actions(json.loads(data.decode()))
+
+        try:
+            connection.send(json.dumps(response).encode())
+        except BrokenPipeError:
+            self._sockets.remove(connection)
+            connection.close()
 
     def handle_actions(self, message):
         """
@@ -111,15 +179,10 @@ class IPCServer(Thread):
             # broadcast message
             self._logger.info("IPC action received: %s", message["action"])
             self._broadcaster.send_message(message=message)
-        elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": States.get(State.ARM)}
         elif message["action"] == MONITOR_GET_STATE:
             return_value["value"] = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:
             return_value["value"] = {"state": States.get(State.POWER)}
-        elif message["action"] == UPDATE_SECURE_CONNECTION:
-            self._logger.info("Update secure connection...")
-            SecureConnection(self._stop_event).run()
         elif message["action"] == UPDATE_SSH:
             self._logger.info("Update ssh connection...")
             ssh = SSHService()
@@ -168,39 +231,10 @@ class IPCServer(Thread):
 
         return return_value
 
-    def run(self):
-        self._logger.info("IPC server started")
-        # read all the messages
-        while not self._stop_event.is_set():
-            connection = None
-            with contextlib.suppress(socket.timeout):
-                connection, _ = self._socket.accept()
-
-            # read all the parts of a messages
-            while connection:
-                try:
-                    data = connection.recv(1024)
-                except ConnectionResetError as error:
-                    self._logger.error("Connection reset: %s", error)
-                    break
-
-                if not data:
-                    break
-
-                self._logger.debug("Received action: '%s'", data)
-
-                response = self.handle_actions(json.loads(data.decode()))
-
-                with contextlib.suppress(BrokenPipeError):
-                    connection.send(json.dumps(response).encode())
-            if connection:
-                connection.close()
-
-        with contextlib.suppress(FileNotFoundError):
-            remove(MONITOR_INPUT_SOCKET)
-        self._logger.info("IPC server stopped")
-
     def test_syren(self, duration=5):
+        """
+        Test syren for a given duration.
+        """
         self._logger.debug("Testing syren %ss...", duration)
         Syren.start_syren(silent=False, delay=0, duration=duration)
         sleep(duration)

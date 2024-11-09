@@ -45,18 +45,19 @@ class SensorAlert(Thread):
         cls._stop_event.set()
         send_alert_state(None)
 
-        db_session = get_database_session()
-        alert = db_session.query(Alert).filter_by(end_time=None).first()
-        disarm = db_session.query(Disarm).get(disarm_id)
-        if alert:
-            alert.end_time = datetime.now()
-            alert.disarm = disarm
-            db_session.commit()
+        if disarm_id is not None:
+            db_session = get_database_session()
+            alert = db_session.query(Alert).filter_by(end_time=None).first()
+            disarm = db_session.query(Disarm).get(disarm_id)
+            if alert:
+                alert.end_time = datetime.now()
+                alert.disarm = disarm
+                db_session.commit()
+                Notifier.notify_alert_stopped(alert.id, alert.end_time)
 
-            send_alert_state(None)
-            send_syren_state(None)
-            Notifier.notify_alert_stopped(alert.id, alert.end_time)
-            logging.getLogger(LOG_ALERT).info("Alerts stopped")
+        send_alert_state(None)
+        send_syren_state(None)
+        logging.getLogger(LOG_ALERT).info("Alerts stopped")
 
     def __init__(
         self,

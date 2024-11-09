@@ -31,6 +31,9 @@ class KeypadBase(ABC):
         self._delay: Handler = None
         self._logger = logging.getLogger(LOG_ADKEYPAD)
 
+    def close(self):
+        pass
+
     def get_last_key(self):
         return self._keys.pop(0) if self._keys else None
 

@@ -7,16 +7,10 @@ from constants import LOG_IPC
 
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
-    "bash -c 'cd /home/argus/server; "
-    "PYTHONPATH=src /home/argus/server/src/tools/dyndns.py'"
+    "bash -c 'cd /home/argus/server/;"
+    " PYTHONPATH=/home/argus/server/src /home/argus/.venvs/server/bin/python"
+    " /home/argus/server/src/tools/dyndns.py'"
 )
-
-certbot_job = (
-    "systemd-cat -t 'argus_certbot' "
-    "bash -c 'cd /home/argus/server; "
-    "PYTHONPATH=src /home/argus/server/src/tools/certbot.py'"
-)
-
 
 def enable_dyndns_job(enable=True):
     try:
@@ -36,23 +30,3 @@ def enable_dyndns_job(enable=True):
     job.hours.every(1)
     job.enable(enable)
     argus_cron.write()
-
-
-def enable_certbot_job(enable=True):
-    try:
-        root_cron = CronTab(user="root")
-    except OSError as error:
-        logging.getLogger(LOG_IPC).error("Can't access crontab! %s", error)
-        return
-
-    jobs = list(root_cron.find_command("argus_certbot"))
-    job = jobs[0] if jobs else None
-    if job is None:
-        job = root_cron.new(
-            command=certbot_job,
-            comment="Generate or update certificate with certbot",
-        )
-
-    job.day.every(1)
-    job.enable(enable)
-    root_cron.write()

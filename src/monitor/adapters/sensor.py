@@ -50,7 +50,7 @@ class SensorAdapter(object):
 
     def close(self):
         """
-        Close all the channels
+        Close all the channels.
         """
         for channel in self._channels:
             channel.close()

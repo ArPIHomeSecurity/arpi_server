@@ -4,11 +4,22 @@ Manage areas
 
 import logging
 
-from constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
+from sqlalchemy import select
+
+from constants import (
+    ARM_AWAY,
+    ARM_DISARM,
+    ARM_STAY,
+    LOG_MONITOR,
+    MONITORING_READY,
+    MONITORING_STARTUP,
+    MONITORING_UPDATING_CONFIG,
+)
 from models import Area
 from monitor.communication.mqtt import MQTTClient
+from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_area_state
-from .output.handler import OutputHandler
+from monitor.storage import State, States
 
 
 class AreaHandler:
@@ -23,6 +34,30 @@ class AreaHandler:
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_area")
         self._logger.debug("AreaHandler initialized")
+
+    def load_areas(self):
+        """
+        Load all the areas from the database.
+        """
+        disarmed_states = [
+            MONITORING_STARTUP,
+            MONITORING_READY,
+            MONITORING_UPDATING_CONFIG,
+        ]
+
+        # restore the arm state of the areas if the monitoring state is disarmed
+        monitoring_state = States.get(State.MONITORING)
+        self._db_session.expire_all()
+        for area in self._db_session.execute(
+            select(Area).filter(Area.deleted == False)
+        ).scalars().all():
+            if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
+                area.arm_state = ARM_DISARM
+                self._logger.info("Area '%s' restored to disarmed state", area.name)
+
+            send_area_state(area.serialized)
+
+        self._db_session.commit()
 
     def publish_areas(self):
         """
@@ -63,40 +98,14 @@ class AreaHandler:
         send_area_state(area.serialized)
         self._db_session.commit()
 
-    def are_areas_mixed_state(self) -> bool:
-        """
-        Check if there are areas with more than one state.
-        """
-        count = (
-            self._db_session.query(Area.arm_state)
-            .filter(Area.arm_state != ARM_DISARM)
-            .filter(Area.deleted == False)
-            .distinct(Area.arm_state)
-            .count()
-        )
-        self._logger.debug("Are areas mixed state %s", count > 1)
-        return count > 1
-
-    def get_areas_state(self):
-        """
-        Get the state of the areas.
-        """
-        if self.are_areas_mixed_state():
-            self._logger.debug("Areas state %s", ARM_MIXED)
-            return ARM_MIXED
-
-        state = self._db_session.query(Area).distinct(Area.arm_state).first().arm_state
-        self._logger.debug("Areas state %s", state)
-        return state
-
     def change_areas_arm(self, arm_type):
         """
         Change the arm state of all the areas.
         Skip deleted areas or areas without a sensor.
         """
         self._logger.info("Arming areas to %s", arm_type)
-        areas = self._db_session.query(Area).filter(Area.deleted == False).filter(
-            Area.sensors.any()
+        areas = (
+            self._db_session.query(Area).filter(Area.deleted == False).filter(Area.sensors.any())
         )
 
         for area in areas:
@@ -110,3 +119,10 @@ class AreaHandler:
         self._db_session.commit()
 
         self.publish_areas()
+
+    def close(self):
+        """
+        Close the area handler.
+        """
+        self._logger.debug("Closing MQTT client...")
+        self._mqtt_client.close()

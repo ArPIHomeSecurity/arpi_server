@@ -7,6 +7,8 @@ from datetime import datetime as dt, timedelta
 from os import environ
 from time import sleep
 
+from sqlalchemy import select
+
 from constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -28,6 +30,7 @@ from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
+from monitor.database import get_database_session
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import State, States
@@ -54,9 +57,9 @@ class SensorHandler:
     Handles the sensors monitoring and alerting.
     """
 
-    def __init__(self, session, broadcaster):
+    def __init__(self, broadcaster):
         self._logger = logging.getLogger(LOG_SENSORS)
-        self._db_session = session
+        self._db_session = get_database_session()
         self._broadcaster = broadcaster
         self._sensor_adapter = SensorAdapter()
         self._alerting_sensors = set()
@@ -104,16 +107,8 @@ class SensorHandler:
         States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
 
-        for sensor in self._db_session.query(Sensor).all():
-            if not sensor.deleted:
-                self._mqtt_client.publish_sensor_config(
-                    sensor.id, sensor.type.name, sensor.description
-                )
-                self._mqtt_client.publish_sensor_state(sensor.description, False)
-            else:
-                self._mqtt_client.delete_sensor(sensor.description)
-
-        self._sensors = []
+        # force reload the sensors from the database
+        self._db_session.expire_all()
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
@@ -122,6 +117,7 @@ class SensorHandler:
             self._logger.info("Alert sensitivity config not found!")
             alert_sensitivity = AlertSensitivityConfig(None, None)
 
+        # initialize the sensors history
         sample_rate = int(environ["SAMPLE_RATE"])
         if alert_sensitivity.monitor_period is None:
             # instant alerts
@@ -138,6 +134,7 @@ class SensorHandler:
                 threshold=alert_sensitivity.monitor_threshold,
             )
 
+        # set the sensitivity of the sensors
         for idx, sensor in enumerate(self._sensors):
             if sensor.monitor_threshold is not None:
                 if sensor.monitor_period is None:
@@ -155,6 +152,7 @@ class SensorHandler:
         # keep config update state
         sleep(2)
 
+        # verify the sensor configuration
         if len(self._sensors) > self._sensor_adapter.channel_count:
             self._logger.info(
                 "Invalid number of sensors to monitor (Found=%s > Max=%s)",
@@ -175,6 +173,20 @@ class SensorHandler:
             States.set(State.MONITORING, monitoring_state)
 
         send_sensors_state(False)
+
+    def publish_sensors(self):
+        """
+        Publish the sensor configuration to the MQTT.
+        """
+        sensors = self._db_session.execute(select(Sensor)).scalars().all()
+        for sensor in sensors:
+            if not sensor.deleted:
+                self._mqtt_client.publish_sensor_config(
+                    sensor.id, sensor.type.name, sensor.name
+                )
+                self._mqtt_client.publish_sensor_state(sensor.name, False)
+            else:
+                self._mqtt_client.delete_sensor(sensor.description)
 
     def validate_sensor_config(self):
         """
@@ -249,12 +261,12 @@ class SensorHandler:
                         value,
                     )
                     sensor.alert = True
-                    self._mqtt_client.publish_sensor_state(sensor.description, True)
+                    self._mqtt_client.publish_sensor_state(sensor.name, True)
                     changes = True
             elif sensor.alert:
                 self._logger.debug("Cleared alert on channel: %s", sensor.channel)
                 sensor.alert = False
-                self._mqtt_client.publish_sensor_state(sensor.description, False)
+                self._mqtt_client.publish_sensor_state(sensor.name, False)
                 changes = True
 
             if sensor.alert and sensor.enabled:
@@ -392,6 +404,7 @@ class SensorHandler:
         Close the sensor handler.
         """
         self._logger.debug("Closing sensor handler...")
+        self._sensor_adapter.close()
         self._alerting_sensors.clear()
         self._mqtt_client.close()
 
