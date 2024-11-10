@@ -58,7 +58,7 @@ class Certbot:
                     "--non-interactive",
                     "--quiet",
                     "--cert-name", Certbot.CERT_NAME,
-                    "--email", dyndns_config.username,
+                    "--email", dyndns_config.certbot_email,
                     "--post-hook", "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/",
                     f"-d {dyndns_config.hostname}",
                 ],
