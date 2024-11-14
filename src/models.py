@@ -26,7 +26,7 @@ from constants import (
     ARM_DISARM,
     ARM_MIXED,
 )
-from tools.dictionary import merge_dicts, replace_keys
+from utils.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):

@@ -4,7 +4,7 @@ import sys
 
 from constants import LOGGING_MODULES, TRACE
 from monitor.logger import ArgusLogger
-from tools.formatter import NotTooLongStringFormatter
+from utils.formatter import NotTooLongStringFormatter
 
 
 def initialize_logging():

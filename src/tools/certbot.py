@@ -20,7 +20,7 @@ sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_CERTBOT
 from monitor.config_helper import load_dyndns_config
-from tools.dictionary import filter_keys
+from utils.dictionary import filter_keys
 
 
 class Certbot:
@@ -57,9 +57,12 @@ class Certbot:
                     "--agree-tos",
                     "--non-interactive",
                     "--quiet",
-                    "--cert-name", Certbot.CERT_NAME,
-                    "--email", dyndns_config.certbot_email,
-                    "--post-hook", "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/",
+                    "--cert-name",
+                    Certbot.CERT_NAME,
+                    "--email",
+                    dyndns_config.certbot_email,
+                    "--post-hook",
+                    "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/",
                     f"-d {dyndns_config.hostname}",
                 ],
                 capture_output=True,
@@ -137,23 +140,51 @@ class Certbot:
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
-    def _switch2certbot(self):
+    def _update_remote_configurations(self, enable=True, hostname=None):
         """
         Changes the symlinks using the certbot certificates instead of the self-signed
         """
-        self._replace_configuration(
-            "/usr/local/nginx/conf/snippets/certificates.conf",
-            "/usr/local/nginx/conf/snippets/certbot-signed.conf",
-        )
-        self._replace_configuration(
-            "/etc/mosquitto/conf.d/ssl.conf",
-            "/etc/mosquitto/configs-available/ssl-certbot.conf",
-        )
+        if enable:
+            self._update_nginx_remote(hostname)
+            self._enable_configuration(
+                "/usr/local/nginx/conf/sites-enabled/remote.conf",
+                "/usr/local/nginx/conf/sites-available/remote.conf",
+            )
+            self._enable_configuration(
+                "/etc/mosquitto/conf.d/ssl.conf",
+                "/etc/mosquitto/configs-available/ssl-certbot.conf",
+            )
+        else:
+            self._disable_configuration("/usr/local/nginx/conf/sites-enabled/remote.conf")
+            self._disable_configuration("/etc/mosquitto/conf.d/ssl.conf")
 
-    def _replace_configuration(self, used_config, new_config):
-        self._logger.info("Updating configuration %s with %s", used_config, new_config)
-        Path(used_config).unlink()
-        symlink(new_config, used_config)
+    def _update_nginx_remote(self, hostname):
+        """
+        Updates the server_name in the remote.conf file
+        """
+        self._logger.info("Updating remote configurations")
+        remote_conf = Path("/usr/local/nginx/conf/sites-available/remote.conf")
+        if remote_conf.is_file():
+            with open(remote_conf, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+                for i, line in enumerate(lines):
+                    if "server_name" in line and "# managed by Certbot" in line:
+                        lines[i] = f"    server_name {hostname}; # managed by Certbot\n"
+                        break
+
+            with open(remote_conf, "w", encoding="utf-8") as file:
+                file.writelines(lines)
+
+    def _enable_configuration(self, destination_config, source_config):
+        self._logger.info("Updating configuration %s with %s", destination_config, source_config)
+        symlink(source_config, destination_config)
+
+    def _disable_configuration(self, destination_config):
+        self._logger.info("Disabling configuration %s", destination_config)
+        try:
+            os.remove(destination_config)
+        except FileNotFoundError:
+            self._logger.error("File not found: %s", destination_config)
 
     def _restart_systemd_service(self, service_name):
         self._logger.info("Restarting '%s' with DBUS", service_name)
@@ -186,7 +217,7 @@ class Certbot:
 
         self._logger.info("Domain changed: %s => %s", cert_domain, dyndns_config.hostname)
         return True
-    
+
     def check_certificate_exists(self):
         """
         Check if the certificate exists
@@ -201,7 +232,7 @@ class Certbot:
 
         self._logger.info("Certificate does not exist")
         return False
-    
+
     def get_certificate_timestamp(self):
         """
         Get the timestamp of the certificate
@@ -232,24 +263,17 @@ class Certbot:
                 # if exists and domain not changed try to renew it
                 self._logger.info("Certbot certificate exists and no change of domain")
                 self.renew_certificate()
-
         else:
             # if certificate doesn't exist generate one
             self._logger.info("No certbot certificate found")
             self.generate_certificate()
 
             if self.check_certificate_exists():
-                if Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
-                    "/usr/local/nginx/conf/snippets/self-signed.conf"
-                ):
-                    self._logger.info("NGINX uses self-signed certificates")
-                    self._switch2certbot()
-                elif Path(
-                    "/usr/local/nginx/conf/snippets/certificates.conf"
-                ).resolve() == PosixPath("/usr/local/nginx/conf/snippets/certbot-signed.conf"):
+                if Path("/usr/local/nginx/conf/sites-enabled/remote.conf").exists():
                     self._logger.info("Using certbot certificates")
                 else:
-                    self._logger.error("Failed detecting certificate configuration")
+                    self._logger.info("NGINX uses self-signed certificates")
+                    self._update_remote_configurations(enable=True)
             else:
                 self._logger.warning("No certbot certificate found")
 
@@ -260,7 +284,12 @@ class Certbot:
                 self._restart_systemd_service("mosquitto.service")
                 self._restart_systemd_service("nginx.service")
                 return True
-        
+        else:
+            self._logger.error("Certificate not renewed")
+            self._update_remote_configurations(enable=False)
+            self._restart_systemd_service("mosquitto.service")
+            self._restart_systemd_service("nginx.service")
+
         return False
 
 

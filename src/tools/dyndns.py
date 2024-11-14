@@ -6,6 +6,7 @@ import sys
 
 from dataclasses import asdict
 from ipaddress import ip_address
+from time import sleep, time
 
 import requests
 from dotenv import load_dotenv
@@ -19,27 +20,11 @@ sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_DYNDNS
 from monitor.config_helper import load_dyndns_config, DyndnsConfig
-from tools.dictionary import filter_keys
-from tools.lock import file_lock
+from utils.dictionary import filter_keys
+from utils.lock import file_lock
 
 
-def get_dns_records(hostname=None, record_type="A"):
-    """
-    Query IP address from google.
-
-    Avoid conflict of local and remote IP addresses.
-    """
-    if hostname is None:
-        return None
-
-    api_url = "https://dns.google.com/resolve?"
-    params = {"name": hostname, "type": record_type}
-    try:
-        response = requests.get(api_url, params=params)
-        return response.json()
-    except requests.RequestException as request_error:
-        logging.error("Failed to query DNS record! (Request error: %s)", request_error)
-        return None
+logger = logging.getLogger(LOG_SC_DYNDNS)
 
 
 class DynDns:
@@ -47,8 +32,38 @@ class DynDns:
     Class for managing the IP address of the dynamic DNS name.
     """
 
-    def __init__(self, logger=None):
-        self._logger = logger or logging.getLogger(LOG_SC_DYNDNS)
+    def get_dns_records(self, hostname=None, record_type="A"):
+        """
+        Query IP address from google.
+
+        Avoid conflict of local and remote IP addresses.
+        """
+        if hostname is None:
+            return None
+
+        api_url = "https://dns.google.com/resolve?"
+        params = {"name": hostname, "type": record_type}
+        try:
+            response = requests.get(api_url, params=params, timeout=30)
+            dns_info = response.json()
+            return dns_info["Answer"][0]["data"]
+        except (KeyError, TypeError) as error:
+            logger.error(
+                "Failed to query IP Address! (Missing key: %s) Response: %s", error, response
+            )
+        except requests.RequestException as request_error:
+            logger.error("Failed to query DNS record! (Request error: %s)", request_error)
+            return None
+
+    def get_public_ip(self):
+        """
+        Get the public IP address.
+        """
+        try:
+            return requests.get("http://checkip.amazonaws.com/", timeout=30).text.strip()
+        except requests.RequestException as request_error:
+            logger.error("Failed to query IP Address! (Request error: %s)", request_error)
+            return None
 
     @file_lock("dyndns.lock", timeout=3600)
     def update_ip(self, force=False):
@@ -59,60 +74,42 @@ class DynDns:
         """
         dyndns_config = load_dyndns_config()
         if not dyndns_config.provider:
-            self._logger.info("No dynamic dns provider found")
+            logger.info("No dynamic dns provider found")
             return False
 
         tmp_config = asdict(dyndns_config)
         filter_keys(tmp_config, ["password"])
-        self._logger.info("Update dynamics DNS provider with options: %s", tmp_config)
+        logger.info("Update dynamics DNS provider with options: %s", tmp_config)
 
         if not dyndns_config.provider:
-            self._logger.error("Missing provider!")
+            logger.error("Missing provider!")
             return False
 
         # DNS lookup IP from hostname
-        response = None
-        try:
-            response = get_dns_records(hostname=dyndns_config.hostname)
-            current_ip = response["Answer"][0]["data"]
-        except KeyError as key_error:
-            self._logger.error(
-                "Failed to query IP Address! (Missing key: %s) Response: %s",
-                key_error,
-                response,
-            )
-            return False
-        except TypeError as type_error:
-            self._logger.error(
-                "Failed to query IP Address! (Type: %s) Response: %s",
-                type_error,
-                response,
-            )
+        current_ip = self.get_dns_records(hostname=dyndns_config.hostname)
+        if not current_ip:
             return False
 
-        try:
-            # Getting public IP
-            new_ip = requests.get("http://checkip.amazonaws.com/", timeout=30).text.strip()
-        except requests.RequestException as request_error:
-            self._logger.error("Failed to query IP Address! (Request error: %s)", request_error)
+        new_ip = self.get_public_ip()
+        if not new_ip:
             return False
 
         try:
             # converting the address to string for comparison
             new_ip = format(ip_address(new_ip))
         except ValueError:
-            self._logger.info("Invalid IP address: %s", new_ip)
+            logger.info("Invalid IP address: %s", new_ip)
             return False
 
         if (new_ip != current_ip) or force:
-            self._logger.info("IP: '%s' => '%s'", current_ip, new_ip)
+            logger.info("IP: '%s' => '%s'", current_ip, new_ip)
             dyndns_config.ip = new_ip
             result = self.save_ip(dyndns_config)
-            self._logger.info("Update result: '%s'", result)
+            logger.info("Update result: '%s'", result)
             return True
         else:
-            self._logger.info("IP: '%s' == '%s'", current_ip, new_ip)
-            self._logger.info("No IP update necessary")
+            logger.info("IP: '%s' == '%s'", current_ip, new_ip)
+            logger.info("No IP update necessary")
 
         return True
 
@@ -135,17 +132,44 @@ class DynDns:
             args.ip = noip_config.ip
             return execute_update(args)
         except KeyError as key_error:
-            self._logger.error("Failed to update NOIP provider! (%s)", key_error)
-            self._logger.debug("NOIP settings: %s", noip_config)
+            logger.error("Failed to update NOIP provider! (%s)", key_error)
+            logger.debug("NOIP settings: %s", noip_config)
 
         return {}
+
+    def wait_for_update(self, timeout=120) -> bool:
+        """
+        Wait for the update to be finished.
+        :param timeout: timeout in seconds
+        """
+        dyndns_config = load_dyndns_config()
+        if not dyndns_config.provider:
+            logger.info("No dynamic dns provider found")
+            return False
+
+        hostname = dyndns_config.hostname
+        if not hostname:
+            logger.error("Missing hostname!")
+            return False
+
+        public_ip = self.get_public_ip()
+
+        start_time = time()
+        while time() - start_time < timeout:
+            new_ip = self.get_dns_records(hostname=hostname)
+            if new_ip and new_ip == public_ip:
+                logger.info("IP address for '%s' updated to '%s'", hostname, public_ip)
+                return True
+            logger.info("Waiting for IP address update...")
+            sleep(5)
+
+        logger.error("Timeout waiting for IP address update!")
+        return False
 
 
 def main():
     parser = argparse.ArgumentParser(description="Update IP address at DNS provider")
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="increase output verbosity"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
     parser.add_argument("-f", "--force", action="store_true", help="force update")
 
     args = parser.parse_args()
@@ -155,7 +179,7 @@ def main():
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
 
-    dyndns = DynDns(logging.getLogger("argus_noip"))
+    dyndns = DynDns()
     dyndns.update_ip(force=args.force)
 
 

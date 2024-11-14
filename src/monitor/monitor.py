@@ -54,8 +54,8 @@ from monitor.syren import Syren
 from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
-from tools.connection import SecureConnection
-from tools.queries import get_arm_state, get_arm_delay
+from monitor.connection import SecureConnection
+from utils.queries import get_arm_state, get_arm_delay
 
 
 # 2000.01.01 00:00:00
@@ -218,7 +218,7 @@ class Monitor(Thread):
                 secure_connection = None
                 if States.get(State.MONITORING) == MONITORING_UPDATING_CONFIG:
                     States.set(State.MONITORING, MONITORING_READY)
-                    self._logger.info("Secure connection updated")
+                    self._logger.info("Secure connection finished")
 
             if secure_connection is None:
                 self.check_power()

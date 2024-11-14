@@ -18,7 +18,7 @@ from monitor.adapters.keypads.wiegand import WiegandKeypad
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
-from tools.queries import (
+from utils.queries import (
     get_alert_delay,
     get_arm_state,
     get_arm_delay,
