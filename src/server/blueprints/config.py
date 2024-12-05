@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 
@@ -152,3 +153,18 @@ def get_installation():
             "primaryDomain": dyndns.get("hostname", "localhost") or "localhost",
             "secondaryDomain": "localhost",
         })
+
+
+@config_blueprint.route("/api/config/installation_id", methods=["GET"])
+def get_installation_id():
+    """
+    Get the installation id which identifies the installation by a hash.
+
+    The hash is from:
+    * SECRET
+    * SALT
+    * host id?
+    """
+    secret = os.environ["SECRET"]
+    salt = os.environ["SALT"]
+    return hashlib.sha256(f"{secret}{salt}".encode()).hexdigest()

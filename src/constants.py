@@ -87,7 +87,7 @@ DELETE_SMS_MESSAGE = "delete_sms_message"
 """---------------------------------------------------------------"""
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
 
-# authentication toket valid for 15 mins
+# authentication token valid for 15 mins
 USER_TOKEN_EXPIRY = 60 * 15
 
 # arm types

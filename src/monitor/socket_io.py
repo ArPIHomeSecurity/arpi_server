@@ -27,8 +27,6 @@ if noip_config and noip_config.get("restrict_host", False) and noip_config.get("
 else:
     allowed_origins = "*"
 
-if len(allowed_origins) == 1:
-    allowed_origins = allowed_origins[0]
 
 logger.info("Server CORS allowed on '%s'", allowed_origins)
 
