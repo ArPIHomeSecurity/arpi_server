@@ -177,6 +177,9 @@ class Certbot:
 
     def _enable_configuration(self, destination_config, source_config):
         self._logger.info("Updating configuration %s with %s", destination_config, source_config)
+        if Path(destination_config).exists():
+            os.remove(destination_config)
+
         symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
