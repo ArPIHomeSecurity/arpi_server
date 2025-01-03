@@ -231,23 +231,25 @@ class Monitor(Thread):
         """
         self._logger.info("Arming to %s", arm_type)
 
+        arm_changed = False
         if area_id is None:
             # arm the system and all the areas
-            self._area_handler.change_areas_arm(arm_type)
+            arm_changed = self._area_handler.change_areas_arm(arm_type)
             self.arm_system(arm_type, use_delay)
         else:
             arm_state_before = get_arm_state(self._db_session)
-            self._area_handler.change_area_arm(arm_type, area_id)
+            arm_changed = self._area_handler.change_area_arm(arm_type, area_id)
             arm_state_after = get_arm_state(self._db_session)
 
             if arm_state_before != arm_state_after:
                 self.arm_system(arm_type, use_delay=False)
 
-        self.update_database_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
+        if arm_changed:
+            self.update_database_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
 
     def arm_system(self, arm_type, use_delay):
         """
-        Arm only the system.
+        Arm only the system (internal states, no database update).
         """
         self._logger.info("Arming system to %s", arm_type)
 
@@ -295,7 +297,6 @@ class Monitor(Thread):
                 self.disarm_system(user_id, keypad_id)
 
             send_arm_state(areas_state)
-            self.update_database_arm(arm_type=ARM_DISARM, user_id=user_id, keypad_id=keypad_id)
         else:
             # disarm system and all the areas
             self._area_handler.change_areas_arm(ARM_DISARM)

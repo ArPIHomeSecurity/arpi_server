@@ -73,19 +73,27 @@ class AreaHandler:
             else:
                 self._mqtt_client.delete_area(area.name)
 
-    def change_area_arm(self, arm_type, area_id=None):
+    def change_area_arm(self, arm_type, area_id=None) -> bool:
         """
         Change the arm state of the given area.
+
+        Return True if the area was found and the arm state was changed.
         """
-        self._logger.info("Arming area: %s to %s", area_id, arm_type)
+        self._logger.info("Arming area id=%s to %s", area_id, arm_type)
         area = self._db_session.query(Area).get(area_id)
         if area is None and not area.deleted:
             self._logger.error("Area not found or deleted")
-            return
+            return False
 
         if area.sensors == []:
             self._logger.error("Area has no sensors")
-            return
+            return False
+
+        if area.arm_state == arm_type:
+            self._logger.info("Area id=%s already in state %s", area_id, arm_type)
+            return False
+
+        self._logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
 
         # update output channel
         if arm_type in (ARM_AWAY, ARM_STAY):
@@ -98,18 +106,30 @@ class AreaHandler:
         send_area_state(area.serialized)
         self._db_session.commit()
 
-    def change_areas_arm(self, arm_type):
+        return True
+
+    def change_areas_arm(self, arm_type) -> bool:
         """
         Change the arm state of all the areas.
         Skip deleted areas or areas without a sensor.
+
+        Return True if at least one area was found and the arm state was changed.
         """
         self._logger.info("Arming areas to %s", arm_type)
         areas = (
             self._db_session.query(Area).filter(Area.deleted == False).filter(Area.sensors.any())
         )
 
+        arm_changed = False
         for area in areas:
-            area.update({"arm_state": arm_type})
+            if area.arm_state == arm_type:
+                self._logger.info("Area id=%s already in state %s", area.id, arm_type)
+                continue
+
+            self._logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
+            area.arm_state = arm_type
+            arm_changed = True
+
             # update output channel
             if arm_type in (ARM_AWAY, ARM_STAY):
                 OutputHandler.send_area_armed(area)
@@ -119,6 +139,8 @@ class AreaHandler:
         self._db_session.commit()
 
         self.publish_areas()
+
+        return arm_changed
 
     def close(self):
         """
