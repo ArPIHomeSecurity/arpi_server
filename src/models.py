@@ -715,18 +715,18 @@ class User(BaseModel):
     def serialized(self):
         return convert2camel(
             {
-                "id": self.id,
-                "name": self.name,
-                "email": self.email,
-                "has_registration_code": bool(self.registration_code),
-                "has_card": bool(self.cards),
-                "registration_expiry": (
-                    self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
-                    if self.registration_expiry
-                    else None
-                ),
-                "role": self.role,
-                "comment": self.comment,
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "has_registration_code": bool(self.registration_code),
+            "has_card": bool(self.cards),
+            "registration_expiry": (
+                self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%dT%H:%M:%S")
+                if self.registration_expiry
+                else None
+            ),
+            "role": self.role,
+            "comment": self.comment,
             }
         )
 
