@@ -18,19 +18,7 @@ from monitor.database import get_database_session
 session = get_database_session()
 logger = logging.getLogger(LOG_SOCKETIO)
 
-noip_config = session.query(Option).filter_by(name="network", section="dyndns").first()
-if noip_config:
-    noip_config = json.loads(noip_config.value)
-
-if noip_config and noip_config.get("restrict_host", False) and noip_config.get("hostname", None):
-    allowed_origins = f"https://{noip_config['hostname']}"
-else:
-    allowed_origins = "*"
-
-
-logger.info("Server CORS allowed on '%s'", allowed_origins)
-
-sio = socketio.Server(async_mode="threading", cors_allowed_origins=allowed_origins)
+sio = socketio.Server(async_mode="threading", cors_allowed_origins='*')
 socketio_app = Flask(__name__)
 # wrap Flask application with socketio's middleware
 socketio_app.wsgi_app = socketio.WSGIApp(sio, socketio_app.wsgi_app)
