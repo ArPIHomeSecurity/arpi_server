@@ -114,8 +114,10 @@ def authenticated(role=ROLE_ADMIN):
                     if int(user_token.get("timestamp", 0)) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
-                    if (role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN)) or (
-                        role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,)
+                    if (
+                        (role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN))
+                        or
+                        (role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,))
                     ):
                         logger.info(
                             "Operation %s not permitted for user='%s/%s' on origin=%s from %s",

@@ -72,6 +72,16 @@ def user(user_id):
 
 
 @user_blueprint.route(
+    "/api/user/<int:user_id>/name", methods=["GET"]
+)
+@registered
+@restrict_host
+def get_user_name(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    return jsonify(db_user.name)
+
+
+@user_blueprint.route(
     "/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"]
 )
 @authenticated()
