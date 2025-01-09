@@ -81,7 +81,7 @@ def registered(request_handler):
                 logger.debug("Token: %s", device_token)
                 return request_handler(*args, **kws)
             except jose.exceptions.JWTError:
-                logger.warn("Bad token (%s) from %s", raw_token, request.remote_addr)
+                logger.warning("Bad token (%s) from %s", raw_token, request.remote_addr)
                 return jsonify({"error": "invalid device token"}), 403
         else:
             logger.info("Request without authentication info from %s", request.remote_addr)
@@ -128,7 +128,7 @@ def authenticated(role=ROLE_ADMIN):
                             remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
-
+                    
                     flask.request.environ["requester_id"] = user_token["id"]
                     flask.request.environ["requester_role"] = user_token["role"]
                     response = request_handler(*args, **kws)

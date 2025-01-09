@@ -24,11 +24,6 @@ from server.database import db
 
 app = Flask(__name__)
 
-# enable CORS if necessary (in development)
-if environ.get("FLASK_CORS", 'False').lower() in ('true', '1'):
-    from flask_cors import CORS
-    CORS(app, expose_headers=["User-Token"])
-
 app.logger.debug("App name: %s", __name__)
 
 if __name__ != "server":
