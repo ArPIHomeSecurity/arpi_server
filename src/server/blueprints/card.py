@@ -15,6 +15,18 @@ card_blueprint = Blueprint("card", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_cards():
+    # if body has userId
+    if "userId" in request.args:
+        user_id = request.args.get("userId")
+        return jsonify(
+            [
+                i.serialized
+                for i in db.session.query(Card)
+                .filter(Card.user_id == user_id)
+                .order_by(Card.description)
+                .all()
+            ]
+        )
     return jsonify([i.serialized for i in db.session.query(Card).order_by(Card.description).all()])
 
 
