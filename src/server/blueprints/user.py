@@ -28,9 +28,7 @@ user_blueprint = Blueprint("user", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_users():
-    return jsonify(
-        [i.serialized for i in db.session.query(User).order_by(User.role).all()]
-    )
+    return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
 
 
 @user_blueprint.route("/api/users", methods=["POST"])
@@ -38,19 +36,26 @@ def get_users():
 @restrict_host
 def create_user():
     data = request.json
-    db_user: User = User(
-        name=data["name"], role=data["role"], access_code=data["accessCode"]
-    )
+    db_user: User = User(name=data["name"], role=data["role"], access_code=data["accessCode"], comment=data.get("comment"))
     db.session.add(db_user)
     db.session.commit()
 
     return jsonify(None)
 
 
-@user_blueprint.route("/api/user/<int:user_id>", methods=["GET", "PUT", "DELETE"])
-@authenticated()
+@user_blueprint.route("/api/user/<int:user_id>", methods=["GET", "PUT"])
+@authenticated(role=ROLE_USER)
 @restrict_host
 def user(user_id):
+    """
+    Get or update a user
+    """
+    if (
+        request.environ.get("requester_role") == ROLE_USER
+        and request.environ.get("requester_id") != user_id
+    ):
+        return make_response(jsonify({"error": "Unauthorized"}), 401)
+
     db_user: User = db.session.query(User).get(user_id)
     if not db_user:
         return make_response(jsonify({"error": "User not found"}), 404)
@@ -58,22 +63,38 @@ def user(user_id):
     if request.method == "GET":
         return jsonify(db_user.serialized)
     elif request.method == "PUT":
+        user_data = request.json
+        if user_data.get("newAccessCode"):
+            if hash_code(user_data["oldAccessCode"]) != db_user.access_code:
+                return make_response(jsonify({"error": "Invalid old access code"}), 400)
+            user_data["accessCode"] = user_data["newAccessCode"]
+            del user_data["newAccessCode"]
+            del user_data["oldAccessCode"]
+
+        current_app.logger.debug("Updating user %s", db_user)
         if not db_user.update(request.json):
+            # nothing changed
             return make_response("", 204)
 
-        db.session.commit()
-        return jsonify(None)
-    elif request.method == "DELETE":
-        db.session.delete(db_user)
+        current_app.logger.debug("Updated user %s", db_user)
         db.session.commit()
         return jsonify(None)
 
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+
+@user_blueprint.route("/api/user/<int:user_id>", methods=["DELETE"])
+@authenticated()
+@restrict_host
+def delete_user(user_id):
+    db_user: User = db.session.query(User).get(user_id)
+    if not db_user:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+    db.session.delete(db_user)
+    db.session.commit()
+    return jsonify(None)
 
 
-@user_blueprint.route(
-    "/api/user/<int:user_id>/name", methods=["GET"]
-)
+@user_blueprint.route("/api/user/<int:user_id>/name", methods=["GET"])
 @registered
 @restrict_host
 def get_user_name(user_id):
@@ -81,10 +102,8 @@ def get_user_name(user_id):
     return jsonify(db_user.name)
 
 
-@user_blueprint.route(
-    "/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"]
-)
-@authenticated()
+@user_blueprint.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
+@authenticated(role=ROLE_USER)
 @restrict_host
 def registration_code(user_id):
     remote_ip = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
@@ -95,17 +114,18 @@ def registration_code(user_id):
         request.get_json(silent=True),
     )
 
+    # only the user itself or an admin can manage the registration code
+    if (request.environ.get("requester_role") == ROLE_USER and 
+        request.environ.get("requester_id") != user_id):
+        return make_response(jsonify({"error": "Unauthorized"}), 401)
+
     if request.method == "GET":
         db_user: User = db.session.query(User).get(user_id)
         if db_user:
             if db_user.registration_code:
-                return make_response(
-                    jsonify({"error": "Already has registration code"}), 400
-                )
+                return make_response(jsonify({"error": "Already has registration code"}), 400)
 
-            expiry = (
-                int(request.args.get("expiry")) if request.args.get("expiry") else None
-            )
+            expiry = int(request.args.get("expiry")) if request.args.get("expiry") else None
             code = db_user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
@@ -139,17 +159,12 @@ def register_device():
     if request.json["registration_code"]:
         db_user: User = (
             db.session.query(User)
-            .filter_by(
-                registration_code=hash_code(request.json["registration_code"].upper())
-            )
+            .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
             .first()
         )
 
         if db_user:
-            if (
-                db_user.registration_expiry
-                and dt.now(tzlocal()) > db_user.registration_expiry
-            ):
+            if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
                 sleep(5)
                 return make_response(
                     jsonify(
@@ -169,18 +184,12 @@ def register_device():
                 "user_id": db_user.id,
             }
             return jsonify(
-                {
-                    "device_token": jwt.encode(
-                        token, os.environ.get("SECRET"), algorithm="HS256"
-                    )
-                }
+                {"device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")}
             )
         else:
             sleep(5)
             return make_response(
-                jsonify(
-                    {"error": "Failed to register device", "reason": "User not found"}
-                ),
+                jsonify({"error": "Failed to register device", "reason": "User not found"}),
                 400,
             )
 
@@ -297,6 +306,7 @@ def generate_ssh_key(user_id):
         return jsonify(private_key)
 
     return make_response(jsonify({"error": "User not found"}), 404)
+
 
 @user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["PUT"])
 @authenticated(ROLE_ADMIN)

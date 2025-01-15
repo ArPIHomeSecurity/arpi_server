@@ -653,13 +653,14 @@ class User(BaseModel):
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 
-    def __init__(self, name, role, access_code, fourkey_code=None):
+    def __init__(self, name, role, access_code, fourkey_code=None, comment=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
         self.name = name
         self.email = ""
         self.role = role
         self.access_code = hash_code(access_code)
         self.fourkey_code = fourkey_code or hash_code(access_code[:4])
+        self.comment = comment
 
     def update(self, data):
         # !!! incoming data has camelCase key/field name format
@@ -670,6 +671,7 @@ class User(BaseModel):
                 len(access_code) >= 4 and len(access_code) <= 12
             ), "Access code length (>=4, <=12)"
             assert access_code.isdigit(), "Access code only number"
+
             data["accessCode"] = hash_code(access_code)
             if not data.get("fourkeyCode", None):
                 data["fourkeyCode"] = hash_code(access_code[:4])
@@ -677,11 +679,12 @@ class User(BaseModel):
                 assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
                 assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
                 data["fourkeyCode"] = hash_code(data["fourkeyCode"])
+
             fields += (
                 "access_code",
                 "fourkey_code",
             )
-
+ 
         return self.update_record(fields, data)
 
     def set_card_registration(self):
