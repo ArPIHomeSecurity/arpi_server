@@ -186,7 +186,7 @@ class SensorHandler:
                 )
                 self._mqtt_client.publish_sensor_state(sensor.name, False)
             else:
-                self._mqtt_client.delete_sensor(sensor.description)
+                self._mqtt_client.delete_sensor(sensor.name)
 
     def validate_sensor_config(self):
         """
