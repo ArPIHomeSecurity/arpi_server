@@ -77,14 +77,6 @@ class BaseModel(Base):
         """Define a base way to print models"""
         return f"{self.__class__.__name__}({dict(self.__dict__.items())})"
 
-    def json(self):
-        """
-        Define a base way to jsonify models, dealing with datetime objects
-        """
-        return {
-            column: value.strftime("%Y-%m-%d") if isinstance(value, date) else value
-            for column, value in self.__dict__.items()
-        }
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -102,7 +94,7 @@ class BaseModel(Base):
         for attribute in attributes:
             value = getattr(self, attribute, None)
             if isinstance(value, dt):
-                value = value.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+                value = value.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
             serialized[attribute] = value
 
         return serialized
@@ -716,22 +708,20 @@ class User(BaseModel):
 
     @property
     def serialized(self):
-        return convert2camel(
-            {
+        return convert2camel({
             "id": self.id,
             "name": self.name,
             "email": self.email,
             "has_registration_code": bool(self.registration_code),
             "has_card": bool(self.cards),
             "registration_expiry": (
-                self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%dT%H:%M:%S")
+                self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
                 if self.registration_expiry
                 else None
             ),
             "role": self.role,
             "comment": self.comment,
-            }
-        )
+        })
 
     @validates("name")
     def validates_name(self, key, name):
