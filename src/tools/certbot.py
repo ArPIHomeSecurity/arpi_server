@@ -62,7 +62,7 @@ class Certbot:
                     "--email",
                     dyndns_config.certbot_email,
                     "--post-hook",
-                    "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/",
+                    "chmod -R 755 /etc/letsencrypt/live/ /etc/letsencrypt/archive/; systemctl restart mosquitto.service; systemctl restart nginx.service",
                     f"-d {dyndns_config.hostname}",
                 ],
                 capture_output=True,
