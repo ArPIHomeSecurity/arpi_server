@@ -72,7 +72,7 @@ def manage_output(output_id):
 
 
 @output_blueprint.route("/api/output/<int:output_id>/activate", methods=["PUT"])
-@authenticated()
+@authenticated(role=ROLE_USER)
 @restrict_host
 def activate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
@@ -83,7 +83,7 @@ def activate_output(output_id):
 
 
 @output_blueprint.route("/api/output/<int:output_id>/deactivate", methods=["PUT"])
-@authenticated()
+@authenticated(role=ROLE_USER)
 @restrict_host
 def deactivate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
