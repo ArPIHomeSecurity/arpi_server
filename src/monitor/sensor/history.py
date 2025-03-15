@@ -74,7 +74,7 @@ class SensorHistory:
             bool: True if the percentage of alert states is above the threshold, False otherwise.
         """
         return (self.alert_states_length() / len(self._states)) * 100 >= self._threshold
-    
+
     def get_sensitivity(self) -> AlertSensitivityConfig:
         """
         Returns the sensitivity configuration of the sensor history.
@@ -95,11 +95,14 @@ class SensorsHistory:
     """
     Tracking the history of N sensors.
     """
+
     DEFAULT_SIZE = 1
     DEFAULT_THRESHOLD = 100
 
     def __init__(self, sensor_count, size=DEFAULT_SIZE, threshold=DEFAULT_THRESHOLD) -> None:
-        self._sensors = [SensorHistory(size, threshold) for _ in range(sensor_count)]
+        self._sensors: List[SensorHistory] = [
+            SensorHistory(size, threshold) for _ in range(sensor_count)
+        ]
         self._logger = logging.getLogger(LOG_MONITOR)
 
     def set_sensitivity(self, idx: int, size: int, threshold: int):
@@ -143,6 +146,7 @@ class SensorsHistory:
     def has_sensor_any_alert(self, idx) -> bool:
         """
         Checks if the sensor at the given index has any alert state.
+        (May be still below the threshold but has some alert states)
 
         Args:
             idx (int): The index of the sensor.

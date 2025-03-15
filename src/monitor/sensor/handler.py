@@ -344,8 +344,9 @@ class SensorHandler:
 
                 # start the alert
                 self._logger.debug(
-                    "Found alerting sensor id: %s delay: %s, alert type: %s",
+                    "Found alerting sensor id: %s, states: %s, delay: %s, type: %s",
                     sensor.id,
+                    self._sensors_history.get_states(idx),
                     delay,
                     alert_type,
                 )
@@ -359,7 +360,7 @@ class SensorHandler:
                     SensorAlert.start_alert(
                         sensor.id, delay, alert_type, sensitivity, self._broadcaster
                     )
-                
+
                 if alert_type is None:
                     self._logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
                 if delay is None:
