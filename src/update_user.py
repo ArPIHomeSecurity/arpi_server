@@ -13,6 +13,7 @@ from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentTypeError
 from datetime import datetime as dt
 from dateutil.tz.tz import tzlocal
 from logging import basicConfig
+import sqlalchemy
 from time import sleep
 
 from models import User
@@ -51,7 +52,11 @@ def new_registration_code(user_id, code, expiry):
     """
     Generate a new registration code for the user.
     """
-    user = session.query(User).filter(User.id == user_id).one()
+    try:
+        user = session.query(User).filter(User.id == user_id).one()
+    except sqlalchemy.exc.NoResultFound:
+        logging.error("User with id %s not found", user_id)
+        return
 
     if user.registration_code is not None:
         if user.registration_expiry and dt.now(tzlocal()) < user.registration_expiry:
