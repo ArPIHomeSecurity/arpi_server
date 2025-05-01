@@ -54,8 +54,8 @@ from monitor.syren import Syren
 from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
-from tools.connection import SecureConnection
-from tools.queries import get_arm_state, get_arm_delay
+from monitor.connection import SecureConnection
+from utils.queries import get_arm_state, get_arm_delay
 
 
 # 2000.01.01 00:00:00
@@ -88,30 +88,40 @@ class Monitor(Thread):
         self._logger.info("Monitoring started")
 
         try:
+            self.startup_monitoring()
+
             self.do_monitoring()
-            States.set(State.MONITORING, MONITORING_STOPPED)
+
+            self.teardown_monitoring()
         except Exception:  # pylint: disable=broad-except
             self._logger.exception("Monitoring thread crashed!")
             States.set(State.MONITORING, MONITORING_ERROR)
             return
         finally:
-            self._sensor_handler.close()
-            self._area_handler.close()
+            if self._sensor_handler:
+                self._sensor_handler.close()
+            if self._area_handler:
+                self._area_handler.close()
+            if self._db_session:
+                self._db_session.close()
             self._power_adapter.close()
-            self._db_session.close()
             States.close()
 
         self._logger.info("Monitoring stopped")
 
-    def do_monitoring(self):
+    def startup_monitoring(self):
         """
-        Start the monitoring of the sensors and manage alerting.
+        Startup the monitoring system.
+
+        * Load the database session
+        * Cleanup the database
+        * Setup the states
+        * Send initial states
+        * Load the areas
+        * Load the sensors
         """
         # create the database session in the thread
         self._db_session = get_database_session()
-
-        # cleanup the database
-        self.cleanup_database()
 
         # setup the states
         States.open()
@@ -140,8 +150,11 @@ class Monitor(Thread):
         else:
             self._logger.error(
                 "Monitor restarted without proper shutdown, restoring state: %s",
-                States.get(State.MONITORING)
+                States.get(State.MONITORING),
             )
+
+        # cleanup the database
+        self.cleanup_database()
 
         send_arm_state(get_arm_state(self._db_session))
 
@@ -151,6 +164,7 @@ class Monitor(Thread):
         # send initial states
         alert = self._db_session.query(Alert).filter_by(end_time=None).first()
         if alert:
+            self._logger.info("Continue unresolved alert: %s", alert)
             send_alert_state(alert)
             Syren.start_syren()
         else:
@@ -165,6 +179,17 @@ class Monitor(Thread):
         self._sensor_handler.load_sensors()
         self._sensor_handler.publish_sensors()
 
+    def teardown_monitoring(self):
+        """
+        Teardown the monitoring system.
+        """
+        self._logger.info("Closing monitoring system")
+        States.set(State.MONITORING, MONITORING_STOPPED)
+
+    def do_monitoring(self):
+        """
+        Start the monitoring of the sensors and manage alerting.
+        """
         message_wait_time = 1 / int(environ["SAMPLE_RATE"])
         secure_connection = None
         while True:
@@ -218,7 +243,7 @@ class Monitor(Thread):
                 secure_connection = None
                 if States.get(State.MONITORING) == MONITORING_UPDATING_CONFIG:
                     States.set(State.MONITORING, MONITORING_READY)
-                    self._logger.info("Secure connection updated")
+                    self._logger.info("Secure connection finished")
 
             if secure_connection is None:
                 self.check_power()
@@ -231,23 +256,25 @@ class Monitor(Thread):
         """
         self._logger.info("Arming to %s", arm_type)
 
+        arm_changed = False
         if area_id is None:
             # arm the system and all the areas
-            self._area_handler.change_areas_arm(arm_type)
+            arm_changed = self._area_handler.change_areas_arm(arm_type)
             self.arm_system(arm_type, use_delay)
         else:
             arm_state_before = get_arm_state(self._db_session)
-            self._area_handler.change_area_arm(arm_type, area_id)
+            arm_changed = self._area_handler.change_area_arm(arm_type, area_id)
             arm_state_after = get_arm_state(self._db_session)
 
             if arm_state_before != arm_state_after:
                 self.arm_system(arm_type, use_delay=False)
 
-        self.update_database_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
+        if arm_changed:
+            self.update_database_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
 
     def arm_system(self, arm_type, use_delay):
         """
-        Arm only the system.
+        Arm only the system (internal states, no database update).
         """
         self._logger.info("Arming system to %s", arm_type)
 
@@ -281,8 +308,8 @@ class Monitor(Thread):
         # do not disarm if the system is already disarmed
         # except if the system is in sabotage mode
         if (
-            get_arm_state(self._db_session) == ARM_DISARM and
-            States.get(State.MONITORING) != MONITORING_SABOTAGE
+            get_arm_state(self._db_session) == ARM_DISARM
+            and States.get(State.MONITORING) != MONITORING_SABOTAGE
         ):
             self._logger.info("System is already disarmed")
             return
@@ -295,7 +322,6 @@ class Monitor(Thread):
                 self.disarm_system(user_id, keypad_id)
 
             send_arm_state(areas_state)
-            self.update_database_arm(arm_type=ARM_DISARM, user_id=user_id, keypad_id=keypad_id)
         else:
             # disarm system and all the areas
             self._area_handler.change_areas_arm(ARM_DISARM)
@@ -387,6 +413,17 @@ class Monitor(Thread):
         """
         Cleanup invalid values in the database.
         """
+        # close the alert if the system is not alerting
+        alert_states = [
+            MONITORING_ALERT,
+            MONITORING_ALERT_DELAY
+        ]
+        alert = self._db_session.query(Alert).filter_by(end_time=None).first()
+        if alert and States.get(State.MONITORING) not in alert_states:
+            alert.end_time = dt.now()
+            self._logger.info("Close invalid alert: %s", alert)
+            send_alert_state(None)
+
         # overwrite invalid values in the database with default values
         load_ssh_config(cleanup=True, session=self._db_session)
         load_syren_config(cleanup=True, session=self._db_session)

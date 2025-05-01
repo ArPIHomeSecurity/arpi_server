@@ -81,7 +81,7 @@ def registered(request_handler):
                 logger.debug("Token: %s", device_token)
                 return request_handler(*args, **kws)
             except jose.exceptions.JWTError:
-                logger.warn("Bad token (%s) from %s", raw_token, request.remote_addr)
+                logger.warning("Bad token (%s) from %s", raw_token, request.remote_addr)
                 return jsonify({"error": "invalid device token"}), 403
         else:
             logger.info("Request without authentication info from %s", request.remote_addr)
@@ -114,8 +114,10 @@ def authenticated(role=ROLE_ADMIN):
                     if int(user_token.get("timestamp", 0)) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
-                    if (role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN)) or (
-                        role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,)
+                    if (
+                        (role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN))
+                        or
+                        (role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,))
                     ):
                         logger.info(
                             "Operation %s not permitted for user='%s/%s' on origin=%s from %s",
@@ -126,7 +128,7 @@ def authenticated(role=ROLE_ADMIN):
                             remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
-
+                    
                     flask.request.environ["requester_id"] = user_token["id"]
                     flask.request.environ["requester_role"] = user_token["role"]
                     response = request_handler(*args, **kws)

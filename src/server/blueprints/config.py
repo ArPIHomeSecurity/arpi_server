@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 
 from flask import jsonify, request, Response
@@ -134,3 +136,35 @@ def public_access():
         return make_response(jsonify(True), 200)
 
     return make_response(jsonify(False), 200)
+
+
+@config_blueprint.route("/api/config/installation", methods=["GET"])
+def get_installation():
+    dyndns = db.session \
+        .query(Option) \
+        .filter_by(name="network", section="dyndns") \
+        .first()
+
+    if dyndns:
+        dyndns = json.loads(dyndns.value)
+
+        # TODO: find out if use localhost or arpi.local
+        return jsonify({
+            "primaryDomain": dyndns.get("hostname", "localhost") or "localhost",
+            "secondaryDomain": "localhost",
+        })
+
+
+@config_blueprint.route("/api/config/installation_id", methods=["GET"])
+def get_installation_id():
+    """
+    Get the installation id which identifies the installation by a hash.
+
+    The hash is from:
+    * SECRET
+    * SALT
+    * host id?
+    """
+    secret = os.environ["SECRET"]
+    salt = os.environ["SALT"]
+    return hashlib.sha256(f"{secret}{salt}".encode()).hexdigest()

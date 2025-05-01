@@ -28,9 +28,9 @@ LOG_ADOUTPUT = "AD.Output"
 LOG_ADGSM = "AD.GSM"
 LOG_ADKEYPAD = "AD.Keypad"
 LOG_SECCON = THREAD_SECCON
-LOG_SC_CERTBOT = "SC.CertBot"
-LOG_SC_DYNDNS = "SC.DynDns"
-LOG_SC_ACCESS = "SC.Access"
+LOG_SC_CERTBOT = "CertBot"
+LOG_SC_DYNDNS = "DynDns"
+LOG_SC_ACCESS = "SSH"
 LOG_CLOCK = "Clock"
 LOG_OUTPUT = THREAD_OUTPUT
 
@@ -87,7 +87,7 @@ DELETE_SMS_MESSAGE = "delete_sms_message"
 """---------------------------------------------------------------"""
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
 
-# authentication toket valid for 15 mins
+# authentication token valid for 15 mins
 USER_TOKEN_EXPIRY = 60 * 15
 
 # arm types

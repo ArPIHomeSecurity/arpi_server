@@ -16,6 +16,7 @@ class DyndnsConfig:
     hostname: str = None
     provider: str = None
     restrict_host: str = False
+    certbot_email: str = None
 
 
 def load_dyndns_config(cleanup=False, session=None) -> DyndnsConfig:

@@ -94,6 +94,8 @@ class Clock:
             if "timezone" in settings and os.path.isfile("/usr/share/zoneinfo/" + settings["timezone"]):
                 os.remove("/etc/localtime")
                 os.symlink("/usr/share/zoneinfo/" + settings["timezone"], "/etc/localtime")
+                with open("/etc/timezone", "w", encoding='utf-8') as timezone_file:
+                    timezone_file.write(settings["timezone"] + "\n")
             if "datetime" in settings and settings["datetime"]:
                 run(["date", "--set={}".format(settings["datetime"])])
         except PermissionError:

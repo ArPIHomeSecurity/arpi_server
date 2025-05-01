@@ -8,7 +8,7 @@ from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
-from tools.queries import get_arm_state
+from utils.queries import get_arm_state
 
 monitor_blueprint = Blueprint("monitor", __name__)
 

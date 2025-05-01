@@ -16,7 +16,7 @@ from constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
 from monitor.notifications.notification import Notification, NotificationType
-from tools.queries import get_user_with_access_code
+from utils.queries import get_user_with_access_code
 
 
 # check if running with simulator

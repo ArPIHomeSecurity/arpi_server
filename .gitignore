@@ -15,3 +15,5 @@ simulator*.json
 textual.log
 
 status.json
+
+/scripts/nginx/arpi_*.*

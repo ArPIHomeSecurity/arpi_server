@@ -26,7 +26,7 @@ from constants import (
     ARM_DISARM,
     ARM_MIXED,
 )
-from tools.dictionary import merge_dicts, replace_keys
+from utils.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):
@@ -77,14 +77,6 @@ class BaseModel(Base):
         """Define a base way to print models"""
         return f"{self.__class__.__name__}({dict(self.__dict__.items())})"
 
-    def json(self):
-        """
-        Define a base way to jsonify models, dealing with datetime objects
-        """
-        return {
-            column: value.strftime("%Y-%m-%d") if isinstance(value, date) else value
-            for column, value in self.__dict__.items()
-        }
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -102,7 +94,7 @@ class BaseModel(Base):
         for attribute in attributes:
             value = getattr(self, attribute, None)
             if isinstance(value, dt):
-                value = value.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+                value = value.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
             serialized[attribute] = value
 
         return serialized
@@ -653,13 +645,14 @@ class User(BaseModel):
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 
-    def __init__(self, name, role, access_code, fourkey_code=None):
+    def __init__(self, name, role, access_code, fourkey_code=None, comment=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
         self.name = name
         self.email = ""
         self.role = role
         self.access_code = hash_code(access_code)
         self.fourkey_code = fourkey_code or hash_code(access_code[:4])
+        self.comment = comment
 
     def update(self, data):
         # !!! incoming data has camelCase key/field name format
@@ -670,6 +663,7 @@ class User(BaseModel):
                 len(access_code) >= 4 and len(access_code) <= 12
             ), "Access code length (>=4, <=12)"
             assert access_code.isdigit(), "Access code only number"
+
             data["accessCode"] = hash_code(access_code)
             if not data.get("fourkeyCode", None):
                 data["fourkeyCode"] = hash_code(access_code[:4])
@@ -677,11 +671,12 @@ class User(BaseModel):
                 assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
                 assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
                 data["fourkeyCode"] = hash_code(data["fourkeyCode"])
+
             fields += (
                 "access_code",
                 "fourkey_code",
             )
-
+ 
         return self.update_record(fields, data)
 
     def set_card_registration(self):
@@ -693,6 +688,8 @@ class User(BaseModel):
     def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
             registration_code = str(uuid.uuid4()).upper().split("-")[-1]
+        else:
+            registration_code = registration_code.upper()
 
         registration_expiry = None
         if expiry is None:
@@ -711,22 +708,20 @@ class User(BaseModel):
 
     @property
     def serialized(self):
-        return convert2camel(
-            {
-                "id": self.id,
-                "name": self.name,
-                "email": self.email,
-                "has_registration_code": bool(self.registration_code),
-                "has_card": bool(self.cards),
-                "registration_expiry": (
-                    self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
-                    if self.registration_expiry
-                    else None
-                ),
-                "role": self.role,
-                "comment": self.comment,
-            }
-        )
+        return convert2camel({
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "has_registration_code": bool(self.registration_code),
+            "has_card": bool(self.cards),
+            "registration_expiry": (
+                self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
+                if self.registration_expiry
+                else None
+            ),
+            "role": self.role,
+            "comment": self.comment,
+        })
 
     @validates("name")
     def validates_name(self, key, name):

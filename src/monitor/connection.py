@@ -1,3 +1,6 @@
+"""
+SecureConnection
+"""
 import logging
 from threading import Event, Thread
 
@@ -9,6 +12,10 @@ from constants import THREAD_SECCON, LOG_SECCON
 
 
 class SecureConnection(Thread):
+    """
+    SecureConnection class for updating to remote/secure secure connection
+    with dynamic dns and certificate.
+    """
     lock = Event()
 
     def __init__(self):
@@ -25,7 +32,15 @@ class SecureConnection(Thread):
         # update configuration
         self._logger.debug("Start switching to secure connection...")
 
-        DynDns().update_ip()
+        # update the IP address of the dynamic DNS
+        dyndns = DynDns()
+        dyndns.update_ip()
+        if not dyndns.wait_for_update(300):
+            self._logger.error("Failed to update IP address!")
+            SecureConnection.lock.clear()
+            return
+
+        # update the certificate
         certbot = Certbot()
         certificated_updated = certbot.update_certificate()
 
@@ -33,7 +48,10 @@ class SecureConnection(Thread):
         enable_dyndns_job()
 
         if certificated_updated:
+            self._logger.debug("Certificate updated successfully")
             public_access = certbot.check_certificate_exists()
             send_public_access(public_access)
+        else:
+            self._logger.error("Failed to update certificate!")
 
         SecureConnection.lock.clear()

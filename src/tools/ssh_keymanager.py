@@ -17,7 +17,7 @@ sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_ACCESS
 
-
+SSH_PATH = "~/.ssh"
 AUTHORIZED_KEYS_PATH = "~/.ssh/authorized_keys"
 
 
@@ -87,8 +87,8 @@ class SSHKeyManager:
 
         # create authorized_keys if not exists
         if not os.path.exists(os.path.expanduser(self.authorized_keys_path)):
-            if not os.path.exists(os.path.expanduser("~/.ssh")):
-                os.mkdir(os.path.expanduser("~/.ssh"))
+            if not os.path.exists(os.path.expanduser(SSH_PATH)):
+                os.mkdir(os.path.expanduser(SSH_PATH))
             os.mknod(self.authorized_keys_path)
 
         if self.check_key_exists(key_name):
@@ -123,6 +123,10 @@ class SSHKeyManager:
         Check if key exists in authorized_keys
         """
         self._logger.debug("Checking if key with name %s exists", key_name)
+        if not os.path.exists(self.authorized_keys_path):
+            self._logger.debug("%s does not exist", self.authorized_keys_path)
+            return False
+
         with open(self.authorized_keys_path, "r", encoding="utf-8") as key_file:
             for line in key_file:
                 if key_name in line:
