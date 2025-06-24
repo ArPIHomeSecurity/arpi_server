@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Enable version updates for pip (Python)
+  - package-ecosystem: "pip"
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    # Group updates for related packages
+    groups:
+      flask-ecosystem:
+        patterns:
+          - "flask*"
+        update-types:
+          - "minor"
+          - "patch"
+      security-updates:
+        patterns:
+          - "cryptography"
+          - "urllib3"
+          - "python-jose"
+        update-types:
+          - "minor"
+          - "patch"
+      development-tools:
+        patterns:
+          - "black"
+          - "rope"
+        update-types:
+          - "minor"
+          - "patch"
+    # Allow only patch and minor updates for production dependencies
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # Rebase strategy for keeping PRs up to date
+    rebase-strategy: "auto"
