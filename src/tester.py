@@ -10,15 +10,15 @@ from typing import List
 from dotenv import load_dotenv
 
 from monitor.adapters.power import PowerAdapter
-from monitor.adapters.sensor import SensorAdapter
+from monitor.adapters.sensor import get_sensor_adapter
 from monitor.adapters.output import OutputAdapter
 
 
-def test_sensor_adapter():
+def test_sensor_adapter(board_version):
     """
     Check the state of the sensor inputs and mark the ones that changed.
     """
-    adapter = SensorAdapter()
+    adapter = get_sensor_adapter(board_version)
 
     # mark channels as correct if they changed
     correct_channels = [False] * int(os.environ["INPUT_NUMBER"])
@@ -39,7 +39,7 @@ def test_sensor_adapter():
         logging.info("Channel CH%02d %s", idx+1, u"\u2705" if correct else u"\u274C")
 
 
-def test_power_adapter():
+def test_power_adapter(board_version):
     """
     Check the power source type.
     """
@@ -50,7 +50,7 @@ def test_power_adapter():
         sleep(1)
 
 
-def test_output_adapter():
+def test_output_adapter(board_version):
     """
     Control the output channels.
     """
@@ -85,6 +85,12 @@ def main():
     )
     parser.add_argument("adapter", choices=list_adapters())
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "-b", "--board-version",
+        type=int,
+        choices=[2, 3],
+        help="Board version (2=GPIO, 3=SPI/AD)"
+    )
 
     args = parser.parse_args()
     if args.verbose:
@@ -93,7 +99,7 @@ def main():
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     test_function = f"test_{args.adapter}_adapter"
-    globals()[test_function]()
+    globals()[test_function](args.board_version)
 
 
 if __name__ == "__main__":

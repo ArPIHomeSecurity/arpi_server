@@ -7,6 +7,7 @@ from datetime import datetime as dt, timedelta
 from os import environ
 from time import sleep
 
+from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
 from constants import (
@@ -26,7 +27,6 @@ from constants import (
     MONITORING_UPDATING_CONFIG,
 )
 from models import AlertSensor, Arm, Sensor
-from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
@@ -61,7 +61,7 @@ class SensorHandler:
         self._logger = logging.getLogger(LOG_SENSORS)
         self._db_session = get_database_session()
         self._broadcaster = broadcaster
-        self._sensor_adapter = SensorAdapter()
+        self._sensor_adapter = get_sensor_adapter(int(environ["BOARD_VERSION"]))
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
