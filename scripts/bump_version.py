@@ -11,17 +11,26 @@ from logging import INFO, basicConfig, info
 VERSION_FILE = "src/server/version.py"
 
 VERSION_TEMPLATE = '__version__="v%s.%s.%s%s:%s"\n'
-VERSION_PARSER = re.compile(r"v(\d+)\.(\d+)\.(\d+)_(.*):([a-z0-9]{7})")
+VERSION_PARSER = re.compile(r"v(\d+)\.(\d+)\.(\d+)(?:_(.+))?:([a-z0-9]{7})")
 
 
 def load_version() -> tuple:
     """Load the current version from the version file"""
     with open(VERSION_FILE, "r", encoding="utf-8") as f:
         raw_text = f.read()
-        raw_version = raw_text.replace('__version__="', "").replace('"', "")
+        raw_version = (
+            raw_text.replace("__version__=", "")
+            .replace('"', "")
+            .replace("'", "")
+            .strip()
+        )
         info("Previous raw version: %s", raw_version)
 
-        major, minor, patch, pre_release, commit = VERSION_PARSER.match(raw_version).groups()
+        match = VERSION_PARSER.match(raw_version)
+        info("Parsed raw version: %s", match)
+
+        major, minor, patch, pre_release, commit = match.groups()
+        pre_release = pre_release or ""
         info(
             "Parsed version: Major: %s, Minor: %s, Patch: %s, Pre-release: %s, Commit: %s",
             major,
