@@ -26,9 +26,13 @@ class WiegandReader:
 
     def _load(self):
         with contextlib.suppress(FileNotFoundError, OSError):
-            with open("simulator_keypad.json", "r+", encoding="utf-8") as keypad_file:
+            filename = "simulator_keypad.json" 
+            with open(filename, "r+", encoding="utf-8") as keypad_file:
                 fcntl.flock(keypad_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                self._keypad_data = json.load(keypad_file)
+                try:
+                    self._keypad_data = json.load(keypad_file)
+                except json.JSONDecodeError:
+                    self._logger.error("Failed to load: %s", filename)
                 self._logger.trace("Loaded keypad data: %s", self._keypad_data)
                 keypad_file.seek(0)
                 keypad_file.truncate()
