@@ -10,6 +10,7 @@ start-nginx = "./scripts/start_nginx.sh"
 start-database = "./scripts/start_database.sh"
 start-mqtt = "./scripts/start_mqtt.sh"
 start-simulator  = "textual run --dev ./src/simulator.py"
+start-simulator-web  = "textual serve --dev -p 8888 ./src/simulator.py"
 create-package = "tar -cvzf arpi-server.tar.gz --exclude='__pycache__' etc scripts src Pipfile Pipfile.lock"
 bump-version = "scripts/bump_version.py"
 
@@ -42,7 +43,7 @@ cryptography = "~=42.0.0"
 rope = "~=1.13.0"
 
 [simulator]
-textual = "~=0.52.0"
+textual = "~=5.3"
 textual-dev = "*"
 
 [device]
