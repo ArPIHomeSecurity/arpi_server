@@ -24,20 +24,16 @@ from monitor.output import OUTPUT_NAMES
 
 # Channel states
 CHANNEL_CUT = 1.0
-CHANNEL_DEFAULT_HIGH = 0.9
-CHANNEL_A = 0.7
-CHANNEL_B = 0.4
-CHANNEL_A_B = 0.2
-CHANNEL_SHORTAGE = 0.0
+CHANNEL_A_B = 1.0
 
-CHANNEL_STATE_TO_CLASS = {
-    CHANNEL_CUT: "cut",
-    CHANNEL_DEFAULT_HIGH: "default",
-    CHANNEL_A: "high",
-    CHANNEL_B: "middle",
-    CHANNEL_A_B: "low",
-    CHANNEL_SHORTAGE: "shortage",
-}
+CHANNEL_B = 0.71
+CHANNEL_A_DEFAULT = 0.71
+
+CHANNEL_A = 0.57
+CHANNEL_B_DEFAULT = 0.57
+
+CHANNEL_AB_DEFAULT = 0.47
+CHANNEL_SHORTAGE = 0.0
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -52,8 +48,16 @@ class Channels(Widget):
     """Display and control the channels"""
 
     DEFAULT_CSS = """
+    #channels {
+        overflow: scroll;
+    }
+
+    .channel-column {
+        width: 56;
+        margin-right: 5;
+    }
+
     .channel-row {
-        width: 100%;
         height: 3;
         background: black 100%;
     }
@@ -65,7 +69,7 @@ class Channels(Widget):
         color: white;
     }
 
-    .channel-label.default {
+    .channel-label.a, .channel-label.b, .channel-label.ab {
         background: green 90%;
         color: white;
     }
@@ -76,11 +80,11 @@ class Channels(Widget):
     }
 
     .channel-label.cut {
-        background: red 100%;
+        background: orange 100%;
         color: white;
     }
 
-    .channel-label.high {
+    .channel-label.low {
         background: red 40%;
         color: white;
     }
@@ -90,7 +94,7 @@ class Channels(Widget):
         color: white;
     }
 
-    .channel-label.low {
+    .channel-label.high {
         background: red 90%;
         color: white;
     }
@@ -113,7 +117,7 @@ class Channels(Widget):
     }
 
     RadioButton.default {
-        width: 12;
+        width: 6;
     }
 
     RadioButton.cut {
@@ -137,31 +141,41 @@ class Channels(Widget):
     }
     """
 
+    def __init__(self, default_states, **kwargs):
+        super().__init__(**kwargs)
+        self._default_states = default_states
+
     def compose(self) -> ComposeResult:
-        """Create channel rows with radio buttons and A/B buttons"""
-        with Vertical():
-            for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1):
-                with Horizontal(classes="channel-row"):
-                    yield Static(
-                        f"CH{i:02d}", id=f"channel-label-{i}", classes="channel-label default"
-                    )
-                    with RadioSet(classes="channel-radio", id=f"channel-radio-{i}"):
-                        yield RadioButton(
-                            "Default",
-                            value=True,
-                            id=f"channel-radio-{i}-default",
-                            classes="default",
-                        )
-                        yield RadioButton("Cut", id=f"channel-radio-{i}-cut", classes="cut")
-                        yield RadioButton(
-                            "Shortage", id=f"channel-radio-{i}-shortage", classes="shortage"
-                        )
+        """Create channel rows with radio buttons and A/B buttons in two columns"""
+        num_channels = len(self._default_states) - 1
+        col1 = range(1, num_channels // 2 + 1)
+        col2 = range(num_channels // 2 + 1, num_channels + 1)
+        with Horizontal(id="channels"):
+            for col in [col1, col2]:
+                with Vertical(classes="channel-column"):
+                    for i in col:
+                        with Horizontal(classes="channel-row"):
+                            yield Static(
+                                f"CH{i:02d} {self._default_states[i - 1]}",
+                                id=f"channel-label-{i}",
+                                classes="channel-label cut",
+                            )
+                            with RadioSet(classes="channel-radio", id=f"channel-radio-{i}"):
+                                yield RadioButton("A", id=f"channel-radio-{i}-a", classes="default")
+                                yield RadioButton("B", id=f"channel-radio-{i}-b", classes="default")
+                                yield RadioButton("AB", id=f"channel-radio-{i}-ab", classes="default")
+                                yield RadioButton(
+                                    "Cut", value="True", id=f"channel-radio-{i}-cut", classes="cut"
+                                )
+                                yield RadioButton(
+                                    "Shortage", id=f"channel-radio-{i}-shortage", classes="shortage"
+                                )
 
-                    yield Button("A", classes="channel-button", id=f"channel-{i}-a")
-                    yield Button("B", classes="channel-button", id=f"channel-{i}-b")
+                            yield Button("A", id=f"channel-{i}-a", classes="channel-button", disabled=True)
+                            yield Button("B", id=f"channel-{i}-b", classes="channel-button", disabled=True)
 
-            yield Static("")
-            yield Button("POWER", id="power", classes="power")
+        yield Static("")
+        yield Button("POWER", id="power", classes="power")
 
 
 class Outputs(Widget):
@@ -170,10 +184,11 @@ class Outputs(Widget):
     DEFAULT_CSS = """
     #outputs {
         background: black 100%;
+        overflow: scroll;
     }
 
     #outputs Checkbox {
-        width: 100%;
+        width: 10;
         height: 3;
         margin: 0 1;
     }
@@ -181,7 +196,7 @@ class Outputs(Widget):
 
     def compose(self) -> ComposeResult:
         """Create output checkboxes"""
-        with Vertical(id="outputs"):
+        with Horizontal(id="outputs"):
             yield Checkbox("GO", id="output-GO", value=False)
             yield Checkbox("R1", id="output-R1", value=False)
             yield Checkbox("R0", id="output-R0", value=False)
@@ -205,6 +220,7 @@ class Keypad(Widget):
         grid-rows: 3 3 3 3 3;
         grid-columns: 11 11 11;
         background: black 100%;
+        overflow: scroll;
     }
     
     #keypad Button {
@@ -243,44 +259,35 @@ class SimulatorApp(App):
         overflow: auto;
     }
 
-    #channels-pane {
-        min-width: 48;
-        width: 30%;
+    #main-grid {
+        layout: grid;
+        grid-size: 2 2;
+        grid-gutter: 2 2;
+        grid-rows: 7fr 1fr;
+        grid-columns: 2fr 38;
+        width: 100%;
+        height: 35;
     }
 
-    #outputs-pane {
-        min-width: 10;
-        width: 15%;
+    #channels-pane {
     }
 
     #keypad-pane {
-        min-width: 21;
-        width: 60%;
+    }
+
+    #outputs-pane {
+        column-span: 2;
     }
     """
 
     channel_values = {
-        "CH01": CHANNEL_DEFAULT_HIGH,
-        "CH02": CHANNEL_DEFAULT_HIGH,
-        "CH03": CHANNEL_DEFAULT_HIGH,
-        "CH04": CHANNEL_DEFAULT_HIGH,
-        "CH05": CHANNEL_DEFAULT_HIGH,
-        "CH06": CHANNEL_DEFAULT_HIGH,
-        "CH07": CHANNEL_DEFAULT_HIGH,
-        "CH08": CHANNEL_DEFAULT_HIGH,
-        "CH09": CHANNEL_DEFAULT_HIGH,
-        "CH10": CHANNEL_DEFAULT_HIGH,
-        "CH11": CHANNEL_DEFAULT_HIGH,
-        "CH12": CHANNEL_DEFAULT_HIGH,
-        "CH13": CHANNEL_DEFAULT_HIGH,
-        "CH14": CHANNEL_DEFAULT_HIGH,
-        "CH15": CHANNEL_DEFAULT_HIGH,
-        "POWER": POWER_HIGH,
+        f"CH{i:02d}": CHANNEL_CUT for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
     }
+    channel_values["POWER"] = POWER_HIGH
 
-    # Track channel states: "default", "cut", "shortage"
+    # Track channel states: "a", "b", "ab", "cut", "shortage"
     channel_states = {
-        f"CH{i:02d}": "default" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
+        f"CH{i:02d}": "cut" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
     }
 
     # Track A/B button states for normal channels
@@ -294,32 +301,11 @@ class SimulatorApp(App):
     keypad = deepcopy(DEFAULT_KEYPAD)
 
     def compose(self) -> ComposeResult:
-        """Add our widgets."""
-        with Horizontal():
-            yield Channels(id="channels-pane")
-            yield Outputs(id="outputs-pane")
+        """Add our widgets in a grid layout."""
+        with Container(id="main-grid"):
+            yield Channels(id="channels-pane", default_states=list(self.channel_values.values()))
             yield Keypad(id="keypad-pane")
-
-    def calculate_channel_value(self, channel):
-        """Calculate the channel value based on state and A/B buttons"""
-        state = self.channel_states[channel]
-
-        if state == "cut":
-            return CHANNEL_CUT
-        elif state == "shortage":
-            return CHANNEL_SHORTAGE
-        else:  # in default state combination of A/B buttons
-            a_active = self.channel_a_active[channel]
-            b_active = self.channel_b_active[channel]
-
-            if a_active and b_active:
-                return CHANNEL_A_B
-            elif a_active:
-                return CHANNEL_A
-            elif b_active:
-                return CHANNEL_B
-            else:
-                return CHANNEL_DEFAULT_HIGH
+            yield Outputs(id="outputs-pane")
 
     def read_output_states(self):
         outputs = get_output_states()
@@ -341,27 +327,70 @@ class SimulatorApp(App):
         """Start background tasks when the app mounts"""
         self.set_interval(0.5, self.read_output_states)
 
+    def calculate_channel_value(self, channel):
+        """Calculate the channel value based on state and A/B buttons"""
+        state = self.channel_states[channel]
+
+        logging.debug(
+            "Calculating value channel: %s, state: %s, A active: %s, B active: %s",
+            channel,
+            state,
+            self.channel_a_active[channel],
+            self.channel_b_active[channel],
+        )
+        if state == "cut":
+            return CHANNEL_CUT
+        elif state == "shortage":
+            return CHANNEL_SHORTAGE
+        elif state == "a":
+            return CHANNEL_A if self.channel_a_active[channel] else CHANNEL_A_DEFAULT
+        elif state == "b":
+            return CHANNEL_B if self.channel_b_active[channel] else CHANNEL_B_DEFAULT
+        elif state == "ab":
+            if self.channel_a_active[channel] and self.channel_b_active[channel]:
+                return CHANNEL_A_B
+            if self.channel_a_active[channel]:
+                return CHANNEL_A
+            if self.channel_b_active[channel]:
+                return CHANNEL_B
+            return CHANNEL_AB_DEFAULT
+        else:
+            raise ValueError(f"Unknown channel state: {state}")
+
     @on(Button.Pressed, "#channels-pane .channel-button")
     def channel_button_pressed(self, event: Button.Pressed) -> None:
         """Toggle channel A/B state"""
-        _, channel_num, channel_type = event.button.id.split("-")
+        _, channel_num, state = event.button.id.split("-")
         channel_num = int(channel_num)
         channel_name = f"CH{channel_num:02d}"
 
         # Only allow toggle if in default state
-        if self.channel_states[channel_name] == "default":
+        if self.channel_states[channel_name] in ["a", "b", "ab"]:
             # remove channel label class
             channel_label = self.query_one(f"#channel-label-{channel_num}")
-            channel_label.remove_class(CHANNEL_STATE_TO_CLASS[self.channel_values[channel_name]])
+            channel_label.set_classes("channel-label")
             event.button.toggle_class("channel-active")
 
-            if channel_type == "a":
+            # update channel A/B active states
+            if state == "a":
                 self.channel_a_active[channel_name] = not self.channel_a_active[channel_name]
-            if channel_type == "b":
+            if state == "b":
                 self.channel_b_active[channel_name] = not self.channel_b_active[channel_name]
 
+            # update channel value
             self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
-            channel_label.add_class(CHANNEL_STATE_TO_CLASS[self.channel_values[channel_name]])
+
+            # update channel label
+            channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel_name]:.2f}V")
+            if self.channel_a_active[channel_name] and self.channel_b_active[channel_name]:
+                channel_label.add_class("high")
+            elif self.channel_b_active[channel_name]:
+                channel_label.add_class("middle")
+            elif self.channel_a_active[channel_name]:
+                channel_label.add_class("low")
+            else:
+                channel_label.add_class(state)
+
             self.save_input_states()
 
     @on(RadioSet.Changed, "#channels-pane .channel-radio")
@@ -371,27 +400,43 @@ class SimulatorApp(App):
         channel_num = int(radio_id.split("-")[2])
         channel = f"CH{channel_num:02d}"
 
+        # remove class based on previous state
         channel_label = self.query_one(f"#channel-label-{channel_num}")
-        channel_label.remove_class(CHANNEL_STATE_TO_CLASS[self.channel_values[channel]])
+        channel_label.set_classes("channel-label")
+        logging.debug(
+            "Channel state: %s, classes: %s", self.channel_states[channel], channel_label.classes
+        )
 
-        # Determine new state based on selected radio button
-        if event.pressed.id.endswith("-default"):
-            self.channel_states[channel] = "default"
-        elif event.pressed.id.endswith("-cut"):
-            channel_label.add_class("cut")
-            self.channel_states[channel] = "cut"
-        elif event.pressed.id.endswith("-shortage"):
-            self.channel_states[channel] = "shortage"
+        # determine new state based on selected radio button
+        state = event.pressed.id.split("-")[-1]
+        self.channel_states[channel] = state
+        logging.debug(
+            "Radio changed: %s, new state: %s", event.pressed.id, self.channel_states[channel]
+        )
 
-        # Update channel value and button states
+        # update channel value
         self.channel_values[channel] = self.calculate_channel_value(channel)
+
+        # update A,B buttons disabled states
+        disabled_states = ["cut", "shortage"]
         self.query_one(f"#channel-{channel_num}-a").disabled = (
-            self.channel_states[channel] != "default"
+            self.channel_states[channel] in disabled_states or state == "b"
         )
         self.query_one(f"#channel-{channel_num}-b").disabled = (
-            self.channel_states[channel] != "default"
+            self.channel_states[channel] in disabled_states or state == "a"
         )
-        channel_label.add_class(CHANNEL_STATE_TO_CLASS[self.channel_values[channel]])
+
+        # update channel label
+        channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel]:.2f}V")
+        if self.channel_a_active[channel] and self.channel_b_active[channel] and state == "ab":
+            channel_label.add_class("high")
+        elif self.channel_b_active[channel] and "b" in state:
+            channel_label.add_class("middle")
+        elif self.channel_a_active[channel] and "a" in state:
+            channel_label.add_class("low")
+        else:
+            channel_label.add_class(state)
+
         self.save_input_states()
 
     @on(Button.Pressed, "#power")
@@ -407,20 +452,22 @@ class SimulatorApp(App):
 
     @on(Button.Pressed, "#keypad Button")
     def keypad_button_pressed(self, event: Button.Pressed) -> None:
-        """
-        Pressed a button on the keypad.
-        """
-        if str(event.button.label) == "Card 1":
-            self.keypad["data"].append(CARD_1.split(":")[0])
-            self.keypad["pending_bits"] = int(CARD_1.split(":")[1])
-        elif str(event.button.label) == "Card 2":
-            self.keypad["data"].append(CARD_2.split(":")[0])
-            self.keypad["pending_bits"] = int(CARD_2.split(":")[1])
-        elif str(event.button.label) == "Card 3":
-            self.keypad["data"].append(CARD_3.split(":")[0])
-            self.keypad["pending_bits"] = int(CARD_3.split(":")[1])
+        """Pressed a button on the keypad."""
+        label = str(event.button.label)
+
+        # Card handling
+        card_map = {
+            "Card 1": CARD_1,
+            "Card 2": CARD_2,
+            "Card 3": CARD_3,
+        }
+
+        if label in card_map:
+            card_data, pending_bits = card_map[label].split(":")
+            self.keypad["data"].append(card_data)
+            self.keypad["pending_bits"] = int(pending_bits)
         else:
-            self.keypad["data"].append(str(event.button.label))
+            self.keypad["data"].append(label)
             self.keypad["pending_bits"] = len(self.keypad["data"]) * 8
 
         self.save_keypad_states()

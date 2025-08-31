@@ -66,7 +66,7 @@ def test_sensor_adapter(board_version):
 
             if previous:
                 for idx, value in enumerate(values):
-                    if abs(value - previous[idx]) > 0.3:
+                    if abs(value - previous[idx]) > 0.2:
                         correct_channels[idx] = True
 
             previous = values
