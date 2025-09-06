@@ -291,10 +291,18 @@ class SensorHandler:
 
         arm: Arm = None
         if current_monitoring == MONITORING_ARM_DELAY:
-            # wait for the arm created in the database
+            # wait 5 seconds for the arm created in the database
             # synchronizing the two threads
-            while not arm:
+            retries = 0
+            while not arm and retries < 50:
                 arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+                retries += 1
+                if not arm:
+                    sleep(0.1)
+
+            if not arm:
+                raise RuntimeError("No arm found in the database while in ARM_DELAY state")
+
             self._logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
