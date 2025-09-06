@@ -396,9 +396,8 @@ class SensorHandler:
         """
         Callback for the alert stopped event.
         """
-        # do not clear the alerting sensors
-        # because in sabotage mode the alert will be triggered again
-        # self._alerting_sensors.clear()
+        # clear all alerting sensors if disarmed
+        self._alerting_sensors.clear()
 
     def close(self):
         """

@@ -344,6 +344,10 @@ class Monitor(Thread):
         self._db_session.commit()
 
         current_state = States.get(State.MONITORING)
+        stop_alert = True
+        if current_state == MONITORING_SABOTAGE:
+            # do not stop alerting if the system is in sabotage mode
+            stop_alert = False
         if (
             current_state
             in (MONITORING_ARM_DELAY, MONITORING_ARMED, MONITORING_ALERT_DELAY, MONITORING_ALERT)
@@ -355,7 +359,10 @@ class Monitor(Thread):
             OutputHandler.send_system_disarmed()
 
         send_arm_state(ARM_DISARM)
-        self.stop_alert(disarm.id)
+        SensorAlert.stop_alerts(disarm.id)
+        Syren.stop_syren()
+        if stop_alert:
+            self._sensor_handler.on_alert_stopped()
 
     def update_database_arm(self, arm_type, user_id, keypad_id):
         """
@@ -430,11 +437,3 @@ class Monitor(Thread):
         load_alert_sensitivity_config(cleanup=True, session=self._db_session)
         load_dyndns_config(cleanup=True, session=self._db_session)
         self._db_session.commit()
-
-    def stop_alert(self, disarm_id: int):
-        """
-        Stop the alerting.
-        """
-        self._sensor_handler.on_alert_stopped()
-        SensorAlert.stop_alerts(disarm_id)
-        Syren.stop_syren()
