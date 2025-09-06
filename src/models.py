@@ -25,6 +25,7 @@ from constants import (
     ARM_STAY,
     ARM_DISARM,
     ARM_MIXED,
+    ROLE_USER,
 )
 from utils.dictionary import merge_dicts, replace_keys
 
@@ -645,8 +646,8 @@ class User(BaseModel):
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 
-    def __init__(self, name, role, access_code, fourkey_code=None, comment=None):
-        self.id = int(str(uuid.uuid1(1000).int)[:8])
+    def __init__(self, name, id=None, role=ROLE_USER, access_code=None, fourkey_code=None, comment=None):
+        self.id = id or int(str(uuid.uuid1(1000).int)[:8])
         self.name = name
         self.email = ""
         self.role = role

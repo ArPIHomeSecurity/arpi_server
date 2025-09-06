@@ -4,6 +4,7 @@ import contextlib
 import fcntl
 import json
 import logging
+import os
 
 from constants import LOG_ADKEYPAD
 
@@ -26,7 +27,7 @@ class WiegandReader:
 
     def _load(self):
         with contextlib.suppress(FileNotFoundError, OSError):
-            filename = "simulator_keypad.json" 
+            filename = f"{os.environ.get('SIMULATOR_PATH', '.')}/simulator_keypad.json"
             with open(filename, "r+", encoding="utf-8") as keypad_file:
                 fcntl.flock(keypad_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 try:

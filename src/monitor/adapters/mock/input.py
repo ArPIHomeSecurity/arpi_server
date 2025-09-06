@@ -1,6 +1,7 @@
 import fcntl
 import json
 import logging
+import os
 
 from constants import LOG_ADSENSOR
 
@@ -16,7 +17,7 @@ class SimulatorBasedMockInput(object):
     def value(self):
         # write+create if not exists
         try:
-            with open("simulator_input.json", "r", encoding="utf-8") as input_file:
+            with open(f"{os.environ.get('SIMULATOR_PATH', '.')}/simulator_input.json", "r", encoding="utf-8") as input_file:
                 fcntl.flock(input_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 channels_data = json.load(input_file)
                 fcntl.flock(input_file, fcntl.LOCK_UN)

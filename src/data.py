@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
+import argparse
 import json
+import logging
 from dotenv import load_dotenv
 
-load_dotenv()
 load_dotenv("secrets.env")
-
-import argparse
-
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
 from models import Area, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
 from monitor.database import get_database_session
 from models import metadata
+
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
 
 
 SENSOR_TYPES = [
@@ -22,42 +25,44 @@ SENSOR_TYPES = [
     SensorType(4, name="Break", description="Detect glass break"),
 ]
 
-session = get_database_session()
 
 
 def cleanup():
-    print("Clean up database...")
+    session = get_database_session()
+    logger.info("Clean up database...")
     for table in reversed(metadata.sorted_tables):
-        print(f" - Clear table {table}")
+        logger.info(" - Clear table %s", table)
         try:
             session.execute(table.delete())
             session.commit()
         except ProgrammingError:
+            logger.warning("   Table %s does not exist, skipping", table)
             session.rollback()
-    print("Database is empty")
+    logger.info("Database is empty")
 
 
 def env_prod():
+    session = get_database_session()
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
     session.add(admin_user)
-    print(" - Created admin user")
+    logger.info(" - Created admin user")
 
     session.add_all(SENSOR_TYPES)
-    print(" - Created sensor types")
+    logger.info(" - Created sensor types")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
     session.add_all([kt1, kt2])
-    print(" - Created keypad types")
+    logger.info(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt2)
     session.add_all([k1])
-    print(" - Created keypads")
+    logger.info(" - Created keypads")
 
     a1 = Area(name="House")
     session.add(a1)
-    print(" - Created area")
+    logger.info(" - Created area")
 
     access_config = {
         "service_enabled": True,
@@ -66,19 +71,20 @@ def env_prod():
     }
     ssh_access = Option(name="network", section="access", value=json.dumps(access_config))
     session.add(ssh_access)
-    print(" - Created access options")
+    logger.info(" - Created access options")
 
     session.commit()
 
 
 def env_live_01():
+    session = get_database_session()
     session.add_all(
         [
             User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
             User(name="Chuck.Norris", role=ROLE_USER, access_code="1111"),
         ]
     )
-    print(" - Created users")
+    logger.info(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
     z2 = Zone(
@@ -108,14 +114,14 @@ def env_live_01():
         description="Sabotage alert",
     )
     session.add_all([z1, z2, z3, z4, z5, z6])
-    print(" - Created zones")
+    logger.info(" - Created zones")
 
     session.add_all(SENSOR_TYPES)
-    print(" - Created sensor types")
+    logger.info(" - Created sensor types")
 
     area = Area(name="House")
     session.add(area)
-    print(" - Created area")
+    logger.info(" - Created area")
 
     s1 = Sensor(
         channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, name="Garage", area=area
@@ -162,26 +168,27 @@ def env_live_01():
         channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, name="Tamper", area=area
     )
     session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
-    print(" - Created sensors")
+    logger.info(" - Created sensors")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     session.add_all([kt1])
-    print(" - Created keypad types")
+    logger.info(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
     session.add_all([k1])
-    print(" - Created keypads")
+    logger.info(" - Created keypads")
 
     session.commit()
 
 
 def env_test_01():
-    admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
+    session = get_database_session()
+    admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
     session.add_all(
-        [admin_user, User(name="Chuck Norris", role=ROLE_USER, access_code="1111")]
+        [admin_user, User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")]
     )
-    print(" - Created users")
+    logger.info(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
     z2 = Zone(
@@ -206,14 +213,14 @@ def env_test_01():
         name="Stay", stay_alert_delay=None, description="No alert when armed STAY"
     )
     session.add_all([z1, z2, z3, z4, z5])
-    print(" - Created zones")
+    logger.info(" - Created zones")
 
     session.add_all(SENSOR_TYPES)
-    print(" - Created sensor types")
+    logger.info(" - Created sensor types")
 
     area = Area(name="House")
     session.add(area)
-    print(" - Created area")
+    logger.info(" - Created area")
 
     s1 = Sensor(
         channel=0,
@@ -241,29 +248,29 @@ def env_test_01():
         description="Sabotage wire",
     )
     session.add_all([s1, s2, s3])
-    print(" - Created sensors")
+    logger.info(" - Created sensors")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
-    kt3 = KeypadType(3, "MOCK", "MOCK keypad")
-    session.add_all([kt1, kt2, kt3])
-    print(" - Created keypad types")
+    session.add_all([kt1, kt2])
+    logger.info(" - Created keypad types")
 
-    k1 = Keypad(keypad_type=kt1)
+    k1 = Keypad(keypad_type=kt2, enabled=False)
     session.add_all([k1])
-    print(" - Created keypads")
+    logger.info(" - Created keypads")
 
     session.commit()
 
 
 def env_admin_registration():
+    session = get_database_session()
     admin_user = session.query(User).filter(User.role == ROLE_ADMIN).first()
     code = admin_user.add_registration_code("ABCD")
-    print("Code: ", code)
+    logger.info("Code: %s", code)
     admin_user.update({"access_code": "1234"})
-    print("Password: ", "1234")
+    logger.info("Password: %s", "1234")
     session.commit()
-    print("Admin registration added and password changed")
+    logger.info("Admin registration added and password changed")
 
 
 def main():
@@ -283,17 +290,27 @@ def main():
         metavar="environment",
         help=f'Create database content (environments: {", ".join(environments)})',
     )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging"
+    )
 
     args = parser.parse_args()
+
+    # Configure logging based on verbose flag
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
     if args.delete:
         cleanup()
 
     if args.create:
         create_method = globals()[f"env_{args.create}"]
-        print(f"Creating '{args.create}' environment...")
+        logger.info("Creating '%s' environment...", args.create)
         create_method()
-        print("Environment created")
+        logger.info("Environment created")
 
 
 if __name__ == "__main__":

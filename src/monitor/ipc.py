@@ -87,7 +87,7 @@ class IPCServer(Thread):
             chown(MONITOR_INPUT_SOCKET, getpwnam(environ["USERNAME"]).pw_uid, getgrnam(environ["GROUPNAME"]).gr_gid)
             self._logger.info("Socket permissions fixed")
         except KeyError as error:
-            self._logger.error("Failed to fix permission and/or owner!")
+            self._logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
             self._logger.debug("Error: %s", error)
 
         self._sockets = [_socket]
@@ -98,11 +98,10 @@ class IPCServer(Thread):
         """
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
-            self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
+            self._logger.info("Create socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(path.dirname(filename))
             with open(MONITOR_INPUT_SOCKET, "w", encoding="utf-8"):
                 pass
-            self._logger.debug("Create socket file: %s", MONITOR_INPUT_SOCKET)
 
     def run(self):
         self._logger.info("IPC server started")

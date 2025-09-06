@@ -35,7 +35,7 @@ class OutputAdapter(object):
             )
 
         try:
-            with open("simulator_output.json", "r", encoding="utf-8") as output_file:
+            with open(f"{os.environ.get('SIMULATOR_PATH', '.')}/simulator_output.json", "r", encoding="utf-8") as output_file:
                 fcntl.flock(output_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 tmp_states = json.load(output_file)
                 fcntl.flock(output_file, fcntl.LOCK_UN)
@@ -56,7 +56,7 @@ class OutputAdapter(object):
         self._write_states()
 
     def _write_states(self):
-        with open("simulator_output.json", "w", encoding="utf-8") as output_file:
+        with open(f"{os.environ.get('SIMULATOR_PATH', '.')}/simulator_output.json", "w", encoding="utf-8") as output_file:
             try:
                 fcntl.flock(output_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 # write the state to the file

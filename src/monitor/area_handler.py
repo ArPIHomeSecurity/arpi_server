@@ -81,7 +81,7 @@ class AreaHandler:
         """
         self._logger.info("Arming area id=%s to %s", area_id, arm_type)
         area = self._db_session.query(Area).get(area_id)
-        if area is None and not area.deleted:
+        if area is None or area.deleted:
             self._logger.error("Area not found or deleted")
             return False
 
