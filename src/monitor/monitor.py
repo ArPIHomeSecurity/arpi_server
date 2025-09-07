@@ -37,6 +37,7 @@ from constants import (
     UPDATE_SECURE_CONNECTION,
 )
 from models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
+from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
 from monitor.config_helper import (
@@ -47,7 +48,7 @@ from monitor.config_helper import (
 )
 from monitor.sensor.handler import SensorHandler
 from monitor.storage import States, State
-from monitor.adapters.power import PowerAdapter
+from monitor.adapters.power import get_power_adapter
 from monitor.broadcast import Broadcaster
 from monitor.notifications.notifier import Notifier
 from monitor.syren import Syren
@@ -74,7 +75,7 @@ class Monitor(Thread):
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
         self._actions = Queue()
-        self._power_adapter = PowerAdapter()
+        self._power_adapter = get_power_adapter()
         self._power_source = None
         self._db_session = None
         self._delay_timer = None
@@ -104,7 +105,6 @@ class Monitor(Thread):
                 self._area_handler.close()
             if self._db_session:
                 self._db_session.close()
-            self._power_adapter.close()
             States.close()
 
         self._logger.info("Monitoring stopped")
@@ -392,23 +392,23 @@ class Monitor(Thread):
         """
         # load the value once from the adapter
         new_power_source = self._power_adapter.source_type
-        if new_power_source == PowerAdapter.SOURCE_BATTERY:
+        if new_power_source == SOURCE_BATTERY:
             States.set(State.POWER, POWER_SOURCE_BATTERY)
             self._logger.debug("System works from battery")
-        elif new_power_source == PowerAdapter.SOURCE_NETWORK:
+        elif new_power_source == SOURCE_NETWORK:
             States.set(State.POWER, POWER_SOURCE_NETWORK)
             self._logger.trace("System works from network")
 
         if (
-            new_power_source == PowerAdapter.SOURCE_BATTERY
-            and self._power_source == PowerAdapter.SOURCE_NETWORK
+            new_power_source == SOURCE_BATTERY
+            and self._power_source == SOURCE_NETWORK
         ):
             send_power_state(POWER_SOURCE_BATTERY)
             Notifier.notify_power_outage_started(dt.now())
             self._logger.info("Power outage started!")
         elif (
-            new_power_source == PowerAdapter.SOURCE_NETWORK
-            and self._power_source == PowerAdapter.SOURCE_BATTERY
+            new_power_source == SOURCE_NETWORK
+            and self._power_source == SOURCE_BATTERY
         ):
             send_power_state(POWER_SOURCE_NETWORK)
             Notifier.notify_power_outage_stopped(dt.now())

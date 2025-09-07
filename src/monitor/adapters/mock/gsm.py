@@ -21,7 +21,7 @@ MESSAGES = [
 ]
 
 
-class GSM(object):
+class GSM:
 
     CONNECTS = 0
 

@@ -1,17 +1,46 @@
 import logging
-from monitor.adapters import CHANNEL_GPIO_PINS
+
+from gpiozero import DigitalInputDevice
+
 from constants import LOG_ADSENSOR
-import os
+from monitor.adapters.sensor_base import SensorAdapterBase
 
-# check if running with simulator
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero import DigitalInputDevice
-else:
-    from monitor.adapters.mock.input import Channels as DigitalInputDevice
+# Input channel pins
+CH01_PIN = 19
+CH02_PIN = 20
+CH03_PIN = 26
+CH04_PIN = 21
+CH05_PIN = 12
+CH06_PIN = 6
+CH07_PIN = 13
+CH08_PIN = 16
+CH09_PIN = 7
+CH10_PIN = 1
+CH11_PIN = 0
+CH12_PIN = 5
+CH13_PIN = 23
+CH14_PIN = 24
+CH15_PIN = 25
 
-from .sensor_base import BaseSensorAdapter
+CHANNEL_GPIO_PINS = [
+    CH01_PIN,
+    CH02_PIN,
+    CH03_PIN,
+    CH04_PIN,
+    CH05_PIN,
+    CH06_PIN,
+    CH07_PIN,
+    CH08_PIN,
+    CH09_PIN,
+    CH10_PIN,
+    CH11_PIN,
+    CH12_PIN,
+    CH13_PIN,
+    CH14_PIN,
+    CH15_PIN,
+]
 
-class SensorAdapterV2(BaseSensorAdapter):
+class SensorAdapterV2(SensorAdapterBase):
     """
     GPIO-based sensor adapter (board version 2)
     """
@@ -21,6 +50,9 @@ class SensorAdapterV2(BaseSensorAdapter):
         for pin in CHANNEL_GPIO_PINS:
             self._logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
             self._channels.append(DigitalInputDevice(pin, pull_up=False))
+
+    def __del__(self):
+        self._cleanup()
 
     def get_value(self, channel):
         if not (0 <= channel <= (len(CHANNEL_GPIO_PINS) - 1)):
@@ -35,7 +67,7 @@ class SensorAdapterV2(BaseSensorAdapter):
         self._logger.debug("Values: %s", [f"{v}" for v in values])
         return values
 
-    def close(self):
+    def _cleanup(self):
         for channel in self._channels:
             channel.close()
 

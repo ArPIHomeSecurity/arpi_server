@@ -11,11 +11,7 @@ from monitor.socket_io import send_syren_state
 
 from constants import LOG_ALERT, THREAD_ALERT
 
-# check if using the simulator
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.output import OutputAdapter
-else:
-    from monitor.adapters.mock.output import OutputAdapter
+from monitor.adapters.output import get_output_adapter
 
 
 class Syren(Thread):
@@ -79,7 +75,7 @@ class Syren(Thread):
     def __init__(self, config: SyrenConfig):
         super(Syren, self).__init__(name=THREAD_ALERT)
         self._logger = logging.getLogger(LOG_ALERT)
-        self._output_adapter = OutputAdapter()
+        self._output_adapter = get_output_adapter()
         self._alert = None
         self._config = config
 

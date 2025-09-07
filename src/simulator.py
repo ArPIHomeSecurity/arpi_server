@@ -2,8 +2,6 @@
 
 from contextlib import suppress
 from copy import deepcopy
-import fcntl
-import json
 from time import sleep
 
 from textual import on, work
@@ -13,9 +11,20 @@ from textual.css.query import NoMatches
 from textual.widgets import Button, Checkbox, Static
 from textual.worker import get_current_worker
 
+from monitor.adapters.mock.utils import (
+    DEFAULT_KEYPAD,
+    get_output_states,
+    set_input_states,
+    set_keypad_state,
+)
+from monitor.output import OUTPUT_NAMES
 
-CHANNEL_LOW = 0
-CHANNEL_HIGH = 1
+
+CHANNEL_SHORTAGE = 0
+CHANNEL_LOW = 0.2
+CHANNEL_NORMAL = 0.5
+CHANNEL_HIGH = 0.8
+CHANNEL_BROKEN = 1.0
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -24,12 +33,6 @@ POWER_HIGH = 1
 CARD_1 = "550021576706:34"
 CARD_2 = "550021576707:34"
 CARD_3 = "550021576708:34"
-
-
-EMPTY_DATA = {
-    "pending_bits": 0,
-    "data": []
-}
 
 
 class SimulatorApp(App):
@@ -43,7 +46,7 @@ class SimulatorApp(App):
     #simulator {
         layout: grid;
         grid-size: 2;
-        grid-columns: 1fr 1fr;
+        grid-columns: 2fr 1fr;
         grid-rows: 1fr 5;
         min-height: 26;
         height: 100%;
@@ -98,7 +101,7 @@ class SimulatorApp(App):
     }
 
     /* power button */
-    #channel-16 {
+    #input-16 {
         column-span: 8;
     }
 
@@ -112,7 +115,7 @@ class SimulatorApp(App):
     }
     """
 
-    outputs = {
+    inputs = {
         "CH01": CHANNEL_LOW,
         "CH02": CHANNEL_LOW,
         "CH03": CHANNEL_LOW,
@@ -131,27 +134,15 @@ class SimulatorApp(App):
         "POWER": POWER_LOW,
     }
 
-    keypad = deepcopy(EMPTY_DATA)
+    keypad = deepcopy(DEFAULT_KEYPAD)
 
     def read_output_states(self):
-        with open("simulator_output.json", "r", encoding="utf-8") as outputs_file:
-            try:
-                outputs = json.load(outputs_file)
-            except FileNotFoundError:
-                return
-            except json.JSONDecodeError:
-                self.log.error("Error decoding simulator_output.json")
-                return
+        outputs = get_output_states()
 
-            for key in outputs:
-                with suppress(NoMatches):
-                    checkbox = self.query_one(f"#id-{key}")
-                    if outputs[key] == 0:
-                        checkbox.value = False
-                    elif outputs[key] == 1:
-                        checkbox.value = True
-                    else:
-                        raise ValueError(f"Invalid value for {key}: {outputs[key]}")
+        for idx, name in OUTPUT_NAMES.items():
+            with suppress(NoMatches):
+                checkbox = self.query_one(f"#output-{name}")
+                checkbox.value = outputs[idx]
 
     @work(exclusive=True, thread=True)
     async def watch_output_states(self):
@@ -161,48 +152,35 @@ class SimulatorApp(App):
             sleep(0.5)
 
     def save_input_states(self):
-        with open("simulator_input.json", "w", encoding="utf-8") as inputs_file:
-            fcntl.flock(inputs_file, fcntl.LOCK_EX)
-            json.dump(self.outputs, inputs_file)
-            fcntl.flock(inputs_file, fcntl.LOCK_UN)
+        set_input_states(list(self.inputs.values()))
 
     def save_keypad_states(self):
-        with open("simulator_keypad.json", "r+", encoding="utf-8") as keypad_file:
-            fcntl.flock(keypad_file, fcntl.LOCK_EX)
-            try:
-                tmp = json.load(keypad_file)
-            except json.JSONDecodeError:
-                tmp = deepcopy(EMPTY_DATA)
-            tmp["pending_bits"] += self.keypad["pending_bits"]
-            tmp["data"].extend(self.keypad["data"])
-            self.keypad = deepcopy(EMPTY_DATA)
-            keypad_file.seek(0)
-            keypad_file.truncate()
-            json.dump(tmp, keypad_file)
-            fcntl.flock(keypad_file, fcntl.LOCK_UN)
+        set_keypad_state(self.keypad["pending_bits"], self.keypad["data"])
+        # reset keypad state
+        self.keypad = deepcopy(DEFAULT_KEYPAD)
 
     def compose(self) -> ComposeResult:
         """Add our buttons."""
         with Container(id="simulator"):
             with Container(id="channels"):
-                yield Button("CH01", id="channel-1")
-                yield Button("CH02", id="channel-2")
-                yield Button("CH03", id="channel-3")
-                yield Button("CH04", id="channel-4")
-                yield Button("CH05", id="channel-5")
-                yield Button("CH06", id="channel-6")
-                yield Button("CH07", id="channel-7")
-                yield Button("CH08", id="channel-8")
-                yield Button("CH09", id="channel-9")
-                yield Button("CH10", id="channel-10")
-                yield Button("CH11", id="channel-11")
-                yield Button("CH12", id="channel-12")
-                yield Button("CH13", id="channel-13")
-                yield Button("CH14", id="channel-14")
-                yield Button("CH15", id="channel-15")
+                yield Button("CH01", id="input-1")
+                yield Button("CH02", id="input-2")
+                yield Button("CH03", id="input-3")
+                yield Button("CH04", id="input-4")
+                yield Button("CH05", id="input-5")
+                yield Button("CH06", id="input-6")
+                yield Button("CH07", id="input-7")
+                yield Button("CH08", id="input-8")
+                yield Button("CH09", id="input-9")
+                yield Button("CH10", id="input-10")
+                yield Button("CH11", id="input-11")
+                yield Button("CH12", id="input-12")
+                yield Button("CH13", id="input-13")
+                yield Button("CH14", id="input-14")
+                yield Button("CH15", id="input-15")
                 yield Static("", id="spacer-0")
 
-                yield Button("POWER", id="channel-16")
+                yield Button("POWER", id="input-16")
 
             with Container(id="keypad"):
                 yield Button("1", id="button-1")
@@ -222,14 +200,14 @@ class SimulatorApp(App):
                 yield Button("Card 3", id="card-3")
 
             with Container(id="outputs"):
-                yield Checkbox("GO", id="id-GO", value=False)
-                yield Checkbox("R1", id="id-R1", value=False)
-                yield Checkbox("R0", id="id-R0", value=False)
-                yield Checkbox("O4", id="id-O4", value=False)
-                yield Checkbox("O3", id="id-O3", value=False)
-                yield Checkbox("O2", id="id-O2", value=False)
-                yield Checkbox("O1", id="id-O1", value=False)
-                yield Checkbox("O0", id="id-O0", value=False)
+                yield Checkbox("GO", id="output-GO", value=False)
+                yield Checkbox("R1", id="output-R1", value=False)
+                yield Checkbox("R0", id="output-R0", value=False)
+                yield Checkbox("O4", id="output-O4", value=False)
+                yield Checkbox("O3", id="output-O3", value=False)
+                yield Checkbox("O2", id="output-O2", value=False)
+                yield Checkbox("O1", id="output-O1", value=False)
+                yield Checkbox("O0", id="output-O0", value=False)
 
         self.watch_output_states()
 
@@ -238,11 +216,11 @@ class SimulatorApp(App):
         """
         Pressed a button on the channels.
         """
-        if self.outputs[str(event.button.label)] == CHANNEL_LOW:
-            self.outputs[str(event.button.label)] = CHANNEL_HIGH
+        if self.inputs[str(event.button.label)] == CHANNEL_LOW:
+            self.inputs[str(event.button.label)] = CHANNEL_HIGH
             event.button.classes = "button-pressed"
         else:
-            self.outputs[str(event.button.label)] = CHANNEL_LOW
+            self.inputs[str(event.button.label)] = CHANNEL_LOW
             event.button.classes = "button"
 
         self.save_input_states()
@@ -263,7 +241,7 @@ class SimulatorApp(App):
             self.keypad["pending_bits"] = int(CARD_3.split(":")[1])
         else:
             self.keypad["data"].append(str(event.button.label))
-            self.keypad["pending_bits"] = len(self.keypad["data"])*8
+            self.keypad["pending_bits"] = len(self.keypad["data"]) * 8
 
         self.save_keypad_states()
 
@@ -271,4 +249,5 @@ class SimulatorApp(App):
 if __name__ == "__main__":
     app = SimulatorApp()
     app.save_input_states()
+    app.save_keypad_states()
     app.run()

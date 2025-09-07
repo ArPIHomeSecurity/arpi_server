@@ -23,6 +23,7 @@ from constants import (
     MONITORING_ARMED,
     MONITORING_INVALID_CONFIG,
     MONITORING_READY,
+    MONITORING_SABOTAGE,
     MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
@@ -61,7 +62,7 @@ class SensorHandler:
         self._logger = logging.getLogger(LOG_SENSORS)
         self._db_session = get_database_session()
         self._broadcaster = broadcaster
-        self._sensor_adapter = get_sensor_adapter(int(environ["BOARD_VERSION"]))
+        self._sensor_adapter = get_sensor_adapter()
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
@@ -352,7 +353,7 @@ class SensorHandler:
 
                 # start the alert
                 self._logger.debug(
-                    "Found alerting sensor id: %s, states: %s, delay: %s, type: %s",
+                    "Found alerting sensor id: %s, states: %s, delay: %s, alert type: %s",
                     sensor.id,
                     self._sensors_history.get_states(idx),
                     delay,
@@ -412,7 +413,6 @@ class SensorHandler:
         Close the sensor handler.
         """
         self._logger.debug("Closing sensor handler...")
-        self._sensor_adapter.close()
         self._alerting_sensors.clear()
         self._mqtt_client.close()
 
@@ -425,7 +425,7 @@ class SensorHandler:
         if monitoring_state == MONITORING_READY:
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
-        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT):
+        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT, MONITORING_SABOTAGE):
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
             elif (
