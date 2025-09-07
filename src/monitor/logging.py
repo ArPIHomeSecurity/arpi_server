@@ -40,6 +40,7 @@ def initialize_logging():
         logger.setLevel(level)
         logger.handlers.clear()
         logger.addHandler(console_handler)
+        logger.propagate = False  # Prevent propagation to root logger
         if file_handler:
             logger.addHandler(file_handler)
 

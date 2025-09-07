@@ -14,9 +14,6 @@ from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
 
 
-logger = logging.getLogger(LOG_SERVICE)
-
-
 MAX_RETRIES = 3
 CRASH_TIMEOUT = 120
 
@@ -71,7 +68,7 @@ class BackgroundService(Thread):
         if retries < MAX_RETRIES:
             self._stop_threads()
 
-        logger.info("Health checker stopped")
+        self._logger.info("Health checker stopped")
 
     def _start_threads(self):
         self._logger.info("Starting threads...")
