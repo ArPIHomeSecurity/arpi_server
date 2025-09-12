@@ -77,10 +77,10 @@ class SensorHandler:
         self._logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
         if len(new_references) == self._sensor_adapter.channel_count:
-            self._logger.info("New references: %s", new_references)
+            self._logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
             self.save_sensor_references(new_references)
         else:
-            self._logger.error("Error measure values! %s", new_references)
+            self._logger.error("Error measure values! %s", [float(f"{x:.3f}") for x in new_references])
 
     def has_uncalibrated_sensor(self):
         """

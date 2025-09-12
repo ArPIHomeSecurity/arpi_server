@@ -3,63 +3,86 @@
 import argparse
 import logging
 import os
-
 from time import sleep
 from typing import List
 
-import lgpio
+try:
+    import lgpio
+except ImportError:
+    lgpio = None
 
-from constants import LOG_ADSENSOR
 from dotenv import load_dotenv
 
+from constants import LOG_ADSENSOR
+from monitor.adapters.keypads import get_wiegand_keypad
+from monitor.adapters.keypads.base import Action
 from monitor.logger import ArgusLogger
 from monitor.output import OUTPUT_NAMES
 
-
 try:
+    from monitor.adapters.output import get_output_adapter
     from monitor.adapters.power import get_power_adapter
     from monitor.adapters.sensor import get_sensor_adapter
-    from monitor.adapters.output import get_output_adapter
-except lgpio.error:
-    logging.error("Can't connect to GPIO. Please stop the argus_server and argus_monitor services!")
+except Exception as error:
+    if isinstance(error, lgpio.error):
+        logging.error(
+            "Can't connect to GPIO. Please stop the argus_server and argus_monitor services!"
+        )
+    else:
+        logging.exception("Error importing adapters: %s", error)
+
     exit(1)
 
+def print_channels(correct_channels, values):
+    for idx, value in enumerate(values):
+        print(f"\033[2K", end="")  # Clear line
+        print(f"CH{idx + 1:02d}: {value:.2f}", end="")
+        if correct_channels[idx]:
+            print(" ✅", end="")
+        else:
+            print(" ❓", end="")
+        print()
 
 def test_sensor_adapter(board_version):
     """
     Check the state of the sensor inputs and mark the ones that changed.
     """
     adapter = get_sensor_adapter(board_version)
+
+    # mark channels as correct if they changed
+    correct_channels = [False] * int(os.environ["INPUT_NUMBER"])
+    previous = []
+    values = []
     try:
-        # mark channels as correct if they changed
-        correct_channels = [False] * int(os.environ["INPUT_NUMBER"])
-        previous = []
-        for _ in range(99):
+        while True:
             values = adapter.get_values()
             values = [round(v, 2) for v in values]
-            logging.info("Values: %s", values)
+
+            # Clear previous output and print current values
+            if previous:
+                print(f"\033[{len(values)}A", end="")  # Move cursor up
+
             sleep(1)
 
             if previous:
                 for idx, value in enumerate(values):
-                    if value != previous[idx]:
+                    if abs(value - previous[idx]) > 0.3:
                         correct_channels[idx] = True
 
             previous = values
 
+            print_channels(correct_channels, values)
+
             # break if all correct
             if all(correct_channels):
                 break
+    except KeyboardInterrupt:
+        print("\n")
 
-        for idx, correct in enumerate(correct_channels):
-            logging.info("Channel CH%02d %s", idx + 1, "\u2705" if correct else "\u274c")
-    finally:
-        # Ensure GPIO/SPI resources released promptly
-        try:
-            adapter.close()
-        except (OSError, RuntimeError, ValueError):
-            pass
+    if not all(correct_channels):
+        print_channels(correct_channels, values)
 
+        
 
 def test_power_adapter(board_version):
     """
@@ -67,7 +90,9 @@ def test_power_adapter(board_version):
     """
     adapter = get_power_adapter(board_version)
 
-    for _ in range(9):
+    logging.info("Press Ctrl-C to exit")
+
+    while True:
         logging.info("Source: %s", adapter.source_type)
         sleep(1)
 
@@ -84,10 +109,7 @@ def test_output_adapter(board_version):
         adapter.control_channel(i, True)
         logging.info(
             "Output: %s",
-            [
-                (name, "ON" if state else "OFF")
-                for name, state in zip(OUTPUT_NAMES.values(), adapter.states)
-            ],
+            {name: state for name, state in zip(OUTPUT_NAMES.values(), adapter.states)},
         )
         sleep(2)
 
@@ -96,12 +118,33 @@ def test_output_adapter(board_version):
         adapter.control_channel(i, False)
         logging.info(
             "Outputs: %s",
-            [
-                (name, "ON" if state else "OFF")
-                for name, state in zip(OUTPUT_NAMES.values(), adapter.states)
-            ],
+            {name: state for name, state in zip(OUTPUT_NAMES.values(), adapter.states)},
         )
         sleep(2)
+
+
+def test_keypad_adapter(board_version):
+    """
+    Test the keypad adapter.
+    """
+    adapter = get_wiegand_keypad(board_version)
+
+    logging.info("Press Ctrl-C to exit")
+
+    while True:
+        adapter.communicate()
+        while True:
+            last_action = adapter.last_action()
+            if not last_action:
+                break
+
+            if last_action == Action.CARD:
+                logging.info("Card presented: %s", adapter.get_card())
+            elif last_action == Action.KEY:
+                logging.info("Key pressed: %s", adapter.get_last_key())
+            elif last_action == Action.FUNCTION:
+                logging.info("Function activated: %s", adapter.get_function())
+        sleep(1)
 
 
 def list_adapters() -> List[str]:

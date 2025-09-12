@@ -1,12 +1,14 @@
 import logging
-from constants import LOG_ADSENSOR
-from .sensor_base import SensorAdapterBase
 
 from gpiozero import MCP3008
 
+from constants import LOG_ADSENSOR
+from monitor.adapters import V3BoardPin
+
+from monitor.adapters.sensor_base import SensorAdapterBase
 
 
-class SensorAdapterV3(SensorAdapterBase):
+class SensorAdapter(SensorAdapterBase):
     """
     SPI/AD converter-based sensor adapter (board version 3)
     """
@@ -34,14 +36,17 @@ class SensorAdapterV3(SensorAdapterBase):
         ]
 
         self._channels = {}
-        LATCH_GPIO = {1: 8, 2: 7}  # AD1: GPIO8 (CE0), AD2: GPIO7 (CE1)
-        self._channels = {}
-
-        # Create only two MCP3008 instances
         for idx, (ad_chip, ad_channel) in enumerate(self._channel_map):
+            LATCH_GPIO = {1: V3BoardPin.SENSOR_LATCH_PIN_AD1, 2: V3BoardPin.SENSOR_LATCH_PIN_AD2}
             select_pin = LATCH_GPIO[ad_chip]
             try:
-                self._channels[idx] = MCP3008(clock_pin=11, mosi_pin=10, miso_pin=9, select_pin=select_pin, channel=ad_channel)
+                self._channels[idx] = MCP3008(
+                    clock_pin=V3BoardPin.SENSOR_CLOCK_PIN,
+                    mosi_pin=V3BoardPin.SENSOR_MOSI_PIN,
+                    miso_pin=V3BoardPin.SENSOR_MISO_PIN,
+                    select_pin=select_pin,
+                    channel=ad_channel
+                )
             except (OSError, ValueError, RuntimeError) as e:
                 self._logger.error("Failed to init MCP3008 chip=%s: %s", ad_chip, e)
 

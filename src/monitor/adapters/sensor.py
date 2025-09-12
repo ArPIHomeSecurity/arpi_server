@@ -21,8 +21,8 @@ def get_sensor_adapter(board_version: int = 0) -> SensorAdapterBase:
 
         return SensorAdapter()
     else:
-        from .sensor_v2 import SensorAdapterV2
-        from .sensor_v3 import SensorAdapterV3
+        from .sensor_v2 import SensorAdapter as SensorAdapterV2
+        from .sensor_v3 import SensorAdapter as SensorAdapterV3
 
         if board_version == 0:
             board_version = int(environ["BOARD_VERSION"])

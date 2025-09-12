@@ -117,7 +117,7 @@ def set_output_states(states):
     Set the state of all output channels.
     """
     data = {
-        name: state for name, state in zip(OUTPUT_NAMES.values(), [bool(state) for state in states])
+        name: state for name, state in zip(OUTPUT_NAMES.values(), states)
     }
     protected_write(OUTPUT_FILE, data)
 

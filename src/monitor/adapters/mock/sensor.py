@@ -1,6 +1,7 @@
 import logging
 import json
 import fcntl
+from os import environ
 
 from constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
@@ -38,7 +39,7 @@ class SensorAdapter(SensorAdapterBase):
 
     @property
     def channel_count(self):
-        return 8
+        return int(environ.get("INPUT_NUMBER", 8))
 
     def close(self):
         self._logger.debug("Mock SensorAdapter closed")

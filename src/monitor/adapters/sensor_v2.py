@@ -4,43 +4,27 @@ from gpiozero import DigitalInputDevice
 
 from constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
-
-# Input channel pins
-CH01_PIN = 19
-CH02_PIN = 20
-CH03_PIN = 26
-CH04_PIN = 21
-CH05_PIN = 12
-CH06_PIN = 6
-CH07_PIN = 13
-CH08_PIN = 16
-CH09_PIN = 7
-CH10_PIN = 1
-CH11_PIN = 0
-CH12_PIN = 5
-CH13_PIN = 23
-CH14_PIN = 24
-CH15_PIN = 25
+from monitor.adapters import V2BoardPin
 
 CHANNEL_GPIO_PINS = [
-    CH01_PIN,
-    CH02_PIN,
-    CH03_PIN,
-    CH04_PIN,
-    CH05_PIN,
-    CH06_PIN,
-    CH07_PIN,
-    CH08_PIN,
-    CH09_PIN,
-    CH10_PIN,
-    CH11_PIN,
-    CH12_PIN,
-    CH13_PIN,
-    CH14_PIN,
-    CH15_PIN,
+    V2BoardPin.CH01_PIN,
+    V2BoardPin.CH02_PIN,
+    V2BoardPin.CH03_PIN,
+    V2BoardPin.CH04_PIN,
+    V2BoardPin.CH05_PIN,
+    V2BoardPin.CH06_PIN,
+    V2BoardPin.CH07_PIN,
+    V2BoardPin.CH08_PIN,
+    V2BoardPin.CH09_PIN,
+    V2BoardPin.CH10_PIN,
+    V2BoardPin.CH11_PIN,
+    V2BoardPin.CH12_PIN,
+    V2BoardPin.CH13_PIN,
+    V2BoardPin.CH14_PIN,
+    V2BoardPin.CH15_PIN,
 ]
 
-class SensorAdapterV2(SensorAdapterBase):
+class SensorAdapter(SensorAdapterBase):
     """
     GPIO-based sensor adapter (board version 2)
     """

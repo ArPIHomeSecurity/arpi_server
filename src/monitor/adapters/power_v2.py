@@ -2,8 +2,8 @@ import logging
 
 from gpiozero import DigitalInputDevice
 
-from monitor.adapters import POWER_PIN
 from constants import LOG_ADPOWER
+from monitor.adapters import V2BoardPin
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 
 
@@ -11,9 +11,6 @@ class PowerAdapter:
     """
     Determine the source of the power (network or battery)
     """
-
-    SOURCE_NETWORK = "network"
-    SOURCE_BATTERY = "battery"
 
     def __init__(self):
         """
@@ -24,7 +21,7 @@ class PowerAdapter:
 
         self._logger.debug("Power sense creating...")
         # the sense is on the last channel
-        self._sense = DigitalInputDevice(POWER_PIN)
+        self._sense = DigitalInputDevice(V2BoardPin.POWER_PIN)
 
     def __del__(self):
         self._cleanup()

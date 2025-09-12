@@ -131,7 +131,7 @@ class SimulatorApp(App):
         "CH13": CHANNEL_LOW,
         "CH14": CHANNEL_LOW,
         "CH15": CHANNEL_LOW,
-        "POWER": POWER_LOW,
+        "POWER": POWER_HIGH,
     }
 
     keypad = deepcopy(DEFAULT_KEYPAD)
@@ -163,24 +163,24 @@ class SimulatorApp(App):
         """Add our buttons."""
         with Container(id="simulator"):
             with Container(id="channels"):
-                yield Button("CH01", id="input-1")
-                yield Button("CH02", id="input-2")
-                yield Button("CH03", id="input-3")
-                yield Button("CH04", id="input-4")
-                yield Button("CH05", id="input-5")
-                yield Button("CH06", id="input-6")
-                yield Button("CH07", id="input-7")
-                yield Button("CH08", id="input-8")
-                yield Button("CH09", id="input-9")
-                yield Button("CH10", id="input-10")
-                yield Button("CH11", id="input-11")
-                yield Button("CH12", id="input-12")
-                yield Button("CH13", id="input-13")
-                yield Button("CH14", id="input-14")
-                yield Button("CH15", id="input-15")
+                yield Button("CH01", id="input-1", classes="channel")
+                yield Button("CH02", id="input-2", classes="channel")
+                yield Button("CH03", id="input-3", classes="channel")
+                yield Button("CH04", id="input-4", classes="channel")
+                yield Button("CH05", id="input-5", classes="channel")
+                yield Button("CH06", id="input-6", classes="channel")
+                yield Button("CH07", id="input-7", classes="channel")
+                yield Button("CH08", id="input-8", classes="channel")
+                yield Button("CH09", id="input-9", classes="channel")
+                yield Button("CH10", id="input-10", classes="channel")
+                yield Button("CH11", id="input-11", classes="channel")
+                yield Button("CH12", id="input-12", classes="channel")
+                yield Button("CH13", id="input-13", classes="channel")
+                yield Button("CH14", id="input-14", classes="channel")
+                yield Button("CH15", id="input-15", classes="channel")
                 yield Static("", id="spacer-0")
 
-                yield Button("POWER", id="input-16")
+                yield Button("POWER", id="input-16", classes="power")
 
             with Container(id="keypad"):
                 yield Button("1", id="button-1")
@@ -211,17 +211,30 @@ class SimulatorApp(App):
 
         self.watch_output_states()
 
-    @on(Button.Pressed, "#channels Button")
+    @on(Button.Pressed, "#channels .channel")
     def channel_button_pressed(self, event: Button.Pressed) -> None:
         """
         Pressed a button on the channels.
         """
         if self.inputs[str(event.button.label)] == CHANNEL_LOW:
             self.inputs[str(event.button.label)] = CHANNEL_HIGH
-            event.button.classes = "button-pressed"
+            event.button.add_class("button-pressed")
         else:
             self.inputs[str(event.button.label)] = CHANNEL_LOW
-            event.button.classes = "button"
+            event.button.remove_class("button-pressed")
+
+        self.save_input_states()
+
+    @on(Button.Pressed, "#input-16")
+    def power_button_pressed(self, event: Button.Pressed) -> None:
+        """
+        Pressed the power button.
+        """
+        self.inputs["POWER"] = POWER_HIGH if self.inputs["POWER"] == POWER_LOW else POWER_LOW
+        if self.inputs["POWER"] == POWER_HIGH:
+            event.button.remove_class("button-pressed")
+        else:
+            event.button.add_class("button-pressed")
 
         self.save_input_states()
 

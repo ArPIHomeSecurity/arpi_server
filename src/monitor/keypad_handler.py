@@ -11,21 +11,16 @@ from constants import (ARM_AWAY, ARM_STAY, LOG_ADKEYPAD,
                        MONITOR_UPDATE_KEYPAD, MONITORING_ALERT,
                        MONITORING_ALERT_DELAY, MONITORING_READY, THREAD_KEYPAD)
 from models import Arm, Card, Keypad, User, hash_code
-from monitor.adapters import KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2
+from monitor.adapters import V2BoardPin
+from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
 from monitor.adapters.keypads.dsc import DSCKeypad
-from monitor.adapters.keypads.wiegand import WiegandKeypad
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
-from utils.queries import (
-    get_alert_delay,
-    get_arm_state,
-    get_arm_delay,
-    get_user_with_access_code,
-)
-
+from utils.queries import (get_alert_delay, get_arm_delay, get_arm_state,
+                           get_user_with_access_code)
 
 COMMUNICATION_PERIOD = 0.2  # sec
 CARD_REGISTRATION_EXPIRY = 120  # sec
@@ -53,10 +48,10 @@ class KeypadHandler(Thread):
                 return
 
             if keypad_settings.type.name == "DSC":
-                self._keypad = DSCKeypad(KEYBUS_PIN1, KEYBUS_PIN0)
+                self._keypad = DSCKeypad(V2BoardPin.KEYBUS_PIN1, V2BoardPin.KEYBUS_PIN0)
                 self._keypad.id = keypad_settings.id
             elif keypad_settings.type.name == "WIEGAND":
-                self._keypad = WiegandKeypad(KEYBUS_PIN0, KEYBUS_PIN1, KEYBUS_PIN2)
+                self._keypad = get_wiegand_keypad()
                 self._keypad.id = keypad_settings.id
             else:
                 self._logger.error("Unknown keypad type: %s", keypad_settings.type.name)
