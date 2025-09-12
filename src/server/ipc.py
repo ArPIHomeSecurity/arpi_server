@@ -60,7 +60,7 @@ class IPCClient(object):
                 "action": MONITOR_ARM_AWAY,
                 "user_id": user_id,
                 "area_id": area_id,
-                "delay": False
+                "use_delay": False
             })
         elif arm_type == ARM_STAY:
             return self._send_message({

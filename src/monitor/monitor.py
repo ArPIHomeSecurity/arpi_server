@@ -73,7 +73,6 @@ class Monitor(Thread):
         """
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
-        self._broadcaster = broadcaster
         self._actions = Queue()
         self._power_adapter = PowerAdapter()
         self._power_source = None
@@ -81,6 +80,7 @@ class Monitor(Thread):
         self._delay_timer = None
         self._sensor_handler = None
         self._area_handler = None
+        self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
         self._logger.info("Monitoring created")
 
@@ -205,7 +205,7 @@ class Monitor(Thread):
                         ARM_AWAY,
                         message.get("user_id", None),
                         message.get("keypad_id", None),
-                        message.get("delay", True),
+                        message["use_delay"],
                         message.get("area_id", None),
                     )
                 elif message["action"] == MONITOR_ARM_STAY:
@@ -213,7 +213,7 @@ class Monitor(Thread):
                         ARM_STAY,
                         message.get("user_id", None),
                         message.get("keypad_id", None),
-                        message.get("use_delay", True),
+                        message["use_delay"],
                         message.get("area_id", None),
                     )
                 elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
@@ -254,7 +254,7 @@ class Monitor(Thread):
         """
         Arm the monitoring system to the given state (away, stay).
         """
-        self._logger.info("Arming to %s", arm_type)
+        self._logger.info("Arming to %s %s", arm_type, "with delay" if use_delay else "without delay")
 
         arm_changed = False
         if area_id is None:
