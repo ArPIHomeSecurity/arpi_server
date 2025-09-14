@@ -13,27 +13,34 @@ from textual.logging import TextualHandler
 from textual.widgets import Button, Checkbox, Static, RadioButton, RadioSet
 from textual.widget import Widget
 
+from monitor.sensor.detector import wiring_config
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
     get_output_states,
     set_input_states,
+    get_channel_types,
     set_keypad_state,
 )
 from monitor.output import OUTPUT_NAMES
 
 
-# Channel states
+# channel error states
 CHANNEL_CUT = 1.0
-CHANNEL_A_B = 1.0
-
-CHANNEL_B = 0.71
-CHANNEL_A_DEFAULT = 0.71
-
-CHANNEL_A = 0.57
-CHANNEL_B_DEFAULT = 0.57
-
-CHANNEL_AB_DEFAULT = 0.47
 CHANNEL_SHORTAGE = 0.0
+
+# channel A and B active level
+CHANNEL_A_B = wiring_config.dual.nc.both_active
+
+# channel B active level
+CHANNEL_B = wiring_config.dual.nc.channel_b_active
+CHANNEL_A_DEFAULT = wiring_config.dual.nc.default
+
+# channel A active level
+CHANNEL_A = wiring_config.dual.nc.channel_a_active
+CHANNEL_B_DEFAULT = wiring_config.dual.nc.default
+
+# channel AB default when both A and B are not active
+CHANNEL_AB_DEFAULT = wiring_config.dual.nc.default
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -141,9 +148,10 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, **kwargs):
+    def __init__(self, default_states, channel_states, **kwargs):
         super().__init__(**kwargs)
         self._default_states = default_states
+        self._channel_states = channel_states
 
     def compose(self) -> ComposeResult:
         """Create channel rows with radio buttons and A/B buttons in two columns"""
@@ -154,25 +162,32 @@ class Channels(Widget):
             for col in [col1, col2]:
                 with Vertical(classes="channel-column"):
                     for i in col:
+                        ch_key = f"CH{i:02d}"
+                        channel_type = self._channel_states.get(ch_key, "cut")
+                        
                         with Horizontal(classes="channel-row"):
                             yield Static(
-                                f"CH{i:02d} {self._default_states[i - 1]}",
+                                f"CH{i:02d} {self._default_states[i - 1]:.2f}V",
                                 id=f"channel-label-{i}",
-                                classes="channel-label cut",
+                                classes=f"channel-label {channel_type}",
                             )
                             with RadioSet(classes="channel-radio", id=f"channel-radio-{i}"):
-                                yield RadioButton("A", id=f"channel-radio-{i}-a", classes="default")
-                                yield RadioButton("B", id=f"channel-radio-{i}-b", classes="default")
-                                yield RadioButton("AB", id=f"channel-radio-{i}-ab", classes="default")
+                                yield RadioButton("A", id=f"channel-radio-{i}-a", classes="default", value=(channel_type == "a"))
+                                yield RadioButton("B", id=f"channel-radio-{i}-b", classes="default", value=(channel_type == "b"))
+                                yield RadioButton("AB", id=f"channel-radio-{i}-ab", classes="default", value=(channel_type == "ab"))
                                 yield RadioButton(
-                                    "Cut", value="True", id=f"channel-radio-{i}-cut", classes="cut"
+                                    "Cut", value=(channel_type == "cut"), id=f"channel-radio-{i}-cut", classes="cut"
                                 )
                                 yield RadioButton(
-                                    "Shortage", id=f"channel-radio-{i}-shortage", classes="shortage"
+                                    "Shortage", id=f"channel-radio-{i}-shortage", classes="shortage", value=(channel_type == "shortage")
                                 )
 
-                            yield Button("A", id=f"channel-{i}-a", classes="channel-button", disabled=True)
-                            yield Button("B", id=f"channel-{i}-b", classes="channel-button", disabled=True)
+                            # Set A/B button disabled states based on channel type
+                            disabled_states = ["cut", "shortage"]
+                            yield Button("A", id=f"channel-{i}-a", classes="channel-button", 
+                                       disabled=(channel_type in disabled_states or channel_type == "b"))
+                            yield Button("B", id=f"channel-{i}-b", classes="channel-button", 
+                                       disabled=(channel_type in disabled_states or channel_type == "a"))
 
         yield Static("")
         yield Button("POWER", id="power", classes="power")
@@ -280,30 +295,52 @@ class SimulatorApp(App):
     }
     """
 
-    channel_values = {
-        f"CH{i:02d}": CHANNEL_CUT for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
-    }
-    channel_values["POWER"] = POWER_HIGH
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.keypad = deepcopy(DEFAULT_KEYPAD)
+        self.channel_values = {}
+        self.channel_states = {}
+        self.channel_a_active = {}
+        self.channel_b_active = {}
 
-    # Track channel states: "a", "b", "ab", "cut", "shortage"
-    channel_states = {
-        f"CH{i:02d}": "cut" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
-    }
+    def initialize_channels(self, input_number: int) -> None:
+        """Initialize channel states and values from saved data or defaults"""
+        # Load channel types from buffer file
+        saved_types = get_channel_types()
 
-    # Track A/B button states for normal channels
-    channel_a_active = {
-        f"CH{i:02d}": False for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
-    }
-    channel_b_active = {
-        f"CH{i:02d}": False for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
-    }
+        # Initialize channel dictionaries
+        self.channel_values = {
+            f"CH{i:02d}": CHANNEL_CUT for i in range(1, input_number + 1)
+        }
+        self.channel_values["POWER"] = POWER_HIGH
 
-    keypad = deepcopy(DEFAULT_KEYPAD)
+        self.channel_states = {
+            f"CH{i:02d}": "cut" for i in range(1, input_number + 1)
+        }
+
+        self.channel_a_active = {
+            f"CH{i:02d}": False for i in range(1, input_number + 1)
+        }
+        self.channel_b_active = {
+            f"CH{i:02d}": False for i in range(1, input_number + 1)
+        }
+
+        # Apply saved types and calculate values
+        for ch_key, channel_type in saved_types.items():
+            if ch_key in self.channel_states:
+                self.channel_states[ch_key] = channel_type
+                # Reset A/B buttons to inactive state
+                self.channel_a_active[ch_key] = False
+                self.channel_b_active[ch_key] = False
+                # Calculate initial values based on types
+                self.channel_values[ch_key] = self.calculate_channel_value(ch_key)
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a grid layout."""
         with Container(id="main-grid"):
-            yield Channels(id="channels-pane", default_states=list(self.channel_values.values()))
+            yield Channels(id="channels-pane", 
+                         default_states=list(self.channel_values.values()),
+                         channel_states=self.channel_states)
             yield Keypad(id="keypad-pane")
             yield Outputs(id="outputs-pane")
 
@@ -316,7 +353,10 @@ class SimulatorApp(App):
                 checkbox.value = outputs[idx]
 
     def save_input_states(self):
-        set_input_states(list(self.channel_values.values()))
+        set_input_states(
+            list(self.channel_values.values()), 
+            [self.channel_states[f"CH{i:02d}"] for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)]
+        )
 
     def save_keypad_states(self):
         set_keypad_state(self.keypad["pending_bits"], self.keypad["data"])
@@ -327,7 +367,7 @@ class SimulatorApp(App):
         """Start background tasks when the app mounts"""
         self.set_interval(0.5, self.read_output_states)
 
-    def calculate_channel_value(self, channel):
+    def calculate_channel_value(self, channel: str) -> float:
         """Calculate the channel value based on state and A/B buttons"""
         state = self.channel_states[channel]
 
@@ -476,9 +516,14 @@ class SimulatorApp(App):
 logging.basicConfig(
     level="NOTSET",
     handlers=[TextualHandler()],
+    format="%(asctime)s: %(message)s",
 )
 if __name__ == "__main__":
     app = SimulatorApp()
+    # Initialize channel values and states from saved data
+    app.initialize_channels(int(environ.get("INPUT_NUMBER", 15)))
+
+    # Save initial states only after initialization
     app.save_input_states()
     app.save_keypad_states()
     app.run()

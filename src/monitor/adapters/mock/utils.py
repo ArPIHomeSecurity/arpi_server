@@ -90,18 +90,44 @@ def get_input_state(input_name):
     """
     Get the state of a specific input channel.
     """
-    default_data = {f"CH{str(i).zfill(2)}": 0 for i in range(int(environ.get("INPUT_NUMBER", 0)))}
+    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(environ.get("INPUT_NUMBER", 0)))}
     default_data["POWER"] = 0
-    return protected_read(INPUT_FILE, default_data).get(input_name)
+    data = protected_read(INPUT_FILE, default_data)
+    if input_name == "POWER":
+        return data.get(input_name)
+    else:
+        channel_data = data.get(input_name, {"value": 0, "type": "cut"})
+        return channel_data.get("value", 0) if isinstance(channel_data, dict) else channel_data
 
 
-def set_input_states(states):
+def set_input_states(channel_values, channel_types):
     """
-    Set the state of all input channels.
+    Set the state of all input channels with their types.
     """
-    data = {f"CH{str(i).zfill(2)}": state for i, state in enumerate(states[:-1], start=1)}
-    data["POWER"] = states[-1]
+    data = {}
+    for i, (value, channel_type) in enumerate(zip(channel_values[:-1], channel_types), start=1):
+        ch_key = f"CH{str(i).zfill(2)}"
+        data[ch_key] = {"value": value, "type": channel_type}
+    data["POWER"] = channel_values[-1]
     protected_write(INPUT_FILE, data)
+
+
+def get_channel_types():
+    """
+    Get the types of all channels.
+    """
+    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(environ.get("INPUT_NUMBER", 0)))}
+    default_data["POWER"] = 0
+    data = protected_read(INPUT_FILE, default_data)
+    types = {}
+    for ch_key in [f"CH{str(i).zfill(2)}" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)]:
+        channel_data = data.get(ch_key, {"value": 0, "type": "cut"})
+        if isinstance(channel_data, dict):
+            types[ch_key] = channel_data.get("type", "cut")
+        else:
+            # Handle old format - default to "cut"
+            types[ch_key] = "cut"
+    return types
 
 
 def get_output_states() -> list[bool]:

@@ -32,25 +32,22 @@ from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.database import get_database_session
+from monitor.sensor.detector import detect_alert, detect_error, wiring_config
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import State, States
 
+
 MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3
-TOLERANCE = float(environ["TOLERANCE"])
+
 
 # alert time window length in seconds
 ALERT_WINDOW = int(environ.get("ALERT_TIME_WINDOW", 1))
 # threshold in the percent of high values in the time window (0-100)
 ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", 100))
-
-
-def is_close(a, b, tolerance=0.0):
-    """
-    Check if two values are close enough.
-    """
-    return abs(a - b) < tolerance
+# board version
+BOARD_VERSION = int(environ["BOARD_VERSION"])
 
 
 class SensorHandler:
@@ -69,6 +66,9 @@ class SensorHandler:
 
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_sensors")
+
+        # log the wiring configuration
+        wiring_config.debug_values()
 
     def calibrate_sensors(self):
         """
@@ -197,7 +197,7 @@ class SensorHandler:
         self._logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
-            if sensor.channel in channels:
+            if sensor.channel in channels and BOARD_VERSION == 2:
                 self._logger.debug("Channel already in use: %s", sensor.channel)
                 return False
             else:
@@ -253,21 +253,32 @@ class SensorHandler:
 
             value = self._sensor_adapter.get_value(sensor.channel)
 
-            if not is_close(value, sensor.reference_value, TOLERANCE):
-                if not sensor.alert:
-                    self._logger.debug(
-                        "Alert on channel: %s, (changed %s -> %s)",
-                        sensor.channel,
-                        sensor.reference_value,
-                        value,
-                    )
-                    sensor.alert = True
-                    self._mqtt_client.publish_sensor_state(sensor.name, True)
-                    changes = True
-            elif sensor.alert:
-                self._logger.debug("Cleared alert on channel: %s", sensor.channel)
-                sensor.alert = False
-                self._mqtt_client.publish_sensor_state(sensor.name, False)
+            is_alert = detect_alert(sensor, value)
+            self._logger.trace(
+                "Sensor %s (CH%02d) value: %s, ref: %s => alert: %s",
+                sensor.description,
+                sensor.channel,
+                float(f"{value:.3f}"),
+                float(f"{sensor.reference_value:.3f}"),
+                is_alert,
+            )
+            if is_alert != sensor.alert:
+                sensor.alert = is_alert
+                self._mqtt_client.publish_sensor_state(sensor.name, sensor.alert)
+                changes = True
+
+            is_error = detect_error(sensor, value)
+            self._logger.trace(
+                "Sensor %s (CH%02d) value: %s, ref: %s => error: %s",
+                sensor.description,
+                sensor.channel,
+                float(f"{value:.3f}"),
+                float(f"{sensor.reference_value:.3f}"),
+                is_error,
+            )
+            if is_error != sensor.error:
+                sensor.error = is_error
+                # self._mqtt_client.publish_sensor_state(sensor.name, sensor.error)
                 changes = True
 
             if sensor.alert and sensor.enabled:

@@ -8,13 +8,13 @@ load_dotenv("secrets.env")
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
+from models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
 from monitor.database import get_database_session
 from models import metadata
 
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +24,6 @@ SENSOR_TYPES = [
     SensorType(3, name="Open", description="Detect opening"),
     SensorType(4, name="Break", description="Detect glass break"),
 ]
-
 
 
 def cleanup():
@@ -67,7 +66,7 @@ def env_prod():
     access_config = {
         "service_enabled": True,
         "restrict_local_network": False,
-        "password_authentication_enabled": True
+        "password_authentication_enabled": True,
     }
     ssh_access = Option(name="network", section="access", value=json.dumps(access_config))
     session.add(ssh_access)
@@ -97,9 +96,7 @@ def env_live_01():
         stay_alert_delay=20,
         description="Alert delayed when armed STAY",
     )
-    z4 = Zone(
-        name="Stay", stay_alert_delay=None, description="No alert when armed STAY"
-    )
+    z4 = Zone(name="Stay", stay_alert_delay=None, description="No alert when armed STAY")
     z5 = Zone(
         name="Away/Stay delayed",
         away_alert_delay=40,
@@ -124,13 +121,24 @@ def env_live_01():
     logger.info(" - Created area")
 
     s1 = Sensor(
-        channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, name="Garage", area=area
+        channel=0,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z5,
+        name="Garage",
+        area=area,
     )
     s2 = Sensor(
-        channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, name="Hall", area=area
+        channel=1,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        zone=z5,
+        name="Hall",
+        area=area,
     )
     s3 = Sensor(
         channel=2,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[2],
         zone=z5,
         name="Front door",
@@ -138,6 +146,7 @@ def env_live_01():
     )
     s4 = Sensor(
         channel=3,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
         zone=z3,
         name="Kitchen",
@@ -145,6 +154,7 @@ def env_live_01():
     )
     s5 = Sensor(
         channel=4,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
         zone=z1,
         name="Living room",
@@ -152,6 +162,7 @@ def env_live_01():
     )
     s6 = Sensor(
         channel=5,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
         zone=z4,
         name="Children's room",
@@ -159,13 +170,19 @@ def env_live_01():
     )
     s7 = Sensor(
         channel=6,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
         zone=z4,
         name="Bedroom",
         area=area,
     )
     s8 = Sensor(
-        channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, name="Tamper", area=area
+        channel=7,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[1],
+        zone=z6,
+        name="Tamper",
+        area=area,
     )
     session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
     logger.info(" - Created sensors")
@@ -210,7 +227,9 @@ def env_test_01():
         description="Alert delayed when armed STAY",
     )
     z5 = Zone(
-        name="Stay", stay_alert_delay=None, description="No alert when armed STAY"
+        name="Stay",
+        stay_alert_delay=None,
+        description="No alert when armed STAY",
     )
     session.add_all([z1, z2, z3, z4, z5])
     logger.info(" - Created zones")
@@ -224,6 +243,7 @@ def env_test_01():
 
     s1 = Sensor(
         channel=0,
+        channel_type=ChannelTypes.CHANNEL_A,
         sensor_type=SENSOR_TYPES[0],
         area=area,
         zone=z3,
@@ -232,7 +252,8 @@ def env_test_01():
         silent_alert=True,
     )
     s2 = Sensor(
-        channel=1,
+        channel=0,
+        channel_type=ChannelTypes.CHANNEL_B,
         sensor_type=SENSOR_TYPES[2],
         area=area,
         zone=z5,
@@ -240,14 +261,24 @@ def env_test_01():
         description="Test room door sensor",
     )
     s3 = Sensor(
+        channel=1,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        area=area,
+        zone=z1,
+        name="Living room",
+        description="Living room movement sensor",
+    )
+    s4 = Sensor(
         channel=2,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[1],
         area=area,
         zone=z2,
         name="Tamper",
         description="Sabotage wire",
     )
-    session.add_all([s1, s2, s3])
+    session.add_all([s1, s2, s3, s4])
     logger.info(" - Created sensors")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
@@ -255,7 +286,7 @@ def env_test_01():
     session.add_all([kt1, kt2])
     logger.info(" - Created keypad types")
 
-    k1 = Keypad(keypad_type=kt2, enabled=False)
+    k1 = Keypad(keypad_type=kt2, enabled=True)
     session.add_all([k1])
     logger.info(" - Created keypads")
 
@@ -275,32 +306,25 @@ def env_admin_registration():
 
 def main():
     environments = [
-        attribute.replace("env_", "")
-        for attribute in globals()
-        if attribute.startswith("env_")
+        attribute.replace("env_", "") for attribute in globals() if attribute.startswith("env_")
     ]
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-d", "--delete", action="store_true", help="Delete database content"
-    )
+    parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")
     parser.add_argument(
         "-c",
         "--create",
         metavar="environment",
-        help=f'Create database content (environments: {", ".join(environments)})',
+        help=f"Create database content (environments: {', '.join(environments)})",
     )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 
     # Configure logging based on verbose flag
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     if args.delete:

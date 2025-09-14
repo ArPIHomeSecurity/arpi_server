@@ -5,7 +5,7 @@ import locale
 import os
 import uuid
 from copy import deepcopy
-from datetime import date, timedelta, datetime as dt
+from datetime import timedelta, datetime as dt
 from re import search
 from dateutil.tz.tz import tzlocal
 from typing import List
@@ -31,9 +31,7 @@ from utils.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):
-    return hashlib.sha256(
-        (f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
 
 
 def convert2camel(data):
@@ -77,7 +75,6 @@ class BaseModel(Base):
     def __repr__(self):
         """Define a base way to print models"""
         return f"{self.__class__.__name__}({dict(self.__dict__.items())})"
-
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -123,10 +120,18 @@ class SensorType(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert (
-            0 <= len(name) <= SensorType.NAME_LENGTH
-        ), f"Incorrect name field length ({len(name)})"
+        assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
+            f"Incorrect name field length ({len(name)})"
+        )
         return name
+
+
+class ChannelTypes(str, enum.Enum):
+    """Channel type"""
+
+    NORMAL = "normal"
+    CHANNEL_A = "channel_a"
+    CHANNEL_B = "channel_b"
 
 
 class Sensor(BaseModel):
@@ -142,15 +147,26 @@ class Sensor(BaseModel):
     name = Column(String(16), nullable=False)
     description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
+    channel_type = Column(
+        Enum(
+            ChannelTypes.NORMAL.value,
+            ChannelTypes.CHANNEL_A.value,
+            ChannelTypes.CHANNEL_B.value,
+            name="channel_types",
+        ),
+        nullable=False,
+        default=ChannelTypes.NORMAL.value,
+    )
 
     reference_value = Column(Float, nullable=True)
-    silent_alert = Column(Boolean, nullable=True, default=None)
     monitor_period = Column(Integer, nullable=True, default=None)
     monitor_threshold = Column(Integer, nullable=True, default=100)
 
-    alert = Column(Boolean, default=False)
-    enabled = Column(Boolean, default=True)
-    deleted = Column(Boolean, default=False)
+    alert = Column(Boolean, nullable=False, default=False)
+    silent_alert = Column(Boolean, nullable=True, default=None)
+    error = Column(Boolean, nullable=False, default=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    deleted = Column(Boolean, nullable=False, default=False)
 
     zone_id = Column(Integer, ForeignKey("zone.id"), nullable=False)
     zone = relationship("Zone", back_populates="sensors")
@@ -168,6 +184,7 @@ class Sensor(BaseModel):
     def __init__(
         self,
         channel,
+        channel_type,
         sensor_type,
         area,
         name,
@@ -179,6 +196,7 @@ class Sensor(BaseModel):
         monitor_threshold=None,
     ):
         self.channel = channel
+        self.channel_type = channel_type.value
         self.zone = zone
         self.area = area
         self.type = sensor_type
@@ -198,6 +216,7 @@ class Sensor(BaseModel):
         return self.update_record(
             (
                 "channel",
+                "channel_type",
                 "enabled",
                 "name",
                 "description",
@@ -221,6 +240,7 @@ class Sensor(BaseModel):
                     "name",
                     "description",
                     "channel",
+                    "channel_type",
                     "alert",
                     "zone_id",
                     "area_id",
@@ -237,16 +257,16 @@ class Sensor(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert (
-            0 <= len(name) <= SensorType.NAME_LENGTH
-        ), f"Incorrect name field length ({len(name)})"
+        assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
+            f"Incorrect name field length ({len(name)})"
+        )
         return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
-        assert (
-            -1 <= channel <= int(os.environ["INPUT_NUMBER"])
-        ), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+        assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), (
+            f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+        )
         return channel
 
 
@@ -286,12 +306,10 @@ class Alert(BaseModel):
         return convert2camel(
             {
                 "id": self.id,
-                "alert_type": (
-                    Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE
+                "alert_type": (Alert.get_alert_type(self.arm.type) if self.arm else ALERT_SABOTAGE),
+                "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(
+                    sep=" "
                 ),
-                "start_time": self.start_time.replace(
-                    microsecond=0, tzinfo=None
-                ).isoformat(sep=" "),
                 "end_time": (
                     self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
                     if self.end_time
@@ -586,9 +604,7 @@ class Zone(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert (
-            0 <= len(name) <= Zone.NAME_LENGTH
-        ), f"Incorrect name field length ({len(name)})"
+        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
         return name
 
 
@@ -615,9 +631,7 @@ class Area(BaseModel):
 
     @property
     def serialized(self):
-        return convert2camel(
-            self.serialize_attributes(("id", "name", "arm_state", "ui_order"))
-        )
+        return convert2camel(self.serialize_attributes(("id", "name", "arm_state", "ui_order")))
 
     def update(self, data):
         return self.update_record(("name", "arm_state"), data)
@@ -636,9 +650,7 @@ class User(BaseModel):
     name = Column(String(NAME_LENGTH), nullable=False)
     email = Column(String(EMAIL_LENGTH), nullable=True)
     role = Column(String(12), nullable=False)
-    registration_code = Column(
-        String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True
-    )
+    registration_code = Column(String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
     registration_expiry = Column(DateTime(timezone=True))
     card_registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
@@ -646,7 +658,9 @@ class User(BaseModel):
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 
-    def __init__(self, name, id=None, role=ROLE_USER, access_code=None, fourkey_code=None, comment=None):
+    def __init__(
+        self, name, id=None, role=ROLE_USER, access_code=None, fourkey_code=None, comment=None
+    ):
         self.id = id or int(str(uuid.uuid1(1000).int)[:8])
         self.name = name
         self.email = ""
@@ -660,9 +674,9 @@ class User(BaseModel):
         fields = ("name", "email", "role", "comment")
         access_code = data.get("accessCode", "")
         if access_code:
-            assert (
-                len(access_code) >= 4 and len(access_code) <= 12
-            ), "Access code length (>=4, <=12)"
+            assert len(access_code) >= 4 and len(access_code) <= 12, (
+                "Access code length (>=4, <=12)"
+            )
             assert access_code.isdigit(), "Access code only number"
 
             data["accessCode"] = hash_code(access_code)
@@ -677,7 +691,7 @@ class User(BaseModel):
                 "access_code",
                 "fourkey_code",
             )
- 
+
         return self.update_record(fields, data)
 
     def set_card_registration(self):
@@ -726,16 +740,12 @@ class User(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert (
-            0 < len(name) <= User.NAME_LENGTH
-        ), f"Incorrect user name field length ({len(name)})"
+        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect user name field length ({len(name)})"
         return name
 
     @validates("email")
     def validates_email(self, key, email):
-        assert (
-            0 <= len(email) <= User.EMAIL_LENGTH
-        ), f"Incorrect email field length ({len(email)})"
+        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect email field length ({len(email)})"
         if len(email):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
@@ -743,7 +753,7 @@ class User(BaseModel):
 
 
 class Card(BaseModel):
-
+    """Model for card table"""
     __tablename__ = "card"
 
     id = Column(Integer, primary_key=True)
@@ -813,19 +823,13 @@ class Option(BaseModel):
     @property
     def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
-        replace_keys(
-            filtered_value, {"smtp_password": "******", "replace_empty": False}
-        )
+        replace_keys(filtered_value, {"smtp_password": "******", "replace_empty": False})
         replace_keys(filtered_value, {"password": "******", "replace_empty": False})
-        return convert2camel(
-            {"name": self.name, "section": self.section, "value": filtered_value}
-        )
+        return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
 
     @validates("name", "section")
     def validates_name(self, key, value):
-        assert (
-            0 < len(value) <= Option.OPTION_LENGTH
-        ), f"Incorrect name field length ({len(value)})"
+        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(value)})"
         if key == "name":
             assert value in (
                 "notifications",
@@ -992,9 +996,9 @@ class Output(BaseModel):
     @validates("channel")
     def validates_channel(self, key, channel):
         if channel is not None:
-            assert (
-                0 <= channel <= int(os.environ["OUTPUT_NUMBER"])
-            ), f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+            assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]), (
+                f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+            )
         return channel
 
     @validates("duration")

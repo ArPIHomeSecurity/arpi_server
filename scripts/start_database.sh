@@ -8,4 +8,4 @@ docker start argus-database || docker run -d -it \
     -e POSTGRES_USER=$DB_USER \
     -e POSTGRES_PASSWORD=$DB_PASSWORD \
     -e POSTGRES_DB=$DB_SCHEMA \
-    postgres:13
+    postgres:15
