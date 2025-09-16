@@ -28,8 +28,12 @@ class SensorAdapter(SensorAdapterBase):
                 fcntl.flock(input_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 channels_data = json.load(input_file)
                 fcntl.flock(input_file, fcntl.LOCK_UN)
-                channel_data = channels_data.get(ch_key, 0)
-                raw_value = channel_data.get("value", 0)
+                channel_data = channels_data.get(ch_key, {"value": 0})
+                if isinstance(channel_data, dict):
+                    raw_value = channel_data.get("value", 0)
+                else:
+                    # Handle legacy format
+                    raw_value = channel_data
                 self._logger.debug("Value for %s: %s", ch_key, raw_value)
                 return raw_value
         except (OSError, FileNotFoundError, json.JSONDecodeError):

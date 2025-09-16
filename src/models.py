@@ -126,9 +126,23 @@ class SensorType(BaseModel):
         return name
 
 
+class SensorEOLCount(str, enum.Enum):
+    """Sensor EOL resistor configuration"""
+
+    SINGLE = "single"
+    DOUBLE = "double"
+
+class SensorContactTypes(str, enum.Enum):
+    """Sensor contact type"""
+
+    NO = "NO"
+    NC = "NC"
+
+
 class ChannelTypes(str, enum.Enum):
     """Channel type"""
 
+    BASIC = "basic"
     NORMAL = "normal"
     CHANNEL_A = "channel_a"
     CHANNEL_B = "channel_b"
@@ -149,6 +163,7 @@ class Sensor(BaseModel):
     channel = Column(Integer, nullable=True)
     channel_type = Column(
         Enum(
+            ChannelTypes.BASIC.value,
             ChannelTypes.NORMAL.value,
             ChannelTypes.CHANNEL_A.value,
             ChannelTypes.CHANNEL_B.value,
@@ -156,6 +171,24 @@ class Sensor(BaseModel):
         ),
         nullable=False,
         default=ChannelTypes.NORMAL.value,
+    )
+    sensor_contact_type = Column(
+        Enum(
+            SensorContactTypes.NO.value,
+            SensorContactTypes.NC.value,
+            name="sensor_contact_types",
+        ),
+        nullable=False,
+        default=SensorContactTypes.NO.value,
+    )
+    sensor_eol_count = Column(
+        Enum(
+            SensorEOLCount.SINGLE.value,
+            SensorEOLCount.DOUBLE.value,
+            name="sensor_eol_count",
+        ),
+        nullable=False,
+        default=SensorEOLCount.SINGLE.value,
     )
 
     reference_value = Column(Float, nullable=True)
@@ -183,20 +216,24 @@ class Sensor(BaseModel):
 
     def __init__(
         self,
-        channel,
-        channel_type,
-        sensor_type,
-        area,
-        name,
-        zone=None,
-        description=None,
-        enabled=True,
-        silent_alert=False,
-        monitor_period=None,
+        channel: int,
+        channel_type: ChannelTypes,
+        sensor_contact_type: SensorContactTypes,
+        sensor_eol_count: SensorEOLCount,
+        sensor_type: SensorType,
+        area: 'Area',
+        name: str,
+        zone: 'Zone' = None,
+        description: str = None,
+        enabled: bool = True,
+        silent_alert: bool = False,
+        monitor_period: int = None,
         monitor_threshold=None,
     ):
         self.channel = channel
         self.channel_type = channel_type.value
+        self.sensor_contact_type = sensor_contact_type.value
+        self.sensor_eol_count = sensor_eol_count.value
         self.zone = zone
         self.area = area
         self.type = sensor_type
@@ -217,6 +254,8 @@ class Sensor(BaseModel):
             (
                 "channel",
                 "channel_type",
+                "sensor_contact_type",
+                "sensor_eol_count",
                 "enabled",
                 "name",
                 "description",
@@ -241,7 +280,10 @@ class Sensor(BaseModel):
                     "description",
                     "channel",
                     "channel_type",
+                    "sensor_contact_type",
+                    "sensor_eol_count",
                     "alert",
+                    "error",
                     "zone_id",
                     "area_id",
                     "type_id",

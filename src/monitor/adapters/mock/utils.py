@@ -100,34 +100,60 @@ def get_input_state(input_name):
         return channel_data.get("value", 0) if isinstance(channel_data, dict) else channel_data
 
 
-def set_input_states(channel_values, channel_types):
+def set_input_states(channel_values, channel_configs):
     """
-    Set the state of all input channels with their types.
+    Set the state of all input channels with their complete configurations.
     """
     data = {}
-    for i, (value, channel_type) in enumerate(zip(channel_values[:-1], channel_types), start=1):
+    for i, (value, config) in enumerate(zip(channel_values[:-1], channel_configs), start=1):
         ch_key = f"CH{str(i).zfill(2)}"
-        data[ch_key] = {"value": value, "type": channel_type}
+        if isinstance(config, dict):
+            data[ch_key] = {
+                "value": value,
+                "wiring_strategy": config.get("wiring_strategy", "cut"),
+                "contact_type": config.get("contact_type", "nc"),
+                "sensor_a_active": config.get("sensor_a_active", False),
+                "sensor_b_active": config.get("sensor_b_active", False)
+            }
+        else:
+            # Handle legacy format where config is just a string type
+            data[ch_key] = {
+                "value": value,
+                "wiring_strategy": "cut" if config in ["cut", "shortage"] else "single_with_eol",
+                "contact_type": "nc",
+                "sensor_a_active": False,
+                "sensor_b_active": False
+            }
     data["POWER"] = channel_values[-1]
     protected_write(INPUT_FILE, data)
 
 
-def get_channel_types():
+def get_channel_configs():
     """
-    Get the types of all channels.
+    Get the complete configuration of all channels.
     """
-    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(environ.get("INPUT_NUMBER", 0)))}
+    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False} for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)}
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
-    types = {}
+    configs = {}
     for ch_key in [f"CH{str(i).zfill(2)}" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)]:
-        channel_data = data.get(ch_key, {"value": 0, "type": "cut"})
+        channel_data = data.get(ch_key, {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False})
         if isinstance(channel_data, dict):
-            types[ch_key] = channel_data.get("type", "cut")
+            configs[ch_key] = {
+                "wiring_strategy": channel_data.get("wiring_strategy", "cut"),
+                "contact_type": channel_data.get("contact_type", "nc"),
+                "sensor_a_active": channel_data.get("sensor_a_active", False),
+                "sensor_b_active": channel_data.get("sensor_b_active", False)
+            }
         else:
             # Handle old format - default to "cut"
-            types[ch_key] = "cut"
-    return types
+            configs[ch_key] = {
+                "wiring_strategy": "cut",
+                "contact_type": "nc",
+                "sensor_a_active": False,
+                "sensor_b_active": False
+            }
+    return configs
 
 
 def get_output_states() -> list[bool]:

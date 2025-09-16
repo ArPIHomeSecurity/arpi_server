@@ -8,7 +8,7 @@ load_dotenv("secrets.env")
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone
+from models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorContactTypes, SensorEOLCount, SensorType, User, Zone
 from monitor.database import get_database_session
 from models import metadata
 
@@ -124,6 +124,8 @@ def env_live_01():
         channel=0,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z5,
         name="Garage",
         area=area,
@@ -132,6 +134,8 @@ def env_live_01():
         channel=1,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z5,
         name="Hall",
         area=area,
@@ -140,6 +144,8 @@ def env_live_01():
         channel=2,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[2],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z5,
         name="Front door",
         area=area,
@@ -148,6 +154,8 @@ def env_live_01():
         channel=3,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z3,
         name="Kitchen",
         area=area,
@@ -156,6 +164,8 @@ def env_live_01():
         channel=4,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z1,
         name="Living room",
         area=area,
@@ -164,6 +174,8 @@ def env_live_01():
         channel=5,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z4,
         name="Children's room",
         area=area,
@@ -172,6 +184,8 @@ def env_live_01():
         channel=6,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z4,
         name="Bedroom",
         area=area,
@@ -180,6 +194,8 @@ def env_live_01():
         channel=7,
         channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[1],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         zone=z6,
         name="Tamper",
         area=area,
@@ -244,41 +260,82 @@ def env_test_01():
     s1 = Sensor(
         channel=0,
         channel_type=ChannelTypes.CHANNEL_A,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=SENSOR_TYPES[0],
         area=area,
         zone=z3,
-        name="Garage",
-        description="Garage movement sensor",
+        name="Test room",
+        description="Test room movement sensor",
         silent_alert=True,
     )
     s2 = Sensor(
         channel=0,
         channel_type=ChannelTypes.CHANNEL_B,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=SENSOR_TYPES[2],
         area=area,
         zone=z5,
-        name="Test room",
-        description="Test room door sensor",
+        name="Test room 0",
+        description="Test room 0 door sensor",
     )
     s3 = Sensor(
         channel=1,
-        channel_type=ChannelTypes.NORMAL,
+        channel_type=ChannelTypes.BASIC,
         sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         area=area,
         zone=z1,
-        name="Living room",
-        description="Living room movement sensor",
+        name="Test room 1",
+        description="Test room 1 movement sensor",
     )
     s4 = Sensor(
         channel=2,
         channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=z1,
+        name="Test room 2",
+        description="Test room 2 movement sensor",
+    )
+    s5 = Sensor(
+        channel=3,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NO,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=z1,
+        name="Test room 3",
+        description="Test room 3 movement sensor",
+    )
+    s6 = Sensor(
+        channel=4,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=SENSOR_TYPES[0],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.DOUBLE,
+        area=area,
+        zone=z1,
+        name="Test room 4",
+        description="Test room 4 movement sensor",
+    )
+    s7 = Sensor(
+        channel=5,
+        channel_type=ChannelTypes.NORMAL,
         sensor_type=SENSOR_TYPES[1],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
         area=area,
         zone=z2,
         name="Tamper",
         description="Sabotage wire",
     )
-    session.add_all([s1, s2, s3, s4])
+    session.add_all([s1, s2, s3, s4, s5, s6, s7])
     logger.info(" - Created sensors")
 
     kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")

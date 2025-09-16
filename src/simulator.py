@@ -1,46 +1,54 @@
 #!/usr/bin/env python
 
+import logging
 from contextlib import suppress
 from copy import deepcopy
-import logging
+from enum import Enum
 from os import environ
 
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical, Container
+from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.logging import TextualHandler
-from textual.widgets import Button, Checkbox, Static, RadioButton, RadioSet
 from textual.widget import Widget
+from textual.widgets import Button, Checkbox, Select, Static
 
-from monitor.sensor.detector import wiring_config
+from models import SensorContactTypes
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
+    get_channel_configs,
     get_output_states,
     set_input_states,
-    get_channel_types,
     set_keypad_state,
 )
 from monitor.output import OUTPUT_NAMES
+from monitor.sensor.detector import wiring_config
 
+
+class WiringStrategies(str, Enum):
+    SINGLE_WITH_EOL = "single_with_eol"
+    SINGLE_WITH_2EOL = "single_with_2eol"
+    DUAL = "dual"
+    CUT = "cut"
+    SHORTAGE = "shortage"
+
+
+# Wiring strategies
+WIRING_STRATEGIES = [
+    ("Single/EOL", WiringStrategies.SINGLE_WITH_EOL.value),
+    ("Single/2 EOL", WiringStrategies.SINGLE_WITH_2EOL.value),
+    ("Dual", WiringStrategies.DUAL.value),
+    ("Cut", WiringStrategies.CUT.value),
+    ("Shortage", WiringStrategies.SHORTAGE.value),
+]
+
+# Contact types
+CONTACT_TYPES = [("NC", "nc"), ("NO", "no")]
 
 # channel error states
 CHANNEL_CUT = 1.0
 CHANNEL_SHORTAGE = 0.0
-
-# channel A and B active level
-CHANNEL_A_B = wiring_config.dual.nc.both_active
-
-# channel B active level
-CHANNEL_B = wiring_config.dual.nc.channel_b_active
-CHANNEL_A_DEFAULT = wiring_config.dual.nc.default
-
-# channel A active level
-CHANNEL_A = wiring_config.dual.nc.channel_a_active
-CHANNEL_B_DEFAULT = wiring_config.dual.nc.default
-
-# channel AB default when both A and B are not active
-CHANNEL_AB_DEFAULT = wiring_config.dual.nc.default
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -60,7 +68,7 @@ class Channels(Widget):
     }
 
     .channel-column {
-        width: 56;
+        width: 44;
         margin-right: 5;
     }
 
@@ -76,8 +84,18 @@ class Channels(Widget):
         color: white;
     }
 
-    .channel-label.a, .channel-label.b, .channel-label.ab {
+    .channel-label.default {
         background: green 90%;
+        color: white;
+    }
+
+    .channel-label.active-low {
+        background: red 50%;
+        color: white;
+    }
+
+    .channel-label.active {
+        background: red 80%;
         color: white;
     }
 
@@ -91,48 +109,25 @@ class Channels(Widget):
         color: white;
     }
 
-    .channel-label.low {
-        background: red 40%;
-        color: white;
+    .wiring-strategy-select {
+        width: 20;
+        margin: 0;
     }
 
-    .channel-label.middle {
-        background: red 60%;
-        color: white;
+    .contact-type-select {
+        width: 12;
+        margin: 0;
     }
 
-    .channel-label.high {
-        background: red 90%;
-        color: white;
-    }
-
-    .channel-button {
+    .sensor-button {
         min-width: 3;
         width: 3;
         height: 3;
     }
 
-    .channel-active {
+    .sensor-active {
         background: red 80%;
         color: white;
-    }
-
-    RadioSet {
-        layout: horizontal;
-        width: 100%;
-        height: 3;
-    }
-
-    RadioButton.default {
-        width: 6;
-    }
-
-    RadioButton.cut {
-        width: 8;
-    }
-
-    RadioButton.shortage {
-        width: 12;
     }
 
     /* power button */
@@ -148,13 +143,13 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, channel_states, **kwargs):
+    def __init__(self, default_states, channel_configs, **kwargs):
         super().__init__(**kwargs)
         self._default_states = default_states
-        self._channel_states = channel_states
+        self._channel_configs = channel_configs
 
     def compose(self) -> ComposeResult:
-        """Create channel rows with radio buttons and A/B buttons in two columns"""
+        """Create channel rows with strategy select, contact type select, and sensor buttons in two columns"""
         num_channels = len(self._default_states) - 1
         col1 = range(1, num_channels // 2 + 1)
         col2 = range(num_channels // 2 + 1, num_channels + 1)
@@ -163,34 +158,85 @@ class Channels(Widget):
                 with Vertical(classes="channel-column"):
                     for i in col:
                         ch_key = f"CH{i:02d}"
-                        channel_type = self._channel_states.get(ch_key, "cut")
-                        
+                        config = self._channel_configs.get(ch_key, {})
+                        wiring_strategy = config.get("wiring_strategy", "cut")
+                        contact_type = config.get("contact_type", "nc")
+                        sensor_a_active = config.get("sensor_a_active", False)
+                        sensor_b_active = config.get("sensor_b_active", False)
+
                         with Horizontal(classes="channel-row"):
+                            channel_class = self.get_channel_class(
+                                wiring_strategy, sensor_a_active, sensor_b_active
+                            )
+
                             yield Static(
                                 f"CH{i:02d} {self._default_states[i - 1]:.2f}V",
                                 id=f"channel-label-{i}",
-                                classes=f"channel-label {channel_type}",
+                                classes=f"channel-label {channel_class or wiring_strategy}",
                             )
-                            with RadioSet(classes="channel-radio", id=f"channel-radio-{i}"):
-                                yield RadioButton("A", id=f"channel-radio-{i}-a", classes="default", value=(channel_type == "a"))
-                                yield RadioButton("B", id=f"channel-radio-{i}-b", classes="default", value=(channel_type == "b"))
-                                yield RadioButton("AB", id=f"channel-radio-{i}-ab", classes="default", value=(channel_type == "ab"))
-                                yield RadioButton(
-                                    "Cut", value=(channel_type == "cut"), id=f"channel-radio-{i}-cut", classes="cut"
-                                )
-                                yield RadioButton(
-                                    "Shortage", id=f"channel-radio-{i}-shortage", classes="shortage", value=(channel_type == "shortage")
-                                )
 
-                            # Set A/B button disabled states based on channel type
-                            disabled_states = ["cut", "shortage"]
-                            yield Button("A", id=f"channel-{i}-a", classes="channel-button", 
-                                       disabled=(channel_type in disabled_states or channel_type == "b"))
-                            yield Button("B", id=f"channel-{i}-b", classes="channel-button", 
-                                       disabled=(channel_type in disabled_states or channel_type == "a"))
+                            # Wiring strategy select
+                            yield Select(
+                                [(value, label) for value, label in WIRING_STRATEGIES],
+                                value=wiring_strategy,
+                                id=f"wiring-strategy-{i}",
+                                classes="wiring-strategy-select",
+                                allow_blank=False,
+                            )
+
+                            # Contact type select (disabled for cut/shortage)
+                            contact_disabled = wiring_strategy in ["cut", "shortage"]
+                            yield Select(
+                                [(value, label) for value, label in CONTACT_TYPES],
+                                value=contact_type,
+                                id=f"contact-type-{i}",
+                                classes="contact-type-select",
+                                disabled=contact_disabled,
+                                allow_blank=False,
+                            )
+
+                            # Sensor activation buttons (only enabled for dual configurations)
+                            yield Button(
+                                "A",
+                                id=f"sensor-{i}-a",
+                                classes="sensor-button"
+                                + (" sensor-active" if sensor_a_active else ""),
+                                disabled=(
+                                    wiring_strategy
+                                    not in [
+                                        WiringStrategies.DUAL.value,
+                                        WiringStrategies.SINGLE_WITH_EOL.value,
+                                        WiringStrategies.SINGLE_WITH_2EOL.value,
+                                    ]
+                                ),
+                            )
+                            yield Button(
+                                "B",
+                                id=f"sensor-{i}-b",
+                                classes="sensor-button"
+                                + (" sensor-active" if sensor_b_active else ""),
+                                disabled=wiring_strategy != WiringStrategies.DUAL.value,
+                            )
 
         yield Static("")
         yield Button("POWER", id="power", classes="power")
+
+    @staticmethod
+    def get_channel_class(wiring_strategy, sensor_a_active, sensor_b_active):
+        """
+        Determine the CSS class for the channel label based on wiring strategy and sensor states
+        """
+        channel_class = None
+        if wiring_strategy in [WiringStrategies.CUT.value, WiringStrategies.SHORTAGE.value]:
+            channel_class = wiring_strategy
+        else:
+            if sensor_a_active and sensor_b_active:
+                channel_class = "active"
+            elif sensor_a_active or sensor_b_active:
+                channel_class = "active-low"
+            else:
+                channel_class = "default"
+        return channel_class
 
 
 class Outputs(Widget):
@@ -281,7 +327,7 @@ class SimulatorApp(App):
         grid-rows: 7fr 1fr;
         grid-columns: 2fr 38;
         width: 100%;
-        height: 35;
+        height: 37;
     }
 
     #channels-pane {
@@ -299,48 +345,44 @@ class SimulatorApp(App):
         super().__init__(**kwargs)
         self.keypad = deepcopy(DEFAULT_KEYPAD)
         self.channel_values = {}
-        self.channel_states = {}
-        self.channel_a_active = {}
-        self.channel_b_active = {}
+        self.channel_configs = {}
 
     def initialize_channels(self, input_number: int) -> None:
-        """Initialize channel states and values from saved data or defaults"""
-        # Load channel types from buffer file
-        saved_types = get_channel_types()
+        """
+        Initialize channel states and values from saved data or defaults.
+        """
+        # Load channel configurations from buffer file
+        saved_configs = get_channel_configs()
 
         # Initialize channel dictionaries
-        self.channel_values = {
-            f"CH{i:02d}": CHANNEL_CUT for i in range(1, input_number + 1)
-        }
+        self.channel_values = {f"CH{i:02d}": CHANNEL_CUT for i in range(1, input_number + 1)}
         self.channel_values["POWER"] = POWER_HIGH
 
-        self.channel_states = {
-            f"CH{i:02d}": "cut" for i in range(1, input_number + 1)
+        self.channel_configs = {
+            f"CH{i:02d}": {
+                "wiring_strategy": "cut",
+                "contact_type": "nc",
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            }
+            for i in range(1, input_number + 1)
         }
 
-        self.channel_a_active = {
-            f"CH{i:02d}": False for i in range(1, input_number + 1)
-        }
-        self.channel_b_active = {
-            f"CH{i:02d}": False for i in range(1, input_number + 1)
-        }
-
-        # Apply saved types and calculate values
-        for ch_key, channel_type in saved_types.items():
-            if ch_key in self.channel_states:
-                self.channel_states[ch_key] = channel_type
-                # Reset A/B buttons to inactive state
-                self.channel_a_active[ch_key] = False
-                self.channel_b_active[ch_key] = False
-                # Calculate initial values based on types
+        # Apply saved configurations and calculate values
+        for ch_key, config in saved_configs.items():
+            if ch_key in self.channel_configs:
+                self.channel_configs[ch_key] = config
+                # Calculate initial values based on configuration
                 self.channel_values[ch_key] = self.calculate_channel_value(ch_key)
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a grid layout."""
         with Container(id="main-grid"):
-            yield Channels(id="channels-pane", 
-                         default_states=list(self.channel_values.values()),
-                         channel_states=self.channel_states)
+            yield Channels(
+                id="channels-pane",
+                default_states=list(self.channel_values.values()),
+                channel_configs=self.channel_configs,
+            )
             yield Keypad(id="keypad-pane")
             yield Outputs(id="outputs-pane")
 
@@ -354,8 +396,11 @@ class SimulatorApp(App):
 
     def save_input_states(self):
         set_input_states(
-            list(self.channel_values.values()), 
-            [self.channel_states[f"CH{i:02d}"] for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)]
+            list(self.channel_values.values()),
+            [
+                self.channel_configs[f"CH{i:02d}"]
+                for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
+            ],
         )
 
     def save_keypad_states(self):
@@ -368,116 +413,140 @@ class SimulatorApp(App):
         self.set_interval(0.5, self.read_output_states)
 
     def calculate_channel_value(self, channel: str) -> float:
-        """Calculate the channel value based on state and A/B buttons"""
-        state = self.channel_states[channel]
+        """Calculate the channel value based on wiring strategy and sensor states"""
+        config = self.channel_configs[channel]
+        wiring_strategy = config["wiring_strategy"]
+        contact_type = config["contact_type"]
+        sensor_a_active = config["sensor_a_active"]
+        sensor_b_active = config["sensor_b_active"]
 
         logging.debug(
-            "Calculating value channel: %s, state: %s, A active: %s, B active: %s",
+            "Calculating value channel: %s, strategy: %s, contact: %s, A active: %s, B active: %s",
             channel,
-            state,
-            self.channel_a_active[channel],
-            self.channel_b_active[channel],
+            wiring_strategy,
+            contact_type,
+            sensor_a_active,
+            sensor_b_active,
         )
-        if state == "cut":
-            return CHANNEL_CUT
-        elif state == "shortage":
-            return CHANNEL_SHORTAGE
-        elif state == "a":
-            return CHANNEL_A if self.channel_a_active[channel] else CHANNEL_A_DEFAULT
-        elif state == "b":
-            return CHANNEL_B if self.channel_b_active[channel] else CHANNEL_B_DEFAULT
-        elif state == "ab":
-            if self.channel_a_active[channel] and self.channel_b_active[channel]:
-                return CHANNEL_A_B
-            if self.channel_a_active[channel]:
-                return CHANNEL_A
-            if self.channel_b_active[channel]:
-                return CHANNEL_B
-            return CHANNEL_AB_DEFAULT
-        else:
-            raise ValueError(f"Unknown channel state: {state}")
 
-    @on(Button.Pressed, "#channels-pane .channel-button")
-    def channel_button_pressed(self, event: Button.Pressed) -> None:
-        """Toggle channel A/B state"""
-        _, channel_num, state = event.button.id.split("-")
+        if wiring_strategy == WiringStrategies.CUT.value:
+            return CHANNEL_CUT
+        elif wiring_strategy == WiringStrategies.SHORTAGE.value:
+            return CHANNEL_SHORTAGE
+
+        # Convert contact type to SensorContactTypes enum
+        contact_enum = SensorContactTypes.NC if contact_type == "nc" else SensorContactTypes.NO
+
+        if wiring_strategy == WiringStrategies.SINGLE_WITH_EOL.value:
+            strategy = wiring_config.select_strategy(contact_enum, dual=False, two_eol=False)
+            return strategy.active if sensor_a_active else strategy.default
+        elif wiring_strategy == WiringStrategies.SINGLE_WITH_2EOL.value:
+            strategy = wiring_config.select_strategy(contact_enum, dual=False, two_eol=True)
+            return strategy.active if sensor_a_active else strategy.default
+        elif wiring_strategy == WiringStrategies.DUAL.value:
+            strategy = wiring_config.select_strategy(contact_enum, dual=True, two_eol=False)
+            if sensor_a_active and sensor_b_active:
+                return strategy.both_active
+            elif sensor_a_active:
+                return strategy.channel_a_active
+            elif sensor_b_active:
+                return strategy.channel_b_active
+            else:
+                return strategy.default
+        else:
+            raise ValueError(f"Unknown wiring strategy: {wiring_strategy}")
+
+    @on(Button.Pressed, "#channels-pane .sensor-button")
+    def sensor_button_pressed(self, event: Button.Pressed) -> None:
+        """Toggle sensor A/B state"""
+        _, channel_num, sensor = event.button.id.split("-")
         channel_num = int(channel_num)
         channel_name = f"CH{channel_num:02d}"
 
-        # Only allow toggle if in default state
-        if self.channel_states[channel_name] in ["a", "b", "ab"]:
-            # remove channel label class
-            channel_label = self.query_one(f"#channel-label-{channel_num}")
-            channel_label.set_classes("channel-label")
-            event.button.toggle_class("channel-active")
+        config = self.channel_configs[channel_name]
+        # Toggle sensor state
+        if sensor == "a":
+            config["sensor_a_active"] = not config["sensor_a_active"]
+        elif sensor == "b":
+            config["sensor_b_active"] = not config["sensor_b_active"]
 
-            # update channel A/B active states
-            if state == "a":
-                self.channel_a_active[channel_name] = not self.channel_a_active[channel_name]
-            if state == "b":
-                self.channel_b_active[channel_name] = not self.channel_b_active[channel_name]
+        # Update button appearance
+        event.button.toggle_class("sensor-active")
 
-            # update channel value
-            self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+        # Update channel value
+        self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
 
-            # update channel label
-            channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel_name]:.2f}V")
-            if self.channel_a_active[channel_name] and self.channel_b_active[channel_name]:
-                channel_label.add_class("high")
-            elif self.channel_b_active[channel_name]:
-                channel_label.add_class("middle")
-            elif self.channel_a_active[channel_name]:
-                channel_label.add_class("low")
-            else:
-                channel_label.add_class(state)
-
-            self.save_input_states()
-
-    @on(RadioSet.Changed, "#channels-pane .channel-radio")
-    def radio_changed(self, event: RadioSet.Changed) -> None:
-        """Handle radio button state changes"""
-        radio_id = event.radio_set.id
-        channel_num = int(radio_id.split("-")[2])
-        channel = f"CH{channel_num:02d}"
-
-        # remove class based on previous state
-        channel_label = self.query_one(f"#channel-label-{channel_num}")
-        channel_label.set_classes("channel-label")
-        logging.debug(
-            "Channel state: %s, classes: %s", self.channel_states[channel], channel_label.classes
-        )
-
-        # determine new state based on selected radio button
-        state = event.pressed.id.split("-")[-1]
-        self.channel_states[channel] = state
-        logging.debug(
-            "Radio changed: %s, new state: %s", event.pressed.id, self.channel_states[channel]
-        )
-
-        # update channel value
-        self.channel_values[channel] = self.calculate_channel_value(channel)
-
-        # update A,B buttons disabled states
-        disabled_states = ["cut", "shortage"]
-        self.query_one(f"#channel-{channel_num}-a").disabled = (
-            self.channel_states[channel] in disabled_states or state == "b"
-        )
-        self.query_one(f"#channel-{channel_num}-b").disabled = (
-            self.channel_states[channel] in disabled_states or state == "a"
-        )
-
-        # update channel label
-        channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel]:.2f}V")
-        if self.channel_a_active[channel] and self.channel_b_active[channel] and state == "ab":
-            channel_label.add_class("high")
-        elif self.channel_b_active[channel] and "b" in state:
-            channel_label.add_class("middle")
-        elif self.channel_a_active[channel] and "a" in state:
-            channel_label.add_class("low")
-        else:
-            channel_label.add_class(state)
+        # Update channel label
+        self.update_channel_label(channel_num, channel_name, config)
 
         self.save_input_states()
+
+    @on(Select.Changed, "#channels-pane .wiring-strategy-select")
+    def wiring_strategy_changed(self, event: Select.Changed) -> None:
+        """Handle wiring strategy selection changes"""
+        select_id = event.select.id
+        channel_num = int(select_id.split("-")[2])
+        channel_name = f"CH{channel_num:02d}"
+        wiring_strategy = event.value
+
+        # Update configuration
+        config = self.channel_configs[channel_name]
+        config["wiring_strategy"] = wiring_strategy
+        config["sensor_a_active"] = False  # Reset sensor states
+        config["sensor_b_active"] = False
+
+        # Update contact type select enable/disable
+        contact_disabled = wiring_strategy in ["cut", "shortage"]
+        contact_select = self.query_one(f"#contact-type-{channel_num}")
+        contact_select.disabled = contact_disabled
+
+        # Update sensor button enable/disable
+        sensor_a_button = self.query_one(f"#sensor-{channel_num}-a")
+        sensor_b_button = self.query_one(f"#sensor-{channel_num}-b")
+        sensor_a_button.disabled = config["wiring_strategy"] in [
+            WiringStrategies.CUT.value,
+            WiringStrategies.SHORTAGE.value,
+        ]
+        sensor_b_button.disabled = wiring_strategy != WiringStrategies.DUAL.value
+
+        # Reset sensor button appearance
+        sensor_a_button.remove_class("sensor-active")
+        sensor_b_button.remove_class("sensor-active")
+
+        # Update channel value and label
+        self.update_channel_label(channel_num, channel_name, config)
+
+        self.save_input_states()
+
+    @on(Select.Changed, "#channels-pane .contact-type-select")
+    def contact_type_changed(self, event: Select.Changed) -> None:
+        """Handle contact type selection changes"""
+        select_id = event.select.id
+        channel_num = int(select_id.split("-")[2])
+        channel_name = f"CH{channel_num:02d}"
+
+        # Update configuration
+        config = self.channel_configs[channel_name]
+        config["contact_type"] = event.value
+
+        # Update channel value and label
+        self.update_channel_label(channel_num, channel_name, config)
+
+        self.save_input_states()
+
+    def update_channel_label(self, channel_num, channel_name, config):
+        self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+        channel_label = self.query_one(f"#channel-label-{channel_num}")
+        channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel_name]:.2f}V")
+        channel_label.set_classes(
+            [
+                "channel-label",
+                Channels.get_channel_class(
+                    config["wiring_strategy"], config["sensor_a_active"], config["sensor_b_active"]
+                )
+                or config["wiring_strategy"],
+            ]
+        )
 
     @on(Button.Pressed, "#power")
     def power_button_pressed(self, event: Button.Pressed) -> None:

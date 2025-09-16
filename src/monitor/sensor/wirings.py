@@ -1,16 +1,73 @@
 """
 Sensor wiring strategies and their voltage level calculations.
 
+Dual sensors == Zone doubling == two sensors on one input/channel.
+
 NC = Normally Closed
 NO = Normally Open
 EOL = End Of Line resistor
+
+R pull up = Pull-up resistor of the input
+R pull down = Pull-down resistor of the input
+Ra = EOL resistor for channel A
+Rb = EOL resistor for channel B
 """
 
 import logging
 
 from functools import cached_property
+from typing import Protocol
 
 from constants import LOG_ADSENSOR
+from models import SensorContactTypes
+
+
+class SingleSensorLevels(Protocol):
+    """
+    Interface for sensor level configurations.
+    """
+
+    @property
+    def default(self) -> float:
+        """
+        Voltage level when the sensor is not triggered.
+        """
+
+    @property
+    def active(self) -> float:
+        """
+        Voltage level when the sensor is triggered.
+        """
+
+
+class DualSensorLevels(Protocol):
+    """
+    Interface for dual sensor level configurations.
+    """
+
+    @property
+    def default(self) -> float:
+        """
+        Voltage level when both sensors are not triggered.
+        """
+
+    @property
+    def channel_a_active(self) -> float:
+        """
+        Voltage level when only sensor A is triggered.
+        """
+
+    @property
+    def channel_b_active(self) -> float:
+        """
+        Voltage level when only sensor B is triggered.
+        """
+
+    @property
+    def both_active(self) -> float:
+        """
+        Voltage level when both sensors are triggered.
+        """
 
 
 class PullUpConfig:
@@ -29,11 +86,38 @@ class PullUpConfig:
         self.single_sensor_2_eol = self.SingleSensorWith2EOL(self)
         self.dual = self.DualSensor(self)
 
+    def select_strategy(
+        self, sensor_contact_type: SensorContactTypes, dual: bool = False, two_eol: bool = False
+    ) -> SingleSensorLevels | DualSensorLevels:
+        """
+        Select wiring strategy based on sensor contact type and configuration.
+        """
+        if dual and two_eol:
+            raise ValueError("Dual sensors cannot have two EOL resistors.")
+
+        if dual:
+            return self.dual.select_contact_type(sensor_contact_type)
+        elif two_eol:
+            return self.single_sensor_2_eol.select_contact_type(sensor_contact_type)
+        else:
+            return self.single_with_eol.select_contact_type(sensor_contact_type)
+
     class SingleSensorWithEOL:
         """Single sensor configurations with one EOL resistor."""
 
         def __init__(self, config):
             self._config = config
+
+        def select_contact_type(self, sensor_contact_type: SensorContactTypes):
+            """
+            Select NC or NO wiring configuration.
+            """
+            if sensor_contact_type == SensorContactTypes.NC:
+                return self.nc
+            elif sensor_contact_type == SensorContactTypes.NO:
+                return self.no
+            else:
+                raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
 
         @cached_property
         def nc(self):
@@ -96,6 +180,17 @@ class PullUpConfig:
 
         def __init__(self, config):
             self._config = config
+
+        def select_contact_type(self, sensor_contact_type: SensorContactTypes):
+            """
+            Select NC or NO wiring configuration.
+            """
+            if sensor_contact_type == SensorContactTypes.NC:
+                return self.nc
+            elif sensor_contact_type == SensorContactTypes.NO:
+                return self.no
+            else:
+                raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
 
         @cached_property
         def nc(self):
@@ -164,6 +259,17 @@ class PullUpConfig:
 
         def __init__(self, config):
             self._config = config
+
+        def select_contact_type(self, sensor_contact_type: SensorContactTypes):
+            """
+            Select NC or NO wiring configuration.
+            """
+            if sensor_contact_type == SensorContactTypes.NC:
+                return self.nc
+            elif sensor_contact_type == SensorContactTypes.NO:
+                return self.no
+            else:
+                raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
 
         @cached_property
         def nc(self):
