@@ -2,9 +2,7 @@
 import argparse
 import json
 import logging
-from dotenv import load_dotenv
 
-load_dotenv("secrets.env")
 from sqlalchemy.exc import ProgrammingError
 
 from constants import ROLE_ADMIN, ROLE_USER
@@ -349,6 +347,97 @@ def env_test_01():
 
     session.commit()
 
+
+def env_test_live_01():
+    session = get_database_session()
+    admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
+    admin_user.add_registration_code("ABCD1234")
+    session.add_all(
+        [admin_user, User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")]
+    )
+    logger.info(" - Created users")
+
+    z1 = Zone(name="No delay", description="Alert with no delay")
+    z2 = Zone(
+        name="Tamper",
+        disarmed_delay=0,
+        away_alert_delay=0,
+        stay_alert_delay=0,
+        description="Sabotage alert",
+    )
+    z3 = Zone(
+        name="Away/stay delayed",
+        away_alert_delay=10,
+        stay_alert_delay=10,
+        description="Alert delayed when armed AWAY or STAY",
+    )
+    z4 = Zone(
+        name="Stay delayed",
+        stay_alert_delay=10,
+        description="Alert delayed when armed STAY",
+    )
+    z5 = Zone(
+        name="Stay",
+        stay_alert_delay=None,
+        description="No alert when armed STAY",
+    )
+    session.add_all([z1, z2, z3, z4, z5])
+    logger.info(" - Created zones")
+
+    session.add_all(SENSOR_TYPES)
+    logger.info(" - Created sensor types")
+
+    area = Area(name="House")
+    session.add(area)
+    logger.info(" - Created area")
+
+    s1 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.CHANNEL_A,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=SENSOR_TYPES[0],
+        area=area,
+        zone=z3,
+        name="Test room",
+        description="Test room movement sensor",
+        silent_alert=True,
+    )
+    s2 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.CHANNEL_B,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=SENSOR_TYPES[2],
+        area=area,
+        zone=z3,
+        name="Test room 0",
+        description="Test room 0 door sensor",
+    )
+    s3 = Sensor(
+        channel=5,
+        channel_type=ChannelTypes.BASIC,
+        sensor_type=SENSOR_TYPES[1],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=z2,
+        name="Tamper",
+        description="Sabotage wire",
+    )
+    session.add_all([s1, s2, s3])
+    logger.info(" - Created sensors")
+
+    kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
+    kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
+    session.add_all([kt1, kt2])
+    logger.info(" - Created keypad types")
+
+    k1 = Keypad(keypad_type=kt2, enabled=True)
+    session.add_all([k1])
+    logger.info(" - Created keypads")
+
+    session.commit()
 
 def env_admin_registration():
     session = get_database_session()
