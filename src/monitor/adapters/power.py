@@ -1,49 +1,37 @@
-import os
+# pylint: disable=import-outside-toplevel
+
 import logging
+from os import environ
 
-from monitor.adapters import POWER_PIN
 from constants import LOG_ADPOWER
-
-# check if running with simulator
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero import DigitalInputDevice
-else:
-    # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitor.adapters.mock.input import Power as DigitalInputDevice
+from monitor.adapters.power_base import PowerAdapterBase
 
 
-class PowerAdapter(object):
+USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
+logger = logging.getLogger(LOG_ADPOWER)
+
+
+def get_power_adapter(board_version: int = 0) -> PowerAdapterBase:
     """
-    Determine the source of the power (network or battery)
+    Get the appropriate sensor adapter based on the board version and
+    simulation mode.
     """
+    if USE_SIMULATOR:
+        from monitor.adapters.mock.power import PowerAdapter
 
-    SOURCE_NETWORK = "network"
-    SOURCE_BATTERY = "battery"
+        return PowerAdapter()
+    else:
+        from monitor.adapters.power_v2 import PowerAdapter as PowerAdapterV2
+        from monitor.adapters.power_v3 import PowerAdapter as PowerAdapterV3
 
-    def __init__(self):
-        """
-        Constructor
-        """
-        self._sense = None
-        self._logger = logging.getLogger(LOG_ADPOWER)
+        if board_version == 0:
+            board_version = int(environ["BOARD_VERSION"])
 
-        self._logger.debug("Power sense creating...")
-        # the sense is on the last channel
-        self._sense = DigitalInputDevice(POWER_PIN)
-
-    @property
-    def source_type(self):
-        if self._sense.value == 0:
-            return PowerAdapter.SOURCE_NETWORK
-
-        return PowerAdapter.SOURCE_BATTERY
-
-    def close(self):
-        """
-        Close the power adapter.
-        """
-        self._logger.debug("Power sense cleanup...")
-        if self._sense is not None:
-            self._sense.close()
-            self._sense = None
-        self._logger.debug("Power sense cleanup done")
+        if board_version == 2:
+            logger.debug(f"Using PowerAdapterV{board_version}")
+            return PowerAdapterV2()
+        elif board_version == 3:
+            logger.debug(f"Using PowerAdapterV{board_version}")
+            return PowerAdapterV3()
+        else:
+            raise ValueError(f"Unsupported board version: {board_version}")

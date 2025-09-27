@@ -1,61 +1,37 @@
-import os
-import logging
+# pylint: disable=import-outside-toplevel
 
-from monitor.adapters import CHANNEL_GPIO_PINS
+import logging
+from os import environ
+
 from constants import LOG_ADSENSOR
 
-# check if running with simulator
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from gpiozero import DigitalInputDevice
-else:
-    # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitor.adapters.mock.input import Channels as DigitalInputDevice
+from .sensor_base import SensorAdapterBase
+
+USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
+logger = logging.getLogger(LOG_ADSENSOR)
 
 
-class SensorAdapter(object):
+def get_sensor_adapter(board_version: int = 0) -> SensorAdapterBase:
     """
-    Load sensor values.
+    Get the appropriate sensor adapter based on the board version and
+    simulation mode.
     """
+    if USE_SIMULATOR:
+        from monitor.adapters.mock.sensor import SensorAdapter
 
-    def __init__(self):
-        self._logger = logging.getLogger(LOG_ADSENSOR)
+        return SensorAdapter()
+    else:
+        from .sensor_v2 import SensorAdapter as SensorAdapterV2
+        from .sensor_v3 import SensorAdapter as SensorAdapterV3
 
-        self._channels = []
-        for pin in CHANNEL_GPIO_PINS:
-            self._logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
-            self._channels.append(DigitalInputDevice(pin, pull_up=False))
+        if board_version == 0:
+            board_version = int(environ["BOARD_VERSION"])
 
-    def get_value(self, channel):
-        """
-        Get the value from one channel
-
-        We have IO_NUMBER of channels we can use for sensors,
-        the last channel is for sensing the battery mode.
-        """
-        if not (0 <= channel <= (len(CHANNEL_GPIO_PINS) - 1)):
-            self._logger.error("Invalid channel number: %s", channel)
-            return 0
-
-        value = int(self._channels[channel].value)
-        self._logger.trace("Value[CH%02d]: %s", channel+1, value)
-        return value
-
-    def get_values(self):
-        """
-        Get the values from all the channels
-        """
-        values = [int(channel.value) for channel in self._channels]
-        self._logger.debug("Values: %s", [f"{v}" for v in values])
-        return values
-
-    def close(self):
-        """
-        Close all the channels.
-        """
-        for channel in self._channels:
-            channel.close()
-
-    @property
-    def channel_count(self):
-        """Retrieve the number of the handled channels"""
-        return len(self._channels)
+        if board_version == 2:
+            logger.debug("Using SensorAdapterV2")
+            return SensorAdapterV2()
+        elif board_version == 3:
+            logger.debug("Using SensorAdapterV3")
+            return SensorAdapterV3()
+        else:
+            raise ValueError(f"Unsupported board version: {board_version}")

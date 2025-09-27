@@ -273,13 +273,13 @@ class Notifier(Thread):
 
     def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
-        self._actions = Queue()
-        self._broadcaster = broadcaster
         self._logger = logging.getLogger(LOG_NOTIFIER)
+        self._actions = Queue()
         self._gsm = None
         self._smtp = None
         self._options: NotifierOptions = None
 
+        self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
         self._logger.info("Notifier created")
 

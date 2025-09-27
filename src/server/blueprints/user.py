@@ -237,7 +237,7 @@ def authenticate():
 
 
 @user_blueprint.route("/api/user/<int:user_id>/register_card", methods=["PUT"])
-@authenticated()
+@authenticated(role=ROLE_USER)
 @restrict_host
 def register_card(user_id):
     for db_user in db.session.query(User).all():

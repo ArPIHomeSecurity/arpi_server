@@ -1,4 +1,4 @@
-"""empty message
+"""Monitoring and naming for sensors
 
 Revision ID: e72781fbd520
 Revises: b525bd3091af

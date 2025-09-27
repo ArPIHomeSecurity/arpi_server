@@ -18,10 +18,7 @@ from monitor.output.notification import Notification, EventType, TriggerSource
 from monitor.output.sign import OutputSign
 from monitor.socket_io import send_output_state
 
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.output import OutputAdapter
-else:
-    from monitor.adapters.mock.output import OutputAdapter
+from monitor.adapters.output import get_output_adapter
 
 
 class OutputHandler(Thread):
@@ -113,7 +110,7 @@ class OutputHandler(Thread):
 
         # initialize output default states
         self._logger.info("Initializing outputs from database")
-        adapter = OutputAdapter()
+        adapter = get_output_adapter()
         for output in self._outputs:
             if output.channel is not None:
                 adapter.control_channel(output.channel, output.default_state)

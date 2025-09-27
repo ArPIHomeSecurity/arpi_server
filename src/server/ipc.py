@@ -43,10 +43,16 @@ class IPCClient(object):
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
+                self._logger.info("Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"])
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
                 self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):
+                self._logger.error("Failed to connect to monitor socket! %s", environ["MONITOR_INPUT_SOCKET"])
                 self._socket = None
+
+    @property
+    def is_connected(self):
+        return self._socket is not None
 
     def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:
@@ -54,7 +60,7 @@ class IPCClient(object):
                 "action": MONITOR_ARM_AWAY,
                 "user_id": user_id,
                 "area_id": area_id,
-                "delay": False
+                "use_delay": False
             })
         elif arm_type == ARM_STAY:
             return self._send_message({

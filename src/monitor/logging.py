@@ -28,16 +28,21 @@ def initialize_logging():
     console_handler.setFormatter(formatter)
     console_handler.setLevel(TRACE)
 
-    # file_handler = logging.FileHandler("monitoring.log")
-    # file_handler.setFormatter(formatter)
+    file_handler = None
+    if os.environ.get("OUTPUT_PATH"):
+        file_handler = logging.FileHandler(os.environ["OUTPUT_PATH"])
+        file_handler.setFormatter(formatter)
+
 
     for name, level in LOGGING_MODULES:
         logger = logging.getLogger(name)
         logger.__class__ = ArgusLogger
         logger.setLevel(level)
         logger.handlers.clear()
-        # logger.addHandler(file_handler)
         logger.addHandler(console_handler)
+        logger.propagate = False  # Prevent propagation to root logger
+        if file_handler:
+            logger.addHandler(file_handler)
 
     os.environ["LOGGING_INITIALIZED"] = "true"
 

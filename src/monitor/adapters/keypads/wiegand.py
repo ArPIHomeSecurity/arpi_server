@@ -5,7 +5,6 @@ import re
 
 from time import sleep
 
-
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from gpiozero import LED
     from pywiegand import WiegandReader
@@ -35,7 +34,7 @@ class WiegandKeypad(KeypadBase):
         super(WiegandKeypad, self).__init__()
         self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._reader = WiegandReader(data0, data1)
-        self._logger.info("Wiegand keypad created: %s", self._reader.is_initialized())
+        self._logger.debug("Wiegand keypad created, reader initialized: %s", self._reader.is_initialized())
         self._function_mode = False
 
         # initialize sound

@@ -77,9 +77,11 @@ class KeypadBase(ABC):
         return self._armed
 
     def start_delay(self, start, delay):
+        self._logger.debug("Starting delay: %s s", delay)
         self._delay = Handler(start, delay)
 
     def stop_delay(self):
+        self._logger.debug("Stopping delay")
         self._delay = None
 
     @abstractmethod

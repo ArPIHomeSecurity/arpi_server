@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-from dotenv import load_dotenv
-
-load_dotenv()
-load_dotenv("secrets.env")
-
-
 # pylint: disable=wrong-import-position,wrong-import-order
 import contextlib
 import logging
@@ -26,13 +20,18 @@ Update the given user with a new registration or access code.
 
 session = get_database_session()
 
-basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+logger.propagate = False
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(handler)
 
 
 def get_users():
-    logging.info("Users:")
+    logger.info("Users:")
     for user in session.query(User).all():
-        logging.info("ID: %s = %s (%s): ", user.id, user.name, user.role)
+        logger.info("ID: %s = %s (%s)", user.id, user.name, user.role)
 
 
 def wait(seconds=5):
@@ -55,36 +54,36 @@ def new_registration_code(user_id, code, expiry):
     try:
         user = session.query(User).filter(User.id == user_id).one()
     except sqlalchemy.exc.NoResultFound:
-        logging.error("User with id %s not found", user_id)
+        logger.error("User with id %s not found", user_id)
         return
 
     if user.registration_code is not None:
         if user.registration_expiry and dt.now(tzlocal()) < user.registration_expiry:
-            logging.warning(
+            logger.warning(
                 "User has active registration code (until %s)",
                 user.registration_expiry.strftime("%Y-%m-%d %H:%M:%S"),
             )
         elif user.registration_expiry is None:
-            logging.warning("User has active registration code (never expires)")
+            logger.warning("User has active registration code (never expires)")
         else:
-            logging.info("User has expired registration code")
+            logger.info("User has expired registration code")
 
         wait()
     else:
-        logging.info("User doesn't have registration code")
+        logger.info("User doesn't have registration code")
 
     registration_code = user.add_registration_code(registration_code=code, expiry=expiry)
 
-    logging.info("\n------------------------------")
-    logging.info("Code generated for user (id: %s): %s", user.id, user.name)
+    logger.info("\n------------------------------")
+    logger.info("Code generated for user (id: %s): %s", user.id, user.name)
 
     if code is None or code != registration_code:
-        logging.info("New registration code: %s", registration_code)
+        logger.info("New registration code: %s", registration_code)
 
     if expiry is None:
-        logging.info("The code never expires")
+        logger.info("The code never expires")
     else:
-        logging.info("The code expires in %s seconds", expiry)
+        logger.info("The code expires in %s seconds", expiry)
 
     session.commit()
 
@@ -96,18 +95,18 @@ def new_access_code(user_id, code):
     user = session.query(User).filter(User.id == user_id).one()
 
     if user.access_code is not None:
-        logging.warning("User has access code")
+        logger.warning("User has access code")
         wait()
     else:
-        logging.info("User doesn't have access code")
+        logger.info("User doesn't have access code")
 
     access_code = user.update({"accessCode": code})
 
-    logging.info("\n------------------------------")
-    logging.info("Code generated for user (id: %s): %s", user.id, user.name)
+    logger.info("\n------------------------------")
+    logger.info("Code generated for user (id: %s): %s", user.id, user.name)
 
     if code is None or code != access_code:
-        logging.info("New access code: %s", access_code)
+        logger.info("New access code: %s", access_code)
 
     session.commit()
 

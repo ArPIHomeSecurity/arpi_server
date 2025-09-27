@@ -3,21 +3,16 @@ Output sign
 """
 
 import logging
-import os
 from queue import Queue
 from threading import Thread
 from time import sleep, time
 
 from constants import LOG_OUTPUT
 from models import Output
+from monitor.adapters.output import get_output_adapter
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
 from monitor.socket_io import send_output_state
-
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.output import OutputAdapter
-else:
-    from monitor.adapters.mock.output import OutputAdapter
 
 
 class OutputSign(Thread):
@@ -29,7 +24,7 @@ class OutputSign(Thread):
         super().__init__(name="OutputSign")
         self._stop_event = stop_event
         self._output = output
-        self._output_adapter = OutputAdapter()
+        self._output_adapter = get_output_adapter()
         self._actions = Queue()
         self._logger = logging.getLogger(LOG_OUTPUT)
 

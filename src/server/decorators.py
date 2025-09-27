@@ -12,6 +12,8 @@ from flask.json import jsonify
 from jose import jwt
 import jose
 
+import inspect
+
 from models import Option
 from constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.database import db
@@ -47,21 +49,15 @@ def restrict_host(request_handler):
             # HTTP_ORIGIN is not always sent
             referer = urlparse(request.environ.get("HTTP_REFERER", ""))
             origin = noip_config.get("hostname", "")
-            if origin != "":
-                logger.debug("Origin -> Referer: '%s' -> '%s'", origin.geturl(), referer.geturl())
-                if origin.netloc != referer.netloc:
-                    return jsonify({
-                        "error": "invalid origin",
-                        "reason": f"{origin.netloc} <> {referer.netloc}"
-                    }), 401
-            else:
+            if origin == "":
                 origin = urlparse(token.get("origin", ""))
-                logger.debug("Origin -> Referer: '%s' -> '%s'", origin.geturl(), referer.geturl())
-                if origin.scheme != referer.scheme or origin.netloc != referer.netloc or origin.port != referer.port:
-                    return jsonify({
-                        "error": "invalid origin",
-                        "reason": f"{baseurl(origin)} <> {baseurl(referer)}"
-                    }), 401
+
+            logger.debug("Origin -> Referer: '%s' -> '%s'", origin, referer.geturl())
+            if origin != referer.netloc:
+                return jsonify({
+                    "error": "invalid origin",
+                    "reason": f"{baseurl(origin)} <> {baseurl(referer)}"
+                }), 401
 
         return request_handler(*args, **kws)
 
@@ -131,6 +127,12 @@ def authenticated(role=ROLE_ADMIN):
                     
                     flask.request.environ["requester_id"] = user_token["id"]
                     flask.request.environ["requester_role"] = user_token["role"]
+
+                    # Forward user_id if the handler accepts it
+                    sig = inspect.signature(request_handler)
+                    if "request_user_id" in sig.parameters and "request_user_id" not in kws:
+                        kws["request_user_id"] = user_token["id"]
+
                     response = request_handler(*args, **kws)
                     # generate new user token to extend the user session
                     referer = urlparse(request.environ.get("HTTP_REFERER", ""))

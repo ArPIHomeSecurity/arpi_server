@@ -37,6 +37,7 @@ from constants import (
     UPDATE_SECURE_CONNECTION,
 )
 from models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
+from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
 from monitor.config_helper import (
@@ -47,7 +48,7 @@ from monitor.config_helper import (
 )
 from monitor.sensor.handler import SensorHandler
 from monitor.storage import States, State
-from monitor.adapters.power import PowerAdapter
+from monitor.adapters.power import get_power_adapter
 from monitor.broadcast import Broadcaster
 from monitor.notifications.notifier import Notifier
 from monitor.syren import Syren
@@ -73,14 +74,14 @@ class Monitor(Thread):
         """
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
-        self._broadcaster = broadcaster
         self._actions = Queue()
-        self._power_adapter = PowerAdapter()
+        self._power_adapter = get_power_adapter()
         self._power_source = None
         self._db_session = None
         self._delay_timer = None
         self._sensor_handler = None
         self._area_handler = None
+        self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
         self._logger.info("Monitoring created")
 
@@ -104,7 +105,6 @@ class Monitor(Thread):
                 self._area_handler.close()
             if self._db_session:
                 self._db_session.close()
-            self._power_adapter.close()
             States.close()
 
         self._logger.info("Monitoring stopped")
@@ -205,7 +205,7 @@ class Monitor(Thread):
                         ARM_AWAY,
                         message.get("user_id", None),
                         message.get("keypad_id", None),
-                        message.get("delay", True),
+                        message["use_delay"],
                         message.get("area_id", None),
                     )
                 elif message["action"] == MONITOR_ARM_STAY:
@@ -213,7 +213,7 @@ class Monitor(Thread):
                         ARM_STAY,
                         message.get("user_id", None),
                         message.get("keypad_id", None),
-                        message.get("use_delay", True),
+                        message["use_delay"],
                         message.get("area_id", None),
                     )
                 elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
@@ -254,7 +254,7 @@ class Monitor(Thread):
         """
         Arm the monitoring system to the given state (away, stay).
         """
-        self._logger.info("Arming to %s", arm_type)
+        self._logger.info("Arming to %s %s", arm_type, "with delay" if use_delay else "without delay")
 
         arm_changed = False
         if area_id is None:
@@ -344,6 +344,10 @@ class Monitor(Thread):
         self._db_session.commit()
 
         current_state = States.get(State.MONITORING)
+        stop_alert = True
+        if current_state == MONITORING_SABOTAGE:
+            # do not stop alerting if the system is in sabotage mode
+            stop_alert = False
         if (
             current_state
             in (MONITORING_ARM_DELAY, MONITORING_ARMED, MONITORING_ALERT_DELAY, MONITORING_ALERT)
@@ -355,7 +359,10 @@ class Monitor(Thread):
             OutputHandler.send_system_disarmed()
 
         send_arm_state(ARM_DISARM)
-        self.stop_alert(disarm.id)
+        SensorAlert.stop_alerts(disarm.id)
+        Syren.stop_syren()
+        if stop_alert:
+            self._sensor_handler.on_alert_stopped()
 
     def update_database_arm(self, arm_type, user_id, keypad_id):
         """
@@ -385,23 +392,23 @@ class Monitor(Thread):
         """
         # load the value once from the adapter
         new_power_source = self._power_adapter.source_type
-        if new_power_source == PowerAdapter.SOURCE_BATTERY:
+        if new_power_source == SOURCE_BATTERY:
             States.set(State.POWER, POWER_SOURCE_BATTERY)
             self._logger.debug("System works from battery")
-        elif new_power_source == PowerAdapter.SOURCE_NETWORK:
+        elif new_power_source == SOURCE_NETWORK:
             States.set(State.POWER, POWER_SOURCE_NETWORK)
             self._logger.trace("System works from network")
 
         if (
-            new_power_source == PowerAdapter.SOURCE_BATTERY
-            and self._power_source == PowerAdapter.SOURCE_NETWORK
+            new_power_source == SOURCE_BATTERY
+            and self._power_source == SOURCE_NETWORK
         ):
             send_power_state(POWER_SOURCE_BATTERY)
             Notifier.notify_power_outage_started(dt.now())
             self._logger.info("Power outage started!")
         elif (
-            new_power_source == PowerAdapter.SOURCE_NETWORK
-            and self._power_source == PowerAdapter.SOURCE_BATTERY
+            new_power_source == SOURCE_NETWORK
+            and self._power_source == SOURCE_BATTERY
         ):
             send_power_state(POWER_SOURCE_NETWORK)
             Notifier.notify_power_outage_stopped(dt.now())
@@ -430,11 +437,3 @@ class Monitor(Thread):
         load_alert_sensitivity_config(cleanup=True, session=self._db_session)
         load_dyndns_config(cleanup=True, session=self._db_session)
         self._db_session.commit()
-
-    def stop_alert(self, disarm_id: int):
-        """
-        Stop the alerting.
-        """
-        self._sensor_handler.on_alert_stopped()
-        SensorAlert.stop_alerts(disarm_id)
-        Syren.stop_syren()

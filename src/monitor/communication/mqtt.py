@@ -71,16 +71,16 @@ class MQTTClient:
             self._client.username_pw_set(username, password)
 
         if os.environ.get("ARGUS_MQTT_TLS_ENABLED", "false").lower() in ("true", "1"):
-            self._logger.debug("Using TLS")
             self._client.tls_set(cert_reqs=ssl.CERT_NONE)
 
         if os.environ.get("ARGUS_MQTT_TLS_INSECURE", "false").lower() in ("true", "1"):
-            self._logger.debug("Using TLS insecure")
             self._client.tls_insecure_set(True)
 
         host = os.environ["ARGUS_MQTT_HOST"]
         port = int(os.environ["ARGUS_MQTT_PORT"])
-        self._logger.debug("Connecting to MQTT broker at %s:%s", host, port)
+        self._logger.info("Connecting to MQTT broker at %s:%s TLS: %s insecure:%s", host, port,
+                          os.environ.get("ARGUS_MQTT_TLS_ENABLED", "false"),
+                          os.environ.get("ARGUS_MQTT_TLS_INSECURE", "false"))
         try:
             self._client.connect(host, port, keepalive=60)
             self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)

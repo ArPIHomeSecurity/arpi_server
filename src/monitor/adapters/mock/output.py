@@ -2,73 +2,53 @@
 Update a file with the output states
 """
 
-import fcntl
-import json
 import logging
 import os
+from threading import Lock
 
 from constants import LOG_ADOUTPUT
-from monitor.output import OUTPUT_NAMES
+from monitor.adapters.mock.utils import set_output_states, get_output_states
+from monitor.adapters.output_base import OutputAdapterBase
 
 
 OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
 
+# shared state and lock across all instances (similar to hardware adapters)
+_shared_states = [0] * OUTPUT_NUMBER
+_state_lock = Lock()
 
-class OutputAdapter(object):
+
+class OutputAdapter(OutputAdapterBase):
     """
-    Mock output
+    Mock output adapter for simulator mode.
     """
 
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADOUTPUT)
-        self._states = [0] * OUTPUT_NUMBER
-        self._write_states()
+        # Initialize shared state from file if it exists
+        with _state_lock:
+            try:
+                file_states = get_output_states()
+                if len(file_states) == OUTPUT_NUMBER:
+                    # Update the shared states with file contents
+                    for i, state in enumerate(file_states):
+                        _shared_states[i] = 1 if state else 0
+            except (FileNotFoundError, OSError, ValueError):
+                self._logger.debug("Could not read initial state from file, using defaults")
 
     def control_channel(self, channel: int, state: bool):
         """
         Control output by channel number
         """
         self._logger.debug("Control channel %d to %d", channel, state)
-        if channel is not None and (channel < 0 or channel > OUTPUT_NUMBER - 1):
-            raise ValueError(
-                f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
-            )
+        with _state_lock:
+            _shared_states[channel] = 1 if state else 0
+            set_output_states(_shared_states)
 
-        try:
-            with open("simulator_output.json", "r", encoding="utf-8") as output_file:
-                fcntl.flock(output_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                tmp_states = json.load(output_file)
-                fcntl.flock(output_file, fcntl.LOCK_UN)
-
-                for idx in range(OUTPUT_NUMBER):
-                    self._states[idx] = tmp_states[OUTPUT_NAMES[idx]]
-        except json.decoder.JSONDecodeError:
-            self._logger.warning(
-                "Output file is invalid (=> overwriting)!\n%s",
-                output_file.read(),
-            )
-        except FileNotFoundError:
-            self._logger.warning("Output file not found!")
-        except OSError:
-            self._logger.warning("Failed to lock the output file!")
-
-        self._states[channel] = 1 if state else 0
-        self._write_states()
-
-    def _write_states(self):
-        with open("simulator_output.json", "w", encoding="utf-8") as output_file:
-            try:
-                fcntl.flock(output_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                # write the state to the file
-                states = {
-                    OUTPUT_NAMES[idx]: self._states[idx]
-                    for idx, state in enumerate(self._states)
-                }
-                output_file.write(json.dumps(states))
-                fcntl.flock(output_file, fcntl.LOCK_UN)
-            except OSError:
-                pass
-
-
-# initialize output file
-oa = OutputAdapter()
+    @property
+    def states(self):
+        """
+        Get the current states of all output channels.
+        """
+        with _state_lock:
+            return _shared_states.copy()

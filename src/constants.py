@@ -46,7 +46,7 @@ LOGGING_MODULES = [
     (LOG_ADSENSOR, INFO),
     (LOG_ADOUTPUT, INFO),
     (LOG_ADGSM, INFO),
-    (LOG_ADKEYPAD, INFO),
+    (LOG_ADKEYPAD, DEBUG),
     (LOG_SECCON, INFO),
     (LOG_SC_CERTBOT, INFO),
     (LOG_SC_DYNDNS, INFO),
@@ -104,16 +104,27 @@ ALERT_STAY_DELAYED = "alert_stay_delayed"
 ALERT_SABOTAGE = "alert_sabotage"
 
 # monitoring system states
+# Initial state of the system
 MONITORING_STARTUP = "monitoring_startup"
-MONITORING_READY = "monitoring_ready"
+# State when the system is updating its configuration
 MONITORING_UPDATING_CONFIG = "monitoring_updating_config"
+# State when the system configuration is invalid
 MONITORING_INVALID_CONFIG = "monitoring_invalid_config"
+# State when the system is ready to be armed
+MONITORING_READY = "monitoring_ready"
+# State when the system is armed and in the exit delay period
 MONITORING_ARM_DELAY = "monitoring_arm_delay"
+# State when the system is armed
 MONITORING_ARMED = "monitoring_armed"
+# State when the system is in the entry delay period before an alert is triggered
 MONITORING_ALERT_DELAY = "monitoring_alert_delay"
+# State when the system is in an alert condition
 MONITORING_ALERT = "monitoring_alert"
+# State when the system is in a sabotage condition (disarmed with tamper open)
 MONITORING_SABOTAGE = "monitoring_sabotage"
+# State when the system has encountered an error
 MONITORING_ERROR = "monitoring_error"
+# State when the system is stopped
 MONITORING_STOPPED = "monitoring_stopped"
 
 POWER_SOURCE_NETWORK = "network"

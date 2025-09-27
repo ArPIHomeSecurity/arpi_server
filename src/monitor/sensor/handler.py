@@ -7,6 +7,7 @@ from datetime import datetime as dt, timedelta
 from os import environ
 from time import sleep
 
+from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
 from constants import (
@@ -22,34 +23,31 @@ from constants import (
     MONITORING_ARMED,
     MONITORING_INVALID_CONFIG,
     MONITORING_READY,
+    MONITORING_SABOTAGE,
     MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
 from models import AlertSensor, Arm, Sensor
-from monitor.adapters.sensor import SensorAdapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.database import get_database_session
+from monitor.sensor.detector import detect_alert, detect_error, wiring_config
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_state
 from monitor.storage import State, States
 
+
 MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3
-TOLERANCE = float(environ["TOLERANCE"])
+
 
 # alert time window length in seconds
 ALERT_WINDOW = int(environ.get("ALERT_TIME_WINDOW", 1))
 # threshold in the percent of high values in the time window (0-100)
 ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", 100))
-
-
-def is_close(a, b, tolerance=0.0):
-    """
-    Check if two values are close enough.
-    """
-    return abs(a - b) < tolerance
+# board version
+BOARD_VERSION = int(environ["BOARD_VERSION"])
 
 
 class SensorHandler:
@@ -61,13 +59,16 @@ class SensorHandler:
         self._logger = logging.getLogger(LOG_SENSORS)
         self._db_session = get_database_session()
         self._broadcaster = broadcaster
-        self._sensor_adapter = SensorAdapter()
+        self._sensor_adapter = get_sensor_adapter()
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
 
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_sensors")
+
+        # log the wiring configuration
+        wiring_config.debug_values()
 
     def calibrate_sensors(self):
         """
@@ -76,10 +77,10 @@ class SensorHandler:
         self._logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
         if len(new_references) == self._sensor_adapter.channel_count:
-            self._logger.info("New references: %s", new_references)
+            self._logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
             self.save_sensor_references(new_references)
         else:
-            self._logger.error("Error measure values! %s", new_references)
+            self._logger.error("Error measure values! %s", [float(f"{x:.3f}") for x in new_references])
 
     def has_uncalibrated_sensor(self):
         """
@@ -196,7 +197,7 @@ class SensorHandler:
         self._logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
-            if sensor.channel in channels:
+            if sensor.channel in channels and BOARD_VERSION == 2:
                 self._logger.debug("Channel already in use: %s", sensor.channel)
                 return False
             else:
@@ -252,21 +253,32 @@ class SensorHandler:
 
             value = self._sensor_adapter.get_value(sensor.channel)
 
-            if not is_close(value, sensor.reference_value, TOLERANCE):
-                if not sensor.alert:
-                    self._logger.debug(
-                        "Alert on channel: %s, (changed %s -> %s)",
-                        sensor.channel,
-                        sensor.reference_value,
-                        value,
-                    )
-                    sensor.alert = True
-                    self._mqtt_client.publish_sensor_state(sensor.name, True)
-                    changes = True
-            elif sensor.alert:
-                self._logger.debug("Cleared alert on channel: %s", sensor.channel)
-                sensor.alert = False
-                self._mqtt_client.publish_sensor_state(sensor.name, False)
+            is_alert = detect_alert(sensor, value)
+            self._logger.trace(
+                "Sensor %s (CH%02d) value: %s, ref: %s => alert: %s",
+                sensor.description,
+                sensor.channel,
+                float(f"{value:.3f}"),
+                float(f"{sensor.reference_value:.3f}"),
+                is_alert,
+            )
+            if is_alert != sensor.alert:
+                sensor.alert = is_alert
+                self._mqtt_client.publish_sensor_state(sensor.name, sensor.alert)
+                changes = True
+
+            is_error = detect_error(sensor, value)
+            self._logger.trace(
+                "Sensor %s (CH%02d) value: %s, ref: %s => error: %s",
+                sensor.description,
+                sensor.channel,
+                float(f"{value:.3f}"),
+                float(f"{sensor.reference_value:.3f}"),
+                is_error,
+            )
+            if is_error != sensor.error:
+                sensor.error = is_error
+                # self._mqtt_client.publish_sensor_state(sensor.name, sensor.error)
                 changes = True
 
             if sensor.alert and sensor.enabled:
@@ -291,10 +303,18 @@ class SensorHandler:
 
         arm: Arm = None
         if current_monitoring == MONITORING_ARM_DELAY:
-            # wait for the arm created in the database
+            # wait 5 seconds for the arm created in the database
             # synchronizing the two threads
-            while not arm:
+            retries = 0
+            while not arm and retries < 50:
                 arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+                retries += 1
+                if not arm:
+                    sleep(0.1)
+
+            if not arm:
+                raise RuntimeError("No arm found in the database while in ARM_DELAY state")
+
             self._logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
@@ -344,7 +364,7 @@ class SensorHandler:
 
                 # start the alert
                 self._logger.debug(
-                    "Found alerting sensor id: %s, states: %s, delay: %s, type: %s",
+                    "Found alerting sensor id: %s, states: %s, delay: %s, alert type: %s",
                     sensor.id,
                     self._sensors_history.get_states(idx),
                     delay,
@@ -396,16 +416,14 @@ class SensorHandler:
         """
         Callback for the alert stopped event.
         """
-        # do not clear the alerting sensors
-        # because in sabotage mode the alert will be triggered again
-        # self._alerting_sensors.clear()
+        # clear all alerting sensors if disarmed
+        self._alerting_sensors.clear()
 
     def close(self):
         """
         Close the sensor handler.
         """
         self._logger.debug("Closing sensor handler...")
-        self._sensor_adapter.close()
         self._alerting_sensors.clear()
         self._mqtt_client.close()
 
@@ -418,7 +436,7 @@ class SensorHandler:
         if monitoring_state == MONITORING_READY:
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
-        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT):
+        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT, MONITORING_SABOTAGE):
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
             elif (
