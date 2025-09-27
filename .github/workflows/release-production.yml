@@ -1,3 +1,7 @@
+# Release Production Workflow
+# This workflow automates the release process for the production build which is
+# used in the live environment on the raspberry pi.
+# The workflow will bump the version, and create a new release with the build artifacts.
 name: Release Production
 
 on:
@@ -24,6 +28,7 @@ on:
 
 jobs:
   release:
+    name: Release Production
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -36,10 +41,27 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-cache-${{ runner.os }}
+          restore-keys: |
+            apt-cache-${{ runner.os }}-
+
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-cache-${{ runner.os }}-${{ hashFiles('Pipfile.lock') }}
+          restore-keys: |
+            pip-cache-${{ runner.os }}-
+
+
       - name: Setup Python 🐍
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Configure Git 🔧
         run: |
@@ -49,7 +71,7 @@ jobs:
       - name: Install dependencies 📦
         run: |
           pip install pipenv
-          pipenv install --dev
+          pipenv install --categories=dev-packages,simulator
 
       - name: Bump version 🏷️
         run: |
@@ -62,18 +84,21 @@ jobs:
       - name: Get new version 📋
         id: get_version
         run: |
-          VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' src/constants.py | head -1)
+          VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' src/server/version.py | head -1)
+          VERSION_SIMPLE=$(echo "$VERSION" | sed 's/:.*//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "simple_version=$VERSION_SIMPLE" >> $GITHUB_OUTPUT
           echo "New version: $VERSION"
+          echo "Simple version: $VERSION_SIMPLE"
 
       - name: Commit version changes 💾
         run: |
-          git add src/constants.py
-          git commit -m "chore: bump version to $(echo '${{ steps.get_version.outputs.version }}' | sed 's/:.*//')"
+          git add src/server/version.py
+          git commit -m "GitHub Actions: bump version to $(echo '${{ steps.get_version.outputs.version }}' | sed 's/:.*//')"
 
       - name: Create Git tag 🏷️
         run: |
-            git tag "$(echo '${{ steps.get_version.outputs.version }}' | sed 's/:.*//')"
+            git tag "$(echo '${{ steps.get_version.outputs.simple_version }}')" -m "Release version $(echo '${{ steps.get_version.outputs.version }}')"
 
       # no testing for now
       # - name: Run tests 🧪
@@ -82,23 +107,23 @@ jobs:
       
       - name: Build and package server 🏗️
         run: |
-          tar -czf arpi-server-${{ steps.get_version.outputs.version }}.tar.gz --exclude='__pycache__' --exclude='*.pyc' src/
+          tar -czf arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz --exclude='__pycache__' --exclude='*.pyc' src/
 
       - name: Push changes and tags 🚀
         run: |
           git push origin master
-          git push origin ${{ steps.get_version.outputs.version }}
+          git push origin ${{ steps.get_version.outputs.simple_version }}
 
       - name: Create GitHub Release 📦
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.simple_version }}
+          name: Release ${{ steps.get_version.outputs.simple_version }}
           draft: false
           prerelease: ${{ inputs.version_type == 'pre-release' }}
           generate_release_notes: true
           files: |
-            arpi-server-${{ steps.get_version.outputs.version }}.tar.gz
+            arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz
           body: |
             ## What's Changed
 
@@ -114,11 +139,3 @@ jobs:
             - **Build Date**: ${{ github.run_started_at }}
             - **Commit**: ${{ github.sha }}
             - **Workflow Run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-      - name: Upload build artifacts 📤
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-build-${{ steps.get_version.outputs.version }}
-          path: |
-            arpi-server-${{ steps.get_version.outputs.version }}.tar.gz
-          retention-days: 30
