@@ -129,10 +129,6 @@ jobs:
 
             ${{ inputs.release_notes || 'This release includes the latest changes from the master branch.' }}
 
-            ### Installation
-
-            Download the `arpi-server-${{ steps.get_version.outputs.version }}.tar.gz` file and extract it to your server directory.
-
             ### Build Information
             - **Version**: ${{ steps.get_version.outputs.version }}
             - **Branch**: ${{ github.ref_name }}
