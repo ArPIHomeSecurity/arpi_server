@@ -107,7 +107,7 @@ jobs:
       
       - name: Build and package server 🏗️
         run: |
-          tar -czf arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz --exclude='__pycache__' --exclude='*.pyc' src/
+          tar -czf arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz --exclude='__pycache__' --exclude='*.pyc' src/ etc/ requirements.txt Pipfile* migrations/
 
       - name: Push changes and tags 🚀
         run: |
