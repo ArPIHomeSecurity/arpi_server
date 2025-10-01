@@ -16,11 +16,9 @@ tar -czf "$SCRIPT_DIR/$OUTFILE" \
     src/ \
     etc/ \
     migrations/ \
-    pyproject.toml \
     Pipfile \
     Pipfile.lock \
     README.md \
-    MANIFEST.in \
     LICENSE \
     --transform="s|${1:-prod}.env|.env|" \
     "${1:-prod}.env"
