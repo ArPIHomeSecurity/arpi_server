@@ -16,6 +16,7 @@ on:
         default: 'patch'
         type: choice
         options:
+          - no bump
           - major
           - minor
           - patch
@@ -57,7 +58,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-
       - name: Cache APT packages 📦
         uses: actions/cache@v4
         with:
@@ -73,7 +73,6 @@ jobs:
           key: pip-cache-${{ runner.os }}-${{ hashFiles('Pipfile.lock') }}
           restore-keys: |
             pip-cache-${{ runner.os }}-
-
 
       - name: Setup Python 🐍
         uses: actions/setup-python@v4
@@ -92,6 +91,11 @@ jobs:
 
       - name: Bump version 🏷️
         run: |
+          if [ "${{ steps.set_inputs.outputs.version_type }}" = "no bump" ]; then
+            echo "No version bump selected, skipping version bump step."
+            exit 0
+          fi
+
           if [ "${{ steps.set_inputs.outputs.version_type }}" = "pre-release" ]; then
             python scripts/bump_version.py -p "${{ steps.set_inputs.outputs.pre_release }}" -v
           else
