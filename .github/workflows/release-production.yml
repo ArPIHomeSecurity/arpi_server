@@ -58,14 +58,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Cache APT packages 📦
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-cache-${{ runner.os }}
-          restore-keys: |
-            apt-cache-${{ runner.os }}-
-
       - name: Cache Python packages 📦
         uses: actions/cache@v4
         with:
