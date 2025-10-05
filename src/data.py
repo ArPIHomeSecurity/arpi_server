@@ -477,11 +477,17 @@ def main():
         cleanup()
 
     if args.create:
-        create_method = globals()[f"env_{args.create}"]
+        try:
+            create_method = globals()[f"env_{args.create}"]
+        except KeyError:
+            logger.error("Unknown environment: %s", args.create)
+            return 1
+
         logger.info("Creating '%s' environment...", args.create)
         create_method()
         logger.info("Environment created")
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())

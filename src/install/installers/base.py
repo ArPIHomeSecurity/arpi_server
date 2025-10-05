@@ -1,4 +1,3 @@
-
 from abc import ABC, abstractmethod
 
 
@@ -8,17 +7,12 @@ class BaseInstaller(ABC):
     def __init__(self, config: dict):
         self.config = config
         self.warnings = []
-    
+
     @abstractmethod
     def install(self):
         """Install the component"""
         pass
-    
-    @abstractmethod
-    def is_installed(self) -> bool:
-        """Check if component is installed"""
-        pass
-    
+
     @abstractmethod
     def get_status(self) -> dict:
         """Get component status information"""

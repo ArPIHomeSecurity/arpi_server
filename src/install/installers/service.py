@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import subprocess
 import click
@@ -6,7 +7,7 @@ from install.helpers import SystemHelper, ServiceHelper, SecurityHelper
 from install.installers.base import BaseInstaller
 
 
-class ServiceInstaller(BaseInstaller):
+class ServerInstaller(BaseInstaller):
     """Installer for ArPI services and configurations"""
 
     def __init__(self, config: dict):
@@ -16,11 +17,17 @@ class ServiceInstaller(BaseInstaller):
         self.salt = config.get("salt", "")
         self.secret = config.get("secret", "")
         self.mqtt_password = config.get("mqtt_password", "")
+        self.install_source = config.get("install_source", "/tmp/server")
+        self.data_set_name = config.get("data_set_name", "")
 
     def generate_service_secrets(self):
         """Generate secrets for ArPI services"""
-        click.echo("   🔑 Generating service secrets...")
 
+        if os.path.exists(f"/home/{self.user}/server/secrets.env"):
+            click.echo("   ✓ Secrets file already exists, skipping generation")
+            return
+
+        click.echo("   🔑 Generating service secrets...")
         secrets_generated = False
 
         if not self.db_password:
@@ -42,25 +49,23 @@ class ServiceInstaller(BaseInstaller):
         if secrets_generated:
             click.echo("   ✓ Service secrets generated")
         else:
-            click.echo("   ✓ Service secrets already exist")
+            click.echo("   ✓ All service secrets presented, skipping generation")
 
     def create_service_directories(self):
         """Create ArPI service directories"""
         click.echo("   📁 Creating service directories...")
 
         # Create argus user if it doesn't exist
-        try:
-            SystemHelper.run_command(f"id {self.user}", capture=True)
+        if not self.check_user_exists():
+            SystemHelper.run_command(f"useradd -m -s /bin/zsh {self.user}")
+            click.echo(f"   ✓ User '{self.user}' created")
+        else:
             click.echo(f"   ✓ User '{self.user}' already exists")
-        except subprocess.CalledProcessError:
-            SystemHelper.run_command(f"useradd -m -s /bin/bash {self.user}")
-            click.echo(f"   ✓ Created user '{self.user}'")
 
         # Create service directories
         directories = [
             f"/home/{self.user}/server",
             f"/home/{self.user}/webapplication",
-            f"/run/{self.user}",
             f"/run/{self.user}",
         ]
         for directory in directories:
@@ -72,15 +77,20 @@ class ServiceInstaller(BaseInstaller):
         SecurityHelper.set_file_permissions(
             f"/run/{self.user}", f"{self.user}:{self.user}", "755", recursive=True
         )
-
-        # Create tmpfiles configuration
-        tmpfiles_config = f"""# Type Path                     Mode    UID     GID     Age     Argument
-d /run/{self.user} 0755 {self.user} {self.user}
-"""
-        SystemHelper.run_command("mkdir -p /usr/lib/tmpfiles.d")
-        SystemHelper.write_file(f"/usr/lib/tmpfiles.d/{self.user}.conf", tmpfiles_config)
-
         click.echo("   ✓ Service directories created")
+
+        if not self.check_tmpfiles_configured():
+            click.echo("   ⚙️ Configuring tmpfiles...")
+            # Create tmpfiles configuration
+            tmpfiles_config = f"""# Type Path                     Mode    UID     GID     Age     Argument
+d /run/{self.user} 0755 {self.user} {self.user}
+
+"""
+            SystemHelper.run_command("mkdir -p /usr/lib/tmpfiles.d")
+            SystemHelper.write_file(f"/usr/lib/tmpfiles.d/{self.user}.conf", tmpfiles_config)
+            click.echo("   ✓ Tmpfiles configuration created")
+        else:
+            click.echo("   ✓ Tmpfiles configuration already exists")
 
     def save_secrets_to_file(self):
         """Save generated secrets to file"""
@@ -92,7 +102,6 @@ d /run/{self.user} 0755 {self.user} {self.user}
         click.echo("   💾 Saving secrets to file...")
 
         secrets_file = f"/home/{self.user}/server/secrets.env"
-        SystemHelper.run_command(f"mkdir -p {os.path.dirname(secrets_file)}")
 
         secrets_content = f"""# Argus Service Secrets
 # Generated on {datetime.now()}
@@ -116,7 +125,7 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         click.echo("   ⚙️ Setting up systemd services...")
 
         # Copy systemd service files
-        SystemHelper.run_command("cp -r /tmp/server/etc/systemd/* /etc/systemd/system/")
+        SystemHelper.run_command(f"cp -r {self.install_source}/etc/systemd/* /etc/systemd/system/")
 
         # Reload systemd daemon
         SystemHelper.run_command("systemctl daemon-reload")
@@ -138,9 +147,64 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         if not os.path.exists(venv_path):
             SystemHelper.run_command(f"mkdir -p {venv_path}")
             SecurityHelper.set_file_permissions(venv_path, f"{self.user}:{self.user}", "755")
-            click.echo("   ✓ Python virtual environment created")
+            click.echo("   ✓ Python virtual environment root created")
         else:
-            click.echo("   ✓ Python virtual environment already exists")
+            click.echo("   ✓ Python virtual environment root already exists")
+
+        # always update the virtual environment
+        packages = ["packages"]
+        if ServiceHelper.is_raspberry_pi():
+            packages.append("device")
+
+        if self.config.get("deploy_simulator", "false").lower() == "true":
+            packages.append("simulator")
+
+        install_config = {
+            "PIPENV_TIMEOUT": "9999",
+            "CI": "1",
+            "WORKON_HOME": venv_path,
+            "PIPENV_CUSTOM_VENV_NAME": "server",
+        }
+
+        SystemHelper.run_command(
+            f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
+            f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
+            f'pipenv install --site-packages --categories "{" ".join(packages)}"\'',
+            suppress_output=False,
+        )
+        SecurityHelper.set_file_permissions(
+            os.path.join(venv_path, "server"), f"{self.user}:{self.user}", "755"
+        )
+        click.echo("   ✓ Python virtual environment synced")
+
+    def update_database_schema(self):
+        """Update database schema using Alembic"""
+        click.echo("   🗄️ Updating database schema...")
+
+        SystemHelper.run_command(
+            f'sudo -u {self.user} -H bash -c "cd /home/{self.user}/server; '
+            f"source /home/{self.user}/.venvs/server/bin/activate && "
+            "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
+            "printenv && "
+            'flask --app server:app db upgrade"'
+        )
+
+        click.echo("   ✓ Database schema updated")
+
+    def update_database_contents(self):
+        """Update database contents if needed"""
+        click.echo("   🗄️ Updating database contents...")
+
+        if self.data_set_name:
+            SystemHelper.run_command(
+                f'sudo -u {self.user} -H bash -c "cd /home/{self.user}/server; '
+                f"source /home/{self.user}/.venvs/server/bin/activate && "
+                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
+                f'src/data.py -d -c {self.data_set_name}"'
+            )
+            click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
+        else:
+            click.echo("   ✓ No data set name provided, skipping database contents update")
 
     def install(self):
         """Install service components"""
@@ -149,20 +213,53 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         self.create_python_virtual_environment()
         self.save_secrets_to_file()
         self.setup_systemd_services()
+        self.update_database_schema()
+        self.update_database_contents()
 
-    def is_installed(self) -> bool:
-        """Check if services are installed"""
-        return os.path.exists(f"/home/{self.user}/server/secrets.env")
+    def check_user_exists(self) -> bool:
+        """Check if service user exists"""
+        return os.path.exists(f"/home/{self.user}")
+
+    def check_tmpfiles_configured(self) -> bool:
+        """Check if tmpfiles configuration exists"""
+        return os.path.exists(f"/usr/lib/tmpfiles.d/{self.user}.conf")
+
+    def check_database_schema_updated(self) -> bool:
+        """Check if database schema is up to date"""
+        try:
+            current_revision = SystemHelper.run_command(
+                f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
+                f"source /home/{self.user}/.venvs/server/bin/activate && "
+                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
+                'flask --app server:app db current"',
+                capture=True,
+            ).stdout.strip()
+            head_revision = SystemHelper.run_command(
+                f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
+                f"source /home/{self.user}/.venvs/server/bin/activate && "
+                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
+                'flask --app server:app db heads"',
+                capture=True,
+            ).stdout.strip()
+            return current_revision == head_revision
+        except subprocess.CalledProcessError:
+            return False
 
     def get_status(self) -> dict:
         """Get service status"""
         return {
-            "user_exists": os.path.exists(f"/home/{self.user}"),
-            "secrets_file_exists": os.path.exists(f"/home/{self.user}/server/secrets.env"),
-            "env_file_exists": os.path.exists(f"/home/{self.user}/server/.env"),
-            "venv_exists": os.path.exists(f"/home/{self.user}/.venvs/server"),
-            "service_directories_exist": os.path.exists(f"/run/{self.user}"),
-            "argus_server_enabled": SystemHelper.is_service_enabled("argus_server"),
-            "argus_monitor_enabled": SystemHelper.is_service_enabled("argus_monitor"),
-            "nginx_enabled": SystemHelper.is_service_enabled("nginx"),
+            "User exists": self.check_user_exists(),
+            "Env file exists": os.path.exists(f"/home/{self.user}/server/.env"),
+            "Secrets file exists": os.path.exists(f"/home/{self.user}/server/secrets.env"),
+            "Venv exists": os.path.exists(f"/home/{self.user}/.venvs/server"),
+            "Run directory exists": os.path.exists(f"/run/{self.user}"),
+            "Service directories exist": (
+                os.path.exists(f"/home/{self.user}/server")
+                and os.path.exists(f"/home/{self.user}/webapplication")
+            ),
+            "Database schema updated": self.check_database_schema_updated(),
+            "Argus server enabled": SystemHelper.is_service_enabled("argus_server"),
+            "Argus monitor enabled": SystemHelper.is_service_enabled("argus_monitor"),
+            "Nginx enabled": SystemHelper.is_service_enabled("nginx"),
+            "Tmpfiles configured": self.check_tmpfiles_configured(),
         }

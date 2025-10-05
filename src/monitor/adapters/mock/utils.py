@@ -64,6 +64,8 @@ def protected_transfer(filename, default_data):
             fcntl.flock(file_handle, fcntl.LOCK_UN)
             return raw_data
 
+    return default_data
+
 def protected_update(filename, data, default_data, merge_function):
     """
     Update the data in a JSON file with file locking to avoid conflicts.
