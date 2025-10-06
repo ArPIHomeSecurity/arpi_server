@@ -44,7 +44,7 @@ class ArpiOrchestrator:
             "nginx_version": os.getenv("NGINX_VERSION", "1.24.0"),
             "db_username": os.getenv("ARGUS_DB_USERNAME", "argus"),
             "db_name": os.getenv("ARGUS_DB_NAME", "argus"),
-            "dhparam_file": os.getenv("DHPARAM_FILE", "/tmp/arpi_dhparam.pem"),
+            "dhparam_file": os.getenv("DHPARAM_FILE", "arpi_dhparam.pem"),
             "db_password": os.getenv("ARGUS_DB_PASSWORD", ""),
             "data_set_name": os.getenv("DATA_SET_NAME", ""),
             "deploy_simulator": os.getenv("DEPLOY_SIMULATOR", "false"),
