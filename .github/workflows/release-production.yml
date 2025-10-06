@@ -97,7 +97,7 @@ jobs:
       - name: Get new version 📋
         id: get_version
         run: |
-          VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' src/server/version.py | head -1)
+          VERSION=$(jq -r '.version' src/server/version.json)
           VERSION_SIMPLE=$(echo "$VERSION" | sed 's/:.*//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "simple_version=$VERSION_SIMPLE" >> $GITHUB_OUTPUT
@@ -106,7 +106,7 @@ jobs:
 
       - name: Commit version changes 💾
         run: |
-          git add src/server/version.py
+          git add src/server/version.json
           git commit -m "GitHub Actions: bump version to $(echo '${{ steps.get_version.outputs.version }}' | sed 's/:.*//')"
 
       - name: Create Git tag 🏷️
