@@ -66,11 +66,12 @@ class DatabaseInstaller(BaseInstaller):
             else:
                 click.echo(f"   ✓ Database user {self.db_username} already exists")
 
-            SystemHelper.run_command(
-                f'su - postgres -c "psql -c \\"ALTER USER {self.db_username} WITH PASSWORD \'{self.db_password}\';\\""',
-                suppress_output=False,
-            )
-            click.echo(f"   ✓ Updated password for user: {self.db_username}")
+            # we socket based authentication, so no need to set password
+            # SystemHelper.run_command(
+            #     f'su - postgres -c "psql -c \\"ALTER USER {self.db_username} WITH PASSWORD \'{self.db_password}\';\\""',
+            #     suppress_output=False,
+            # )
+            # click.echo(f"   ✓ Updated password for user: {self.db_username}")
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: User creation may have failed: {e}")
             self.warnings.append(f"User creation may have failed: {e}")

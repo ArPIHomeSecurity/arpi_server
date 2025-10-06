@@ -7,13 +7,7 @@ from sqlalchemy import create_engine
 
 
 # database connection common to all threads
-url = "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % {
-    "user": environ["DB_USER"],
-    "pw": environ["DB_PASSWORD"],
-    "db": environ["DB_SCHEMA"],
-    "host": environ["DB_HOST"],
-    "port": environ["DB_PORT"],
-}
+url = f"postgresql://{environ['DB_USER']}@/{environ['DB_SCHEMA']}"
 
 common_engine = create_engine(url)
 
