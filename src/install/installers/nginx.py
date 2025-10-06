@@ -94,7 +94,7 @@ class NginxInstaller(BaseInstaller):
         )
 
         # Copy dhparam file
-        SystemHelper.run_command(f"cp {self.dhparam_file} /usr/local/nginx/conf/ssl/arpi_dhparam.pem")
+        SystemHelper.run_command(f"cp {self.install_source}/{self.dhparam_file} /usr/local/nginx/conf/ssl/arpi_dhparam.pem")
         click.echo("   ✓ Copied dhparam file")
 
         # Set proper ownership for SSL directory

@@ -74,7 +74,7 @@ class MqttInstaller(BaseInstaller):
         SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
 
         # Copy dhparam file
-        SystemHelper.run_command(f"cp {self.dhparam_file} /etc/mosquitto/certs/")
+        SystemHelper.run_command(f"cp {self.install_source}/{self.dhparam_file} /etc/mosquitto/certs/")
         click.echo("   ✓ Copied dhparam file")
 
         # Copy SSL certificates from nginx config
