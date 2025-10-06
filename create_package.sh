@@ -8,7 +8,7 @@ VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' "$SCRIPT_DIR/src/server/ver
 OUTFILE="${2:-${PACKAGE_NAME}-${VERSION}}.tar.gz"
 
 echo "Get dhparam from Mozilla..."
-curl https://ssl-config.mozilla.org/ffdhe2048.txt -o arpi_dhparam.pem
+curl https://ssl-config.mozilla.org/ffdhe2048.txt -o "${SCRIPT_DIR}/arpi_dhparam.pem"
 
 echo "Packaging server as $OUTFILE ..."
 tar -czf "$SCRIPT_DIR/$OUTFILE" \

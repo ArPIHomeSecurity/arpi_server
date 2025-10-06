@@ -17,3 +17,5 @@ textual.log
 status.json
 
 /scripts/nginx/arpi_*.*
+
+arpi_dhparam.pem
