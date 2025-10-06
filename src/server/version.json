@@ -1,9 +1,9 @@
 {
-  "version": "v1.4.0_RC06:bd9c230",
+  "version": "v1.4.0_RC07:30f32ae",
   "major": 1,
   "minor": 4,
   "patch": 0,
   "prerelease": "RC",
-  "prerelease_num": "06",
-  "commit_id": "bd9c230"
+  "prerelease_num": "07",
+  "commit_id": "30f32ae"
 }
