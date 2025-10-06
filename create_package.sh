@@ -4,7 +4,7 @@ set -e
 
 PACKAGE_NAME="arpi-server"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' "$SCRIPT_DIR/src/server/version.py" | head -1 | sed 's/:.*//')
+VERSION=$(jq -r '.version' "$SCRIPT_DIR/src/server/version.json")
 OUTFILE="${2:-${PACKAGE_NAME}-${VERSION}}.tar.gz"
 
 echo "Get dhparam from Mozilla..."
