@@ -57,7 +57,8 @@ class SystemHelper:
             def print_lines(output):
                 for line in output or []:
                     line = "    |\t" + line.rstrip()
-                    click.echo(line)
+                    if not suppress_output:
+                        click.echo(line)
                     collected_output.append(line)
 
             if capture:
@@ -83,8 +84,7 @@ class SystemHelper:
                     process.stdin.flush()
                     process.stdin.close()
 
-                if not suppress_output:
-                    print_lines(process.stdout)
+                print_lines(process.stdout)
 
                 process.wait()
                 result = subprocess.CompletedProcess(
@@ -112,8 +112,8 @@ class SystemHelper:
             click.echo(f"    Command failed! Error: {e}")
             if suppress_output:
                 click.echo("    ⚠️ Command failed!")
-                if result and e.stdout:
-                    for line in e.stdout:
+                if result and (e.stdout or result.stdout):
+                    for line in e.stdout or result.stdout:
                         click.echo(line)
 
             raise
@@ -161,6 +161,20 @@ class SystemHelper:
         """Append text to file"""
         with open(file_path, "a") as f:
             f.write(text)
+
+    @staticmethod
+    def remove_from_file(file_path: str, text: str):
+        """Remove lines containing specific text from file"""
+        if not os.path.exists(file_path):
+            return
+
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+
+        with open(file_path, "w") as f:
+            for line in lines:
+                if text not in line:
+                    f.write(line)
 
     @staticmethod
     def write_file(file_path: str, content: str):
@@ -224,7 +238,9 @@ class PackageHelper:
         error = None
         while attempts < PackageHelper.MAX_RETRIES:
             try:
-                SystemHelper.run_command("apt-get -y upgrade", suppress_output=False)
+                SystemHelper.run_command(
+                    'apt-get -y -o Dpkg::Options::="--force-confnew" upgrade', suppress_output=False
+                )
                 SystemHelper.run_command("apt-get -y autoremove", suppress_output=False)
                 return
             except AptLockError as e:
@@ -279,6 +295,8 @@ class PackageHelper:
         else:
             if description:
                 click.echo(f"   ✓ {description} already installed")
+            else:
+                click.echo(f"   ✓ All packages ({', '.join(packages)}) already installed")
             return False
 
 

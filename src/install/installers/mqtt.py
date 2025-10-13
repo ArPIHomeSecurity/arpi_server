@@ -148,6 +148,14 @@ class MqttInstaller(BaseInstaller):
         self.configure_mqtt_configs()
         self.configure_mqtt_authentication()
 
+    def upgrade(self):
+        """Upgrade MQTT components"""
+        # 1. Check if MQTT version/config is outdated
+        # 2. If outdated, remove/replace as needed and call install()
+        # 3. If not outdated, skip install
+        # (Implement actual logic here)
+        pass
+
     def get_status(self) -> dict:
         """Get MQTT status"""
         return {

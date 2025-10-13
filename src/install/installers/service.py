@@ -12,13 +12,13 @@ class ServerInstaller(BaseInstaller):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.user = config.get("user", "argus")
-        self.db_password = config.get("db_password", "")
-        self.salt = config.get("salt", "")
-        self.secret = config.get("secret", "")
-        self.mqtt_password = config.get("mqtt_password", "")
-        self.install_source = config.get("install_source", "/tmp/server")
-        self.data_set_name = config.get("data_set_name", "")
+        self.user = config["user"]
+        self.db_password = config["db_password"]
+        self.salt = config["salt"]
+        self.secret = config["secret"]
+        self.mqtt_password = config["mqtt_password"]
+        self.install_source = config["install_source"]
+        self.data_set_name = config["data_set_name"]
 
     def generate_service_secrets(self):
         """Generate secrets for ArPI services"""
@@ -206,16 +206,6 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         else:
             click.echo("   ✓ No data set name provided, skipping database contents update")
 
-    def install(self):
-        """Install service components"""
-        self.generate_service_secrets()
-        self.create_service_directories()
-        self.create_python_virtual_environment()
-        self.save_secrets_to_file()
-        self.setup_systemd_services()
-        self.update_database_schema()
-        self.update_database_contents()
-
     def check_user_exists(self) -> bool:
         """Check if service user exists"""
         return os.path.exists(f"/home/{self.user}")
@@ -244,6 +234,24 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
             return current_revision == head_revision
         except subprocess.CalledProcessError:
             return False
+
+    def install(self):
+        """Install service components"""
+        self.generate_service_secrets()
+        self.create_service_directories()
+        self.create_python_virtual_environment()
+        self.save_secrets_to_file()
+        self.setup_systemd_services()
+        self.update_database_schema()
+        self.update_database_contents()
+
+    def upgrade(self):
+        """Upgrade ArPI service components"""
+        # 1. Check if service config/code is outdated
+        # 2. If outdated, remove/replace as needed and call install()
+        # 3. If not outdated, skip install
+        # (Implement actual logic here)
+        pass
 
     def get_status(self) -> dict:
         """Get service status"""

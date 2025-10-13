@@ -42,7 +42,7 @@ class SSHService:
                 systemd.StopUnit("ssh.service", "fail")
                 systemd[".Manager"].DisableUnitFiles(["ssh.service"], False)
         except GLib.Error as error:
-            self._logger.error("Failed: %s", error)
+            self._logger.error("Failed to update SSH service state: %s", error)
 
     def update_access_local_network(self):
         self._logger.debug("Updating SSH access...")

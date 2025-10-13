@@ -1,3 +1,4 @@
+from functools import cached_property
 import os
 import tempfile
 import click
@@ -11,11 +12,11 @@ class NginxInstaller(BaseInstaller):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.nginx_version = config.get("nginx_version", "1.24.0")
-        self.dhparam_file = config.get("dhparam_file", "")
-        self.user = config.get("user", "argus")
+        self.nginx_version = config["nginx_version"]
+        self.dhparam_file = config["dhparam_file"]
+        self.user = config["user"]
+        self.install_source = config["install_source"]
         self.nginx_user = "www-data"
-        self.install_source = config.get("install_source", "/tmp/server")
 
     def install_nginx_dependencies(self):
         """Install NGINX build dependencies"""
@@ -94,7 +95,9 @@ class NginxInstaller(BaseInstaller):
         )
 
         # Copy dhparam file
-        SystemHelper.run_command(f"cp {self.install_source}/{self.dhparam_file} /usr/local/nginx/conf/ssl/arpi_dhparam.pem")
+        SystemHelper.run_command(
+            f"cp {self.install_source}/{self.dhparam_file} /usr/local/nginx/conf/ssl/arpi_dhparam.pem"
+        )
         click.echo("   ✓ Copied dhparam file")
 
         # Set proper ownership for SSL directory
@@ -103,12 +106,6 @@ class NginxInstaller(BaseInstaller):
         )
 
         click.echo("   ✓ NGINX configuration setup complete")
-
-    def install(self):
-        """Install NGINX components"""
-        self.install_nginx_dependencies()
-        self.compile_nginx_from_source()
-        self.configure_nginx_setup()
 
     def check_user_in_group(self, user: str, group: str) -> bool:
         """Check if a user is in a specific group"""
@@ -120,18 +117,59 @@ class NginxInstaller(BaseInstaller):
 
     def check_config_valid(self) -> bool:
         """Check if NGINX configuration is valid"""
-        try:
-            result = SystemHelper.run_command(
-                "/usr/local/nginx/sbin/nginx -t", check=False, capture=True
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
+        result = SystemHelper.run_command(
+            "/usr/local/nginx/sbin/nginx -t", check=False
+        )
+        if result.returncode == 0:
+            return True
+        
+        for line in result.stdout:
+            if "syntax is ok" in line:
+                return True
+
+        return False
+
+    @cached_property
+    def get_system_nginx_version(self) -> str | None:
+        """Get the installed NGINX version"""
+        result = SystemHelper.run_command(
+            "/usr/local/nginx/sbin/nginx -v", check=False, capture=True
+        )
+        if result.returncode == 0:
+            version_line = result.stderr.strip()
+            if "nginx version:" in version_line:
+                click.echo(f"   ℹ️ Found NGINX version: {version_line}")
+                # format: nginx version: nginx/1.28.0
+                return version_line.split(":")[1].strip().split("/")[1]
+
+    def needs_installation(self) -> bool:
+        """Determine if NGINX needs installation or upgrade"""
+        click.echo(f"   ℹ️ NGINX Actual: {self.get_system_nginx_version} | Desired: {self.nginx_version}")
+        return self.get_system_nginx_version != self.nginx_version
+
+    def install(self):
+        """Install NGINX components"""
+        if self.needs_installation():
+            # remove old version
+            click.echo("   🗑️ Removing old NGINX version...")
+            SystemHelper.run_command("rm -fr /usr/local/nginx | true")
+
+            self.install_nginx_dependencies()
+            self.compile_nginx_from_source()
+        else:
+            click.echo("   ✓ NGINX already at the desired version")
+
+        self.configure_nginx_setup()
+
+    def upgrade(self):
+        """Upgrade NGINX components"""
+        self.install()
 
     def get_status(self) -> dict:
         """Get NGINX status"""
         return {
             "NGINX installed": os.path.exists("/usr/local/nginx/sbin/nginx"),
+            "NGINX version": os.path.exists("/usr/local/nginx/sbin/nginx") and not self.needs_installation(),
             "NGINX configured": os.path.exists("/usr/local/nginx/conf/sites-enabled/http.conf"),
             "NGINX user": self.check_user_in_group(self.nginx_user, self.user),
             "NGINX config valid": self.check_config_valid(),

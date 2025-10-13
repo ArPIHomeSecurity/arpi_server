@@ -1,4 +1,5 @@
 import os
+import subprocess
 import click
 
 from install.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
@@ -10,11 +11,11 @@ class DatabaseInstaller(BaseInstaller):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.postgresql_version = config.get("postgresql_version", "15")
-        self.db_username = config.get("db_username", "argus")
-        self.db_name = config.get("db_name", "argus")
-        self.db_password = config.get("db_password", "")
-        self.user = config.get("user", "argus")
+        self.postgresql_version = config["postgresql_version"]
+        self.db_username = config["db_username"]
+        self.db_name = config["db_name"]
+        self.db_password = config["db_password"]
+        self.user = config["user"]
 
         # try to read existing password from secrets.env
         secrets_file = os.path.join(f"/home/{self.user}/server", "secrets.env")
@@ -89,11 +90,6 @@ class DatabaseInstaller(BaseInstaller):
             click.echo(f"    ⚠️ WARNING: Database creation may have failed: {e}")
             self.warnings.append(f"Database creation may have failed: {e}")
 
-    def install(self):
-        """Install database components"""
-        self.install_postgresql()
-        self.configure_database()
-
     def check_user_exists(self) -> bool:
         """Check if the database user exists"""
         try:
@@ -119,14 +115,70 @@ class DatabaseInstaller(BaseInstaller):
         except Exception:
             return False
 
+    def get_system_postgresql_version(self) -> str | None:
+        """Get the installed PostgreSQL version"""
+        result = SystemHelper.run_command(
+            "psql --version", check=False, capture=True
+        )
+        if result.returncode == 0:
+            version_line = result.stdout.strip()
+            if "psql (PostgreSQL)" in version_line:
+                # format: psql (PostgreSQL) 15.3 (Ubuntu 15.3-1.pgdg22.04+1)
+                return version_line.split()[2].split(".")[0]
+
+    def is_user_in_gpio_group(self) -> bool:
+        """Check if user is in gpio group"""
+        try:
+            groups_output = SystemHelper.run_command(
+                f"groups {self.user}", capture=True
+            ).stdout
+            groups = groups_output.strip().split(":")[-1].strip().split()
+            return "gpio" in groups
+        except subprocess.CalledProcessError:
+            return False
+
+    def user_postgres_group(self):
+        """Add user to postgres group for DB access"""
+        click.echo("   👥 Adding user to postgres group...")
+
+        if not self.is_user_in_postgres_group():
+            SystemHelper.run_command(f"usermod -aG postgres {self.user}")
+            click.echo(f"   ✓ User '{self.user}' added to postgres group")
+        else:
+            click.echo(f"   ✓ User '{self.user}' is already in postgres group")
+
+    def needs_installation(self) -> bool:
+        """Determine if PostgreSQL needs installation or upgrade"""
+        click.echo(f"   ℹ️ PostgreSQL Actual: {self.get_system_postgresql_version()} | Desired: {self.postgresql_version}")
+        return self.get_system_postgresql_version() != self.postgresql_version
+
+    def install(self):
+        """Install database components"""
+        if self.needs_installation():
+            self.install_postgresql()
+        else:
+            click.echo("   ✓ PostgreSQL already at the desired version")
+
+        self.configure_database()
+
+    def upgrade(self):
+        """Upgrade database components"""
+        # 1. Check if database version/schema/config is outdated
+        # 2. If outdated, remove/replace/migrate as needed and call install()
+        # 3. If not outdated, skip install
+        # (Implement actual logic here)
+        pass
+
     def get_status(self) -> dict:
         """Get database status"""
         return {
             "PostgreSQL installed": PackageHelper.is_package_installed(
                 f"postgresql-{self.postgresql_version}"
             ),
+            "PostgreSQL version": not self.needs_installation(),
             "PostgreSQL running": SystemHelper.is_service_running("postgresql"),
             "PostgreSQL enabled": SystemHelper.is_service_enabled("postgresql"),
+            "User in postgres group": self.is_user_in_gpio_group(),
             "Database user exists": self.check_user_exists(),
             "Database exists": self.check_database_exists(),
         }

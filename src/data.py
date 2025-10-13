@@ -347,8 +347,7 @@ def env_test_01():
 
     session.commit()
 
-
-def env_test_live_01():
+def env_test_with_v2():
     session = get_database_session()
     admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
@@ -404,7 +403,7 @@ def env_test_live_01():
         silent_alert=True,
     )
     s2 = Sensor(
-        channel=0,
+        channel=1,
         channel_type=ChannelTypes.CHANNEL_B,
         sensor_contact_type=SensorContactTypes.NC,
         sensor_eol_count=SensorEOLCount.SINGLE,
@@ -415,7 +414,7 @@ def env_test_live_01():
         description="Test room 0 door sensor",
     )
     s3 = Sensor(
-        channel=5,
+        channel=2,
         channel_type=ChannelTypes.BASIC,
         sensor_type=SENSOR_TYPES[1],
         sensor_contact_type=SensorContactTypes.NC,

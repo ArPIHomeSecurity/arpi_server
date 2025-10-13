@@ -14,11 +14,13 @@ Based on the original ArPI bash modules:
 """
 
 from datetime import datetime
+import json
+import traceback
 import click
 import logging
 import os
 
-from install.helpers import SecurityHelper, SystemHelper
+from install.helpers import SystemHelper, SecurityHelper
 from install.installers import (
     BaseInstaller,
     SystemInstaller,
@@ -31,7 +33,11 @@ from install.installers import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -40,206 +46,175 @@ class ArpiOrchestrator:
 
     def __init__(self):
         self.config = {
+            "python_version": os.getenv("PYTHON_VERSION", "3.11"),
             "postgresql_version": os.getenv("POSTGRESQL_VERSION", "15"),
-            "nginx_version": os.getenv("NGINX_VERSION", "1.24.0"),
+            "nginx_version": os.getenv("NGINX_VERSION", "1.28.0"),
             "db_username": os.getenv("ARGUS_DB_USERNAME", "argus"),
             "db_name": os.getenv("ARGUS_DB_NAME", "argus"),
-            "dhparam_file": os.getenv("DHPARAM_FILE", "arpi_dhparam.pem"),
             "db_password": os.getenv("ARGUS_DB_PASSWORD", ""),
-            "data_set_name": os.getenv("DATA_SET_NAME", ""),
+            "data_set_name": os.getenv("DATA_SET_NAME", "prod"),
+            "dhparam_file": os.getenv("DHPARAM_FILE", "arpi_dhparam.pem"),
             "deploy_simulator": os.getenv("DEPLOY_SIMULATOR", "false"),
             "salt": os.getenv("SALT", ""),
             "secret": os.getenv("SECRET", ""),
             "mqtt_password": os.getenv("ARGUS_MQTT_PASSWORD", ""),
             "user": os.getenv("ARGUS_USER", "argus"),
             "install_source": os.getenv("INSTALL_SOURCE", "/tmp/server"),
+            "board_version": int(os.getenv("BOARD_VERSION", 0)),
         }
-
-        click.echo("Installation Configuration:")
-        for key, value in self.config.items():
-            display_value = value
-            if all(x in key.lower() for x in ["password", "secret", "salt"]) and value:
-                if not value:
-                    display_value = value
-                else:
-                    display_value = "****"
-            click.echo(f"   {key}: {display_value}")
-
-        # Initialize component installers
-        self.system_installer = SystemInstaller(self.config)
-        self.hardware_installer = HardwareInstaller(self.config)
-        self.database_installer = DatabaseInstaller(self.config)
-        self.nginx_installer = NginxInstaller(self.config)
-        self.mqtt_installer = MqttInstaller(self.config)
-        self.certbot_installer = CertbotInstaller(self.config)
-        self.server_installer = ServerInstaller(self.config)
+        self._installer_cache = {}
 
     def get_installer(self, component: str) -> BaseInstaller:
-        """Get installer for specific component"""
+        """Factory method to get the appropriate installer, with caching"""
+        if component in self._installer_cache:
+            return self._installer_cache[component]
+
         installers = {
-            "system": self.system_installer,
-            "hardware": self.hardware_installer,
-            "database": self.database_installer,
-            "nginx": self.nginx_installer,
-            "mqtt": self.mqtt_installer,
-            "certbot": self.certbot_installer,
-            "services": self.server_installer,
-        }
-        return installers.get(component)
-
-    def get_all_status(self) -> dict:
-        """Get status of all components"""
-        return {
-            "system": self.system_installer.get_status(),
-            "hardware": self.hardware_installer.get_status(),
-            "database": self.database_installer.get_status(),
-            "nginx": self.nginx_installer.get_status(),
-            "mqtt": self.mqtt_installer.get_status(),
-            "certbot": self.certbot_installer.get_status(),
-            "services": self.server_installer.get_status(),
+            "system": SystemInstaller,
+            "hardware": HardwareInstaller,
+            "database": DatabaseInstaller,
+            "nginx": NginxInstaller,
+            "mqtt": MqttInstaller,
+            "certbot": CertbotInstaller,
+            "services": ServerInstaller,
         }
 
-    def get_warnings(self) -> list:
-        """Get all warnings from installers"""
-        warnings = []
-        for installer in [
-            self.system_installer,
-            self.hardware_installer,
-            self.database_installer,
-            self.nginx_installer,
-            self.mqtt_installer,
-            self.certbot_installer,
-            self.server_installer,
-        ]:
-            warnings.extend(installer.warnings)
-        return warnings
+        installer_class = installers.get(component)
+        if not installer_class:
+            raise ValueError(f"Unknown component: {component}")
+
+        try:
+            self._installer_cache[component] = installer_class(self.config)
+        except ValueError as e:
+            click.echo(f"⚠️ Could not initialize installer for {component}: {e}")
+            return None
+
+        return self._installer_cache[component]
+
+
+# --- CLI Implementation ---
+COMPONENTS = [
+    "system",
+    "hardware",
+    "database",
+    "nginx",
+    "mqtt",
+    "certbot",
+    "services",
+]
+
+
+def get_selected_components(selected):
+    if not selected:
+        return COMPONENTS
+
+    return list(selected)
 
 
 @click.group()
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output (debug logging)")
+@click.option("--board-version", type=int, default=None, help="Hardware board version (2 or 3)")
 @click.pass_context
-def cli(ctx):
+def cli(ctx, verbose, board_version):
     """ArPI Installation and Management Tool"""
     ctx.ensure_object(dict)
+
+    # Set logging level based on verbose flag
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose logging enabled")
+
     ctx.obj["orchestrator"] = ArpiOrchestrator()
+    ctx.obj["verbose"] = verbose
+
+    # cli argument has priority over environment variable
+    if board_version is not None:
+        ctx.obj["orchestrator"].config["board_version"] = board_version
+
+    if ctx.obj["orchestrator"].config["board_version"] not in [2, 3]:
+        # read board version from input
+        click.echo("Please specify a valid board version (2 or 3):")
+        while True:
+            try:
+                version = int(input("Board version (2 or 3): ").strip())
+                if version in [2, 3]:
+                    ctx.obj["orchestrator"].config["board_version"] = version
+                    ctx.obj["board_version"] = version
+                    break
+                else:
+                    click.echo("Invalid input. Please enter 2 or 3.")
+            except ValueError:
+                click.echo("Invalid input. Please enter a number (2 or 3).")
 
 
 @cli.command()
+@click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
 @click.pass_context
-def install_system(ctx):
-    """Install and configure system packages"""
+def install(ctx, component):
+    """
+    Install the full environment for the server or a specific component
+    """
+    ctx.ensure_object(dict)
+    start_time = datetime.now()
+    click.echo("🚀 Starting ArPI installation...")
+    click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    components = get_selected_components(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
+    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4))
+    for comp in components:
+        installer = orchestrator.get_installer(comp)
+        if not installer:
+            continue
 
-    click.echo("🔧 Installing system...")
-    orchestrator.system_installer.install()
-    click.echo("✅ System installation complete")
+        click.echo("=====================================")
+        click.echo(f"Installing {comp}...")
+        try:
+            installer.install()
+            click.echo(f"✓ {comp} installed successfully.")
+        except Exception as e:
+            click.echo(f"⚠️ Failed to install {comp}: {e}")
 
+    click.echo(f"Installation completed in {datetime.now() - start_time}")
 
-@cli.command()
-@click.pass_context
-def install_hardware(ctx):
-    """Install and configure hardware components (RTC, GSM, WiringPi)"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
+    for comp in components:
+        installer = orchestrator.get_installer(comp)
+        for warning in installer.warnings:
+            click.echo(f"⚠️ Warning during {comp} installation: {warning}")
 
-    click.echo("🔧 Installing hardware components...")
-    orchestrator.hardware_installer.install()
-    click.echo("✅ Hardware installation complete")
-
-
-@cli.command()
-@click.pass_context
-def install_database(ctx):
-    """Install and configure PostgreSQL database"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-
-    click.echo("🗄️ Installing database...")
-    orchestrator.database_installer.install()
-    click.echo("✅ Database installation complete")
-
-
-@cli.command()
-@click.pass_context
-def install_nginx(ctx):
-    """Install and configure NGINX web server"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-
-    click.echo("🌐 Installing NGINX...")
-    orchestrator.nginx_installer.install()
-    click.echo("✅ NGINX installation complete")
+    if any(
+        orchestrator.get_installer(comp).needs_reboot
+        for comp in components
+        if orchestrator.get_installer(comp)
+    ):
+        click.echo("🔄 A system reboot is required to apply all changes.")
+        click.echo("Please reboot the system at your earliest convenience.")
 
 
 @cli.command()
+@click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
 @click.pass_context
-def install_mqtt(ctx):
-    """Install and configure MQTT broker"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
+def status(ctx, component):
+    """
+    Display the status of the full environment for the server or a specific component
+    """
+    ctx.ensure_object(dict)
+    components = get_selected_components(component)
+    orchestrator = ctx.obj["orchestrator"]
+    for comp in components:
+        installer = orchestrator.get_installer(comp)
+        if not installer:
+            continue
 
-    click.echo("📡 Installing MQTT broker...")
-    orchestrator.mqtt_installer.install()
-    click.echo("✅ MQTT installation complete")
-
-
-@cli.command()
-@click.pass_context
-def install_certbot(ctx):
-    """Install Certbot for SSL certificate management"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-
-    click.echo("🔒 Installing Certbot...")
-    orchestrator.certbot_installer.install()
-    click.echo("✅ Certbot installation complete")
-
-
-@cli.command()
-@click.pass_context
-def install_server(ctx):
-    """Setup ArPI services and configurations"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-
-    click.echo("⚙️ Setting up ArPI services...")
-    orchestrator.server_installer.install()
-    click.echo("✅ ArPI services setup complete")
-
-
-@cli.command()
-@click.pass_context
-def full_install(ctx):
-    """Run complete ArPI installation"""
-    click.echo("🚀 Starting full ArPI installation...")
-
-    current_user_process = SystemHelper.run_command("whoami", capture=True)
-    click.echo(f"👤 Executing with user: {current_user_process.stdout}")
-    ctx.invoke(install_system)
-    ctx.invoke(install_hardware)
-    ctx.invoke(install_database)
-    ctx.invoke(install_nginx)
-    ctx.invoke(install_mqtt)
-    ctx.invoke(install_certbot)
-    ctx.invoke(install_server)
-
-    warnings = ctx.obj["orchestrator"].get_warnings()
-    if warnings:
-        click.echo("\n⚠️ Installation completed with warnings:")
-        for warning in warnings:
-            click.echo(f"   - {warning}")
-
-    click.echo("🎉 Full ArPI installation complete!")
-
-
-@cli.command()
-@click.pass_context
-def status(ctx):
-    """Check status of ArPI components"""
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-
-    click.echo("📊 ArPI System Status:")
-
-    all_status = orchestrator.get_all_status()
-
-    for component, status in all_status.items():
-        click.echo(f"\n{component.upper()}:")
-        for key, value in status.items():
-            status_icon = "✅" if value else "❌"
-            click.echo(f"   {status_icon} {key}")
+        click.echo(f"\nStatus for {comp}:")
+        try:
+            status = installer.get_status()
+            for k, v in status.items():
+                status_emoji = {None: "❓", True: "✅", False: "❌"}.get(v, "❓")
+                click.echo(f"  {k}: {status_emoji}")
+        except Exception as e:
+            click.echo(f"⚠️ Failed to get status for {comp}: {e}")
+            if ctx.obj["verbose"]:
+                traceback.print_exc()
 
 
 @cli.command()
@@ -248,9 +223,9 @@ def status(ctx):
     "--backup", is_flag=True, help="Create a backup of the existing server code before installation"
 )
 @click.pass_context
-def install_code(ctx, restart, backup):
+def deploy_code(ctx, restart, backup):
     """
-    Install source code of the server component
+    Deploy source code of the server component from the specified source directory to the destination directory.
     """
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
     src = orchestrator.config["install_source"]
@@ -278,7 +253,7 @@ def install_code(ctx, restart, backup):
     # remove all files and folders in dst except secrets.env at the top level
     SystemHelper.run_command(
         f"find '{dst}' -mindepth 1 -maxdepth 1 ! -name 'secrets.env' -exec rm -rf -- '{{}}' +",
-        check=False
+        check=False,
     )
 
     click.echo(f"Copying {src} to {dst} (without overwriting existing files)...")
@@ -287,8 +262,25 @@ def install_code(ctx, restart, backup):
 
     user = orchestrator.config["user"]
     click.echo(f"Setting ownership to {user}:{user} ...")
-    SecurityHelper.set_file_permissions(dst, user, 755, recursive=True)
+    SecurityHelper.set_file_permissions(dst, f"{user}:{user}", 755, recursive=True)
 
+    # configure board version in .env
+    if ctx.obj["orchestrator"].config["board_version"] not in [2, 3]:
+        raise ValueError(
+            f"Invalid board version={ctx.obj['orchestrator'].config['board_version']}. Must be 2 or 3."
+        )
+
+    env_file = os.path.join(dst, ".env")
+    if os.path.exists(env_file):
+        SystemHelper.run_command(
+            f"sed -i 's/^BOARD_VERSION=.*/BOARD_VERSION={ctx.obj['orchestrator'].config['board_version']}/' '{env_file}'",
+            check=False,
+        )
+        click.echo(
+            f"Set BOARD_VERSION={ctx.obj['orchestrator'].config['board_version']} in {env_file}"
+        )
+    else:
+        click.echo(f"   ⚠️ {env_file} not found")
 
     if restart:
         click.echo("Restarting argus_server service...")

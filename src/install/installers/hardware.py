@@ -12,37 +12,22 @@ class HardwareInstaller(BaseInstaller):
     def __init__(self, config: dict):
         super().__init__(config)
         self.install_source = config.get("install_source", "/tmp/server")
+        self._board_version = config.get("board_version", 3)
+        self._config_txt = "/boot/firmware/config.txt"
 
-    def install_rtc_hardware(self):
+    def setup_rtc_hardware(self):
         """Install and configure RTC (DS1307) hardware"""
         click.echo("   🕐 Setting up RTC hardware...")
 
         # Install i2c-tools
         PackageHelper.install_packages(["i2c-tools"])
 
-        # Configure RTC device
-        try:
-            SystemHelper.run_command("echo ds1307 0x68 > /sys/class/i2c-adapter/i2c-1/new_device")
-            click.echo("   ✓ RTC device configured")
-        except Exception as e:
-            click.echo(f"    ⚠️ WARNING: Could not configure RTC device: {e}")
-            self.warnings.append(f"Could not configure RTC device: {e}")
-
         # Configure device tree overlay
-        config_txt = "/boot/firmware/config.txt"
-        if os.path.exists(config_txt) and not SystemHelper.file_contains_text(
-            config_txt, "dtoverlay=i2c-rtc,ds1307"
+        if os.path.exists(self._config_txt) and not SystemHelper.file_contains_text(
+            self._config_txt, "dtoverlay=i2c-rtc,ds1307"
         ):
-            SystemHelper.append_to_file(config_txt, "\ndtoverlay=i2c-rtc,ds1307\n")
+            SystemHelper.append_to_file(self._config_txt, "\ndtoverlay=i2c-rtc,ds1307\n")
             click.echo("   ✓ RTC overlay configured")
-
-        # Configure kernel module
-        modules_file = "/etc/modules"
-        if os.path.exists(modules_file) and not SystemHelper.file_contains_text(
-            modules_file, "rtc-ds1307"
-        ):
-            SystemHelper.append_to_file(modules_file, "rtc-ds1307\n")
-            click.echo("   ✓ RTC module configured")
 
         # Copy RTC cron job (matching bash script)
         rtc_cron_source = f"{self.install_source}/etc/cron/hwclock"
@@ -53,7 +38,7 @@ class HardwareInstaller(BaseInstaller):
         else:
             click.echo(f"   ⚠️ RTC cron job file not found at {rtc_cron_source}")
 
-    def install_gsm_hardware(self):
+    def setup_gsm_hardware(self):
         """Install and configure GSM module"""
         click.echo("   📱 Setting up GSM hardware...")
 
@@ -75,22 +60,45 @@ class HardwareInstaller(BaseInstaller):
             click.echo("   ✓ Console removed from boot command line")
 
         # Configure UART and Bluetooth settings
-        config_txt = "/boot/firmware/config.txt"
-        if os.path.exists(config_txt):
+        if os.path.exists(self._config_txt):
             additions = []
-            if not SystemHelper.file_contains_text(config_txt, "enable_uart=1"):
+            if not SystemHelper.file_contains_text(self._config_txt, "enable_uart=1"):
                 additions.extend(["\n# Enable UART", "enable_uart=1", "dtoverlay=uart0"])
 
-            if not SystemHelper.file_contains_text(config_txt, "dtoverlay=disable-bt"):
+            if not SystemHelper.file_contains_text(self._config_txt, "dtoverlay=disable-bt"):
                 additions.extend(["dtoverlay=disable-bt", "dtoverlay=miniuart-bt"])
 
             if additions:
-                SystemHelper.append_to_file(config_txt, "\n".join(additions) + "\n")
+                SystemHelper.append_to_file(self._config_txt, "\n".join(additions) + "\n")
                 click.echo("   ✓ UART and Bluetooth configured")
 
         # Disable hciuart service
         ServiceHelper.stop_service("hciuart")
         ServiceHelper.disable_service("hciuart")
+
+    def setup_spi(self):
+        """Enable SPI interface"""
+        click.echo("   🔧 Enabling SPI interface...")
+
+        if self._board_version == 3:
+            # enable SPI for board version 3
+            if os.path.exists(self._config_txt) and not SystemHelper.file_contains_text(
+                self._config_txt, "dtparam=spi=on"
+            ):
+                SystemHelper.append_to_file(self._config_txt, "\ndtparam=spi=on\n")
+                self.needs_reboot = True
+                click.echo("   ✓ SPI interface enabled")
+        elif self._board_version == 2:
+            # disable SPI for board version 2
+            if os.path.exists(self._config_txt) and SystemHelper.file_contains_text(
+                self._config_txt, "dtparam=spi=on"
+            ):
+                SystemHelper.remove_from_file(self._config_txt, "dtparam=spi=on")
+                self.needs_reboot = True
+                click.echo("   ✓ SPI interface disabled")
+        else:
+            click.echo(f"   ⚠️ Unknown board version: {self._board_version}")
+            self.warnings.append(f"Unknown board version: {self._board_version}")
 
     def install_wiringpi(self):
         """Install WiringPi library"""
@@ -122,14 +130,28 @@ class HardwareInstaller(BaseInstaller):
 
     def install(self):
         """Install hardware components"""
-        self.install_rtc_hardware()
-        self.install_gsm_hardware()
+        self.setup_rtc_hardware()
+        self.setup_gsm_hardware()
+        self.setup_spi()
         self.install_wiringpi()
+
+    def upgrade(self):
+        """Upgrade hardware components"""
+        # 1. Check if hardware config is outdated
+        # 2. If outdated, remove/replace as needed and call install()
+        # 3. If not outdated, skip install
+        # (Implement actual logic here)
+        pass
 
     def get_status(self) -> dict:
         """Get hardware component status"""
         return {
             "i2c_tools installed": PackageHelper.is_package_installed("i2c-tools"),
-            "RTC configured": os.path.exists("/sys/class/i2c-adapter/i2c-1/1-0068"),
+            "RTC configured": SystemHelper.file_contains_text(
+                "/boot/firmware/config.txt", "dtoverlay=i2c-rtc,ds1307"
+            ),
+            "GSM UART configured": SystemHelper.file_contains_text(
+                "/boot/firmware/config.txt", "enable_uart=1"
+            ),
             "WiringPi available": os.system("gpio -v > /dev/null 2>&1") == 0,
         }

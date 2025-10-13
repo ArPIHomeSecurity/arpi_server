@@ -11,7 +11,8 @@ class SystemInstaller(BaseInstaller):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.user = config.get("user", "argus")
+        self.user = config["user"]
+        self.python_version = config["python_version"]
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -86,7 +87,9 @@ class SystemInstaller(BaseInstaller):
         """Configure zsh environment for ArPI"""
         click.echo("   ⚙️ Configuring zsh environment...")
 
-        if not self.check_zsh_configured():
+        if not SystemHelper.file_contains_text(
+            f"/home/{self.user}/.zshrc", ". ~/server/.env"
+        ):
             home = f"/home/{self.user}"
             zshrc_file = os.path.join(home, ".zshrc")
 
@@ -136,17 +139,80 @@ set +a
             if os.path.exists("/etc/pip.conf"):
                 os.remove("/etc/pip.conf")
 
+    def is_user_in_gpio_group(self) -> bool:
+        """Check if user is in gpio group"""
+        try:
+            groups_output = SystemHelper.run_command(
+                f"groups {self.user}", capture=True
+            ).stdout
+            groups = groups_output.strip().split(":")[-1].strip().split()
+            return "gpio" in groups
+        except subprocess.CalledProcessError:
+            return False
+
+    def user_gpio_group(self):
+        """Add user to gpio group for GPIO access"""
+        click.echo("   👥 Adding user to gpio group...")
+
+        if not self.is_user_in_gpio_group():
+            SystemHelper.run_command(f"usermod -aG gpio {self.user}")
+            click.echo(f"   ✓ User '{self.user}' added to gpio group")
+        else:
+            click.echo(f"   ✓ User '{self.user}' is already in gpio group")
+
+    def check_python_version(self) -> bool:
+        """Check if the required Python version is installed"""
+        try:
+            python_executable = f"python{self.python_version}"
+            version_output = SystemHelper.run_command(
+                f"{python_executable} --version", capture=True
+            ).stdout
+            return version_output.startswith(f"Python {self.python_version}")
+        except subprocess.CalledProcessError:
+            return False
+
+    def setup_polkit_rule(self):
+        """Setup polkit rule for systemd access without password"""
+        click.echo("   🛂 Setting up polkit rule for systemd access...")
+
+        rule_file = "/etc/polkit-1/rules.d/49-nopasswd_systemd.rules"
+        rule_content = """
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.systemd1.manage-units" ||
+         action.id == "org.freedesktop.systemd1.manage-unit-files") &&
+        subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+});
+
+"""
+        if not os.path.exists(rule_file):
+            SystemHelper.write_file(rule_file, rule_content)
+    
     def install(self):
         """Install system components"""
         self.install_system_packages()
         self.install_oh_my_zsh()
         self.configure_zsh_environment()
         self.install_common_tools()
+        self.user_gpio_group()
+        self.setup_polkit_rule()
+
+    def upgrade(self):
+        """Upgrade system components"""
+        # 1. Check if system packages/config are outdated
+        # 2. If outdated, remove/replace as needed and call install()
+        # 3. If not outdated, skip install
+        # (Implement actual logic here)
+        pass
 
     def get_status(self) -> dict:
         """Get system component status"""
         return {
-            "zsh installed": PackageHelper.is_package_installed("zsh"),
-            "zsh configured": self.check_zsh_configured(),
-            "python3 installed": PackageHelper.is_package_installed("python3"),
+            "ZSH installed": PackageHelper.is_package_installed("zsh"),
+            "ZSH configured": self.check_zsh_configured(),
+            "User in GPIO group": self.is_user_in_gpio_group(),
+            "Python 3 installed": PackageHelper.is_package_installed("python3"),
+            f"Python version={self.python_version}": self.check_python_version(),
+            "Polkit rule": os.path.exists("/etc/polkit-1/rules.d/49-nopasswd_systemd.rules"),
         }

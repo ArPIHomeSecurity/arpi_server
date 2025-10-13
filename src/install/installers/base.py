@@ -7,6 +7,7 @@ class BaseInstaller(ABC):
     def __init__(self, config: dict):
         self.config = config
         self.warnings = []
+        self.needs_reboot = False
 
     @abstractmethod
     def install(self):
