@@ -17,6 +17,7 @@ GITHUB_API_WEBAPP = "https://api.github.com/repos/ArPIHomeSecurity/arpi_webappli
 class AssetNotFoundError(Exception):
     pass
 
+
 @dataclass
 class VersionInfo:
     version: str
@@ -104,13 +105,14 @@ def get_webapplication_version() -> VersionInfo | None:
         print("⚠️  Warning: Webapplication version file not found")
 
 
-def upgrade_server(tmp_dir):
+def upgrade_server(tmp_dir, board_version: str):
     """
     Execute install.py from the extracted server files.
     """
     install_config = {
         "PYTHONPATH": "src",
         "INSTALL_SOURCE": tmp_dir,
+        "BOARD_VERSION": board_version,
     }
 
     # deploy source code
@@ -123,7 +125,7 @@ def upgrade_server(tmp_dir):
     os.system(
         f"cd {tmp_dir}; "
         f"sudo -E {' '.join(f'{key}={value}' for key, value in install_config.items())} "
-        f"python3 -m install"
+        f"python3 -m install install"
     )
 
 
@@ -203,7 +205,7 @@ def compare_versions(v1: str, v2: VersionInfo):
     return 0
 
 
-def check_and_upgrade(api_url, get_version_func, project_name, prerelease):
+def check_and_upgrade(api_url, get_version_func, project_name, prerelease, board_version):
     """
     Check for updates and upgrade the specified project if a newer version is available.
     """
@@ -220,10 +222,10 @@ def check_and_upgrade(api_url, get_version_func, project_name, prerelease):
         )
     elif result == 1:
         print(f"    ⬆️  New version {latest_release['tag_name']} available for {project_name}")
-        upgrade_project(latest_release, project_name)
+        upgrade_project(latest_release, project_name, board_version)
 
 
-def upgrade_project(release: dict, project: str):
+def upgrade_project(release: dict, project: str, board_version: str):
     """
     Upgrade the specified project using the latest release.
     """
@@ -236,7 +238,7 @@ def upgrade_project(release: dict, project: str):
 
     if project == "server":
         print("      ⚙️  Upgrading server files...")
-        upgrade_server(tmp_dir)
+        upgrade_server(tmp_dir, board_version)
     elif project == "webapplication":
         print("      ⚙️  Upgrading webapplication files...")
         upgrade_webapplication(tmp_dir)
@@ -263,14 +265,25 @@ def main():
     print("🔧 Starting ArPI upgrade process...")
     parser = argparse.ArgumentParser()
     parser.add_argument("--prerelease", action="store_true", help="Use latest prerelease")
+    parser.add_argument("--board-version", type=str, help="Board version (2 or 3)", default="2")
     args = parser.parse_args()
 
     # ensure required packages are installed
     install_packages(["pipenv", "python3-click"])
 
-    check_and_upgrade(GITHUB_API_SERVER, get_server_version, "server", args.prerelease)
     check_and_upgrade(
-        GITHUB_API_WEBAPP, get_webapplication_version, "webapplication", args.prerelease
+        GITHUB_API_SERVER,
+        get_server_version,
+        "server",
+        args.prerelease,
+        args.board_version,
+    )
+    check_and_upgrade(
+        GITHUB_API_WEBAPP,
+        get_webapplication_version,
+        "webapplication",
+        args.prerelease,
+        args.board_version,
     )
 
     print("  🔄 Restarting services: argus_server, argus_monitor, nginx ...")
