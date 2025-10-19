@@ -6,7 +6,7 @@ import logging
 from os import environ
 
 from models import ChannelTypes, Sensor, SensorEOLCount
-from monitor.sensor.wirings import PullUpConfig
+from monitor.sensor.wirings import PullUpConfig, PullUpDownConfig
 from constants import LOG_SENSORS
 
 TOLERANCE_V2 = 0.01
@@ -17,6 +17,8 @@ CHANNEL_SHORTAGE = 0.0
 
 # pull-up resistor
 R_PULL_UP = 2000
+# pull-down resistor
+R_PULL_DOWN = 20000
 
 # EOL resistor for channel A
 R_A = 5600
@@ -24,7 +26,8 @@ R_A = 5600
 R_B = 3000
 
 # Create a default configuration instance for calculating channel constants
-wiring_config = PullUpConfig(R_PULL_UP, R_A, R_B)
+# wiring_config = PullUpConfig(R_PULL_UP, R_A, R_B)
+wiring_config = PullUpDownConfig(R_PULL_UP, R_PULL_DOWN, R_A, R_B)
 
 BOARD_VERSION = int(environ.get("BOARD_VERSION", 1))
 
