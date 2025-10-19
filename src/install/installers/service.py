@@ -13,7 +13,6 @@ class ServerInstaller(BaseInstaller):
     def __init__(self, config: dict):
         super().__init__(config)
         self.user = config["user"]
-        self.db_password = config["db_password"]
         self.salt = config["salt"]
         self.secret = config["secret"]
         self.mqtt_password = config["mqtt_password"]
@@ -29,10 +28,6 @@ class ServerInstaller(BaseInstaller):
 
         click.echo("   🔑 Generating service secrets...")
         secrets_generated = False
-
-        if not self.db_password:
-            self.db_password = SecurityHelper.generate_password()
-            secrets_generated = True
 
         if not self.salt:
             self.salt = SecurityHelper.generate_password()
@@ -108,7 +103,6 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
 SALT="{self.salt}"
 SECRET="{self.secret}"
-DB_PASSWORD="{self.db_password}"
 ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
 """
 

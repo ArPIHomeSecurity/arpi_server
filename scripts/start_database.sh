@@ -7,6 +7,6 @@ docker start argus-database || docker run -d -it \
     -v /var/run/postgresql:/var/run/postgresql \
     -v argus-database:/var/lib/postgresql/data \
     -e POSTGRES_USER=$DB_USER \
-    -e POSTGRES_PASSWORD=$DB_PASSWORD \
+    -e POSTGRES_PASSWORD=argus1 \
     -e POSTGRES_DB=$DB_SCHEMA \
     postgres:15

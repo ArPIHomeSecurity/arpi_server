@@ -211,7 +211,7 @@ class Certbot:
                 cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[
                     0
                 ].value
-                self._logger.debug("Domain in certificate: %s", cert_domain)
+                self._logger.info("Domain in certificate: %s", cert_domain)
 
         dyndns_config = load_dyndns_config()
         if dyndns_config and dyndns_config.hostname == cert_domain:

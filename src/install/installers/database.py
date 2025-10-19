@@ -14,17 +14,7 @@ class DatabaseInstaller(BaseInstaller):
         self.postgresql_version = config["postgresql_version"]
         self.db_username = config["db_username"]
         self.db_name = config["db_name"]
-        self.db_password = config["db_password"]
         self.user = config["user"]
-
-        # try to read existing password from secrets.env
-        secrets_file = os.path.join(f"/home/{self.user}/server", "secrets.env")
-        if os.path.exists(secrets_file):
-            with open(secrets_file, "r") as f:
-                for line in f:
-                    if line.startswith("DB_PASSWORD="):
-                        self.db_password = line.strip().split("=", 1)[1].strip('"')
-                        break
 
     def install_postgresql(self):
         """Install PostgreSQL database"""
@@ -49,11 +39,6 @@ class DatabaseInstaller(BaseInstaller):
         """Configure PostgreSQL database for ArPI"""
         click.echo("   ⚙️ Configuring database...")
 
-        # Generate database password if not set
-        if not self.db_password:
-            self.db_password = SecurityHelper.generate_password()
-            click.echo("   ✓ Generated database password")
-
         # Create database user
         try:
             # Check if user exists
@@ -67,12 +52,6 @@ class DatabaseInstaller(BaseInstaller):
             else:
                 click.echo(f"   ✓ Database user {self.db_username} already exists")
 
-            # we socket based authentication, so no need to set password
-            # SystemHelper.run_command(
-            #     f'su - postgres -c "psql -c \\"ALTER USER {self.db_username} WITH PASSWORD \'{self.db_password}\';\\""',
-            #     suppress_output=False,
-            # )
-            # click.echo(f"   ✓ Updated password for user: {self.db_username}")
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: User creation may have failed: {e}")
             self.warnings.append(f"User creation may have failed: {e}")
