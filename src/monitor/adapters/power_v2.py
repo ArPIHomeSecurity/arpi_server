@@ -1,5 +1,6 @@
 import logging
 
+import lgpio
 from gpiozero import DigitalInputDevice
 
 from constants import LOG_ADPOWER
@@ -21,7 +22,17 @@ class PowerAdapter:
 
         self._logger.debug("Power sense creating...")
         # the sense is on the last channel
-        self._sense = DigitalInputDevice(V2BoardPin.POWER_PIN)
+        try:
+            self._sense = DigitalInputDevice(V2BoardPin.POWER_PIN)
+        except (OSError, ValueError, RuntimeError, lgpio.error) as e:
+            self._logger.error("Failed to init DigitalInputDevice for power sense: %s", e)
+            self._sense = None
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the power adapter is initialized properly.
+        """
+        return self._sense is not None
 
     def __del__(self):
         self._cleanup()

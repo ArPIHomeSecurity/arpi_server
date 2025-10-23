@@ -7,6 +7,7 @@ from threading import Lock
 from time import sleep
 from typing import List
 
+import lgpio
 from constants import LOG_ADOUTPUT
 from gpiozero import DigitalOutputDevice, DigitalInputDevice
 
@@ -49,11 +50,19 @@ class OutputAdapter:
         self._states = [0] * OUTPUT_NUMBER
 
         # Allow pins to be set after instantiation (for get_output_adapter)
-        self._latch = DigitalOutputDevice(latch_pin)
-        self._enable = DigitalOutputDevice(enable_pin)
-        self._clock = DigitalOutputDevice(clock_pin)
-        self._data_in = DigitalInputDevice(data_in_pin)
-        self._data_out = DigitalOutputDevice(data_out_pin)
+        try:
+            self._latch = DigitalOutputDevice(latch_pin)
+            self._enable = DigitalOutputDevice(enable_pin)
+            self._clock = DigitalOutputDevice(clock_pin)
+            self._data_in = DigitalInputDevice(data_in_pin)
+            self._data_out = DigitalOutputDevice(data_out_pin)
+        except lgpio.error as error:
+            self._latch = None
+            self._enable = None
+            self._clock = None
+            self._data_in = None
+            self._data_out = None
+            self._logger.error(f"Error initializing digital devices: {error}")
 
         if all([self._latch, self._enable, self._clock, self._data_in, self._data_out]):
             self._logger.debug(
@@ -66,14 +75,18 @@ class OutputAdapter:
             self._reset_faults()
             self._enable.on()
 
+    def is_initialized(self) -> bool:
+        return all([self._latch, self._enable, self._clock, self._data_in, self._data_out])
+
     def __del__(self):
         with state_lock:
-            self._states = [0] * OUTPUT_NUMBER
-            self._write_states()
-            self._read_states()
-            self._reset_faults()
-            self._read_faults()
-        self._cleanup()
+            if self.is_initialized():
+                self._states = [0] * OUTPUT_NUMBER
+                self._write_states()
+                self._read_states()
+                self._reset_faults()
+                self._read_faults()
+                self._cleanup()
 
     @property
     def states(self):
@@ -116,7 +129,7 @@ class OutputAdapter:
             self._logger.warning(
                 "Read faults: %s",
                 ", ".join(
-                    f"CH{idx + 1:02d}: {'OLP' if buffer[idx] else '-'}|{'OCP' if buffer[idx + 8] else '-'}"
+                    f"OUTP{idx + 1:02d}/{OUTPUT_NAMES[idx]}: {'OLP' if buffer[idx] else '-'}|{'OCP' if buffer[idx + 8] else '-'}"
                     for idx in range(OUTPUT_NUMBER)
                 ),
             )
@@ -161,10 +174,11 @@ class OutputAdapter:
 
         # set the state by channel
         with state_lock:
-            self._states[channel] = 1 if state else 0
-            self._write_states()
-            self._read_states()
-            self._read_faults()
+            if self.is_initialized():
+                self._states[channel] = 1 if state else 0
+                self._write_states()
+                self._read_states()
+                self._read_faults()
 
     def _write_states(self):
         self._latch.off()

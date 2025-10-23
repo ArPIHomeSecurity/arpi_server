@@ -1,5 +1,6 @@
 import logging
 
+import lgpio
 from gpiozero import DigitalInputDevice
 
 from constants import LOG_ADSENSOR
@@ -33,7 +34,17 @@ class SensorAdapter(SensorAdapterBase):
         self._channels = []
         for pin in CHANNEL_GPIO_PINS:
             self._logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
-            self._channels.append(DigitalInputDevice(pin, pull_up=False))
+            try:
+                self._channels.append(DigitalInputDevice(pin, pull_up=False))
+            except lgpio.error as e:
+                self._logger.error("Failed to init DigitalInputDevice on pin %s: %s", pin, e)
+
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the sensor adapter is initialized properly.
+        """
+        return len(self._channels) == len(CHANNEL_GPIO_PINS)
 
     def __del__(self):
         self._cleanup()
