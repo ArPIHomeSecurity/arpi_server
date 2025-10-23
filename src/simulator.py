@@ -23,6 +23,7 @@ from monitor.adapters.mock.utils import (
     set_keypad_state,
 )
 from monitor.output import OUTPUT_NAMES
+# use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
 
 
@@ -47,8 +48,8 @@ WIRING_STRATEGIES = [
 CONTACT_TYPES = [("NC", "nc"), ("NO", "no")]
 
 # channel error states
-CHANNEL_CUT = 1.0
-CHANNEL_SHORTAGE = 0.0
+CHANNEL_CUT = wiring_config.open_circuit
+CHANNEL_SHORTAGE = wiring_config.shortcut
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -115,7 +116,7 @@ class Channels(Widget):
     }
 
     .contact-type-select {
-        width: 12;
+        width: 10;
         margin: 0;
     }
 

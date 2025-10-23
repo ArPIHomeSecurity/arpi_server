@@ -34,7 +34,7 @@ from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity
 from monitor.database import get_database_session
 from monitor.sensor.detector import detect_alert, detect_error, wiring_config
 from monitor.sensor.history import SensorsHistory
-from monitor.socket_io import send_sensors_state
+from monitor.socket_io import send_sensors_error, send_sensors_state
 from monitor.storage import State, States
 
 
@@ -246,6 +246,7 @@ class SensorHandler:
         """
         changes = False
         found_alert = False
+        found_error = False
         for sensor in self._sensors:
             # skip sensor without a channel
             if sensor.channel == -1:
@@ -284,11 +285,16 @@ class SensorHandler:
             if sensor.alert and sensor.enabled:
                 found_alert = True
 
+            if sensor.error and sensor.enabled:
+                found_error = True
+
         self._sensors_history.add_states([sensor.alert for sensor in self._sensors])
 
         if changes:
             self._db_session.commit()
             send_sensors_state(found_alert)
+            send_sensors_error(found_error)
+
 
     def handle_alerts(self):
         """

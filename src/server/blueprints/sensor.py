@@ -124,6 +124,22 @@ def get_sensor_alert():
             is not None
         )
 
+@sensor_blueprint.route("/api/sensor/error", methods=["GET"])
+@registered
+@restrict_host
+def get_sensor_error():
+    if request.args.get("sensorId"):
+        return jsonify(
+            db.session.query(Sensor)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, error=True, deleted=False)
+            .first()
+            is not None
+        )
+    else:
+        return jsonify(
+            db.session.query(Sensor).filter_by(enabled=True, error=True).first()
+            is not None
+        )
 
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered

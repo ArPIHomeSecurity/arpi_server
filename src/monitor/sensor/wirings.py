@@ -148,36 +148,38 @@ class PullUpConfig:
         else:
             return self.single_with_eol.select_contact_type(sensor_contact_type)
 
+    @property
+    def shortcut(self) -> float:
+        """
+        Voltage level when the channel is shorted.
+        """
+        return 0.0
+
+    @property
+    def open_circuit(self) -> float:
+        """
+        Voltage level when the channel is open.
+        """
+        return 1.0
+
     class SingleSensorWithEOL:
         """Single sensor configurations with one EOL resistor."""
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NC:
             """
@@ -226,31 +228,19 @@ class PullUpConfig:
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NC:
             """
@@ -303,31 +293,19 @@ class PullUpConfig:
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NC:
             """
@@ -412,27 +390,78 @@ class PullUpConfig:
         logger.debug("EOL Resistor A: R_A = %d ohm", self.r_a)
         logger.debug("EOL Resistor B: R_B = %d ohm", self.r_b)
         logger.debug("NC with EOL:")
-        logger.debug("  Default Level: %.3f", self.single_with_eol.nc.default)
-        logger.debug("  Active Level: %.3f", self.single_with_eol.nc.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=False).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=False).active,
+        )
         logger.debug("NO with EOL:")
-        logger.debug("  Default Level: %.3f", self.single_with_eol.no.default)
-        logger.debug("  Active Level: %.3f", self.single_with_eol.no.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=False).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=False).active,
+        )
+        logger.debug("Error Conditions:")
+        logger.debug("  Shortcut Level: %.3f", self.shortcut)
+        logger.debug("  Open Circuit Level: %.3f", self.open_circuit)
         logger.debug("NC with 2 EOL:")
-        logger.debug("  Default Level: %.3f", self.single_sensor_2_eol.nc.default)
-        logger.debug("  Active Level: %.3f", self.single_sensor_2_eol.nc.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=True).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=True).active,
+        )
         logger.debug("NO with 2 EOL:")
-        logger.debug("  Default Level: %.3f", self.single_sensor_2_eol.no.default)
-        logger.debug("  Active Level: %.3f", self.single_sensor_2_eol.no.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=True).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=True).active,
+        )
         logger.debug("2 NC with EOL:")
-        logger.debug("  Default Level (Both Closed): %.3f", self.dual.nc.default)
-        logger.debug("  Channel A Active Level (A Open): %.3f", self.dual.nc.channel_a_active)
-        logger.debug("  Channel B Active Level (B Open): %.3f", self.dual.nc.channel_b_active)
-        logger.debug("  Both Active Level (Both Open): %.3f", self.dual.nc.both_active)
+        logger.debug(
+            "  Default Level (Both Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).default,
+        )
+        logger.debug(
+            "  Channel A Active Level (A Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).channel_a_active,
+        )
+        logger.debug(
+            "  Channel B Active Level (B Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).channel_b_active,
+        )
+        logger.debug(
+            "  Both Active Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).both_active,
+        )
         logger.debug("2 NO with EOL:")
-        logger.debug("  Default Level (Both Open): %.3f", self.dual.no.default)
-        logger.debug("  Channel A Active Level (A Closed): %.3f", self.dual.no.channel_a_active)
-        logger.debug("  Channel B Active Level (B Closed): %.3f", self.dual.no.channel_b_active)
-        logger.debug("  Both Active Level (Both Closed): %.3f", self.dual.no.both_active)
+        logger.debug(
+            "  Default Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).default,
+        )
+        logger.debug(
+            "  Channel A Active Level (A Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_a_active,
+        )
+        logger.debug(
+            "  Channel B Active Level (B Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_b_active,
+        )
+        logger.debug(
+            "  Both Active Level (Both Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).both_active,
+        )
 
 
 class PullUpDownConfig:
@@ -466,6 +495,20 @@ class PullUpDownConfig:
         else:
             return self.single_with_eol.select_contact_type(sensor_contact_type)
 
+    @property
+    def shortcut(self) -> float:
+        """
+        Voltage level when the channel is shorted.
+        """
+        return 0.0
+
+    @property
+    def open_circuit(self) -> float:
+        """
+        Voltage level when the channel is open.
+        """
+        return VoltageCalculator.voltage_divider(self.r_pull_down, self.r_pull_up)
+
     class SingleSensorWithEOL:
         """
         Single sensor configurations with one EOL resistor.
@@ -473,31 +516,19 @@ class PullUpDownConfig:
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NC:
             """
@@ -548,8 +579,7 @@ class PullUpDownConfig:
                 """
                 Voltage level when the sensor is triggered.
                 """
-                r_total = self._config.r_pull_down
-                return VoltageCalculator.voltage_divider(r_total, self._config.r_pull_up)
+                return 0.0
 
     class SingleSensorWith2EOL:
         """
@@ -558,31 +588,19 @@ class PullUpDownConfig:
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NC:
             """
@@ -598,7 +616,7 @@ class PullUpDownConfig:
                 Voltage level when the sensor is not triggered.
                 """
                 r_total = VoltageCalculator.parallel_resistance(
-                    self._config.r_a, self._config.r_b, self._config.r_pull_down
+                    self._config.r_a, self._config.r_pull_down
                 )
                 return VoltageCalculator.voltage_divider(r_total, self._config.r_pull_up)
 
@@ -608,7 +626,7 @@ class PullUpDownConfig:
                 Voltage level when the sensor is triggered.
                 """
                 r_total = VoltageCalculator.parallel_resistance(
-                    self._config.r_b, self._config.r_pull_down
+                    self._config.r_a, self._config.r_b, self._config.r_pull_down
                 )
                 return VoltageCalculator.voltage_divider(r_total, self._config.r_pull_up)
 
@@ -647,31 +665,19 @@ class PullUpDownConfig:
 
         def __init__(self, config):
             self._config = config
+            self._nc = self.NC(config)
+            self._no = self.NO(config)
 
         def select_contact_type(self, sensor_contact_type: SensorContactTypes):
             """
             Select NC or NO wiring configuration.
             """
             if sensor_contact_type == SensorContactTypes.NC:
-                return self.nc
+                return self._nc
             elif sensor_contact_type == SensorContactTypes.NO:
-                return self.no
+                return self._no
             else:
                 raise ValueError(f"Unsupported SensorContactType: {sensor_contact_type}")
-
-        @cached_property
-        def nc(self):
-            """
-            Access NC wiring configuration.
-            """
-            return self.NC(self._config)
-
-        @cached_property
-        def no(self):
-            """
-            Access NO wiring configuration.
-            """
-            return self.NO(self._config)
 
         class NO:
             """
@@ -773,24 +779,92 @@ class PullUpDownConfig:
         logger.debug("EOL Resistor A: R_A = %d ohm", self.r_a)
         logger.debug("EOL Resistor B: R_B = %d ohm", self.r_b)
         logger.debug("NC with EOL:")
-        logger.debug("  Default Level: %.3f", self.single_with_eol.nc.default)
-        logger.debug("  Active Level: %.3f", self.single_with_eol.nc.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=False).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=False).active,
+        )
         logger.debug("NO with EOL:")
-        logger.debug("  Default Level: %.3f", self.single_with_eol.no.default)
-        logger.debug("  Active Level: %.3f", self.single_with_eol.no.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=False).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=False).active,
+        )
+        logger.debug("Error Conditions:")
+        logger.debug("  Shortcut Level: %.3f", self.shortcut)
+        logger.debug("  Open Circuit Level: %.3f", self.open_circuit)
         logger.debug("NC with 2 EOL:")
-        logger.debug("  Default Level: %.3f", self.single_sensor_2_eol.nc.default)
-        logger.debug("  Active Level: %.3f", self.single_sensor_2_eol.nc.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=True).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=False, two_eol=True).active,
+        )
         logger.debug("NO with 2 EOL:")
-        logger.debug("  Default Level: %.3f", self.single_sensor_2_eol.no.default)
-        logger.debug("  Active Level: %.3f", self.single_sensor_2_eol.no.active)
+        logger.debug(
+            "  Default Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=True).default,
+        )
+        logger.debug(
+            "  Active Level: %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=False, two_eol=True).active,
+        )
         logger.debug("2 NC with EOL:")
-        logger.debug("  Default Level (Both Closed): %.3f", self.dual.nc.default)
-        logger.debug("  Channel A Active Level (A Open): %.3f", self.dual.nc.channel_a_active)
-        logger.debug("  Channel B Active Level (B Open): %.3f", self.dual.nc.channel_b_active)
-        logger.debug("  Both Active Level (Both Open): %.3f", self.dual.nc.both_active)
+        logger.debug(
+            "  Default Level (Both Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).default,
+        )
+        logger.debug(
+            "  Channel A Active Level (A Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).channel_a_active,
+        )
+        logger.debug(
+            "  Channel B Active Level (B Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).channel_b_active,
+        )
+        logger.debug(
+            "  Both Active Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).both_active,
+        )
         logger.debug("2 NO with EOL:")
-        logger.debug("  Default Level (Both Open): %.3f", self.dual.no.default)
-        logger.debug("  Channel A Active Level (A Closed): %.3f", self.dual.no.channel_a_active)
-        logger.debug("  Channel B Active Level (B Closed): %.3f", self.dual.no.channel_b_active)
-        logger.debug("  Both Active Level (Both Closed): %.3f", self.dual.no.both_active)
+        logger.debug(
+            "  Default Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).default,
+        )
+        logger.debug(
+            "  Channel A Active Level (A Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_a_active,
+        )
+        logger.debug(
+            "  Channel B Active Level (B Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_b_active,
+        )
+        logger.debug(
+            "  Both Active Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NC, dual=True, two_eol=False).both_active,
+        )
+        logger.debug("2 NO with EOL:")
+        logger.debug(
+            "  Default Level (Both Open): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).default,
+        )
+        logger.debug(
+            "  Channel A Active Level (A Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_a_active,
+        )
+        logger.debug(
+            "  Channel B Active Level (B Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).channel_b_active,
+        )
+        logger.debug(
+            "  Both Active Level (Both Closed): %.3f",
+            self.select_strategy(SensorContactTypes.NO, dual=True, two_eol=False).both_active,
+        )
