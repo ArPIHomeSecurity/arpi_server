@@ -180,6 +180,9 @@ def install(ctx, component):
         for warning in installer.warnings:
             click.echo(f"⚠️ Warning during {comp} installation: {warning}")
 
+        for info in installer.infos:
+            click.echo(f"ℹ️ Info during {comp} installation: {info}")
+
     if any(
         orchestrator.get_installer(comp).needs_reboot
         for comp in components
@@ -232,11 +235,13 @@ def deploy_code(ctx, restart, backup):
 
     # create diff report
     click.echo("Creating diff report...")
+    excludes = ["__pycache__", "*.pyc", "secrets.env", "status.json"]
+    exclude_args = " ".join([f"--exclude='{e}'" for e in excludes])
     diff_report = SystemHelper.run_command(
-        f"diff -urN --exclude='__pycache__' --brief {src} {dst}", check=False, capture=True
+        f"diff -urN {exclude_args} --brief {src} {dst}", check=False, capture=True
     )
     if diff_report.stdout:
-        click.echo("📝 Differences between source and destination (excluding __pycache__):")
+        click.echo(f"📝 Differences between source and destination (with excludes: {', '.join(excludes)})")
         [click.echo(f"  | {line}") for line in diff_report.stdout.splitlines()]
     else:
         click.echo("No differences found between source and destination.")

@@ -49,13 +49,13 @@ class HardwareInstaller(BaseInstaller):
             ServiceHelper.disable_service(service)
 
         # Configure boot command line
-        cmdline_file = "/boot/cmdline.txt"
+        cmdline_file = "/boot/firmware/cmdline.txt"
         if os.path.exists(cmdline_file) and SystemHelper.file_contains_text(
             cmdline_file, "console=serial0,115200"
         ):
             with open(cmdline_file, "r") as f:
-                content = f.read()
-            content = content.replace("console=serial0,115200 ", "")
+                content = f.read().replace("console=serial0,115200 ", "")
+
             SystemHelper.write_file(cmdline_file, content)
             click.echo("   ✓ Console removed from boot command line")
 
@@ -64,13 +64,19 @@ class HardwareInstaller(BaseInstaller):
             additions = []
             if not SystemHelper.file_contains_text(self._config_txt, "enable_uart=1"):
                 additions.extend(["\n# Enable UART", "enable_uart=1", "dtoverlay=uart0"])
+            else:
+                click.echo("   ✓ UART already enabled")
 
             if not SystemHelper.file_contains_text(self._config_txt, "dtoverlay=disable-bt"):
                 additions.extend(["dtoverlay=disable-bt", "dtoverlay=miniuart-bt"])
+            else:
+                click.echo("   ✓ Bluetooth already disabled")
 
             if additions:
                 SystemHelper.append_to_file(self._config_txt, "\n".join(additions) + "\n")
                 click.echo("   ✓ UART and Bluetooth configured")
+                self.infos.append("config.txt changed, reboot required!")
+                self.needs_reboot = True
 
         # Disable hciuart service
         ServiceHelper.stop_service("hciuart")
