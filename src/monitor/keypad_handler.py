@@ -5,12 +5,14 @@ from queue import Empty, Queue
 from threading import Thread
 from time import sleep, time
 
+from sqlalchemy import inspect
+
 from constants import (ARM_AWAY, ARM_STAY, LOG_ADKEYPAD,
                        MONITOR_ARM_AWAY, MONITOR_ARM_STAY, MONITOR_DISARM,
                        MONITOR_REGISTER_CARD, MONITOR_STOP,
                        MONITOR_UPDATE_KEYPAD, MONITORING_ALERT,
                        MONITORING_ALERT_DELAY, MONITORING_READY, THREAD_KEYPAD)
-from models import Arm, Card, Keypad, User, hash_code
+from models import Arm, Card, Keypad, User
 from monitor.adapters import V2BoardPin
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
@@ -227,7 +229,10 @@ class KeypadHandler(Thread):
         else:
             self._logger.error("Unknown function: %s", function)
 
-    def get_card_by_number(self, number) -> Card:
+    def get_card_by_number(self, card_number) -> Card | None:
+        """
+        Find the first card from the database matching the card number
+        """
         with get_database_session() as db_session:
             users = db_session.query(User).all()
 
@@ -235,23 +240,37 @@ class KeypadHandler(Thread):
             for user in users:
                 cards.extend(user.cards)
 
-            card_hash = hash_code(number)
-            self._logger.debug("Card %s/%s in %s", number, card_hash, [c.code for c in cards])
-            return next(filter(lambda c: c.code == card_hash, cards), None)
+            for tmp_card in cards:
+                if tmp_card.check_card(card_number):
+                    return tmp_card
 
-    def register_card(self, card):
-        """Find the first user from the database with valid card registration"""
+        return None
+
+    def register_card(self, card_number):
+        """
+        Find the first user from the database with valid card registration
+
+        Parameters
+        card_number : str - card number to register
+        """
         with get_database_session() as db_session:
             users = db_session.query(User).filter(User.card_registration_expiry >= 'NOW()').all()
             if users:
-                if db_session.query(Card).filter_by(code=hash_code(card)).first():
-                    self._logger.info("Card already registered")
-                    send_card_not_registered()
-                    return
+                cards = db_session.query(Card).all()
+                for tmp_card in cards:
+                    if tmp_card.check_card(card_number):
+                        # ensure any changes are committed
+                        state = inspect(tmp_card)
+                        if state.modified:
+                            db_session.commit()
 
-                card = Card(card, users[0].id)
-                self._logger.debug("Card created: %s", card)
-                db_session.add(card)
+                        self._logger.info("Card already registered")
+                        send_card_not_registered()
+                        return
+
+                card_number = Card(card_number, users[0].id)
+                self._logger.debug("Card created: %s", card_number)
+                db_session.add(card_number)
                 users[0].card_registration_expiry = None
                 db_session.commit()
                 send_card_registered()

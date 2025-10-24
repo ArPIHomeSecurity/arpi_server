@@ -9,7 +9,7 @@ from flask import jsonify, request, current_app
 from jose import jwt
 
 from constants import ROLE_ADMIN, ROLE_USER
-from models import User, hash_code
+from models import User
 from server.database import db
 from server.decorators import (
     authenticated,
@@ -20,6 +20,7 @@ from server.decorators import (
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
 from tools.ssh_keymanager import SSHKeyManager
+from sqlalchemy import inspect
 
 user_blueprint = Blueprint("user", __name__)
 
@@ -65,7 +66,11 @@ def user(user_id):
     elif request.method == "PUT":
         user_data = request.json
         if user_data.get("newAccessCode"):
-            if hash_code(user_data["oldAccessCode"]) != db_user.access_code:
+            if not db_user.check_access_code(user_data["oldAccessCode"]):
+                state = inspect(db_user)
+                if state.modified:
+                    db.session.commit()
+
                 return make_response(jsonify({"error": "Invalid old access code"}), 400)
             user_data["accessCode"] = user_data["newAccessCode"]
             del user_data["newAccessCode"]
@@ -157,11 +162,12 @@ def register_device():
     )
 
     if request.json["registration_code"]:
-        db_user: User = (
-            db.session.query(User)
-            .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
-            .first()
-        )
+        users = db.session.query(User).all()
+        db_user = None
+        for tmp_user in users:
+            if tmp_user.check_registration_code(request.json["registration_code"]):
+                db_user = tmp_user
+                break
 
         if db_user:
             if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
@@ -216,20 +222,26 @@ def authenticate():
         request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256"
     )
     db_user: User = db.session.query(User).get(device_token["user_id"])
-    if db_user and db_user.access_code == hash_code(request.json["access_code"]):
-        return jsonify(
-            {
-                "user_token": generate_user_token(
-                    db_user.id,
-                    db_user.name,
-                    db_user.role,
-                    request.environ["HTTP_ORIGIN"],
-                ),
-            }
-        )
+    if db_user:
+        if db_user.check_access_code(request.json["access_code"]):
+            # check if anything changed that needs to be saved
+            state = inspect(db_user)
+            if state.modified:
+                db.session.commit()
+
+            return jsonify(
+                {
+                    "user_token": generate_user_token(
+                        db_user.id,
+                        db_user.name,
+                        db_user.role,
+                        request.environ["HTTP_ORIGIN"],
+                    ),
+                }
+            )
     elif not db_user:
         sleep(2)
-        current_app.logger.warn("Invalid user id %s", device_token["user_id"])
+        current_app.logger.warning("Invalid user id %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
 
     sleep(2)

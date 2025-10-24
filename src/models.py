@@ -9,6 +9,7 @@ from datetime import timedelta, datetime as dt
 from re import search
 from dateutil.tz.tz import tzlocal
 from typing import List
+import bcrypt
 
 from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
@@ -33,6 +34,13 @@ from utils.dictionary import merge_dicts, replace_keys
 def hash_code(access_code):
     return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
 
+
+def hash_code_2(secure_text: str) -> str:
+    """
+    Use hashing with builtin salt.
+    """
+    return bcrypt.hashpw(secure_text.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
+    
 
 def convert2camel(data):
     """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
@@ -707,8 +715,8 @@ class User(BaseModel):
         self.name = name
         self.email = ""
         self.role = role
-        self.access_code = hash_code(access_code)
-        self.fourkey_code = fourkey_code or hash_code(access_code[:4])
+        self.access_code = hash_code_2(access_code)
+        self.fourkey_code = fourkey_code or hash_code_2(access_code[:4])
         self.comment = comment
 
     def update(self, data):
@@ -721,13 +729,13 @@ class User(BaseModel):
             )
             assert access_code.isdigit(), "Access code only number"
 
-            data["accessCode"] = hash_code(access_code)
+            data["accessCode"] = hash_code_2(access_code)
             if not data.get("fourkeyCode", None):
-                data["fourkeyCode"] = hash_code(access_code[:4])
+                data["fourkeyCode"] = hash_code_2(access_code[:4])
             else:
                 assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
                 assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
-                data["fourkeyCode"] = hash_code(data["fourkeyCode"])
+                data["fourkeyCode"] = hash_code_2(data["fourkeyCode"])
 
             fields += (
                 "access_code",
@@ -735,6 +743,34 @@ class User(BaseModel):
             )
 
         return self.update_record(fields, data)
+
+    @staticmethod
+    def sanitize_registration_code(registration_code: str) -> str:
+        return registration_code.lower().strip().replace("-", "")
+
+    def check_access_code(self, access_code):
+        matching_user = False
+        if self.access_code.startswith("$2") and bcrypt.checkpw(access_code.encode('utf-8'), self.access_code.encode('utf-8')):
+            matching_user = True
+
+        if self.access_code == hash_code(access_code):
+            matching_user = True
+            self.access_code = hash_code_2(access_code)
+            self.fourkey_code = hash_code_2(access_code[:4])
+
+        return matching_user
+
+    def check_registration_code(self, registration_code):
+        matching_user = False
+        
+        if self.registration_code and self.registration_code.startswith("$2") and bcrypt.checkpw(registration_code.encode('utf-8'), self.registration_code.encode('utf-8')):
+            matching_user = True
+
+        if self.registration_code == hash_code(registration_code):
+            matching_user = True
+            self.registration_code = hash_code_2(registration_code)
+
+        return matching_user
 
     def set_card_registration(self):
         self.update_record(
@@ -757,7 +793,7 @@ class User(BaseModel):
         if self.update_record(
             ("registration_code", "registration_expiry"),
             {
-                "registration_code": hash_code(registration_code),
+                "registration_code": hash_code_2(User.sanitize_registration_code(registration_code)),
                 "registration_expiry": registration_expiry,
             },
         ):
@@ -804,12 +840,23 @@ class Card(BaseModel):
     enabled = Column(Boolean, default=True)
     description = Column(String, nullable=True)
 
-    def __init__(self, card, owner_id, description=None):
+    def __init__(self, card_number, owner_id, description=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
-        self.code = hash_code(card)
+        self.code = hash_code_2(card_number)
         self.user_id = owner_id
         self.description = description or self.generate_card_description()
         self.enabled = True
+
+    def check_card(self, card_number):
+        matching_card = False
+        if bcrypt.checkpw(card_number.encode('utf-8'), self.code.encode('utf-8')):
+            matching_card = True
+
+        if self.code == hash_code(card_number):
+            matching_card = True
+            self.code = hash_code_2(card_number.encode('utf-8')).decode('utf-8')
+
+        return matching_card
 
     @staticmethod
     def generate_card_description():

@@ -13,7 +13,7 @@ common_engine = create_engine(url)
 
 
 def get_database_session(new_connection=False):
-    logging.info("Creating new database connection: %s", url)
+    logging.debug("Creating new database connection: %s", url)
     if new_connection:
         # create a new connection
         # for multiprocessing
