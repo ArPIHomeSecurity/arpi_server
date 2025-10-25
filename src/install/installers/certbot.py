@@ -45,14 +45,6 @@ class CertbotInstaller(BaseInstaller):
         """Install Certbot components"""
         self.install_certbot()
 
-    def upgrade(self):
-        """Upgrade Certbot components"""
-        # 1. Check if Certbot version/config is outdated
-        # 2. If outdated, remove/replace as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
-
     def get_status(self) -> dict:
         """Get Certbot status"""
         return {"Certbot installed": self.is_installed()}

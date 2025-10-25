@@ -12,6 +12,7 @@ class MqttInstaller(BaseInstaller):
     def __init__(self, config: dict):
         super().__init__(config)
         self.mqtt_password = config.get("mqtt_password", "")
+        self.mqtt_reader_password = config.get("mqtt_reader_password", "")
         self.dhparam_file = config.get("dhparam_file", "")
         self.install_source = config.get("install_source", "/tmp/server")
 
@@ -128,10 +129,18 @@ class MqttInstaller(BaseInstaller):
             self.mqtt_password = SecurityHelper.generate_password()
             click.echo("   ✓ Generated MQTT password")
 
-        # Create password file
+        if not self.mqtt_reader_password:
+            self.mqtt_reader_password = SecurityHelper.generate_password()
+            click.echo("   ✓ Generated MQTT reader password")
+
         try:
+            # create password for argus user
             SystemHelper.run_command(
                 f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.mqtt_password}"
+            )
+            # create password for argus_reader user
+            SystemHelper.run_command(
+                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.mqtt_reader_password}"
             )
             SecurityHelper.set_file_permissions(
                 "/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644"
@@ -147,14 +156,6 @@ class MqttInstaller(BaseInstaller):
         self.configure_mqtt_ssl_certificates()
         self.configure_mqtt_configs()
         self.configure_mqtt_authentication()
-
-    def upgrade(self):
-        """Upgrade MQTT components"""
-        # 1. Check if MQTT version/config is outdated
-        # 2. If outdated, remove/replace as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
 
     def get_status(self) -> dict:
         """Get MQTT status"""

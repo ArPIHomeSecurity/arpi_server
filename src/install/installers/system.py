@@ -198,14 +198,6 @@ polkit.addRule(function(action, subject) {
         self.user_gpio_group()
         self.setup_polkit_rule()
 
-    def upgrade(self):
-        """Upgrade system components"""
-        # 1. Check if system packages/config are outdated
-        # 2. If outdated, remove/replace as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
-
     def get_status(self) -> dict:
         """Get system component status"""
         return {

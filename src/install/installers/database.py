@@ -140,14 +140,6 @@ class DatabaseInstaller(BaseInstaller):
 
         self.configure_database()
 
-    def upgrade(self):
-        """Upgrade database components"""
-        # 1. Check if database version/schema/config is outdated
-        # 2. If outdated, remove/replace/migrate as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
-
     def get_status(self) -> dict:
         """Get database status"""
         return {

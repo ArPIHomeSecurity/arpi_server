@@ -57,18 +57,27 @@ class SensorHandler:
 
     def __init__(self, broadcaster):
         self._logger = logging.getLogger(LOG_SENSORS)
-        self._db_session = get_database_session()
+        self._db_session = None
         self._broadcaster = broadcaster
-        self._sensor_adapter = get_sensor_adapter()
+        self._sensor_adapter = None
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
+        self._mqtt_client = None
 
+
+    def initialize(self):
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_sensors")
+        self._db_session = get_database_session()
+        self._sensor_adapter = get_sensor_adapter()
 
-        # log the wiring configuration
-        wiring_config.debug_values()
+    def update_mqtt_config(self):
+        """
+        Update the MQTT configuration.
+        """
+        self._mqtt_client.close()
+        self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
         """

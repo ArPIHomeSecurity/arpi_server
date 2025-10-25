@@ -161,10 +161,6 @@ class NginxInstaller(BaseInstaller):
 
         self.configure_nginx_setup()
 
-    def upgrade(self):
-        """Upgrade NGINX components"""
-        self.install()
-
     def get_status(self) -> dict:
         """Get NGINX status"""
         return {

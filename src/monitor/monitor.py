@@ -176,6 +176,7 @@ class Monitor(Thread):
         self._area_handler.publish_areas()
 
         self._sensor_handler = SensorHandler(broadcaster=self._broadcaster)
+        self._sensor_handler.initialize()
         self._sensor_handler.load_sensors()
         self._sensor_handler.publish_sensors()
 
@@ -230,6 +231,7 @@ class Monitor(Thread):
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self._area_handler.load_areas()
                     self._area_handler.publish_areas()
+                    self._sensor_handler.update_mqtt_config()
                     self._sensor_handler.load_sensors()
                     self._sensor_handler.publish_sensors()
                 elif message["action"] == UPDATE_SECURE_CONNECTION:

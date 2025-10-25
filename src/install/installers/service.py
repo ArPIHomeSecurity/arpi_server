@@ -239,14 +239,6 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         self.update_database_schema()
         self.update_database_contents()
 
-    def upgrade(self):
-        """Upgrade ArPI service components"""
-        # 1. Check if service config/code is outdated
-        # 2. If outdated, remove/replace as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
-
     def get_status(self) -> dict:
         """Get service status"""
         return {

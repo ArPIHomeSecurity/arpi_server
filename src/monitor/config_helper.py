@@ -71,6 +71,47 @@ def load_alert_sensitivity_config(cleanup=False, session=None) -> AlertSensitivi
 
 
 #####################
+@dataclass
+class MQTTConnection:
+    enabled: bool
+    external: bool
+
+def load_mqtt_connection_config(cleanup=False, session=None) -> MQTTConnection:
+    c = load_config("mqtt", "connection", MQTTConnection, session)
+    if cleanup and c:
+        save_config("mqtt", "connection", asdict(c), session)
+    return c
+
+#####################
+@dataclass
+class MQTTConfig:
+    hostname: str
+    port: int
+    username: str
+    password: str
+    tls_enabled: bool
+    tls_insecure: bool
+
+
+def load_mqtt_internal_publish_config(cleanup=False, session=None) -> MQTTConfig:
+    c = load_config("mqtt", "internal_publish", MQTTConfig, session)
+    if cleanup and c:
+        save_config("mqtt", "internal_publish", asdict(c), session)
+    return c
+
+def load_mqtt_internal_read_config(cleanup=False, session=None) -> MQTTConfig:
+    c = load_config("mqtt", "internal_read", MQTTConfig, session)
+    if cleanup and c:
+        save_config("mqtt", "internal_read", asdict(c), session)
+    return c
+
+def load_mqtt_external_publish_config(cleanup=False, session=None) -> MQTTConfig:
+    c = load_config("mqtt", "external_publish", MQTTConfig, session)
+    if cleanup and c:
+        save_config("mqtt", "external_publish", asdict(c), session)
+    return c
+
+#####################
 def load_config(name, section, config_type, session=None):
     """
     Generic function to load a config from the database and return it as a dataclass

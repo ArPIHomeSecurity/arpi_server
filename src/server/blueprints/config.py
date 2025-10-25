@@ -53,6 +53,14 @@ def option_put(option, section) -> Response:
         # update ssh service in production mode
         if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
             return process_ipc_response(IPCClient().update_ssh())
+    elif (
+        db_option.name == "mqtt"
+        and db_option.section == "connection"
+        or db_option.name == "mqtt"
+        and db_option.section == "external_publish"
+    ):
+        # update mqtt connection in monitor service
+        return process_ipc_response(IPCClient().update_configuration())
 
     return make_response("", 200)
 
@@ -92,7 +100,9 @@ def test_call():
 @restrict_host
 def test_syren():
     if request.method == "GET":
-        return process_ipc_response(IPCClient().send_test_syren(int(request.args.get("duration", None))))
+        return process_ipc_response(
+            IPCClient().send_test_syren(int(request.args.get("duration", None)))
+        )
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
@@ -122,6 +132,7 @@ def delete_sms_messages(message_id):
 
     return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
+
 @config_blueprint.route("/api/config/public_access", methods=["GET"])
 @authenticated()
 @restrict_host
@@ -140,19 +151,18 @@ def public_access():
 
 @config_blueprint.route("/api/config/installation", methods=["GET"])
 def get_installation():
-    dyndns = db.session \
-        .query(Option) \
-        .filter_by(name="network", section="dyndns") \
-        .first()
+    dyndns = db.session.query(Option).filter_by(name="network", section="dyndns").first()
 
     if dyndns:
         dyndns = json.loads(dyndns.value)
 
         # TODO: find out if use localhost or arpi.local
-        return jsonify({
-            "primaryDomain": dyndns.get("hostname", "localhost") or "localhost",
-            "secondaryDomain": "localhost",
-        })
+        return jsonify(
+            {
+                "primaryDomain": dyndns.get("hostname", "localhost") or "localhost",
+                "secondaryDomain": "localhost",
+            }
+        )
 
 
 @config_blueprint.route("/api/config/installation_id", methods=["GET"])

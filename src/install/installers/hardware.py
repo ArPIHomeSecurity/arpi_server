@@ -141,14 +141,6 @@ class HardwareInstaller(BaseInstaller):
         self.setup_spi()
         self.install_wiringpi()
 
-    def upgrade(self):
-        """Upgrade hardware components"""
-        # 1. Check if hardware config is outdated
-        # 2. If outdated, remove/replace as needed and call install()
-        # 3. If not outdated, skip install
-        # (Implement actual logic here)
-        pass
-
     def get_status(self) -> dict:
         """Get hardware component status"""
         return {

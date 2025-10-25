@@ -923,6 +923,7 @@ class Option(BaseModel):
             assert value in (
                 "notifications",
                 "network",
+                "mqtt",
                 "syren",
                 "alert",
             ), f"Unknown option ({value})"
@@ -935,6 +936,11 @@ class Option(BaseModel):
                 "access",
                 "timing",
                 "sensitivity",
+                # MQTT
+                "connection",
+                "internal_publish",
+                "internal_read",
+                "external_publish",
             ), f"Unknown section ({value})"
         return value
 
