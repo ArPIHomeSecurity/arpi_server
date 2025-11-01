@@ -13,23 +13,24 @@ Based on the original ArPI bash modules:
 - Service setup (systemd services, secrets management)
 """
 
-from datetime import datetime
 import json
-import traceback
-import click
 import logging
 import os
+import traceback
+from datetime import datetime
 
-from install.helpers import SystemHelper, SecurityHelper
+import click
+
+from install.helpers import SecurityHelper, SystemHelper, SecretsManager
 from install.installers import (
     BaseInstaller,
-    SystemInstaller,
-    HardwareInstaller,
-    DatabaseInstaller,
-    NginxInstaller,
-    MqttInstaller,
     CertbotInstaller,
+    DatabaseInstaller,
+    HardwareInstaller,
+    MqttInstaller,
+    NginxInstaller,
     ServerInstaller,
+    SystemInstaller,
 )
 
 # Configure logging
@@ -39,6 +40,18 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+INSTALLERS = {
+    "system": SystemInstaller,
+    "hardware": HardwareInstaller,
+    "database": DatabaseInstaller,
+    "nginx": NginxInstaller,
+    "mqtt": MqttInstaller,
+    "certbot": CertbotInstaller,
+    "services": ServerInstaller,
+}
+
+COMPONENTS = INSTALLERS.keys()
 
 
 class ArpiOrchestrator:
@@ -54,12 +67,10 @@ class ArpiOrchestrator:
             "data_set_name": os.getenv("DATA_SET_NAME", "prod"),
             "dhparam_file": os.getenv("DHPARAM_FILE", "arpi_dhparam.pem"),
             "deploy_simulator": os.getenv("DEPLOY_SIMULATOR", "false"),
-            "salt": os.getenv("SALT", ""),
-            "secret": os.getenv("SECRET", ""),
-            "mqtt_password": os.getenv("ARGUS_MQTT_PASSWORD", ""),
             "user": os.getenv("ARGUS_USER", "argus"),
             "install_source": os.getenv("INSTALL_SOURCE", "/tmp/server"),
-            "board_version": int(os.getenv("BOARD_VERSION", 0)),
+            "board_version": int(os.getenv("BOARD_VERSION", "3")),
+            "secrets_manager": SecretsManager(os.getenv("ARGUS_USER", "argus")),
         }
         self._installer_cache = {}
 
@@ -68,17 +79,7 @@ class ArpiOrchestrator:
         if component in self._installer_cache:
             return self._installer_cache[component]
 
-        installers = {
-            "system": SystemInstaller,
-            "hardware": HardwareInstaller,
-            "database": DatabaseInstaller,
-            "nginx": NginxInstaller,
-            "mqtt": MqttInstaller,
-            "certbot": CertbotInstaller,
-            "services": ServerInstaller,
-        }
-
-        installer_class = installers.get(component)
+        installer_class = INSTALLERS.get(component)
         if not installer_class:
             raise ValueError(f"Unknown component: {component}")
 
@@ -92,18 +93,10 @@ class ArpiOrchestrator:
 
 
 # --- CLI Implementation ---
-COMPONENTS = [
-    "system",
-    "hardware",
-    "database",
-    "nginx",
-    "mqtt",
-    "certbot",
-    "services",
-]
-
-
 def get_selected_components(selected):
+    """
+    Determine which components to install/status based on user input
+    """
     if not selected:
         return COMPONENTS
 
@@ -145,6 +138,12 @@ def cli(ctx, verbose, board_version):
             except ValueError:
                 click.echo("Invalid input. Please enter a number (2 or 3).")
 
+class JsonEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle non-serializable objects"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return str(obj)
 
 @cli.command()
 @click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
@@ -159,7 +158,7 @@ def install(ctx, component):
     click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     components = get_selected_components(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4))
+    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
     for comp in components:
         installer = orchestrator.get_installer(comp)
         if not installer:
@@ -172,22 +171,31 @@ def install(ctx, component):
             click.echo(f"✓ {comp} installed successfully.")
         except Exception as e:
             click.echo(f"⚠️ Failed to install {comp}: {e}")
+            installer.warnings.append(f"Installation failed: {e}")
 
     click.echo(f"Installation completed in {datetime.now() - start_time}")
 
-    for comp in components:
-        installer = orchestrator.get_installer(comp)
-        for warning in installer.warnings:
-            click.echo(f"⚠️ Warning during {comp} installation: {warning}")
+    if any(
+        orchestrator.get_installer(comp).warnings
+        for comp in components
+        if orchestrator.get_installer(comp)
+    ):
+        click.echo("=====================================")
+        click.echo("Installation completed with warnings:")
+        for comp in components:
+            installer = orchestrator.get_installer(comp)
+            for warning in installer.warnings:
+                click.echo(f"⚠️ Warning during {comp} installation: {warning}")
 
-        for info in installer.infos:
-            click.echo(f"ℹ️ Info during {comp} installation: {info}")
+            for info in installer.infos:
+                click.echo(f"ℹ️ Info during {comp} installation: {info}")
 
     if any(
         orchestrator.get_installer(comp).needs_reboot
         for comp in components
         if orchestrator.get_installer(comp)
     ):
+        click.echo("=====================================")
         click.echo("🔄 A system reboot is required to apply all changes.")
         click.echo("Please reboot the system at your earliest convenience.")
 
@@ -241,7 +249,9 @@ def deploy_code(ctx, restart, backup):
         f"diff -urN {exclude_args} --brief {src} {dst}", check=False, capture=True
     )
     if diff_report.stdout:
-        click.echo(f"📝 Differences between source and destination (with excludes: {', '.join(excludes)})")
+        click.echo(
+            f"📝 Differences between source and destination (with excludes: {', '.join(excludes)})"
+        )
         [click.echo(f"  | {line}") for line in diff_report.stdout.splitlines()]
     else:
         click.echo("No differences found between source and destination.")

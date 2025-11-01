@@ -8,7 +8,7 @@ from constants import LOG_IPC
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
     "bash -c 'cd /home/argus/server/;"
-    " PYTHONPATH=/home/argus/server/src /home/argus/.venvs/server/bin/python"
+    " PYTHONPATH=/home/argus/server/src /usr/bin/python3"
     " /home/argus/server/src/tools/dyndns.py'"
 )
 

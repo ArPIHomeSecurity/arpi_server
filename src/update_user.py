@@ -1,18 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # pylint: disable=wrong-import-position,wrong-import-order
 import contextlib
 import logging
-
-from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentTypeError
+from argparse import ArgumentParser, ArgumentTypeError, RawTextHelpFormatter
 from datetime import datetime as dt
-from dateutil.tz.tz import tzlocal
-from logging import basicConfig
-import sqlalchemy
 from time import sleep
 
+import sqlalchemy
+from dateutil.tz.tz import tzlocal
 from models import User
 from monitor.database import get_database_session
-
 
 description = """
 Update the given user with a new registration or access code.

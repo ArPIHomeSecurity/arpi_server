@@ -9,7 +9,8 @@ Group=www-data
 WorkingDirectory=/home/argus/server
 EnvironmentFile=/home/argus/server/.env
 EnvironmentFile=/home/argus/server/secrets.env
-ExecStart=/home/argus/.venvs/server/bin/python -m gunicorn \
+ExecStartPre=/usr/bin/python3 /home/argus/server/src/secret.py
+ExecStart=/usr/bin/python3 -m gunicorn \
     -c src/server/gunicorn.conf.py \
     --log-level info \
     server:app

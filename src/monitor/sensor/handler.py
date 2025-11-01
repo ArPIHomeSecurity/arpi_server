@@ -76,8 +76,9 @@ class SensorHandler:
         """
         Update the MQTT configuration.
         """
-        self._mqtt_client.close()
-        self._mqtt_client.connect(client_id="arpi_sensors")
+        if self._mqtt_client is not None:
+            self._mqtt_client.close()
+            self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
         """

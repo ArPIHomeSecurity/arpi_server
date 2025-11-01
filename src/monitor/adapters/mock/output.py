@@ -36,6 +36,9 @@ class OutputAdapter(OutputAdapterBase):
             except (FileNotFoundError, OSError, ValueError):
                 self._logger.debug("Could not read initial state from file, using defaults")
 
+    def is_initialized(self) -> bool:
+        return True
+
     def control_channel(self, channel: int, state: bool):
         """
         Control output by channel number

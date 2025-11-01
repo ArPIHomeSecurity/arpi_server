@@ -11,8 +11,7 @@ class MqttInstaller(BaseInstaller):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.mqtt_password = config.get("mqtt_password", "")
-        self.mqtt_reader_password = config.get("mqtt_reader_password", "")
+        self.secrets_manager = config.get("secrets_manager")
         self.dhparam_file = config.get("dhparam_file", "")
         self.install_source = config.get("install_source", "/tmp/server")
 
@@ -124,23 +123,19 @@ class MqttInstaller(BaseInstaller):
         """Configure MQTT authentication"""
         click.echo("   🔐 Configuring MQTT authentication...")
 
-        # Generate MQTT password if not set
-        if not self.mqtt_password:
-            self.mqtt_password = SecurityHelper.generate_password()
-            click.echo("   ✓ Generated MQTT password")
-
-        if not self.mqtt_reader_password:
-            self.mqtt_reader_password = SecurityHelper.generate_password()
-            click.echo("   ✓ Generated MQTT reader password")
+        if not self.secrets_manager:
+            click.echo("   ⚠️ Warning: No secrets manager available, skipping authentication setup")
+            self.warnings.append("No secrets manager available for MQTT authentication")
+            return
 
         try:
             # create password for argus user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.mqtt_password}"
+                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.secrets_manager.get_mqtt_password()}"
             )
             # create password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.mqtt_reader_password}"
+                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.secrets_manager.get_mqtt_reader_password()}"
             )
             SecurityHelper.set_file_permissions(
                 "/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644"

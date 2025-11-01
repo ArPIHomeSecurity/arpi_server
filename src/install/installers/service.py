@@ -13,38 +13,10 @@ class ServerInstaller(BaseInstaller):
     def __init__(self, config: dict):
         super().__init__(config)
         self.user = config["user"]
-        self.salt = config["salt"]
-        self.secret = config["secret"]
-        self.mqtt_password = config["mqtt_password"]
+        self.secrets_manager = config.get("secrets_manager")
         self.install_source = config["install_source"]
         self.data_set_name = config["data_set_name"]
 
-    def generate_service_secrets(self):
-        """Generate secrets for ArPI services"""
-
-        if os.path.exists(f"/home/{self.user}/server/secrets.env"):
-            click.echo("   ✓ Secrets file already exists, skipping generation")
-            return
-
-        click.echo("   🔑 Generating service secrets...")
-        secrets_generated = False
-
-        if not self.salt:
-            self.salt = SecurityHelper.generate_password()
-            secrets_generated = True
-
-        if not self.secret:
-            self.secret = SecurityHelper.generate_password()
-            secrets_generated = True
-
-        if not self.mqtt_password:
-            self.mqtt_password = SecurityHelper.generate_password()
-            secrets_generated = True
-
-        if secrets_generated:
-            click.echo("   ✓ Service secrets generated")
-        else:
-            click.echo("   ✓ All service secrets presented, skipping generation")
 
     def create_service_directories(self):
         """Create ArPI service directories"""
@@ -90,23 +62,24 @@ d /run/{self.user} 0755 {self.user} {self.user}
     def save_secrets_to_file(self):
         """Save generated secrets to file"""
 
-        if os.path.exists(f"/home/{self.user}/server/secrets.env"):
-            click.echo("   ✓ Secrets file already exists, skipping save")
+        click.echo("   💾 Saving secrets to file...")
+        secrets_file = f"/home/{self.user}/server/secrets.env"
+        if not self.secrets_manager:
+            click.echo("   ⚠️ Warning: No secrets manager available, skipping save")
+            self.warnings.append("No secrets manager available to save secrets")
             return
 
-        click.echo("   💾 Saving secrets to file...")
+        if SystemHelper.file_contains_text(secrets_file, "ARGUS_MQTT_PASSWORD"):
+            click.echo("   ✓ MQTT password already in secrets file, skipping save")
+        else:
+            SystemHelper.append_to_file(secrets_file, f"ARGUS_MQTT_PASSWORD={self.secrets_manager.get_mqtt_password()}\n")
+            click.echo("   ✓ MQTT password saved to secrets file")
 
-        secrets_file = f"/home/{self.user}/server/secrets.env"
-
-        secrets_content = f"""# Argus Service Secrets
-# Generated on {datetime.now()}
-
-SALT="{self.salt}"
-SECRET="{self.secret}"
-ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
-"""
-
-        SystemHelper.write_file(secrets_file, secrets_content)
+        if SystemHelper.file_contains_text(secrets_file, "ARGUS_READER_MQTT_PASSWORD"):
+            click.echo("   ✓ Reader MQTT password already in secrets file, skipping save")
+        else:
+            SystemHelper.append_to_file(secrets_file, f"ARGUS_READER_MQTT_PASSWORD={self.secrets_manager.get_mqtt_reader_password()}\n")
+            click.echo("   ✓ Reader MQTT password saved to secrets file")
 
         # Set proper ownership and permissions
         SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
@@ -136,15 +109,6 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         """Create Python virtual environment"""
         click.echo("   🐍 Creating Python virtual environment...")
 
-        venv_path = f"/home/{self.user}/.venvs"
-
-        if not os.path.exists(venv_path):
-            SystemHelper.run_command(f"mkdir -p {venv_path}")
-            SecurityHelper.set_file_permissions(venv_path, f"{self.user}:{self.user}", "755")
-            click.echo("   ✓ Python virtual environment root created")
-        else:
-            click.echo("   ✓ Python virtual environment root already exists")
-
         # always update the virtual environment
         packages = ["packages"]
         if ServiceHelper.is_raspberry_pi():
@@ -156,31 +120,28 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         install_config = {
             "PIPENV_TIMEOUT": "9999",
             "CI": "1",
-            "WORKON_HOME": venv_path,
-            "PIPENV_CUSTOM_VENV_NAME": "server",
         }
 
-        SystemHelper.run_command(
-            f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
+        if SystemHelper.run_command(
+            f"sudo -u {self.user} -H bash -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
-            f'pipenv install --site-packages --categories "{" ".join(packages)}"\'',
+            f'pipenv install --system --deploy --categories "{" ".join(packages)}"\'',
             suppress_output=False,
-        )
-        SecurityHelper.set_file_permissions(
-            os.path.join(venv_path, "server"), f"{self.user}:{self.user}", "755"
-        )
-        click.echo("   ✓ Python virtual environment synced")
+            cwd=f"/home/{self.user}/server",
+        ):
+            click.echo("   ✓ Python virtual environment created/updated")
+        else:
+            click.echo("   ✗ Failed to create/update Python virtual environment")
+            self.warnings.append("Failed to create/update Python virtual environment")
 
     def update_database_schema(self):
         """Update database schema using Alembic"""
         click.echo("   🗄️ Updating database schema...")
 
         SystemHelper.run_command(
-            f'sudo -u {self.user} -H bash -c "cd /home/{self.user}/server; '
-            f"source /home/{self.user}/.venvs/server/bin/activate && "
-            "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
-            "printenv && "
-            'flask --app server:app db upgrade"'
+            f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c "'
+            'python3 -m flask --app server:app db upgrade"',
+            cwd=f"/home/{self.user}/server",
         )
 
         click.echo("   ✓ Database schema updated")
@@ -191,10 +152,10 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
 
         if self.data_set_name:
             SystemHelper.run_command(
-                f'sudo -u {self.user} -H bash -c "cd /home/{self.user}/server; '
-                f"source /home/{self.user}/.venvs/server/bin/activate && "
+                f'sudo -u {self.user} -H bash -c "'
                 "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
-                f'src/data.py -d -c {self.data_set_name}"'
+                f'python3 src/data.py -d -c {self.data_set_name}"',
+                cwd=f"/home/{self.user}/server",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
         else:
@@ -212,17 +173,15 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
         """Check if database schema is up to date"""
         try:
             current_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
-                f"source /home/{self.user}/.venvs/server/bin/activate && "
-                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
-                'flask --app server:app db current"',
+                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c '"
+                "python3 -m flask --app server:app db current'",
                 capture=True,
+                cwd=f"/home/{self.user}/server",
             ).stdout.strip()
             head_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -H bash -c 'cd /home/{self.user}/server && "
-                f"source /home/{self.user}/.venvs/server/bin/activate && "
-                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
-                'flask --app server:app db heads"',
+                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c '"
+                "python3 -m flask --app server:app db heads'",
+                cwd=f"/home/{self.user}/server",
                 capture=True,
             ).stdout.strip()
             return current_revision == head_revision
@@ -231,7 +190,6 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
 
     def install(self):
         """Install service components"""
-        self.generate_service_secrets()
         self.create_service_directories()
         self.create_python_virtual_environment()
         self.save_secrets_to_file()
@@ -245,7 +203,6 @@ ARGUS_MQTT_PASSWORD="{self.mqtt_password}"
             "User exists": self.check_user_exists(),
             "Env file exists": os.path.exists(f"/home/{self.user}/server/.env"),
             "Secrets file exists": os.path.exists(f"/home/{self.user}/server/secrets.env"),
-            "Venv exists": os.path.exists(f"/home/{self.user}/.venvs/server"),
             "Run directory exists": os.path.exists(f"/run/{self.user}"),
             "Service directories exist": (
                 os.path.exists(f"/home/{self.user}/server")

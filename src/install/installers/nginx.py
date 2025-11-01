@@ -150,9 +150,10 @@ class NginxInstaller(BaseInstaller):
     def install(self):
         """Install NGINX components"""
         if self.needs_installation():
-            # remove old version
-            click.echo("   🗑️ Removing old NGINX version...")
-            SystemHelper.run_command("rm -fr /usr/local/nginx | true")
+            if self.get_system_nginx_version:
+                # remove old version
+                click.echo("   🗑️ Removing old NGINX version...")
+                SystemHelper.run_command("rm -fr /usr/local/nginx | true")
 
             self.install_nginx_dependencies()
             self.compile_nginx_from_source()

@@ -3,9 +3,9 @@ Manage the communication between the simulator and the mock adapters.
 """
 
 import contextlib
-import json
 import fcntl
-from os import environ
+import json
+import os
 
 from monitor.output import OUTPUT_NAMES
 
@@ -70,6 +70,10 @@ def protected_update(filename, data, default_data, merge_function):
     """
     Update the data in a JSON file with file locking to avoid conflicts.
     """
+    # create the file if it does not exist
+    if not os.path.exists(filename):
+        protected_write(filename, default_data)
+        
     with contextlib.suppress(FileNotFoundError, OSError):
         with open(filename, "r+", encoding="utf-8") as file_handle:
             fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -92,7 +96,7 @@ def get_input_state(input_name):
     """
     Get the state of a specific input channel.
     """
-    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(environ.get("INPUT_NUMBER", 0)))}
+    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(os.environ.get("INPUT_NUMBER", 0)))}
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
     if input_name == "POWER":

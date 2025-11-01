@@ -25,7 +25,8 @@ class SystemInstaller(BaseInstaller):
             and SystemHelper.run_command(f"getent passwd {self.user}", capture=True)
             .stdout.strip()
             .endswith("/bin/zsh")
-            and SystemHelper.file_contains_text(zshrc_file, "source ~/.venvs/server/bin/activate")
+            and SystemHelper.file_contains_text(zshrc_file, ". ~/server/.env")
+            and SystemHelper.file_contains_text(zshrc_file, ". ~/server/secrets.env")
         )
 
     def install_system_packages(self):
@@ -96,7 +97,6 @@ class SystemInstaller(BaseInstaller):
             config_addition = """
 
 # active python virtual environment and load env variables
-source ~/.venvs/server/bin/activate
 set -a
 . ~/server/.env
 . ~/server/secrets.env

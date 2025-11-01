@@ -300,6 +300,79 @@ class PackageHelper:
             return False
 
 
+class SecretsManager:
+    """Helper class for managing service secrets"""
+
+    def __init__(self, user: str):
+        """
+        Initialize SecretsManager
+
+        Args:
+            user: The system user for ArPI (e.g., 'argus')
+        """
+        self.user = user
+        self.secrets_file = f"/home/{user}/server/secrets.env"
+        self._secrets = {}
+        self._load_existing_secrets()
+
+    def _load_existing_secrets(self):
+        """Load existing secrets from secrets.env file if it exists"""
+        if not os.path.exists(self.secrets_file):
+            return
+
+        try:
+            with open(self.secrets_file, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip comments and empty lines
+                    if not line or line.startswith("#"):
+                        continue
+                    # Parse KEY="value" or KEY=value format
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        # Remove quotes if present
+                        value = value.strip().strip('"').strip("'")
+                        self._secrets[key] = value
+        except Exception as e:
+            click.echo(f"   ⚠️ Warning: Could not read secrets file: {e}")
+
+    def _get_or_generate_secret(self, key: str) -> str:
+        """
+        Get secret by key, generating if it doesn't exist
+
+        Args:
+            key: The secret key to retrieve
+
+        Returns:
+            str: The secret value
+        """
+        if key in self._secrets:
+            return self._secrets[key]
+
+        # generate new password
+        password = SecurityHelper.generate_password()
+        self._secrets[key] = password
+        return password
+
+    def get_mqtt_password(self) -> str:
+        """
+        Get MQTT password, generating if it doesn't exist
+
+        Returns:
+            str: The MQTT password
+        """
+        return self._get_or_generate_secret("ARGUS_MQTT_PASSWORD")
+
+    def get_mqtt_reader_password(self) -> str:
+        """
+        Get MQTT reader password, generating if it doesn't exist
+
+        Returns:
+            str: The MQTT reader password
+        """
+        return self._get_or_generate_secret("ARGUS_READER_MQTT_PASSWORD")
+
+
 class ServiceHelper:
     """Helper class for systemd service operations"""
 

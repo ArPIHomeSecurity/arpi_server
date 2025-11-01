@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-from ipaddress import ip_network
 import logging
 import os
-import sys
+from ipaddress import ip_network
 
-from dotenv import load_dotenv
 from gi.repository import GLib
 from pydbus import SystemBus
-
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_ACCESS
 from monitor.config_helper import load_ssh_config
@@ -63,7 +57,6 @@ class SSHService:
         return os.popen("ip addr show wlan0").read().split("inet ")[1].split(" brd")[0]
 
     def _update_access_cidr(self, network, enable: bool):
-
         if enable:
             self._logger.info("Restrict SSH access only for %s to %s", network, enable)
             os.system("sed -i '/sshd:/d' /etc/hosts.allow")
@@ -95,7 +88,7 @@ class SSHService:
             os.system(
                 'sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication no/g" /etc/ssh/sshd_config'
             )
-        
+
         self._logger.info("Restarting SSH service")
         systemd = self._bus.get(".systemd1")
         systemd.RestartUnit("ssh.service", "fail")
@@ -103,12 +96,8 @@ class SSHService:
 
 def main():
     args = argparse.ArgumentParser(description="SSH service")
-    args.add_argument(
-        "--enable-ssh", action="store_true", default=None, help="Enable SSH"
-    )
-    args.add_argument(
-        "--disable-ssh", action="store_true", default=None, help="Disable SSH"
-    )
+    args.add_argument("--enable-ssh", action="store_true", default=None, help="Enable SSH")
+    args.add_argument("--disable-ssh", action="store_true", default=None, help="Disable SSH")
     args.add_argument(
         "--allow-local-networks",
         action="store_true",
@@ -121,9 +110,7 @@ def main():
         default=None,
         help="Allow SSH access from all networks",
     )
-    args.add_argument(
-        "--get-local-ip", action="store_true", default=None, help="Get local IP"
-    )
+    args.add_argument("--get-local-ip", action="store_true", default=None, help="Get local IP")
     args.add_argument(
         "--enable-password",
         action="store_true",

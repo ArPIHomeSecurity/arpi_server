@@ -48,6 +48,9 @@ def create_sensor():
         name=data["name"],
         description=data["description"],
         enabled=data["enabled"],
+        channel_type=data.get("channelType"),
+        sensor_contact_type=data.get("sensorContactType"),
+        sensor_eol_count=data.get("sensorEolCount"),
     )
     db.session.add(db_sensor)
     db.session.commit()

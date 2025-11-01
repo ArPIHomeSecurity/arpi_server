@@ -1,22 +1,20 @@
-#!/usr/bin/env python
-
-from dotenv import load_dotenv
-
-load_dotenv()
-load_dotenv("secrets.env")
+#!/usr/bin/env python3
 
 import argparse
 import logging
 from logging import basicConfig
 
-from models import hash_code, hash_code_2, User, Card
+from models import Card, User, hash_code, hash_code_2
 from monitor.database import get_database_session
 
 
-basicConfig(level=logging.INFO, format="%(message)s")
-
-
 def check_hashes():
+    """
+    Check if the database is using bcrypt hashes
+
+    Returns:
+        int: 0 if all hashes are bcrypt, 1 if any hash is not bcrypt
+    """
     db_session = get_database_session()
 
     # Check if the database is using bcrypt hashes
@@ -42,18 +40,22 @@ def check_hashes():
     return 0
 
 
-parser = argparse.ArgumentParser(description="Hash text to database format")
-parser.add_argument(
-    "-c", "--check", action="store_true", help="Check if database uses bcrypt hashes"
-)
-parser.add_argument(
-    "input", nargs="?", default=None, help="Input string to hash"
-)
+def main():
+    parser = argparse.ArgumentParser(description="Hash text to database format")
+    parser.add_argument(
+        "-c", "--check", action="store_true", help="Check if database uses bcrypt hashes"
+    )
+    parser.add_argument("input", nargs="?", default=None, help="Input string to hash")
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.check:
-    exit(check_hashes())
-elif args.input:
-    logging.info("SHA256 hash: %s", hash_code(args.input))
-    logging.info("BCrypt hash: %s", hash_code_2(args.input))
+    if args.check:
+        exit(check_hashes())
+    elif args.input:
+        logging.info("SHA256 hash: %s", hash_code(args.input))
+        logging.info("BCrypt hash: %s", hash_code_2(args.input))
+
+
+if __name__ == "__main__":
+    basicConfig(level=logging.INFO, format="%(message)s")
+    main()

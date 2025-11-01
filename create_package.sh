@@ -25,7 +25,7 @@ tar -czf "$SCRIPT_DIR/$OUTFILE" \
     README.md \
     LICENSE \
     arpi_dhparam.pem \
-    --transform="s|${1:-prod}.env|.env|" \
-    "${1:-prod}.env"
+    --transform="s|.env.${1:-prod}|.env|" \
+    ".env.${1:-prod}"
 
 echo "Package created: $OUTFILE"

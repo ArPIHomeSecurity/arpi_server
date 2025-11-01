@@ -225,9 +225,6 @@ class Sensor(BaseModel):
     def __init__(
         self,
         channel: int,
-        channel_type: ChannelTypes,
-        sensor_contact_type: SensorContactTypes,
-        sensor_eol_count: SensorEOLCount,
         sensor_type: SensorType,
         area: 'Area',
         name: str,
@@ -237,11 +234,11 @@ class Sensor(BaseModel):
         silent_alert: bool = False,
         monitor_period: int = None,
         monitor_threshold=None,
+        channel_type: ChannelTypes = ChannelTypes.BASIC,
+        sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
+        sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
     ):
         self.channel = channel
-        self.channel_type = channel_type.value
-        self.sensor_contact_type = sensor_contact_type.value
-        self.sensor_eol_count = sensor_eol_count.value
         self.zone = zone
         self.area = area
         self.type = sensor_type
@@ -251,6 +248,9 @@ class Sensor(BaseModel):
         self.silent_alert = silent_alert
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
+        self.channel_type = channel_type
+        self.sensor_contact_type = sensor_contact_type
+        self.sensor_eol_count = sensor_eol_count
         self.deleted = False
 
     def update(self, data):
@@ -546,7 +546,7 @@ class ArmSensor(BaseModel):
             channel=sensor.channel,
             type_id=sensor.type_id,
             name=sensor.name,
-            description=sensor.description,
+            description=sensor.description or sensor.name,
             timestamp=timestamp,
             delay=delay,
             enabled=sensor.enabled,

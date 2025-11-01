@@ -1,10 +1,9 @@
 import logging
-import json
-import fcntl
 from os import environ
 
 from constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
+from server.src.monitor.adapters.mock.utils import get_input_state
 
 
 class SensorAdapter(SensorAdapterBase):
@@ -18,29 +17,15 @@ class SensorAdapter(SensorAdapterBase):
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._logger.debug("Mock SensorAdapter initialized")
 
+    def is_initialized(self) -> bool:
+        return True
+
     def get_values(self):
         return [self.get_value(channel) for channel in range(self.channel_count)]
 
     def get_value(self, channel):
         ch_key = f"CH{channel + 1:02d}"
-        try:
-            with open("simulator_input.json", "r", encoding="utf-8") as input_file:
-                fcntl.flock(input_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                channels_data = json.load(input_file)
-                fcntl.flock(input_file, fcntl.LOCK_UN)
-                channel_data = channels_data.get(ch_key, {"value": 0})
-                if isinstance(channel_data, dict):
-                    raw_value = channel_data.get("value", 0)
-                else:
-                    # Handle legacy format
-                    raw_value = channel_data
-                self._logger.debug("Value for %s: %s", ch_key, raw_value)
-                return raw_value
-        except (OSError, FileNotFoundError, json.JSONDecodeError):
-            self._logger.warning(
-                "Could not read simulator_input.json, returning 0.0 for %s", ch_key
-            )
-            return 0.0
+        return get_input_state(ch_key)
 
     @property
     def channel_count(self):

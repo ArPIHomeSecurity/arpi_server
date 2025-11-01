@@ -25,7 +25,7 @@ def option_get(option, section) -> Response:
     if db_option:
         return jsonify(db_option.serialized) if db_option else jsonify(None)
 
-    return make_response(jsonify({}), 200)
+    return make_response(jsonify(None), 404)
 
 
 @config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["PUT"])
@@ -172,9 +172,6 @@ def get_installation_id():
 
     The hash is from:
     * SECRET
-    * SALT
-    * host id?
     """
     secret = os.environ["SECRET"]
-    salt = os.environ["SALT"]
-    return hashlib.sha256(f"{secret}{salt}".encode()).hexdigest()
+    return hashlib.sha256(f"{secret}".encode()).hexdigest()

@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import logging
 import os
+import subprocess
 from time import sleep
 from typing import List
 
@@ -11,17 +12,15 @@ try:
 except ImportError:
     lgpio = None
 
-from dotenv import load_dotenv
 
 from constants import LOG_ADSENSOR
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action
-from monitor.logger import ArgusLogger
-from monitor.output import OUTPUT_NAMES
-
 from monitor.adapters.output import get_output_adapter
 from monitor.adapters.power import get_power_adapter
 from monitor.adapters.sensor import get_sensor_adapter
+from monitor.logger import ArgusLogger
+from monitor.output import OUTPUT_NAMES
 
 
 def print_channels(correct_channels, values):
@@ -87,7 +86,7 @@ def test_power_adapter(board_version) -> bool:
     Check the power source type.
     """
     adapter = get_power_adapter(board_version)
-    if not adapter.is_initialized():    
+    if not adapter.is_initialized():
         logging.error("Power adapter not initialized properly. Exiting test.")
         logging.info("Check if argus_monitor service is running and using the GPIO.")
         return False
@@ -166,6 +165,15 @@ def list_adapters() -> List[str]:
             adapters.append(g.replace("test_", "").replace("_adapter", ""))
     return adapters
 
+def check_service_running() -> bool:
+    """
+    Check if argus_monitor service is running.
+    """
+    try:
+        output = subprocess.check_output(["systemctl", "is-active", "argus_monitor"], stderr=subprocess.STDOUT)
+        return output.strip() == b"active"
+    except subprocess.CalledProcessError:
+        return False
 
 def main() -> int:
     """
@@ -195,6 +203,10 @@ def main() -> int:
     else:
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
+    if check_service_running():
+        logging.error("argus_monitor service is running. Please stop it before running the tests.")
+        return 1
+
     test_function = f"test_{args.adapter}_adapter"
     result = globals()[test_function](args.board_version)
     if not result:
@@ -205,7 +217,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        load_dotenv()
         exit(main())
     except KeyboardInterrupt:
         print("\n")

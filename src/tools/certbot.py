@@ -1,22 +1,15 @@
 #!/usr/bin/env python3
-import argparse
-from dataclasses import asdict
-import logging
 import os
+
+import argparse
+import logging
 import subprocess
-import sys
+from dataclasses import asdict
+from pathlib import Path
 from time import time
 
 from cryptography import x509
-from dotenv import load_dotenv
-from os import symlink
-from pathlib import Path, PosixPath
 from pydbus import SystemBus
-
-
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
 
 from constants import LOG_SC_CERTBOT
 from monitor.config_helper import load_dyndns_config
@@ -180,7 +173,7 @@ class Certbot:
         if Path(destination_config).exists():
             os.remove(destination_config)
 
-        symlink(source_config, destination_config)
+        os.symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
         self._logger.info("Disabling configuration %s", destination_config)

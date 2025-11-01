@@ -13,6 +13,9 @@ class PowerAdapter(PowerAdapterBase):
     Mock output adapter for simulator mode.
     """
 
+    def is_initialized(self) -> bool:
+        return True
+
     @property
     def source_type(self):
         """
