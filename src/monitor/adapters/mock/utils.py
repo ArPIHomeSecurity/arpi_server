@@ -138,11 +138,11 @@ def get_channel_configs():
     """
     Get the complete configuration of all channels.
     """
-    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False} for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)}
+    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False} for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)}
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
     configs = {}
-    for ch_key in [f"CH{str(i).zfill(2)}" for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)]:
+    for ch_key in [f"CH{str(i).zfill(2)}" for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)]:
         channel_data = data.get(ch_key, {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False})
         if isinstance(channel_data, dict):
             configs[ch_key] = {

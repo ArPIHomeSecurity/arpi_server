@@ -3,7 +3,7 @@ from os import environ
 
 from constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
-from server.src.monitor.adapters.mock.utils import get_input_state
+from monitor.adapters.mock.utils import get_input_state
 
 
 class SensorAdapter(SensorAdapterBase):
