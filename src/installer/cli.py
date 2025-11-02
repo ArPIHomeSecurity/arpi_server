@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
 """
-ArPI Installation and Management Tool
-A comprehensive Python-based replacement for bash installation scripts
+ArPI Installation and Management Tool - CLI Module
 
-Based on the original ArPI bash modules:
-- System packages (zsh, oh-my-zsh, development tools)
-- Hardware setup (RTC, GSM, WiringPi)
-- Database (PostgreSQL installation and configuration)
-- NGINX (compilation from source with SSL)
-- MQTT (Mosquitto broker with authentication)
-- Certbot (SSL certificate management)
-- Service setup (systemd services, secrets management)
+This module contains all the CLI logic for the ArPI installation tool.
+It can be imported and used from multiple entry points.
 """
 
 import json
@@ -21,8 +14,8 @@ from datetime import datetime
 
 import click
 
-from install.helpers import SecurityHelper, SystemHelper, SecretsManager
-from install.installers import (
+from installer.helpers import SecurityHelper, SystemHelper, SecretsManager
+from installer.installers import (
     BaseInstaller,
     CertbotInstaller,
     DatabaseInstaller,
@@ -92,7 +85,7 @@ class ArpiOrchestrator:
         return self._installer_cache[component]
 
 
-# --- CLI Implementation ---
+# --- Helper Functions ---
 def get_selected_components(selected):
     """
     Determine which components to install/status based on user input
@@ -103,6 +96,15 @@ def get_selected_components(selected):
     return list(selected)
 
 
+class JsonEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle non-serializable objects"""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return str(obj)
+
+
+# --- CLI Implementation ---
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output (debug logging)")
 @click.option("--board-version", type=int, default=None, help="Hardware board version (2 or 3)")
@@ -138,12 +140,6 @@ def cli(ctx, verbose, board_version):
             except ValueError:
                 click.echo("Invalid input. Please enter a number (2 or 3).")
 
-class JsonEncoder(json.JSONEncoder):
-    """Custom JSON encoder to handle non-serializable objects"""
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return str(obj)
 
 @cli.command()
 @click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
@@ -301,7 +297,3 @@ def deploy_code(ctx, restart, backup):
         SystemHelper.run_command("systemctl restart argus_server.service", check=False)
 
     click.echo("✅ Server component installation complete.")
-
-
-if __name__ == "__main__":
-    cli()

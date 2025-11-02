@@ -3,8 +3,8 @@ import os
 import subprocess
 import click
 
-from install.helpers import SystemHelper, ServiceHelper, SecurityHelper
-from install.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, ServiceHelper, SecurityHelper
+from installer.installers.base import BaseInstaller
 
 
 class ServerInstaller(BaseInstaller):

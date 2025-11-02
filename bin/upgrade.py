@@ -119,13 +119,13 @@ def upgrade_server(tmp_dir, board_version: str):
     os.system(
         f"cd {tmp_dir}; "
         f"sudo -E {' '.join(f'{key}={value}' for key, value in install_config.items())} "
-        f"python3 -m install deploy-code --backup;"
+        f"bin/install.py deploy-code --backup;"
     )
 
     os.system(
         f"cd {tmp_dir}; "
         f"sudo -E {' '.join(f'{key}={value}' for key, value in install_config.items())} "
-        f"python3 -m install install"
+        f"bin/install.py install"
     )
 
 
@@ -262,11 +262,12 @@ def main():
     """
     Main entry point for the upgrade script.
     """
-    print("🔧 Starting ArPI upgrade process...")
     parser = argparse.ArgumentParser()
     parser.add_argument("--prerelease", action="store_true", help="Use latest prerelease")
     parser.add_argument("--board-version", type=str, help="Board version (2 or 3)", default="2")
     args = parser.parse_args()
+
+    print("🔧 Starting ArPI upgrade process...")
 
     # ensure required packages are installed
     install_packages(["pipenv", "python3-click"])

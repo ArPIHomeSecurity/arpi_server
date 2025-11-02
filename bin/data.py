@@ -597,6 +597,10 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.delete and not args.create:
+        parser.print_help()
+        return 0
+
     # Configure logging based on verbose flag
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(

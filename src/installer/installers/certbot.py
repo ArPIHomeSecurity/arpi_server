@@ -1,7 +1,7 @@
 import click
 
-from install.helpers import SystemHelper, PackageHelper
-from install.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper
+from installer.installers.base import BaseInstaller
 
 
 class CertbotInstaller(BaseInstaller):

@@ -3,8 +3,8 @@ import os
 import tempfile
 import click
 
-from install.helpers import SystemHelper, PackageHelper, SecurityHelper
-from install.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper, SecurityHelper
+from installer.installers.base import BaseInstaller
 
 
 class NginxInstaller(BaseInstaller):

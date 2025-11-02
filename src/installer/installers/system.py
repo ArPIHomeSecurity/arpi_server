@@ -2,8 +2,8 @@ import os
 import subprocess
 import click
 
-from install.installers.base import BaseInstaller
-from install.helpers import SystemHelper, PackageHelper
+from installer.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper
 
 
 class SystemInstaller(BaseInstaller):

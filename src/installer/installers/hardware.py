@@ -2,8 +2,8 @@ import os
 import tempfile
 import click
 
-from install.helpers import SystemHelper, PackageHelper, ServiceHelper
-from install.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper, ServiceHelper
+from installer.installers.base import BaseInstaller
 
 
 class HardwareInstaller(BaseInstaller):

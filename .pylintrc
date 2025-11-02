@@ -1,2 +1,5 @@
 [FORMAT]
 max-line-length=100
+
+[MASTER]
+init-hook='import sys; sys.path.append("src")'

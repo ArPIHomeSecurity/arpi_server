@@ -2,8 +2,8 @@ import os
 import subprocess
 import click
 
-from install.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
-from install.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
+from installer.installers.base import BaseInstaller
 
 
 class DatabaseInstaller(BaseInstaller):
