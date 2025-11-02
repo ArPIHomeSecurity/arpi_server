@@ -334,19 +334,29 @@ class SensorHandler:
             self._logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
+            alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
+            delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
+            sensitivity = self._sensors_history.get_sensitivity(idx)
+
             # alert under threshold
             if (
                 not self._sensors_history.is_sensor_alerting(idx)
                 and self._sensors_history.has_sensor_any_alert(idx)
                 and sensor.id not in self._alerting_sensors
                 and current_monitoring == MONITORING_ARMED
+                and sensor.enabled
+                and alert_type is not None
+                and delay is not None
             ):
                 self._logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert! (%r)",
+                    "Sensor %s (CH%02d) has suppressed alert! %ss%s%| (%r)",
                     sensor.description,
                     sensor.channel,
+                    sensitivity.monitor_period,
+                    sensitivity.monitor_threshold,
                     self._sensors_history.get_states(idx),
                 )
+                continue
 
             # add new alert, enabled sensors to the alert
             if (
@@ -354,9 +364,6 @@ class SensorHandler:
                 and sensor.id not in self._alerting_sensors
                 and sensor.enabled
             ):
-                alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
-                delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
-                sensitivity = self._sensors_history.get_sensitivity(idx)
 
                 # do not start alert if in delay
                 if (
