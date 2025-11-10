@@ -12,7 +12,7 @@ class DatabaseInstaller(BaseInstaller):
     def __init__(self, config: dict):
         super().__init__(config)
         self.postgresql_version = config["postgresql_version"]
-        self.db_username = config["db_username"]
+        self.db_username = config["user"]
         self.db_name = config["db_name"]
         self.user = config["user"]
 

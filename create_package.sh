@@ -17,6 +17,7 @@ tar -czf "$SCRIPT_DIR/$OUTFILE" \
     --exclude='*.pyc' \
     --exclude='*.sock' \
     -C "$SCRIPT_DIR" \
+    bin/ \
     src/ \
     etc/ \
     migrations/ \

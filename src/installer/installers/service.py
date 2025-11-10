@@ -123,9 +123,9 @@ d /run/{self.user} 0755 {self.user} {self.user}
         }
 
         if SystemHelper.run_command(
-            f"sudo -u {self.user} -H bash -c '"
+            f"sudo -u {self.user} -H bash -l -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
-            f'pipenv install --system --deploy --categories "{" ".join(packages)}"\'',
+            f'pipenv install -v --system --deploy --categories "{" ".join(packages)}"\'',
             suppress_output=False,
             cwd=f"/home/{self.user}/server",
         ):
@@ -154,7 +154,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
             SystemHelper.run_command(
                 f'sudo -u {self.user} -H bash -c "'
                 "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
-                f'python3 src/data.py -d -c {self.data_set_name}"',
+                f'bin/data.py -d -c {self.data_set_name}"',
                 cwd=f"/home/{self.user}/server",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
