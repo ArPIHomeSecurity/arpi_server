@@ -39,11 +39,14 @@ def main():
         default=None,
         help="Disable password authentication",
     )
+    args.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity.")
 
     args = args.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
-    print(args)
+    logging.basicConfig(
+        format="%(asctime)-15s: %(message)s",
+        level=logging.DEBUG if args.verbose else logging.INFO,
+    )
 
     if args.get_local_ip:
         ssh = SSHService()

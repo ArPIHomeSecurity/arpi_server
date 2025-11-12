@@ -28,6 +28,14 @@ class SSHKeyManager:
     ) -> tuple[str, str]:
         """
         Generate SSH keys
+
+        Arguments:
+            key_type: The type of the key (rsa, ecdsa, ed25519)
+            key_name: The name of the key
+            passphrase: The passphrase for the key
+        
+        Returns:
+            A tuple containing the private key and public key as strings
         """
         self._logger.info("Generating SSH keys %s with name %s", key_type, key_name)
         key_path = "/tmp/id_rsa"
@@ -55,6 +63,10 @@ class SSHKeyManager:
     def set_public_key(self, public_key: str, key_name: str):
         """
         Add public key to authorized_keys or replace existing key
+
+        Arguments:
+            public_key: The public key string
+            key_name: The name of the key to identify it in authorized_keys
         """
         if len(public_key.split(" ")) == 2:
             self._logger.debug(
@@ -97,6 +109,9 @@ class SSHKeyManager:
     def remove_public_key(self, key_name: str):
         """
         Remove public key from authorized_keys
+
+        Arguments:
+            key_name: The name of the key to identify it in authorized_keys
         """
         self._logger.info("Removing public key with name %s", key_name)
         subprocess.run(["sed", "-i", f"/{key_name}/d", self.authorized_keys_path], check=True)
