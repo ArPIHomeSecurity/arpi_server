@@ -8,7 +8,6 @@ from pathlib import Path
 from time import time
 
 from cryptography import x509
-from pydbus import SystemBus
 
 from constants import LOG_SC_CERTBOT
 from monitor.config_helper import load_dyndns_config
@@ -182,10 +181,11 @@ class Certbot:
             self._logger.error("File not found: %s", destination_config)
 
     def _restart_systemd_service(self, service_name):
-        self._logger.info("Restarting '%s' with DBUS", service_name)
-        bus = SystemBus()
-        systemd = bus.get(".systemd1")
-        systemd.RestartUnit(service_name, "fail")
+        self._logger.info("Restarting '%s' with systemctl", service_name)
+        try:
+            subprocess.run(["sudo", "systemctl", "restart", service_name], check=True)
+        except subprocess.CalledProcessError as error:
+            self._logger.error("Failed to restart %s: %s", service_name, error)
 
     def check_domain_changed(self):
         """
