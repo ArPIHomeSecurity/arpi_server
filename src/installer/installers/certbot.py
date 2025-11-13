@@ -1,16 +1,41 @@
 import click
 
-from installer.helpers import SystemHelper, PackageHelper
+from installer.helpers import SecurityHelper, SystemHelper, PackageHelper
 from installer.installers.base import BaseInstaller
 
 
 class CertbotInstaller(BaseInstaller):
     """Installer for SSL certificate management"""
 
+    FOLDERS = [
+        "/var/lib/letsencrypt",
+        "/var/log/letsencrypt",
+        "/etc/letsencrypt"
+    ]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.user = config["user"]
+
     def should_use_snap_certbot(self) -> bool:
         """Determine if snap should be used for certbot installation"""
         return SystemHelper.get_architecture() == "x86_64"
+    
+    def create_folders(self):
+        """
+        Create necessary folders for Certbot
+        * /var/lib/letsencrypt
+        * /var/log/letsencrypt
+        * /etc/letsencrypt
+        """
+        for folder in self.FOLDERS:
+            SystemHelper.create_folder(folder)
+            SecurityHelper.set_permissions(folder, f"{self.user}:root", "755")
 
+    def check_folders_exist(self) -> bool:
+        """Check if necessary Certbot folders exist"""
+        return all(SystemHelper.run_command(f"test -d {folder}", check=False).returncode == 0 for folder in self.FOLDERS)
+    
     def install_certbot(self):
         """Install Certbot for SSL certificate management"""
 
@@ -44,7 +69,11 @@ class CertbotInstaller(BaseInstaller):
     def install(self):
         """Install Certbot components"""
         self.install_certbot()
+        self.create_folders()
 
     def get_status(self) -> dict:
         """Get Certbot status"""
-        return {"Certbot installed": self.is_installed()}
+        return {
+            "Certbot installed": self.is_installed(),
+            "Certbot folders exist": self.check_folders_exist()
+        }

@@ -3,7 +3,7 @@ import os
 import tempfile
 import click
 
-from installer.helpers import SystemHelper, PackageHelper, SecurityHelper
+from installer.helpers import ServiceHelper, SystemHelper, PackageHelper, SecurityHelper
 from installer.installers.base import BaseInstaller
 
 
@@ -101,7 +101,7 @@ class NginxInstaller(BaseInstaller):
         click.echo("   ✓ Copied dhparam file")
 
         # Set proper ownership for SSL directory
-        SecurityHelper.set_file_permissions(
+        SecurityHelper.set_permissions(
             "/usr/local/nginx/conf", f"{self.nginx_user}:{self.nginx_user}", "755", recursive=True
         )
 
@@ -170,7 +170,7 @@ class NginxInstaller(BaseInstaller):
             "NGINX configured": os.path.exists("/usr/local/nginx/conf/sites-enabled/http.conf"),
             "NGINX user": self.check_user_in_group(self.nginx_user, self.user),
             "NGINX config valid": self.check_config_valid(),
-            "NGINX running": SystemHelper.is_service_running("nginx"),
+            "NGINX running": ServiceHelper.is_service_running("nginx"),
             "NGINX SSL certificates": (
                 os.path.exists("/usr/local/nginx/conf/ssl/arpi_dhparam.pem")
                 and os.path.exists("/usr/local/nginx/conf/ssl/arpi_app.crt")

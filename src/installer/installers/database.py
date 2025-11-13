@@ -32,7 +32,7 @@ class DatabaseInstaller(BaseInstaller):
             ServiceHelper.enable_service("postgresql")
 
         # Ensure service is running
-        if not SystemHelper.is_service_running("postgresql"):
+        if not ServiceHelper.is_service_running("postgresql"):
             ServiceHelper.start_service("postgresql")
 
     def configure_database(self):
@@ -147,8 +147,8 @@ class DatabaseInstaller(BaseInstaller):
                 f"postgresql-{self.postgresql_version}"
             ),
             "PostgreSQL version": not self.needs_installation(),
-            "PostgreSQL running": SystemHelper.is_service_running("postgresql"),
-            "PostgreSQL enabled": SystemHelper.is_service_enabled("postgresql"),
+            "PostgreSQL running": ServiceHelper.is_service_running("postgresql"),
+            "PostgreSQL enabled": ServiceHelper.is_service_enabled("postgresql"),
             "User in postgres group": self.is_user_in_gpio_group(),
             "Database user exists": self.check_user_exists(),
             "Database exists": self.check_database_exists(),

@@ -38,10 +38,10 @@ class ServerInstaller(BaseInstaller):
         for directory in directories:
             SystemHelper.run_command(f"mkdir -p {directory}")
 
-        SecurityHelper.set_file_permissions(
+        SecurityHelper.set_permissions(
             f"/home/{self.user}", f"{self.user}:{self.user}", "755", recursive=True
         )
-        SecurityHelper.set_file_permissions(
+        SecurityHelper.set_permissions(
             f"/run/{self.user}", f"{self.user}:{self.user}", "755", recursive=True
         )
         click.echo("   ✓ Service directories created")
@@ -83,7 +83,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
         # Set proper ownership and permissions
         SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
-        SecurityHelper.set_file_permissions(secrets_file, f"{self.user}:{self.user}", "600")
+        SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
 
         click.echo("   ✓ Secrets saved to file")
 
@@ -209,8 +209,8 @@ d /run/{self.user} 0755 {self.user} {self.user}
                 and os.path.exists(f"/home/{self.user}/webapplication")
             ),
             "Database schema updated": self.check_database_schema_updated(),
-            "Argus server enabled": SystemHelper.is_service_enabled("argus_server"),
-            "Argus monitor enabled": SystemHelper.is_service_enabled("argus_monitor"),
-            "Nginx enabled": SystemHelper.is_service_enabled("nginx"),
+            "Argus server enabled": ServiceHelper.is_service_enabled("argus_server"),
+            "Argus monitor enabled": ServiceHelper.is_service_enabled("argus_monitor"),
+            "Nginx enabled": ServiceHelper.is_service_enabled("nginx"),
             "Tmpfiles configured": self.check_tmpfiles_configured(),
         }

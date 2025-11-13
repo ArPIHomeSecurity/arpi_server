@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 import platform
+import re
 import secrets
 import string
 import subprocess
@@ -119,32 +120,12 @@ class SystemHelper:
             raise
 
     @staticmethod
-    def is_service_running(service: str) -> bool:
-        """Check if systemd service is running"""
-        try:
-            result = SystemHelper.run_command(f"systemctl is-active --quiet {service}", check=False)
-            return result.returncode == 0
-        except Exception:
-            return False
-
-    @staticmethod
-    def is_service_enabled(service: str) -> bool:
-        """Check if systemd service is enabled"""
-        try:
-            result = SystemHelper.run_command(
-                f"systemctl is-enabled --quiet {service}", check=False
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
-
-    @staticmethod
     def get_architecture() -> str:
         """Get system architecture"""
         return platform.machine()
 
     @staticmethod
-    def file_contains_text(file_path: str, text: str) -> bool:
+    def file_contains_text(file_path: str, text: str, regex: bool = False) -> bool:
         """Check if file contains specific text"""
         if not os.path.exists(file_path):
             return False
@@ -152,6 +133,8 @@ class SystemHelper:
         try:
             with open(file_path, "r") as f:
                 content = f.read()
+                if regex:
+                    return bool(re.search(text, content))
                 return text in content
         except Exception:
             return False
@@ -191,7 +174,10 @@ class SystemHelper:
 
         shutil.copytree(src, dst, symlinks=True)
 
-
+    @staticmethod
+    def create_folder(folder_path: str):
+        """Create folder if it doesn't exist"""
+        os.makedirs(folder_path, exist_ok=True)
 class SecurityHelper:
     """Helper class for security-related operations"""
 
@@ -202,7 +188,7 @@ class SecurityHelper:
         return "".join(secrets.choice(alphabet) for _ in range(length))
 
     @staticmethod
-    def set_file_permissions(file_path: str, owner: str, mode: str, recursive: bool = False):
+    def set_permissions(file_path: str, owner: str, mode: str, recursive: bool = False):
         """Set file ownership and permissions"""
         recursive_flag = "-R" if recursive else ""
         SystemHelper.run_command(f"chown {recursive_flag} {owner} {file_path}")
@@ -418,3 +404,23 @@ class ServiceHelper:
         except Exception:
             if not ignore_errors:
                 raise
+
+    @staticmethod
+    def is_service_running(service: str) -> bool:
+        """Check if systemd service is running"""
+        try:
+            result = SystemHelper.run_command(f"systemctl is-active --quiet {service}", check=False)
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def is_service_enabled(service: str) -> bool:
+        """Check if systemd service is enabled"""
+        try:
+            result = SystemHelper.run_command(
+                f"systemctl is-enabled --quiet {service}", check=False
+            )
+            return result.returncode == 0
+        except Exception:
+            return False

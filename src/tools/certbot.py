@@ -169,16 +169,19 @@ class Certbot:
     def _enable_configuration(self, destination_config, source_config):
         self._logger.info("Updating configuration %s with %s", destination_config, source_config)
         if Path(destination_config).exists():
-            os.remove(destination_config)
+            try:
+                subprocess.run(["sudo", "rm", destination_config], check=True)
+            except subprocess.CalledProcessError as error:
+                self._logger.error("Error removing file %s: %s", destination_config, error)
 
         os.symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
         self._logger.info("Disabling configuration %s", destination_config)
         try:
-            os.remove(destination_config)
-        except FileNotFoundError:
-            self._logger.error("File not found: %s", destination_config)
+            subprocess.run(["sudo", "rm", destination_config], check=True)
+        except subprocess.CalledProcessError as error:
+            self._logger.error("Error removing file %s: %s", destination_config, error)
 
     def _restart_systemd_service(self, service_name):
         self._logger.info("Restarting '%s' with systemctl", service_name)

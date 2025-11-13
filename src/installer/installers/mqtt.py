@@ -63,7 +63,7 @@ class MqttInstaller(BaseInstaller):
             ServiceHelper.enable_service("mosquitto")
 
         # Ensure service is running
-        if not SystemHelper.is_service_running("mosquitto"):
+        if not ServiceHelper.is_service_running("mosquitto"):
             ServiceHelper.start_service("mosquitto")
 
     def configure_mqtt_ssl_certificates(self):
@@ -88,7 +88,7 @@ class MqttInstaller(BaseInstaller):
             SystemHelper.run_command(f"cp {ssl_file} /etc/mosquitto/certs/")
 
         # Set proper ownership for certs directory
-        SecurityHelper.set_file_permissions(
+        SecurityHelper.set_permissions(
             "/etc/mosquitto/certs", "mosquitto:mosquitto", "755", recursive=True
         )
 
@@ -137,7 +137,7 @@ class MqttInstaller(BaseInstaller):
             SystemHelper.run_command(
                 f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.secrets_manager.get_mqtt_reader_password()}"
             )
-            SecurityHelper.set_file_permissions(
+            SecurityHelper.set_permissions(
                 "/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644"
             )
             click.echo("   ✓ MQTT authentication configured")
@@ -156,8 +156,8 @@ class MqttInstaller(BaseInstaller):
         """Get MQTT status"""
         return {
             "Mosquitto installed": PackageHelper.is_package_installed("mosquitto"),
-            "Mosquitto running": SystemHelper.is_service_running("mosquitto"),
-            "Mosquitto enabled": SystemHelper.is_service_enabled("mosquitto"),
+            "Mosquitto running": ServiceHelper.is_service_running("mosquitto"),
+            "Mosquitto enabled": ServiceHelper.is_service_enabled("mosquitto"),
             "Mosquitto authentication configured": os.path.exists("/etc/mosquitto/.passwd"),
             "Mosquitto SSL configured": (
                 os.path.exists("/etc/mosquitto/certs/arpi_app.crt")

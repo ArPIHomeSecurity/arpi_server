@@ -271,7 +271,7 @@ def deploy_code(ctx, restart, backup):
 
     user = orchestrator.config["user"]
     click.echo(f"Setting ownership to {user}:{user} ...")
-    SecurityHelper.set_file_permissions(dst, f"{user}:{user}", 755, recursive=True)
+    SecurityHelper.set_permissions(dst, f"{user}:{user}", 755, recursive=True)
 
     # configure board version in .env
     if ctx.obj["orchestrator"].config["board_version"] not in [2, 3]:
