@@ -6,6 +6,7 @@ import contextlib
 import fcntl
 import json
 import os
+from enum import Enum
 
 from monitor.output import OUTPUT_NAMES
 
@@ -15,6 +16,24 @@ OUTPUT_FILE = "simulator_output.json"
 KEYPAD_FILE = "simulator_keypad.json"
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
+
+
+class WiringStrategies(str, Enum):
+    """
+    Wiring strategies of the input channels
+    """
+    SINGLE_WITH_EOL = "single_with_eol"
+    SINGLE_WITH_2EOL = "single_with_2eol"
+    DUAL = "dual"
+    CUT = "cut"
+    SHORTAGE = "shortage"
+
+class ContactTypes(str, Enum):
+    """
+    Contact types of the sensors
+    """
+    NC = "nc"
+    NO = "no"
 
 
 def protected_read(filename, default_data):
@@ -137,13 +156,32 @@ def set_input_states(channel_values, channel_configs):
 def get_channel_configs():
     """
     Get the complete configuration of all channels.
+
+    If the configuration is in an old format (just a string), it defaults to "cut".
+    In case of missing fields, default values are used.
     """
-    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False} for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)}
+
+    default_data = {
+        f"CH{str(i).zfill(2)}": {
+            "value": 0,
+            "wiring_strategy": WiringStrategies.SINGLE_WITH_EOL.value,
+            "contact_type": ContactTypes.NC.value,
+            "sensor_a_active": False,
+            "sensor_b_active": False
+        } for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
+    }
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
     configs = {}
-    for ch_key in [f"CH{str(i).zfill(2)}" for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)]:
-        channel_data = data.get(ch_key, {"value": 0, "wiring_strategy": "cut", "contact_type": "nc", "sensor_a_active": False, "sensor_b_active": False})
+    keys = [f"CH{str(i).zfill(2)}" for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)]
+    for ch_key in keys:
+        channel_data = data.get(ch_key, {
+            "value": 0,
+            "wiring_strategy": "cut",
+            "contact_type": "nc",
+            "sensor_a_active": False,
+            "sensor_b_active": False
+        })
         if isinstance(channel_data, dict):
             configs[ch_key] = {
                 "wiring_strategy": channel_data.get("wiring_strategy", "cut"),

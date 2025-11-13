@@ -3,7 +3,6 @@
 import logging
 from contextlib import suppress
 from copy import deepcopy
-from enum import Enum
 from os import environ
 
 from textual import on
@@ -17,6 +16,8 @@ from textual.widgets import Button, Checkbox, Select, Static
 from models import SensorContactTypes
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
+    ContactTypes,
+    WiringStrategies,
     get_channel_configs,
     get_output_states,
     set_input_states,
@@ -26,16 +27,7 @@ from monitor.output import OUTPUT_NAMES
 # use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
 
-
-class WiringStrategies(str, Enum):
-    SINGLE_WITH_EOL = "single_with_eol"
-    SINGLE_WITH_2EOL = "single_with_2eol"
-    DUAL = "dual"
-    CUT = "cut"
-    SHORTAGE = "shortage"
-
-
-# Wiring strategies
+# Wiring strategies for control
 WIRING_STRATEGIES = [
     ("Single/EOL", WiringStrategies.SINGLE_WITH_EOL.value),
     ("Single/2 EOL", WiringStrategies.SINGLE_WITH_2EOL.value),
@@ -44,8 +36,11 @@ WIRING_STRATEGIES = [
     ("Shortage", WiringStrategies.SHORTAGE.value),
 ]
 
-# Contact types
-CONTACT_TYPES = [("NC", "nc"), ("NO", "no")]
+# Contact types for control
+CONTACT_TYPES = [
+    ("NC", ContactTypes.NC.value),
+    ("NO", ContactTypes.NO.value)
+]
 
 # channel error states
 CHANNEL_CUT = wiring_config.open_circuit
@@ -144,10 +139,11 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, channel_configs, **kwargs):
+    def __init__(self, default_states, channel_configs, is_advanced_mode=False, **kwargs):
         super().__init__(**kwargs)
         self._default_states = default_states
         self._channel_configs = channel_configs
+        self._is_advanced_mode = is_advanced_mode
 
     def compose(self) -> ComposeResult:
         """Create channel rows with strategy select, contact type select, and sensor buttons in two columns"""
@@ -176,25 +172,26 @@ class Channels(Widget):
                                 classes=f"channel-label {channel_class or wiring_strategy}",
                             )
 
-                            # Wiring strategy select
-                            yield Select(
-                                [(value, label) for value, label in WIRING_STRATEGIES],
-                                value=wiring_strategy,
-                                id=f"wiring-strategy-{i}",
-                                classes="wiring-strategy-select",
-                                allow_blank=False,
-                            )
+                            # Wiring strategy select (advanced mode only)
+                            if self._is_advanced_mode:
+                                yield Select(
+                                    [(value, label) for value, label in WIRING_STRATEGIES],
+                                    value=wiring_strategy,
+                                    id=f"wiring-strategy-{i}",
+                                    classes="wiring-strategy-select",
+                                    allow_blank=False,
+                                )
 
-                            # Contact type select (disabled for cut/shortage)
-                            contact_disabled = wiring_strategy in ["cut", "shortage"]
-                            yield Select(
-                                [(value, label) for value, label in CONTACT_TYPES],
-                                value=contact_type,
-                                id=f"contact-type-{i}",
-                                classes="contact-type-select",
-                                disabled=contact_disabled,
-                                allow_blank=False,
-                            )
+                                # Contact type select (disabled for cut/shortage)
+                                contact_disabled = wiring_strategy in ["cut", "shortage"]
+                                yield Select(
+                                    [(value, label) for value, label in CONTACT_TYPES],
+                                    value=contact_type,
+                                    id=f"contact-type-{i}",
+                                    classes="contact-type-select",
+                                    disabled=contact_disabled,
+                                    allow_blank=False,
+                                )
 
                             # Sensor activation buttons (only enabled for dual configurations)
                             yield Button(
@@ -211,13 +208,14 @@ class Channels(Widget):
                                     ]
                                 ),
                             )
-                            yield Button(
-                                "B",
-                                id=f"sensor-{i}-b",
-                                classes="sensor-button"
-                                + (" sensor-active" if sensor_b_active else ""),
-                                disabled=wiring_strategy != WiringStrategies.DUAL.value,
-                            )
+                            if self._is_advanced_mode:
+                                yield Button(
+                                    "B",
+                                    id=f"sensor-{i}-b",
+                                    classes="sensor-button"
+                                    + (" sensor-active" if sensor_b_active else ""),
+                                    disabled=wiring_strategy != WiringStrategies.DUAL.value,
+                                )
 
         yield Static("")
         yield Button("POWER", id="power", classes="power")
@@ -347,6 +345,8 @@ class SimulatorApp(App):
         self.keypad = deepcopy(DEFAULT_KEYPAD)
         self.channel_values = {}
         self.channel_configs = {}
+        self.is_advanced_mode = False
+        self.is_v3_board = environ.get("BOARD_VERSION") == "3"
 
     def initialize_channels(self, input_number: int) -> None:
         """
@@ -361,8 +361,8 @@ class SimulatorApp(App):
 
         self.channel_configs = {
             f"CH{i:02d}": {
-                "wiring_strategy": "cut",
-                "contact_type": "nc",
+                "wiring_strategy": WiringStrategies.CUT.value,
+                "contact_type": ContactTypes.NC.value,
                 "sensor_a_active": False,
                 "sensor_b_active": False,
             }
@@ -370,19 +370,37 @@ class SimulatorApp(App):
         }
 
         # Apply saved configurations and calculate values
-        for ch_key, config in saved_configs.items():
-            if ch_key in self.channel_configs:
-                self.channel_configs[ch_key] = config
+        for channel_name, config in saved_configs.items():
+            if channel_name in self.channel_configs:
+                self.channel_configs[channel_name] = config
                 # Calculate initial values based on configuration
-                self.channel_values[ch_key] = self.calculate_channel_value(ch_key)
+                self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+
+        channels_with_v3_features = any(
+            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
+            for ch in self.channel_configs
+        )
+        self.is_advanced_mode = channels_with_v3_features and self.is_v3_board
+
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a grid layout."""
+        channels_with_v3_features = any(
+            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
+            for ch in self.channel_configs
+        )
+        yield Checkbox(
+            "Advanced Mode",
+            id="mode-toggle",
+            value=self.is_advanced_mode,
+            disabled=not self.is_v3_board or channels_with_v3_features,
+        )
         with Container(id="main-grid"):
             yield Channels(
                 id="channels-pane",
                 default_states=list(self.channel_values.values()),
                 channel_configs=self.channel_configs,
+                is_advanced_mode=self.is_advanced_mode,
             )
             yield Keypad(id="keypad-pane")
             yield Outputs(id="outputs-pane")
@@ -414,7 +432,9 @@ class SimulatorApp(App):
         self.set_interval(0.5, self.read_output_states)
 
     def calculate_channel_value(self, channel: str) -> float:
-        """Calculate the channel value based on wiring strategy and sensor states"""
+        """
+        Calculate the channel value based on wiring strategy and sensor states
+        """
         config = self.channel_configs[channel]
         wiring_strategy = config["wiring_strategy"]
         contact_type = config["contact_type"]
@@ -485,6 +505,9 @@ class SimulatorApp(App):
     @on(Select.Changed, "#channels-pane .wiring-strategy-select")
     def wiring_strategy_changed(self, event: Select.Changed) -> None:
         """Handle wiring strategy selection changes"""
+        if not self.is_advanced_mode:
+            return
+
         select_id = event.select.id
         channel_num = int(select_id.split("-")[2])
         channel_name = f"CH{channel_num:02d}"
@@ -517,11 +540,22 @@ class SimulatorApp(App):
         # Update channel value and label
         self.update_channel_label(channel_num, channel_name, config)
 
+        # update mode
+        channels_with_v3_features = any(
+            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
+            for ch in self.channel_configs
+        )
+        checkbox = self.query_one("#mode-toggle")
+        checkbox.disabled = channels_with_v3_features
+
         self.save_input_states()
 
     @on(Select.Changed, "#channels-pane .contact-type-select")
     def contact_type_changed(self, event: Select.Changed) -> None:
         """Handle contact type selection changes"""
+        if not self.is_advanced_mode:
+            return
+
         select_id = event.select.id
         channel_num = int(select_id.split("-")[2])
         channel_name = f"CH{channel_num:02d}"
@@ -548,6 +582,12 @@ class SimulatorApp(App):
                 or config["wiring_strategy"],
             ]
         )
+
+    @on(Checkbox.Changed, "#mode-toggle")
+    async def mode_toggle_changed(self, event: Checkbox.Changed) -> None:
+        """Toggle between basic and advanced mode"""
+        self.is_advanced_mode = event.value
+        await self.recompose()
 
     @on(Button.Pressed, "#power")
     def power_button_pressed(self, event: Button.Pressed) -> None:
