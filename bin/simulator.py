@@ -5,6 +5,10 @@ from contextlib import suppress
 from copy import deepcopy
 from os import environ
 
+# Database and models for direct DB access
+from monitor.database import get_database_session
+from models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
+
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -13,7 +17,6 @@ from textual.logging import TextualHandler
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Select, Static
 
-from models import SensorContactTypes
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
     ContactTypes,
@@ -42,6 +45,11 @@ CONTACT_TYPES = [
     ("NO", ContactTypes.NO.value)
 ]
 
+SENSOR_CONTACT_TYPE_MAP = {
+    SensorContactTypes.NC: ContactTypes.NC.value,
+    SensorContactTypes.NO: ContactTypes.NO.value,
+}
+
 # channel error states
 CHANNEL_CUT = wiring_config.open_circuit
 CHANNEL_SHORTAGE = wiring_config.shortcut
@@ -64,8 +72,7 @@ class Channels(Widget):
     }
 
     .channel-column {
-        width: 44;
-        margin-right: 5;
+        width: 45;
     }
 
     .channel-row {
@@ -321,14 +328,16 @@ class SimulatorApp(App):
 
     #main-grid {
         layout: grid;
-        grid-size: 2 2;
-        grid-gutter: 2 2;
-        grid-rows: 7fr 1fr;
-        grid-columns: 2fr 38;
-        width: 100%;
-        height: 37;
+        grid-size: 2 3;
+        grid-rows: 3 29 4;
+        grid-columns: 92 38;
+        overflow: auto;
     }
 
+    #top-bar {
+        column-span: 2;
+    }
+    
     #channels-pane {
     }
 
@@ -347,6 +356,56 @@ class SimulatorApp(App):
         self.channel_configs = {}
         self.is_advanced_mode = False
         self.is_v3_board = environ.get("BOARD_VERSION") == "3"
+
+    def load_configuration_from_db(self, input_number: int) -> None:
+        """
+        Refresh channel configurations from the database.
+        """
+        session = get_database_session()
+        sensors = (
+            session.query(Sensor)
+            .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
+            .order_by(Sensor.channel)
+            .all()
+        )
+
+        self.channel_configs = {
+            f"CH{i:02d}": {
+                "wiring_strategy": WiringStrategies.CUT.value,
+                "contact_type": ContactTypes.NC.value,
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            }
+            for i in range(1, input_number + 1)
+        }
+
+        # Update configs from DB
+        for sensor in sensors:
+            channel_name = f"CH{sensor.channel+1:02d}"
+            # Map DB fields to simulator config
+            wiring_strategy = WiringStrategies.CUT.value
+            if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
+                wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
+            elif sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL:
+                wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
+            elif sensor.channel_type == ChannelTypes.CHANNEL_A or sensor.channel_type == ChannelTypes.CHANNEL_B:
+                wiring_strategy = WiringStrategies.DUAL.value
+
+            contact_type = SENSOR_CONTACT_TYPE_MAP[sensor.sensor_contact_type]
+
+            self.channel_configs[channel_name] = {
+                "wiring_strategy": wiring_strategy,
+                "contact_type": contact_type,
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            }
+            self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+
+        # turn on advanced mode if v3 features are present
+        new_advanced_mode = self.has_v3_features() and self.is_v3_board
+        if new_advanced_mode:
+            self.is_advanced_mode = new_advanced_mode
+
 
     def initialize_channels(self, input_number: int) -> None:
         """
@@ -376,26 +435,29 @@ class SimulatorApp(App):
                 # Calculate initial values based on configuration
                 self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
 
-        channels_with_v3_features = any(
-            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
+        self.is_advanced_mode = self.has_v3_features() and self.is_v3_board
+
+    def has_v3_features(self):
+        v3_features = [
+            WiringStrategies.DUAL.value,
+            WiringStrategies.SINGLE_WITH_2EOL.value,
+        ]
+        return  any(
+            self.channel_configs[ch]["wiring_strategy"] in v3_features
             for ch in self.channel_configs
         )
-        self.is_advanced_mode = channels_with_v3_features and self.is_v3_board
-
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a grid layout."""
-        channels_with_v3_features = any(
-            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
-            for ch in self.channel_configs
-        )
-        yield Checkbox(
-            "Advanced Mode",
-            id="mode-toggle",
-            value=self.is_advanced_mode,
-            disabled=not self.is_v3_board or channels_with_v3_features,
-        )
         with Container(id="main-grid"):
+            with Horizontal(id="top-bar"):
+                yield Checkbox(
+                    "Advanced Mode",
+                    id="mode-toggle",
+                    value=self.is_advanced_mode,
+                    disabled=not self.is_v3_board or self.has_v3_features(),
+                )
+                yield Button("Update channels from DB", id="refresh-channels", classes="refresh-button")
             yield Channels(
                 id="channels-pane",
                 default_states=list(self.channel_values.values()),
@@ -541,12 +603,8 @@ class SimulatorApp(App):
         self.update_channel_label(channel_num, channel_name, config)
 
         # update mode
-        channels_with_v3_features = any(
-            self.channel_configs[ch]["wiring_strategy"] not in [WiringStrategies.SINGLE_WITH_EOL.value]
-            for ch in self.channel_configs
-        )
         checkbox = self.query_one("#mode-toggle")
-        checkbox.disabled = channels_with_v3_features
+        checkbox.disabled = self.has_v3_features()
 
         self.save_input_states()
 
@@ -587,6 +645,14 @@ class SimulatorApp(App):
     async def mode_toggle_changed(self, event: Checkbox.Changed) -> None:
         """Toggle between basic and advanced mode"""
         self.is_advanced_mode = event.value
+        await self.recompose()
+
+    @on(Button.Pressed, "#refresh-channels")
+    async def refresh_channels_pressed(self, event: Button.Pressed) -> None:
+        """Reload channel settings from the database and update the UI."""
+        input_number = int(environ.get("INPUT_NUMBER", 15))
+        self.load_configuration_from_db(input_number)
+        self.save_input_states()
         await self.recompose()
 
     @on(Button.Pressed, "#power")
