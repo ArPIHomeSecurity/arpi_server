@@ -88,12 +88,8 @@ class SystemInstaller(BaseInstaller):
         """Configure zsh environment for ArPI"""
         click.echo("   ⚙️ Configuring zsh environment...")
 
-        if not SystemHelper.file_contains_text(
-            f"/home/{self.user}/.zshrc", ". ~/server/.env"
-        ):
-            home = f"/home/{self.user}"
-            zshrc_file = os.path.join(home, ".zshrc")
-
+        zshenv_file = f"/home/{self.user}/.zshenv"
+        if not SystemHelper.file_contains_text(zshenv_file, ". ~/server/.env"):
             config_addition = """
 
 # active python virtual environment and load env variables
@@ -103,10 +99,10 @@ set -a
 set +a
 """
 
-            SystemHelper.append_to_file(zshrc_file, config_addition)
+            SystemHelper.append_to_file(zshenv_file, config_addition)
             # update theme
             SystemHelper.run_command(
-                f"sed -i 's/^ZSH_THEME=.*$/ZSH_THEME=\"ys\"/' {zshrc_file}"
+                f"sed -i 's/^ZSH_THEME=.*$/ZSH_THEME=\"ys\"/' {zshenv_file}"
             )
             click.echo("   ✓ Zsh environment configured")
         else:

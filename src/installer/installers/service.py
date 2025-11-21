@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 import subprocess
 import click
@@ -123,7 +122,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         }
 
         if SystemHelper.run_command(
-            f"sudo -u {self.user} -H bash -l -c '"
+            f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
             f'pipenv install -v --system --deploy --categories "{" ".join(packages)}"\'',
             suppress_output=False,
@@ -137,13 +136,11 @@ d /run/{self.user} 0755 {self.user} {self.user}
     def update_database_schema(self):
         """Update database schema using Alembic"""
         click.echo("   🗄️ Updating database schema...")
-
         SystemHelper.run_command(
-            f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c "'
+            f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c "'
             'python3 -m flask --app server:app db upgrade"',
             cwd=f"/home/{self.user}/server",
         )
-
         click.echo("   ✓ Database schema updated")
 
     def update_database_contents(self):
@@ -152,8 +149,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
         if self.data_set_name:
             SystemHelper.run_command(
-                f'sudo -u {self.user} -H bash -c "'
-                "export $(grep -hv '^#' .env secrets.env | sed 's/\\\"//g' | xargs -d '\\n') && "
+                f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c "'
                 f'bin/data.py -d -c {self.data_set_name}"',
                 cwd=f"/home/{self.user}/server",
             )
@@ -173,13 +169,13 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Check if database schema is up to date"""
         try:
             current_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c '"
+                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
                 "python3 -m flask --app server:app db current'",
                 capture=True,
                 cwd=f"/home/{self.user}/server",
             ).stdout.strip()
             head_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H bash -c '"
+                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
                 "python3 -m flask --app server:app db heads'",
                 cwd=f"/home/{self.user}/server",
                 capture=True,

@@ -34,6 +34,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# installers in execution order
 INSTALLERS = {
     "system": SystemInstaller,
     "hardware": HardwareInstaller,
