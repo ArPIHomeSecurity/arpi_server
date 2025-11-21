@@ -15,6 +15,7 @@ class ServerInstaller(BaseInstaller):
         self.secrets_manager = config.get("secrets_manager")
         self.install_source = config["install_source"]
         self.data_set_name = config["data_set_name"]
+        self.verbose = config.get("verbose", False)
 
 
     def create_service_directories(self):
@@ -124,7 +125,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         if SystemHelper.run_command(
             f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
-            f'pipenv install -v --system --deploy --categories "{" ".join(packages)}"\'',
+            f'pipenv install {"-v" if self.verbose else ""} --system --deploy --categories "{" ".join(packages)}"\'',
             suppress_output=False,
             cwd=f"/home/{self.user}/server",
         ):
