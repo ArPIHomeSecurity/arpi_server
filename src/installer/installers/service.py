@@ -125,9 +125,8 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
         venv_path = f"/home/{self.user}/.venvs"
         if os.path.exists(venv_path):
-            click.echo("   🗑️ Removing existing Python virtual environment...")
+            click.echo("   🗑️ Removing virtual environment folder...")
             SystemHelper.run_command(f"rm -rf {venv_path}")
-            click.echo("   ✓ Existing Python virtual environment removed")
 
     def install_python_dependencies(self):
         """Create Python virtual environment"""
