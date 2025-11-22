@@ -92,7 +92,7 @@ class SystemInstaller(BaseInstaller):
         if not SystemHelper.file_contains_text(zshenv_file, ". ~/server/.env"):
             config_addition = """
 
-# active python virtual environment and load env variables
+# load env variables for ArPI
 set -a
 . ~/server/.env
 . ~/server/secrets.env
@@ -100,13 +100,14 @@ set +a
 """
 
             SystemHelper.append_to_file(zshenv_file, config_addition)
-            # update theme
-            SystemHelper.run_command(
-                f"sed -i 's/^ZSH_THEME=.*$/ZSH_THEME=\"ys\"/' {zshenv_file}"
-            )
             click.echo("   ✓ Zsh environment configured")
         else:
             click.echo("   ✓ Zsh environment already configured")
+
+        # update zsh theme to 'ys'
+        SystemHelper.run_command(
+            f"sed -i 's/^ZSH_THEME=.*$/ZSH_THEME=\"ys\"/' /home/{self.user}/.zshrc"
+        )
 
     def install_common_tools(self):
         """Install common development tools"""

@@ -133,12 +133,12 @@ d /run/{self.user} 0755 {self.user} {self.user}
         click.echo("   🐍 Creating Python virtual environment...")
 
         # always update the python environment
-        packages = ["packages"]
+        categories = ["packages"]
         if ServiceHelper.is_raspberry_pi():
-            packages.append("device")
+            categories.append("device")
 
         if self.config.get("deploy_simulator", "false").lower() == "true":
-            packages.append("simulator")
+            categories.append("simulator")
 
         install_config = {
             "PYTHONPATH": f"/home/{self.user}/server/src",
@@ -149,7 +149,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         if SystemHelper.run_command(
             f"sudo -u {self.user} -E -H zsh --login -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
-            f'pipenv install {"-v" if self.verbose else ""} --system --deploy --categories "{" ".join(packages)}"\'',
+            f'pipenv install {"-v" if self.verbose else ""} --system --deploy --categories "{" ".join(categories)}"\'',
             suppress_output=False,
             cwd=f"/home/{self.user}/server",
         ):
