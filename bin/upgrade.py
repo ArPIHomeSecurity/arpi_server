@@ -1,4 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+# explicitly run in system python3 to avoid issues with virtual environments
+"""
+ArPI Upgrade Script
+
+Stable installation example:
+curl -sSL https://app.arpi-security.info/install.py | /usr/bin/python3 -
+
+Prerelease installation example:
+curl -sSL https://app.arpi-security.info/install.py | /usr/bin/python3 - --prerelease
+
+"""
 import argparse
 from dataclasses import dataclass
 import json
@@ -116,17 +127,19 @@ def upgrade_server(tmp_dir, board_version: str):
     }
 
     # deploy source code
-    os.system(
+    deploy_command = (
         f"cd {tmp_dir}; "
-        f"sudo -E {' '.join(f'{key}={value}' for key, value in install_config.items())} "
+        f"sudo {' '.join(f'{key}={value}' for key, value in install_config.items())} "
         f"bin/install.py deploy-code --backup;"
     )
+    subprocess.run(deploy_command, shell=True, check=True)
 
-    os.system(
+    install_command = (
         f"cd {tmp_dir}; "
-        f"sudo -E {' '.join(f'{key}={value}' for key, value in install_config.items())} "
+        f"sudo {' '.join(f'{key}={value}' for key, value in install_config.items())} "
         f"bin/install.py install"
     )
+    subprocess.run(install_command, shell=True, check=True)
 
 
 def upgrade_webapplication(tmp_dir):
