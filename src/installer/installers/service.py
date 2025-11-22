@@ -105,11 +105,26 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
         click.echo("   ✓ Systemd services configured")
 
-    def create_python_virtual_environment(self):
+    def remove_virtual_env_if_exists(self):
+        """Remove existing Python virtual environment if it exists"""
+        # remove line from .zshrc "source ~/.venvs/server/bin/activate"
+        click.echo("   🗑️ Checking for existing Python virtual environment...")
+        SystemHelper.remove_from_file(
+            f"/home/{self.user}/.zshrc",
+            "source ~/.venvs/server/bin/activate",
+        )
+
+        venv_path = f"/home/{self.user}/.venvs/server"
+        if os.path.exists(venv_path):
+            click.echo("   🗑️ Removing existing Python virtual environment...")
+            SystemHelper.run_command(f"rm -rf {venv_path}")
+            click.echo("   ✓ Existing Python virtual environment removed")
+
+    def install_python_dependencies(self):
         """Create Python virtual environment"""
         click.echo("   🐍 Creating Python virtual environment...")
 
-        # always update the virtual environment
+        # always update the python environment
         packages = ["packages"]
         if ServiceHelper.is_raspberry_pi():
             packages.append("device")
@@ -129,10 +144,10 @@ d /run/{self.user} 0755 {self.user} {self.user}
             suppress_output=False,
             cwd=f"/home/{self.user}/server",
         ):
-            click.echo("   ✓ Python virtual environment created/updated")
+            click.echo("   ✓ Python environment created/updated")
         else:
-            click.echo("   ✗ Failed to create/update Python virtual environment")
-            self.warnings.append("Failed to create/update Python virtual environment")
+            click.echo("   ✗ Failed to create/update Python environment")
+            self.warnings.append("Failed to create/update Python environment")
 
     def update_database_schema(self):
         """Update database schema using Alembic"""
@@ -187,8 +202,9 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
     def install(self):
         """Install service components"""
+        self.remove_virtual_env_if_exists()
         self.create_service_directories()
-        self.create_python_virtual_environment()
+        self.install_python_dependencies()
         self.save_secrets_to_file()
         self.setup_systemd_services()
         self.update_database_schema()
