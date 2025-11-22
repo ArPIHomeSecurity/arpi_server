@@ -1,9 +1,9 @@
 {
-  "version": "v1.4.0_RC12:6418856",
+  "version": "v1.4.0_RC13:93970d1",
   "major": 1,
   "minor": 4,
   "patch": 0,
   "prerelease": "RC",
-  "prerelease_num": "12",
-  "commit_id": "6418856"
+  "prerelease_num": "13",
+  "commit_id": "93970d1"
 }
