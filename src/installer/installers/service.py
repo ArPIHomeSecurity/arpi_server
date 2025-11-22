@@ -107,14 +107,23 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
     def remove_virtual_env_if_exists(self):
         """Remove existing Python virtual environment if it exists"""
+        # remove existing virtual environment
+        click.echo("   🗑️ Removing existing Python virtual environment if it exists...")
+        SystemHelper.run_command(
+            f"sudo -u {self.user} -E -H zsh --login -c '"
+            "pipenv --rm || true'",
+            suppress_output=True,
+            cwd=f"/home/{self.user}/server",
+        )
+
         # remove line from .zshrc "source ~/.venvs/server/bin/activate"
-        click.echo("   🗑️ Checking for existing Python virtual environment...")
+        click.echo("   🗑️ Removing source line from .zshrc if it exists...")
         SystemHelper.remove_from_file(
             f"/home/{self.user}/.zshrc",
             "source ~/.venvs/server/bin/activate",
         )
 
-        venv_path = f"/home/{self.user}/.venvs/server"
+        venv_path = f"/home/{self.user}/.venvs"
         if os.path.exists(venv_path):
             click.echo("   🗑️ Removing existing Python virtual environment...")
             SystemHelper.run_command(f"rm -rf {venv_path}")
@@ -133,12 +142,13 @@ d /run/{self.user} 0755 {self.user} {self.user}
             packages.append("simulator")
 
         install_config = {
+            "PYTHONPATH": f"/home/{self.user}/server/src",
             "PIPENV_TIMEOUT": "9999",
             "CI": "1",
         }
 
         if SystemHelper.run_command(
-            f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
+            f"sudo -u {self.user} -E -H zsh --login -c '"
             f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
             f'pipenv install {"-v" if self.verbose else ""} --system --deploy --categories "{" ".join(packages)}"\'',
             suppress_output=False,
@@ -153,8 +163,9 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Update database schema using Alembic"""
         click.echo("   🗄️ Updating database schema...")
         SystemHelper.run_command(
-            f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c "'
-            'python3 -m flask --app server:app db upgrade"',
+            f"sudo -u {self.user} -E -H zsh --login -c '"
+            f"{' '.join(f'{key}={value}' for key, value in {'PYTHONPATH': f'/home/{self.user}/server/src'}.items())} "
+            "python3 -m flask --app server:app db upgrade'",
             cwd=f"/home/{self.user}/server",
         )
         click.echo("   ✓ Database schema updated")
@@ -165,8 +176,9 @@ d /run/{self.user} 0755 {self.user} {self.user}
 
         if self.data_set_name:
             SystemHelper.run_command(
-                f'sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c "'
-                f'bin/data.py -d -c {self.data_set_name}"',
+                f"sudo -u {self.user} -E -H zsh --login -c '"
+                f"{' '.join(f'{key}={value}' for key, value in {'PYTHONPATH': f'/home/{self.user}/server/src'}.items())} "
+                f"bin/data.py -d -c {self.data_set_name}'",
                 cwd=f"/home/{self.user}/server",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
