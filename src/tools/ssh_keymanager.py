@@ -5,7 +5,7 @@ import re
 import subprocess
 from enum import Enum
 
-from constants import LOG_SC_ACCESS
+from utils.constants import LOG_SC_ACCESS
 
 SSH_PATH = "~/.ssh"
 AUTHORIZED_KEYS_PATH = "~/.ssh/authorized_keys"

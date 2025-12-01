@@ -6,7 +6,7 @@ import logging
 
 from sqlalchemy import select
 
-from constants import (
+from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
     ARM_STAY,
@@ -15,7 +15,7 @@ from constants import (
     MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
-from models import Area
+from utils.models import Area
 from monitor.communication.mqtt import MQTTClient
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_area_state

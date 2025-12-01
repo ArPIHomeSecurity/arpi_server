@@ -1,6 +1,6 @@
 from logging import Logger
 
-from constants import TRACE
+from utils.constants import TRACE
 
 
 class ArgusLogger(Logger):

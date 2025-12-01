@@ -9,8 +9,8 @@ import os
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from constants import LOG_OUTPUT, MONITOR_STOP, MONITOR_UPDATE_CONFIG
-from models import Area, Output, OutputTriggerType
+from utils.constants import LOG_OUTPUT, MONITOR_STOP, MONITOR_UPDATE_CONFIG
+from utils.models import Area, Output, OutputTriggerType
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES

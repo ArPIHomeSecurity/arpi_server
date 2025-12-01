@@ -11,7 +11,7 @@ import logging
 from threading import Lock
 from typing import Optional
 
-from constants import LOG_MONITOR
+from utils.constants import LOG_MONITOR
 from monitor.socket_io import send_system_state
 
 

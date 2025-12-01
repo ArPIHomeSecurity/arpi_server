@@ -5,7 +5,7 @@ import json
 
 from dataclasses import asdict, dataclass
 
-from models import Option
+from utils.models import Option
 from monitor.database import get_database_session
 
 

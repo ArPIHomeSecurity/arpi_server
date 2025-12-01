@@ -8,7 +8,7 @@ from monitor.socket_io import send_public_access
 from tools.certbot import Certbot
 from tools.dyndns import DynDns
 from tools.schedule import enable_dyndns_job
-from constants import THREAD_SECCON, LOG_SECCON
+from utils.constants import THREAD_SECCON, LOG_SECCON
 
 
 class SecureConnection(Thread):

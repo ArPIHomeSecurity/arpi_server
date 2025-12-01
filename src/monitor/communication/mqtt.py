@@ -8,7 +8,7 @@ from enum import Enum
 
 import paho.mqtt.client as mqtt
 
-from constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
+from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
 from monitor.config_helper import load_mqtt_connection_config, load_mqtt_internal_publish_config, load_mqtt_external_publish_config
 
 

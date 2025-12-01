@@ -5,15 +5,15 @@ import click
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
 from installer.installers.base import BaseInstaller
 
+ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
+
 
 class MqttInstaller(BaseInstaller):
     """Installer for MQTT broker"""
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.secrets_manager = config.get("secrets_manager")
-        self.dhparam_file = config.get("dhparam_file", "")
-        self.install_source = config.get("install_source", "/tmp/server")
+        self.secrets_manager = config.secrets_manager
 
     def setup_mosquitto_repository(self):
         """Setup Mosquitto repository for installation"""
@@ -74,14 +74,16 @@ class MqttInstaller(BaseInstaller):
         SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
 
         # Copy dhparam file
-        SystemHelper.run_command(f"cp {self.install_source}/{self.dhparam_file} /etc/mosquitto/certs/")
+        SystemHelper.run_command(
+            f"cp {ETC_DIR}/arpi_dhparam.pem /etc/mosquitto/certs/"
+        )
         click.echo("   ✓ Copied dhparam file")
 
         # Copy SSL certificates from nginx config
         ssl_files = [
-            f"{self.install_source}/etc/nginx/ssl/arpi_app.crt",
-            f"{self.install_source}/etc/nginx/ssl/arpi_app.key",
-            f"{self.install_source}/etc/nginx/ssl/arpi_ca.crt",
+            f"{ETC_DIR}/nginx/ssl/arpi_app.crt",
+            f"{ETC_DIR}/nginx/ssl/arpi_app.key",
+            f"{ETC_DIR}/nginx/ssl/arpi_ca.crt",
         ]
 
         for ssl_file in ssl_files:
@@ -100,16 +102,16 @@ class MqttInstaller(BaseInstaller):
 
         # Copy auth and logging configurations
         SystemHelper.run_command(
-            f"cp {self.install_source}/etc/mosquitto/auth.conf /etc/mosquitto/conf.d/"
+            f"cp {ETC_DIR}/mosquitto/auth.conf /etc/mosquitto/conf.d/"
         )
         SystemHelper.run_command(
-            f"cp {self.install_source}/etc/mosquitto/logging.conf /etc/mosquitto/conf.d/"
+            f"cp {ETC_DIR}/mosquitto/logging.conf /etc/mosquitto/conf.d/"
         )
 
         # Create configs-available directory and copy SSL configs
         SystemHelper.run_command("mkdir -p /etc/mosquitto/configs-available/")
         SystemHelper.run_command(
-            f"cp {self.install_source}/etc/mosquitto/ssl*.conf /etc/mosquitto/configs-available/"
+            f"cp {ETC_DIR}/mosquitto/ssl*.conf /etc/mosquitto/configs-available/"
         )
 
         # Create symlink for SSL configuration
@@ -123,23 +125,16 @@ class MqttInstaller(BaseInstaller):
         """Configure MQTT authentication"""
         click.echo("   🔐 Configuring MQTT authentication...")
 
-        if not self.secrets_manager:
-            click.echo("   ⚠️ Warning: No secrets manager available, skipping authentication setup")
-            self.warnings.append("No secrets manager available for MQTT authentication")
-            return
-
         try:
             # create password for argus user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.secrets_manager.get_mqtt_password()}"
+                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.secrets_manager.get_secret('ARGUS_MQTT_PASSWORD')}"
             )
             # create password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.secrets_manager.get_mqtt_reader_password()}"
+                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.secrets_manager.get_secret('ARGUS_READER_MQTT_PASSWORD')}"
             )
-            SecurityHelper.set_permissions(
-                "/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644"
-            )
+            SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644")
             click.echo("   ✓ MQTT authentication configured")
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")

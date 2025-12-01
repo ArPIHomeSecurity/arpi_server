@@ -4,7 +4,7 @@ import logging
 from threading import Thread, Event
 from time import sleep, time
 
-from constants import LOG_SERVICE, MONITOR_STOP
+from utils.constants import LOG_SERVICE, MONITOR_STOP
 from monitor.broadcast import Broadcaster
 from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler

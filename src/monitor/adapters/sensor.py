@@ -3,7 +3,7 @@
 import logging
 from os import environ
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 
 from .sensor_base import SensorAdapterBase
 

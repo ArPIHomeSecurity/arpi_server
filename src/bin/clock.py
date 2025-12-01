@@ -6,7 +6,7 @@ ArPI Clock Management Tool
 import argparse
 import logging
 
-from constants import LOG_CLOCK
+from utils.constants import LOG_CLOCK
 from tools.clock import Clock
 
 

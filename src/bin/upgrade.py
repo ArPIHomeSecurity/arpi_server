@@ -122,7 +122,6 @@ def upgrade_server(tmp_dir, board_version: str):
     """
     install_config = {
         "PYTHONPATH": "src",
-        "INSTALL_SOURCE": tmp_dir,
         "BOARD_VERSION": board_version,
     }
 

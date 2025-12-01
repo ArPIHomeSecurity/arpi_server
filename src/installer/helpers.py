@@ -297,7 +297,19 @@ class SecretsManager:
             user: The system user for ArPI (e.g., 'argus')
         """
         self.user = user
-        self.secrets_file = f"/home/{user}/server/secrets.env"
+        secrets_paths = [
+            f"/home/{self.user}/secrets.env",
+            f"/home/{self.user}/server/secrets.env",
+        ]
+        self.secrets_file = None
+        for path in secrets_paths:
+            if os.path.exists(path):
+                self.secrets_file = path
+                break
+
+        if not self.secrets_file:
+            self.secrets_file = secrets_paths[0]
+
         self._secrets = {}
         self._load_existing_secrets()
 
@@ -322,9 +334,9 @@ class SecretsManager:
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not read secrets file: {e}")
 
-    def _get_or_generate_secret(self, key: str) -> str:
+    def generate_secret(self, key: str) -> str:
         """
-        Get secret by key, generating if it doesn't exist
+        Generating a new secret and store it
 
         Args:
             key: The secret key to retrieve
@@ -332,31 +344,38 @@ class SecretsManager:
         Returns:
             str: The secret value
         """
-        if key in self._secrets:
-            return self._secrets[key]
-
         # generate new password
         password = SecurityHelper.generate_password()
         self._secrets[key] = password
         return password
 
-    def get_mqtt_password(self) -> str:
+    def get_secret(self, key: str) -> str:
         """
-        Get MQTT password, generating if it doesn't exist
+        Get secret by key
 
+        Args:
+            key: The secret key to retrieve
         Returns:
-            str: The MQTT password
+            str: The secret value
         """
-        return self._get_or_generate_secret("ARGUS_MQTT_PASSWORD")
+        return self._secrets.get(key) 
+    
+    def save_secrets(self):
+        """Save all secrets to the secrets.env file"""
+        click.echo("   💾 Saving secrets to file...")
+        try:
+            # the final location
+            secrets_file = f"/home/{self.user}/secrets.env"
+            with open(secrets_file, "a") as f:
+                for key, value in self._secrets.items():
+                    f.write(f'{key}="{value}"\n')
 
-    def get_mqtt_reader_password(self) -> str:
-        """
-        Get MQTT reader password, generating if it doesn't exist
+            SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
+            SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
 
-        Returns:
-            str: The MQTT reader password
-        """
-        return self._get_or_generate_secret("ARGUS_READER_MQTT_PASSWORD")
+            click.echo("   ✓ Secrets saved to file")
+        except Exception as e:
+            click.echo(f"   ⚠️ Warning: Could not save secrets to file: {e}")
 
 
 class ServiceHelper:

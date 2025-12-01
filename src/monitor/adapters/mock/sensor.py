@@ -1,7 +1,7 @@
 import logging
 from os import environ
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
 from monitor.adapters.mock.utils import get_input_state
 

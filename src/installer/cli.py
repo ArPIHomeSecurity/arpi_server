@@ -9,20 +9,22 @@ It can be imported and used from multiple entry points.
 import json
 import logging
 import os
+import sys
 import traceback
 from datetime import datetime
 
 import click
 
-from installer.helpers import SecurityHelper, SystemHelper, SecretsManager
+from installer.helpers import SecretsManager
 from installer.installers import (
+    InstallerConfig,
     BaseInstaller,
     CertbotInstaller,
     DatabaseInstaller,
     HardwareInstaller,
     MqttInstaller,
     NginxInstaller,
-    ServerInstaller,
+    ServiceInstaller,
     SystemInstaller,
 )
 
@@ -42,7 +44,7 @@ INSTALLERS = {
     "nginx": NginxInstaller,
     "mqtt": MqttInstaller,
     "certbot": CertbotInstaller,
-    "services": ServerInstaller,
+    "service": ServiceInstaller,
 }
 
 COMPONENTS = INSTALLERS.keys()
@@ -52,19 +54,17 @@ class ArpiOrchestrator:
     """Main orchestrator for ArPI installation components"""
 
     def __init__(self):
-        self.config = {
-            "python_version": os.getenv("PYTHON_VERSION", "3.11"),
-            "postgresql_version": os.getenv("POSTGRESQL_VERSION", "15"),
-            "nginx_version": os.getenv("NGINX_VERSION", "1.28.0"),
-            "db_name": os.getenv("ARGUS_DB_NAME", "argus"),
-            "data_set_name": os.getenv("DATA_SET_NAME", "prod"),
-            "dhparam_file": os.getenv("DHPARAM_FILE", "arpi_dhparam.pem"),
-            "deploy_simulator": os.getenv("DEPLOY_SIMULATOR", "false"),
-            "user": os.getenv("ARGUS_USER", "argus"),
-            "install_source": os.getenv("INSTALL_SOURCE", "/tmp/server"),
-            "board_version": int(os.getenv("BOARD_VERSION", "3")),
-            "secrets_manager": SecretsManager(os.getenv("ARGUS_USER", "argus")),
-        }
+        self.config = InstallerConfig(
+            python_version=os.getenv("PYTHON_VERSION", "3.11"),
+            postgresql_version=os.getenv("POSTGRESQL_VERSION", "15"),
+            nginx_version=os.getenv("NGINX_VERSION", "1.28.0"),
+            db_name=os.getenv("ARGUS_DB_NAME", "argus"),
+            data_set_name=os.getenv("DATA_SET_NAME", "prod"),
+            user=os.getenv("ARGUS_USER", "argus"),
+            board_version=int(os.getenv("BOARD_VERSION", "3")),
+            secrets_manager=SecretsManager(os.getenv("ARGUS_USER", "argus")),
+            verbose=False,
+        )
         self._installer_cache = {}
 
     def get_installer(self, component: str) -> BaseInstaller:
@@ -98,6 +98,7 @@ def get_selected_components(selected):
 
 class JsonEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle non-serializable objects"""
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -119,21 +120,20 @@ def cli(ctx, verbose, board_version):
         logger.debug("Verbose logging enabled")
 
     ctx.obj["orchestrator"] = ArpiOrchestrator()
-    ctx.obj["verbose"] = verbose
+    ctx.obj["orchestrator"].config.verbose = verbose
 
     # cli argument has priority over environment variable
     if board_version is not None:
-        ctx.obj["orchestrator"].config["board_version"] = board_version
+        ctx.obj["orchestrator"].config.board_version = board_version
 
-    if ctx.obj["orchestrator"].config["board_version"] not in [2, 3]:
+    if ctx.obj["orchestrator"].config.board_version not in [2, 3]:
         # read board version from input
         click.echo("Please specify a valid board version (2 or 3):")
         while True:
             try:
                 version = int(input("Board version (2 or 3): ").strip())
                 if version in [2, 3]:
-                    ctx.obj["orchestrator"].config["board_version"] = version
-                    ctx.obj["board_version"] = version
+                    ctx.obj["orchestrator"].config.board_version = version
                     break
                 else:
                     click.echo("Invalid input. Please enter 2 or 3.")
@@ -144,7 +144,7 @@ def cli(ctx, verbose, board_version):
 @cli.command()
 @click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
 @click.pass_context
-def install(ctx, component):
+def bootstrap(ctx, component):
     """
     Install the full environment for the server or a specific component
     """
@@ -197,6 +197,30 @@ def install(ctx, component):
 
 
 @cli.command()
+@click.pass_context
+def post_install(ctx):
+    """
+    Run post-installation tasks such as database migrations
+    """
+    ctx.ensure_object(dict)
+    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
+    click.echo("🚀 Starting ArPI post-installation tasks...")
+
+    service_installer: ServiceInstaller = orchestrator.get_installer("service")
+    if not service_installer:
+        click.echo("⚠️ Service installer not found, skipping post-installation tasks.")
+        return
+
+    try:
+        service_installer.post_install()
+        click.echo("✓ Post-installation tasks completed successfully.")
+    except Exception as e:
+        click.echo(f"⚠️ Failed to complete post-installation tasks: {e}")
+        if ctx.obj["verbose"]:
+            traceback.print_exc()
+
+
+@cli.command()
 @click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
 @click.pass_context
 def status(ctx, component):
@@ -223,77 +247,18 @@ def status(ctx, component):
                 traceback.print_exc()
 
 
-@cli.command()
-@click.option("--restart", is_flag=True, help="Restart argus_server service after installation")
-@click.option(
-    "--backup", is_flag=True, help="Create a backup of the existing server code before installation"
-)
-@click.pass_context
-def deploy_code(ctx, restart, backup):
+def status_standalone():
     """
-    Deploy source code of the server component from the specified source directory to the destination directory.
+    Standalone entry point for arpi-status command.
+    This wraps the status command with proper CLI context initialization.
     """
-    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-    src = orchestrator.config["install_source"]
-    dst = f"/home/{orchestrator.config['user']}/server"
+    # check root privileges
+    if os.geteuid() != 0:
+        click.echo("⚠️ This command must be run as root. Please rerun with sudo or as root user.")
+        sys.exit(1)
 
-    # create diff report
-    click.echo("Creating diff report...")
-    excludes = ["__pycache__", "*.pyc", "secrets.env", "status.json"]
-    exclude_args = " ".join([f"--exclude='{e}'" for e in excludes])
-    diff_report = SystemHelper.run_command(
-        f"diff -urN {exclude_args} --brief {src} {dst}", check=False, capture=True
-    )
-    if diff_report.stdout:
-        click.echo(
-            f"📝 Differences between source and destination (with excludes: {', '.join(excludes)})"
-        )
-        [click.echo(f"  | {line}") for line in diff_report.stdout.splitlines()]
-    else:
-        click.echo("No differences found between source and destination.")
+    cli(["status"] + sys.argv[1:], standalone_mode=True)
 
-    if backup:
-        click.echo("Creating backup of existing server code...")
-        backup_file = f"/home/{orchestrator.config['user']}/server_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.tar.gz"
-        # Create a compressed archive of the current server directory, but do not move or remove any files
-        SystemHelper.run_command(f"tar -czf {backup_file} -C {dst} .", check=False)
-        click.echo(f"Backup created at {backup_file}")
 
-    click.echo("Cleanup server folder except secrets.env...")
-    # remove all files and folders in dst except secrets.env at the top level
-    SystemHelper.run_command(
-        f"find '{dst}' -mindepth 1 -maxdepth 1 ! -name 'secrets.env' -exec rm -rf -- '{{}}' +",
-        check=False,
-    )
-
-    click.echo(f"Copying {src} to {dst} (without overwriting existing files)...")
-    SystemHelper.run_command(f"cp -an '{src}/.' '{dst}/'", check=False)
-    click.echo("Copy finished.")
-
-    user = orchestrator.config["user"]
-    click.echo(f"Setting ownership to {user}:{user} ...")
-    SecurityHelper.set_permissions(dst, f"{user}:{user}", 755, recursive=True)
-
-    # configure board version in .env
-    if ctx.obj["orchestrator"].config["board_version"] not in [2, 3]:
-        raise ValueError(
-            f"Invalid board version={ctx.obj['orchestrator'].config['board_version']}. Must be 2 or 3."
-        )
-
-    env_file = os.path.join(dst, ".env")
-    if os.path.exists(env_file):
-        SystemHelper.run_command(
-            f"sed -i 's/^BOARD_VERSION=.*/BOARD_VERSION={ctx.obj['orchestrator'].config['board_version']}/' '{env_file}'",
-            check=False,
-        )
-        click.echo(
-            f"Set BOARD_VERSION={ctx.obj['orchestrator'].config['board_version']} in {env_file}"
-        )
-    else:
-        click.echo(f"   ⚠️ {env_file} not found")
-
-    if restart:
-        click.echo("Restarting argus_server service...")
-        SystemHelper.run_command("systemctl restart argus_server.service", check=False)
-
-    click.echo("✅ Server component installation complete.")
+if __name__ == "__main__":
+    cli()

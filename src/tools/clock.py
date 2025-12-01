@@ -6,7 +6,7 @@ import re
 from datetime import datetime as dt
 from subprocess import CalledProcessError, check_output, run
 
-from constants import LOG_CLOCK
+from utils.constants import LOG_CLOCK
 
 
 TIME1970 = 2208988800

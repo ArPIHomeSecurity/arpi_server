@@ -1,9 +1,9 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request, current_app
 from flask.helpers import make_response
-from models import Sensor, SensorType, Zone, Area
+from utils.models import Sensor, SensorType, Zone, Area
 
-from constants import ROLE_USER
+from utils.constants import ROLE_USER
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host

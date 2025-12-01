@@ -7,15 +7,15 @@ from installer.helpers import ServiceHelper, SystemHelper, PackageHelper, Securi
 from installer.installers.base import BaseInstaller
 
 
+ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
+
 class NginxInstaller(BaseInstaller):
     """Installer for NGINX web server"""
 
     def __init__(self, config: dict):
         super().__init__(config)
         self.nginx_version = config["nginx_version"]
-        self.dhparam_file = config["dhparam_file"]
         self.user = config["user"]
-        self.install_source = config["install_source"]
         self.nginx_user = "www-data"
 
     def install_nginx_dependencies(self):
@@ -72,7 +72,7 @@ class NginxInstaller(BaseInstaller):
 
         # Remove existing config and copy new one
         SystemHelper.run_command("rm -fr /usr/local/nginx/conf/*")
-        SystemHelper.run_command(f"cp -r {self.install_source}/etc/nginx/* /usr/local/nginx/conf/")
+        SystemHelper.run_command(f"cp -r {ETC_DIR}/nginx/* /usr/local/nginx/conf/")
 
         # Create modules-enabled directory and symlinks
         SystemHelper.run_command("mkdir -p /usr/local/nginx/conf/modules-enabled/")
@@ -96,7 +96,7 @@ class NginxInstaller(BaseInstaller):
 
         # Copy dhparam file
         SystemHelper.run_command(
-            f"cp {self.install_source}/{self.dhparam_file} /usr/local/nginx/conf/ssl/arpi_dhparam.pem"
+            f"cp {ETC_DIR}/arpi_dhparam.pem /usr/local/nginx/conf/ssl/arpi_dhparam.pem"
         )
         click.echo("   ✓ Copied dhparam file")
 

@@ -3,8 +3,8 @@ from flask.blueprints import Blueprint
 from flask.helpers import make_response
 
 
-from constants import ROLE_USER
-from models import Output
+from utils.constants import ROLE_USER
+from utils.models import Output
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient

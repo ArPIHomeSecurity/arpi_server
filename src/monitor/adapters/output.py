@@ -5,7 +5,7 @@ Control the outputs
 
 import logging
 from os import environ
-from constants import LOG_ADOUTPUT
+from utils.constants import LOG_ADOUTPUT
 from monitor.adapters.output_base import OutputAdapterBase
 
 from monitor.adapters import V2BoardPin, V3BoardPin

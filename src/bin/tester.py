@@ -13,7 +13,7 @@ except ImportError:
     lgpio = None
 
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action
 from monitor.adapters.output import get_output_adapter

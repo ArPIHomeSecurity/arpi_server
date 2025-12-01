@@ -18,15 +18,14 @@ class SystemInstaller(BaseInstaller):
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
         home = f"/home/{self.user}"
         oh_my_zsh_dir = os.path.join(home, ".oh-my-zsh")
-        zshrc_file = os.path.join(home, ".zshrc")
+        zshenv_file = os.path.join(home, ".zshenv")
 
         return (
             os.path.exists(oh_my_zsh_dir)
             and SystemHelper.run_command(f"getent passwd {self.user}", capture=True)
             .stdout.strip()
             .endswith("/bin/zsh")
-            and SystemHelper.file_contains_text(zshrc_file, ". ~/server/.env")
-            and SystemHelper.file_contains_text(zshrc_file, ". ~/server/secrets.env")
+            and SystemHelper.file_contains_text(zshenv_file, f"{self.config_directory}/config.env")
         )
 
     def install_system_packages(self):
@@ -89,14 +88,17 @@ class SystemInstaller(BaseInstaller):
         click.echo("   ⚙️ Configuring zsh environment...")
 
         zshenv_file = f"/home/{self.user}/.zshenv"
-        if not SystemHelper.file_contains_text(zshenv_file, ". ~/server/.env"):
-            config_addition = """
+        if not SystemHelper.file_contains_text(zshenv_file, f"{self.config_directory}/config.env"):
+            config_addition = f"""
 
 # load env variables for ArPI
 set -a
-. ~/server/.env
-. ~/server/secrets.env
+. {self.config_directory}/config.env
+. ~/secrets.env
 set +a
+
+# add .local/bin to PATH
+export PATH="$HOME/.local/bin:$PATH"
 """
 
             SystemHelper.append_to_file(zshenv_file, config_addition)

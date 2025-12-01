@@ -1,5 +1,5 @@
 import logging
-from constants import LOG_ADKEYPAD
+from utils.constants import LOG_ADKEYPAD
 from monitor.adapters.mock.utils import DEFAULT_KEYPAD, get_keypad_state
 
 logger = logging.getLogger(LOG_ADKEYPAD)

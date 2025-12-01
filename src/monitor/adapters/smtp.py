@@ -3,7 +3,7 @@ import logging
 from smtplib import SMTP, SMTPException, SMTPServerDisconnected
 from socket import gaierror
 
-from constants import LOG_NOTIFIER
+from utils.constants import LOG_NOTIFIER
 
 
 class SMTPSender:

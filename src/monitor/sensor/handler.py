@@ -10,7 +10,7 @@ from time import sleep
 from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
-from constants import (
+from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
     ALERT_STAY,
@@ -27,7 +27,7 @@ from constants import (
     MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
-from models import AlertSensor, Arm, Sensor
+from utils.models import AlertSensor, Arm, Sensor
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config

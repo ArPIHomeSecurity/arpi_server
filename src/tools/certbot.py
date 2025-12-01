@@ -9,7 +9,7 @@ from time import time
 
 from cryptography import x509
 
-from constants import LOG_SC_CERTBOT
+from utils.constants import LOG_SC_CERTBOT
 from monitor.config_helper import load_dyndns_config
 from utils.dictionary import filter_keys
 

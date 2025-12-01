@@ -2,7 +2,7 @@ import logging
 import os
 from typing import List
 
-from constants import LOG_MONITOR
+from utils.constants import LOG_MONITOR
 from monitor.config_helper import AlertSensitivityConfig
 
 

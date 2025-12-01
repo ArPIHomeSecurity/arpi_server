@@ -6,7 +6,7 @@ import logging
 import os
 from threading import Lock
 
-from constants import LOG_ADOUTPUT
+from utils.constants import LOG_ADOUTPUT
 from monitor.adapters.mock.utils import set_output_states, get_output_states
 from monitor.adapters.output_base import OutputAdapterBase
 

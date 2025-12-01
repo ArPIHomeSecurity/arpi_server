@@ -4,7 +4,7 @@ import logging
 import lgpio
 from gpiozero import MCP3008
 
-from constants import LOG_ADPOWER
+from utils.constants import LOG_ADPOWER
 from monitor.adapters import V3BoardPin
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 

@@ -6,10 +6,10 @@ import os
 
 from sqlalchemy.exc import ProgrammingError
 
-from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorContactTypes, SensorEOLCount, SensorType, User, Zone
+from utils.constants import ROLE_ADMIN, ROLE_USER
+from utils.models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorContactTypes, SensorEOLCount, SensorType, User, Zone
 from monitor.database import get_database_session
-from models import metadata
+from utils.models import metadata
 
 
 # Set up logging

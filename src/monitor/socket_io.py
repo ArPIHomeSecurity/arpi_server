@@ -9,8 +9,8 @@ from flask import Flask
 from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
-from constants import LOG_SOCKETIO
-from models import Option
+from utils.constants import LOG_SOCKETIO
+from utils.models import Option
 from monitor.database import get_database_session
 
 

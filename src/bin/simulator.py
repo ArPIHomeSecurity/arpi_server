@@ -7,7 +7,7 @@ from os import environ
 
 # Database and models for direct DB access
 from monitor.database import get_database_session
-from models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
+from utils.models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -694,7 +694,10 @@ logging.basicConfig(
     handlers=[TextualHandler()],
     format="%(asctime)s: %(message)s",
 )
-if __name__ == "__main__":
+
+
+def main():
+    """Main entry point for the simulator application."""
     app = SimulatorApp()
     # Initialize channel values and states from saved data
     app.initialize_channels(int(environ.get("INPUT_NUMBER", 15)))
@@ -703,3 +706,7 @@ if __name__ == "__main__":
     app.save_input_states()
     app.save_keypad_states()
     app.run()
+
+
+if __name__ == "__main__":
+    main()

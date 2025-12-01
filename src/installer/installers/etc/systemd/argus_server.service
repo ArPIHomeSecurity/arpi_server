@@ -6,12 +6,12 @@ After=network.target
 Type=simple
 User=argus
 Group=www-data
-WorkingDirectory=/home/argus/server
-EnvironmentFile=/home/argus/server/.env
-EnvironmentFile=/home/argus/server/secrets.env
-ExecStartPre=/usr/bin/python3 /home/argus/server/bin/secret.py
+WorkingDirectory=/home/argus/
+EnvironmentFile=/home/argus/.local/etc/arpi-server/config.env
+EnvironmentFile=/home/argus/secrets.env
+ExecStartPre=/usr/bin/python3 /home/argus/.local/bin/arpi-secret
 ExecStart=/usr/bin/python3 -m gunicorn \
-    -c src/server/gunicorn.conf.py \
+    -c /home/argus/.local/lib/python3.11/site-packages/server/gunicorn.conf.py \
     --log-level info \
     server:app
 ExecReload=/bin/kill -s HUP $MAINPID

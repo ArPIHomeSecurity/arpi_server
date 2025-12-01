@@ -14,8 +14,8 @@ import jose
 
 import inspect
 
-from models import Option
-from constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from utils.models import Option
+from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.database import db
 
 

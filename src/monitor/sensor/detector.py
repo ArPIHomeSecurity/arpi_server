@@ -5,9 +5,9 @@ Utility functions to detect alerts and errors based on sensor readings.
 import logging
 from os import environ
 
-from models import ChannelTypes, Sensor, SensorEOLCount
+from utils.models import ChannelTypes, Sensor, SensorEOLCount
 from monitor.sensor.wirings import PullUpConfig, PullUpDownConfig
-from constants import LOG_SENSORS
+from utils.constants import LOG_SENSORS
 
 TOLERANCE_V2 = 0.01
 TOLERANCE_V3 = 0.05

@@ -5,7 +5,7 @@ import os
 from flask import jsonify, request, Response
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
-from models import Option
+from utils.models import Option
 
 from server.decorators import authenticated, restrict_host
 from server.database import db

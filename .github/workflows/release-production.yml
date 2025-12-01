@@ -78,6 +78,7 @@ jobs:
 
       - name: Install dependencies 📦
         run: |
+          sudo apt update && sudo apt install -y jq
           pip install pipenv
           pipenv install --categories=dev-packages,simulator
 
@@ -98,7 +99,7 @@ jobs:
         id: get_version
         run: |
           VERSION=$(jq -r '.version' src/server/version.json)
-          VERSION_SIMPLE=$(echo "$VERSION" | sed 's/:.*//')
+          VERSION_SIMPLE=$(scripts/get_package_version.sh) # get python formatted version
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "simple_version=$VERSION_SIMPLE" >> $GITHUB_OUTPUT
           echo "New version: $VERSION"
@@ -120,7 +121,8 @@ jobs:
       
       - name: Build and package server 🏗️
         run: |
-          ./create_package.sh
+          scripts/create_bootstrap_package.sh
+          scripts/create_package.sh
 
       - name: Push changes and tags 🚀
         run: |
@@ -131,12 +133,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.simple_version }}
-          name: Release ${{ steps.get_version.outputs.simple_version }}
+          name: ${{ steps.get_version.outputs.simple_version }}
           draft: false
           prerelease: ${{ steps.set_inputs.outputs.version_type == 'pre-release' }}
           generate_release_notes: true
           files: |
-            arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz
+            dist/arpi_server-${{ steps.get_version.outputs.simple_version }}-*.whl
+            dist/arpi_server-bootstrap-${{ steps.get_version.outputs.simple_version }}.tar.gz
           body: |
             ## What's Changed
 

@@ -4,9 +4,9 @@ from sqlalchemy.sql.expression import false, true
 
 from sqlalchemy.sql.functions import func
 from sqlalchemy.future import select
-from models import Area, Sensor, User, Zone
+from utils.models import Area, Sensor, User, Zone
 
-from constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
+from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
 
 
 logger = logging.getLogger(LOG_MONITOR)

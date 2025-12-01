@@ -4,12 +4,12 @@ import os
 from threading import Thread, Event
 from time import time, sleep
 
-from models import Alert
+from utils.models import Alert
 from monitor.config_helper import SyrenConfig, load_syren_config
 from monitor.database import get_database_session
 from monitor.socket_io import send_syren_state
 
-from constants import LOG_ALERT, THREAD_ALERT
+from utils.constants import LOG_ALERT, THREAD_ALERT
 
 from monitor.adapters.output import get_output_adapter
 

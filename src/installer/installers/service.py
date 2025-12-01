@@ -3,20 +3,20 @@ import subprocess
 import click
 
 from installer.helpers import SystemHelper, ServiceHelper, SecurityHelper
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 
+ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
-class ServerInstaller(BaseInstaller):
+class ServiceInstaller(BaseInstaller):
     """Installer for ArPI services and configurations"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self.user = config["user"]
-        self.secrets_manager = config.get("secrets_manager")
-        self.install_source = config["install_source"]
-        self.data_set_name = config["data_set_name"]
-        self.verbose = config.get("verbose", False)
-
+        self.user = config.user
+        self.secrets_manager = config.secrets_manager
+        self.data_set_name = config.data_set_name
+        self.db_name = config.db_name
+        self.verbose = config.verbose
 
     def create_service_directories(self):
         """Create ArPI service directories"""
@@ -31,7 +31,6 @@ class ServerInstaller(BaseInstaller):
 
         # Create service directories
         directories = [
-            f"/home/{self.user}/server",
             f"/home/{self.user}/webapplication",
             f"/run/{self.user}",
         ]
@@ -63,36 +62,26 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Save generated secrets to file"""
 
         click.echo("   💾 Saving secrets to file...")
-        secrets_file = f"/home/{self.user}/server/secrets.env"
-        if not self.secrets_manager:
-            click.echo("   ⚠️ Warning: No secrets manager available, skipping save")
-            self.warnings.append("No secrets manager available to save secrets")
-            return
-
-        if SystemHelper.file_contains_text(secrets_file, "ARGUS_MQTT_PASSWORD"):
+        if self.secrets_manager.get_secret("ARGUS_MQTT_PASSWORD"):
             click.echo("   ✓ MQTT password already in secrets file, skipping save")
         else:
-            SystemHelper.append_to_file(secrets_file, f"ARGUS_MQTT_PASSWORD={self.secrets_manager.get_mqtt_password()}\n")
-            click.echo("   ✓ MQTT password saved to secrets file")
+            self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
+            click.echo("   ✓ MQTT password created")
 
-        if SystemHelper.file_contains_text(secrets_file, "ARGUS_READER_MQTT_PASSWORD"):
+        if self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD"):
             click.echo("   ✓ Reader MQTT password already in secrets file, skipping save")
         else:
-            SystemHelper.append_to_file(secrets_file, f"ARGUS_READER_MQTT_PASSWORD={self.secrets_manager.get_mqtt_reader_password()}\n")
-            click.echo("   ✓ Reader MQTT password saved to secrets file")
+            self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
+            click.echo("   ✓ Reader MQTT password created")
 
-        # Set proper ownership and permissions
-        SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
-        SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
-
-        click.echo("   ✓ Secrets saved to file")
+        self.secrets_manager.save_secrets()
 
     def setup_systemd_services(self):
         """Setup systemd services"""
         click.echo("   ⚙️ Setting up systemd services...")
 
         # Copy systemd service files
-        SystemHelper.run_command(f"cp -r {self.install_source}/etc/systemd/* /etc/systemd/system/")
+        SystemHelper.run_command(f"cp -r {ETC_DIR}/systemd/* /etc/systemd/system/")
 
         # Reload systemd daemon
         SystemHelper.run_command("systemctl daemon-reload")
@@ -109,12 +98,15 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Remove existing Python virtual environment if it exists"""
         # remove existing virtual environment
         click.echo("   🗑️ Removing existing Python virtual environment if it exists...")
-        SystemHelper.run_command(
-            f"sudo -u {self.user} -E -H zsh --login -c '"
-            "pipenv --rm || true'",
-            suppress_output=True,
-            cwd=f"/home/{self.user}/server",
-        )
+        try:
+            SystemHelper.run_command(
+                f"sudo -u {self.user} -E -H zsh --login -c '"
+                "pipenv --rm || true'",
+                suppress_output=True,
+                cwd=f"/home/{self.user}/server",
+            )
+        except FileNotFoundError:
+            pass
 
         # remove line from .zshrc "source ~/.venvs/server/bin/activate"
         click.echo("   🗑️ Removing source line from .zshrc if it exists...")
@@ -128,44 +120,18 @@ d /run/{self.user} 0755 {self.user} {self.user}
             click.echo("   🗑️ Removing virtual environment folder...")
             SystemHelper.run_command(f"rm -rf {venv_path}")
 
-    def install_python_dependencies(self):
-        """Create Python virtual environment"""
-        click.echo("   🐍 Creating Python virtual environment...")
-
-        # always update the python environment
-        categories = ["packages"]
-        if ServiceHelper.is_raspberry_pi():
-            categories.append("device")
-
-        if self.config.get("deploy_simulator", "false").lower() == "true":
-            categories.append("simulator")
-
-        install_config = {
-            "PYTHONPATH": f"/home/{self.user}/server/src",
-            "PIPENV_TIMEOUT": "9999",
-            "CI": "1",
-        }
-
-        if SystemHelper.run_command(
-            f"sudo -u {self.user} -E -H zsh --login -c '"
-            f"{' '.join(f'{key}={value}' for key, value in install_config.items())} "
-            f'pipenv install {"-v" if self.verbose else ""} --system --deploy --categories "{" ".join(categories)}"\'',
-            suppress_output=False,
-            cwd=f"/home/{self.user}/server",
-        ):
-            click.echo("   ✓ Python environment created/updated")
-        else:
-            click.echo("   ✗ Failed to create/update Python environment")
-            self.warnings.append("Failed to create/update Python environment")
-
     def update_database_schema(self):
         """Update database schema using Alembic"""
         click.echo("   🗄️ Updating database schema...")
+
+        if not self.shared_directory:
+            click.echo("   ⚠️ Shared directory not found, cannot update database schema")
+            self.warnings.append("Shared directory not found, cannot update database schema")
+            return
+
         SystemHelper.run_command(
             f"sudo -u {self.user} -E -H zsh --login -c '"
-            f"{' '.join(f'{key}={value}' for key, value in {'PYTHONPATH': f'/home/{self.user}/server/src'}.items())} "
-            "python3 -m flask --app server:app db upgrade'",
-            cwd=f"/home/{self.user}/server",
+            f"flask --app server:app db upgrade --directory {self.shared_directory}/migrations'",   
         )
         click.echo("   ✓ Database schema updated")
 
@@ -176,9 +142,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         if self.data_set_name:
             SystemHelper.run_command(
                 f"sudo -u {self.user} -E -H zsh --login -c '"
-                f"{' '.join(f'{key}={value}' for key, value in {'PYTHONPATH': f'/home/{self.user}/server/src'}.items())} "
-                f"bin/data.py -d -c {self.data_set_name}'",
-                cwd=f"/home/{self.user}/server",
+                f"arpi-data -d -c {self.data_set_name}'",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
         else:
@@ -196,15 +160,13 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Check if database schema is up to date"""
         try:
             current_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
-                "python3 -m flask --app server:app db current'",
-                capture=True,
-                cwd=f"/home/{self.user}/server",
+                f"sudo -u {self.user} -H zsh --login -c '"
+                f"flask --app server:app db current --directory {self.shared_directory}/migrations'",
+                capture=True
             ).stdout.strip()
             head_revision = SystemHelper.run_command(
-                f"sudo -u {self.user} -E PYTHONPATH=/home/{self.user}/server/src -H zsh --login -c '"
-                "python3 -m flask --app server:app db heads'",
-                cwd=f"/home/{self.user}/server",
+                f"sudo -u {self.user} -H zsh --login -c '"
+                f"flask --app server:app db heads --directory {self.shared_directory}/migrations'",
                 capture=True,
             ).stdout.strip()
             return current_revision == head_revision
@@ -215,9 +177,10 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Install service components"""
         self.remove_virtual_env_if_exists()
         self.create_service_directories()
-        self.install_python_dependencies()
         self.save_secrets_to_file()
         self.setup_systemd_services()
+
+    def post_install(self):
         self.update_database_schema()
         self.update_database_contents()
 
@@ -225,12 +188,11 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Get service status"""
         return {
             "User exists": self.check_user_exists(),
-            "Env file exists": os.path.exists(f"/home/{self.user}/server/.env"),
-            "Secrets file exists": os.path.exists(f"/home/{self.user}/server/secrets.env"),
+            "Env file exists": os.path.exists(f"/home/{self.user}/.env"),
+            "Secrets file exists": os.path.exists(f"/home/{self.user}/secrets.env"),
             "Run directory exists": os.path.exists(f"/run/{self.user}"),
-            "Service directories exist": (
-                os.path.exists(f"/home/{self.user}/server")
-                and os.path.exists(f"/home/{self.user}/webapplication")
+            "Web application directories exist": (
+                os.path.exists(f"/home/{self.user}/webapplication")
             ),
             "Database schema updated": self.check_database_schema_updated(),
             "Argus server enabled": ServiceHelper.is_service_enabled("argus_server"),

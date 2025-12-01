@@ -18,8 +18,8 @@ import logging
 from functools import cached_property
 from typing import Protocol
 
-from constants import LOG_ADSENSOR
-from models import SensorContactTypes
+from utils.constants import LOG_ADSENSOR
+from utils.models import SensorContactTypes
 
 
 class VoltageCalculator:

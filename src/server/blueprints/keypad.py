@@ -1,8 +1,8 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request, make_response
-from models import Keypad, KeypadType
+from utils.models import Keypad, KeypadType
 
-from constants import ROLE_USER
+from utils.constants import ROLE_USER
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient

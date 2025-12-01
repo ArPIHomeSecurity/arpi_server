@@ -8,8 +8,8 @@ from flask.helpers import make_response
 from flask import jsonify, request, current_app
 from jose import jwt
 
-from constants import ROLE_ADMIN, ROLE_USER
-from models import User
+from utils.constants import ROLE_ADMIN, ROLE_USER
+from utils.models import User
 from server.database import db
 from server.decorators import (
     authenticated,

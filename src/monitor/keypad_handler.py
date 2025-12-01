@@ -7,12 +7,12 @@ from time import sleep, time
 
 from sqlalchemy import inspect
 
-from constants import (ARM_AWAY, ARM_STAY, LOG_ADKEYPAD,
+from utils.constants import (ARM_AWAY, ARM_STAY, LOG_ADKEYPAD,
                        MONITOR_ARM_AWAY, MONITOR_ARM_STAY, MONITOR_DISARM,
                        MONITOR_REGISTER_CARD, MONITOR_STOP,
                        MONITOR_UPDATE_KEYPAD, MONITORING_ALERT,
                        MONITORING_ALERT_DELAY, MONITORING_READY, THREAD_KEYPAD)
-from models import Arm, Card, Keypad, User
+from utils.models import Arm, Card, Keypad, User
 from monitor.adapters import V2BoardPin
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action, Function, KeypadBase

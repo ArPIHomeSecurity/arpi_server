@@ -9,10 +9,10 @@ from queue import Empty, Queue
 from threading import Thread
 from time import sleep, time
 
-from models import Option
+from utils.models import Option
 from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
 from monitor.broadcast import Broadcaster
-from constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
+from utils.constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
 from monitor.notifications.notification import Notification, NotificationType

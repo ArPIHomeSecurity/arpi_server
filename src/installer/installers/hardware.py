@@ -5,13 +5,14 @@ import click
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper
 from installer.installers.base import BaseInstaller
 
+ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
+
 
 class HardwareInstaller(BaseInstaller):
     """Installer for hardware components (RTC, GSM, WiringPi)"""
 
     def __init__(self, config: dict):
         super().__init__(config)
-        self.install_source = config.get("install_source", "/tmp/server")
         self._board_version = config.get("board_version", 3)
         self._config_txt = "/boot/firmware/config.txt"
 
@@ -30,7 +31,7 @@ class HardwareInstaller(BaseInstaller):
             click.echo("   ✓ RTC overlay configured")
 
         # Copy RTC cron job (matching bash script)
-        rtc_cron_source = f"{self.install_source}/etc/cron/hwclock"
+        rtc_cron_source = f"{ETC_DIR}/cron/hwclock"
         if os.path.exists(rtc_cron_source):
             SystemHelper.run_command(f"cp {rtc_cron_source} /etc/cron.d/")
             SystemHelper.run_command("chmod 644 /etc/cron.d/hwclock")

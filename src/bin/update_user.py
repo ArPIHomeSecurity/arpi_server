@@ -8,7 +8,7 @@ from time import sleep
 
 import sqlalchemy
 from dateutil.tz.tz import tzlocal
-from models import User
+from utils.models import User
 from monitor.database import get_database_session
 
 description = """

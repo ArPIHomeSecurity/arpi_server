@@ -4,7 +4,7 @@ import argparse
 import logging
 from logging import basicConfig
 
-from models import Card, User, hash_code, hash_code_2
+from utils.models import Card, User, hash_code, hash_code_2
 from monitor.database import get_database_session
 
 

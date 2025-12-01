@@ -5,7 +5,7 @@ import os
 import subprocess
 from ipaddress import ip_network
 
-from constants import LOG_SC_ACCESS
+from utils.constants import LOG_SC_ACCESS
 from monitor.config_helper import load_ssh_config
 from monitor.database import get_database_session
 

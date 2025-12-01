@@ -7,8 +7,8 @@ from queue import Queue
 from threading import Thread
 from time import sleep, time
 
-from constants import LOG_OUTPUT
-from models import Output
+from utils.constants import LOG_OUTPUT
+from utils.models import Output
 from monitor.adapters.output import get_output_adapter
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES

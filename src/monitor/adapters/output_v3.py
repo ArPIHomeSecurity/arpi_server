@@ -8,7 +8,7 @@ from time import sleep
 from typing import List
 
 import lgpio
-from constants import LOG_ADOUTPUT
+from utils.constants import LOG_ADOUTPUT
 from gpiozero import DigitalOutputDevice, DigitalInputDevice
 
 from monitor.output import OUTPUT_NAMES

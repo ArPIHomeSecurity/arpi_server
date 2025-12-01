@@ -3,7 +3,7 @@ import logging
 import lgpio
 from gpiozero import MCP3008
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 from monitor.adapters import V3BoardPin
 
 from monitor.adapters.sensor_base import SensorAdapterBase

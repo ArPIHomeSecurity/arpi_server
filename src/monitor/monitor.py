@@ -11,7 +11,7 @@ from queue import Empty, Queue
 from threading import Thread, Timer
 from time import sleep
 
-from constants import (
+from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
     ARM_STAY,
@@ -36,7 +36,7 @@ from constants import (
     THREAD_MONITOR,
     UPDATE_SECURE_CONNECTION,
 )
-from models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
+from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler

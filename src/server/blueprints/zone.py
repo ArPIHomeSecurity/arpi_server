@@ -1,8 +1,8 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request
 from flask.helpers import make_response
-from models import Zone
-from constants import ROLE_USER
+from utils.models import Zone
+from utils.constants import ROLE_USER
 
 from server.database import db
 from server.decorators import authenticated, restrict_host, registered

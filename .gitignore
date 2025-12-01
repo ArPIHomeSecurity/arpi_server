@@ -3,7 +3,9 @@
 *.pyc
 __pycache__
 
+/build/
 /dist/
+*.egg-info/
 /tmp/
 /monitoring.log
 
@@ -19,3 +21,4 @@ status.json
 /scripts/nginx/arpi_*.*
 
 arpi_dhparam.pem
+config.env

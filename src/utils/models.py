@@ -18,7 +18,7 @@ from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
-from constants import (
+from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
     ALERT_STAY,
