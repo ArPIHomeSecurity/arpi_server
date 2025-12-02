@@ -178,6 +178,8 @@ class SystemHelper:
     def create_folder(folder_path: str):
         """Create folder if it doesn't exist"""
         os.makedirs(folder_path, exist_ok=True)
+
+
 class SecurityHelper:
     """Helper class for security-related operations"""
 
@@ -332,7 +334,9 @@ class SecretsManager:
                         value = value.strip().strip('"').strip("'")
                         self._secrets[key] = value
 
-                click.echo(f"   ✓ Loaded secrets: {', '.join(self._secrets.keys())}")
+                click.echo(
+                    f"   ✓ Loaded secrets from {self.secrets_file}: {', '.join(self._secrets.keys())}"
+                )
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not read secrets file: {e}")
 
@@ -360,8 +364,8 @@ class SecretsManager:
         Returns:
             str: The secret value
         """
-        return self._secrets.get(key) 
-    
+        return self._secrets.get(key)
+
     def save_secrets(self):
         """Save all secrets to the secrets.env file"""
         click.echo("   💾 Saving secrets to file...")
@@ -370,15 +374,16 @@ class SecretsManager:
 
         try:
             # the final location
-            secrets_file = f"/home/{self.user}/secrets.env"
-            with open(secrets_file, "w") as f:
+            with open(self.secrets_file, "w") as f:
                 for key, value in self._secrets.items():
                     f.write(f'{key}="{value}"\n')
 
-            SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
-            SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
+            SystemHelper.run_command(f"chown {self.user}:{self.user} {self.secrets_file}")
+            SecurityHelper.set_permissions(self.secrets_file, f"{self.user}:{self.user}", "600")
 
-            click.echo(f"   ✓ Secrets saved to file: {', '.join([s for s in self._secrets.keys()])}")
+            click.echo(
+                f"   ✓ Secrets saved to {self.secrets_file}: {', '.join([s for s in self._secrets.keys()])}"
+            )
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not save secrets to file: {e}")
 
