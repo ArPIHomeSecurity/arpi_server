@@ -61,15 +61,15 @@ d /run/{self.user} 0755 {self.user} {self.user}
     def save_secrets_to_file(self):
         """Save generated secrets to file"""
 
-        click.echo("   💾 Saving secrets to file...")
+        click.echo("   🔐 Checking MQTT secrets...")
         if self.secrets_manager.get_secret("ARGUS_MQTT_PASSWORD"):
-            click.echo("   ✓ MQTT password already in secrets file, skipping save")
+            click.echo("   ✓ MQTT password already in secrets file")
         else:
             self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
             click.echo("   ✓ MQTT password created")
 
         if self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD"):
-            click.echo("   ✓ Reader MQTT password already in secrets file, skipping save")
+            click.echo("   ✓ Reader MQTT password already in secrets file")
         else:
             self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
             click.echo("   ✓ Reader MQTT password created")

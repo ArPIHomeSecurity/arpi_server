@@ -370,7 +370,9 @@ class SecretsManager:
         """Save all secrets to the secrets.env file"""
         click.echo("   💾 Saving secrets to file...")
 
-        del self._secrets["DB_PASSWORD"]  # do not save database password to file
+        # do not save database password to file
+        if "DB_PASSWORD" in self._secrets:
+            del self._secrets["DB_PASSWORD"]
 
         try:
             # the final location

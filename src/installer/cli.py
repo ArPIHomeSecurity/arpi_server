@@ -166,8 +166,9 @@ def bootstrap(ctx, component):
             installer.install()
             click.echo(f"✓ {comp} installed successfully.")
         except Exception as e:
-            click.echo(f"⚠️ Failed to install {comp}: {e}")
-            installer.warnings.append(f"Installation failed: {e}")
+            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {str(e)}")
+            click.echo(traceback.format_exc())
+            installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
 
     click.echo(f"Installation completed in {datetime.now() - start_time}")
 
@@ -224,8 +225,9 @@ def post_install(ctx, component):
             else:
                 click.echo(f"'{comp}' installer does not have post-installation steps, skipping.")
         except Exception as e:
-            click.echo(f"⚠️ Failed to install {comp}: {e}")
-            installer.warnings.append(f"Installation failed: {e}")
+            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {str(e)}")
+            click.echo(traceback.format_exc())
+            installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
 
     click.echo(f"Installation completed in {datetime.now() - start_time}")
 
