@@ -331,6 +331,8 @@ class SecretsManager:
                         # Remove quotes if present
                         value = value.strip().strip('"').strip("'")
                         self._secrets[key] = value
+
+                click.echo(f"   ✓ Loaded secrets: {', '.join(self._secrets.keys())}")
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not read secrets file: {e}")
 
@@ -363,17 +365,20 @@ class SecretsManager:
     def save_secrets(self):
         """Save all secrets to the secrets.env file"""
         click.echo("   💾 Saving secrets to file...")
+
+        del self._secrets["DB_PASSWORD"]  # do not save database password to file
+
         try:
             # the final location
             secrets_file = f"/home/{self.user}/secrets.env"
-            with open(secrets_file, "a") as f:
+            with open(secrets_file, "w") as f:
                 for key, value in self._secrets.items():
                     f.write(f'{key}="{value}"\n')
 
             SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
             SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
 
-            click.echo("   ✓ Secrets saved to file")
+            click.echo(f"   ✓ Secrets saved to file: {', '.join([s for s in self._secrets.keys()])}")
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not save secrets to file: {e}")
 

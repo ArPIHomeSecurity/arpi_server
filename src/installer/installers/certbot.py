@@ -1,7 +1,7 @@
 import click
 
 from installer.helpers import SecurityHelper, SystemHelper, PackageHelper
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 
 
 class CertbotInstaller(BaseInstaller):
@@ -13,9 +13,9 @@ class CertbotInstaller(BaseInstaller):
         "/etc/letsencrypt"
     ]
 
-    def __init__(self, config):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self.user = config["user"]
+        self.user = config.user
 
     def should_use_snap_certbot(self) -> bool:
         """Determine if snap should be used for certbot installation"""

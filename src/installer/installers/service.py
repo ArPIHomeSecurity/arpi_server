@@ -173,6 +173,12 @@ d /run/{self.user} 0755 {self.user} {self.user}
         except subprocess.CalledProcessError:
             return False
 
+    def remove_old_code(self):
+        """Remove old version of the service if it exists"""
+        if os.path.exists(f"/home/{self.user}/server"):
+            SystemHelper.run_command(f"rm -rf /home/{self.user}/server")
+            click.echo(f"   ✓ Old version removed in /home/{self.user}/server")
+
     def install(self):
         """Install service components"""
         self.remove_virtual_env_if_exists()
@@ -183,12 +189,13 @@ d /run/{self.user} 0755 {self.user} {self.user}
     def post_install(self):
         self.update_database_schema()
         self.update_database_contents()
+        self.remove_old_code()
 
     def get_status(self) -> dict:
         """Get service status"""
         return {
             "User exists": self.check_user_exists(),
-            "Env file exists": os.path.exists(f"/home/{self.user}/.env"),
+            "Env file exists": os.path.exists(f"{self.config_directory}/config.env"),
             "Secrets file exists": os.path.exists(f"/home/{self.user}/secrets.env"),
             "Run directory exists": os.path.exists(f"/run/{self.user}"),
             "Web application directories exist": (

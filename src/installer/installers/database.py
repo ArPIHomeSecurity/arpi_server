@@ -1,20 +1,19 @@
-import os
 import subprocess
 import click
 
-from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
-from installer.installers.base import BaseInstaller
+from installer.helpers import SystemHelper, PackageHelper, ServiceHelper
+from installer.installers.base import BaseInstaller, InstallerConfig
 
 
 class DatabaseInstaller(BaseInstaller):
     """Installer for PostgreSQL database"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self.postgresql_version = config["postgresql_version"]
-        self.db_username = config["user"]
-        self.db_name = config["db_name"]
-        self.user = config["user"]
+        self.postgresql_version = config.postgresql_version
+        self.db_username = config.user
+        self.db_name = config.db_name
+        self.user = config.user
 
     def install_postgresql(self):
         """Install PostgreSQL database"""

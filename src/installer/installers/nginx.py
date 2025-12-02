@@ -4,7 +4,7 @@ import tempfile
 import click
 
 from installer.helpers import ServiceHelper, SystemHelper, PackageHelper, SecurityHelper
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
@@ -12,10 +12,10 @@ ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 class NginxInstaller(BaseInstaller):
     """Installer for NGINX web server"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self.nginx_version = config["nginx_version"]
-        self.user = config["user"]
+        self.nginx_version = config.nginx_version
+        self.user = config.user
         self.nginx_user = "www-data"
 
     def install_nginx_dependencies(self):

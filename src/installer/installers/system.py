@@ -2,17 +2,17 @@ import os
 import subprocess
 import click
 
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 from installer.helpers import SystemHelper, PackageHelper
 
 
 class SystemInstaller(BaseInstaller):
     """Installer for system packages and shell configuration"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self.user = config["user"]
-        self.python_version = config["python_version"]
+        self.user = config.user
+        self.python_version = config.python_version
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -190,10 +190,14 @@ polkit.addRule(function(action, subject) {
         """Install system components"""
         self.install_system_packages()
         self.install_oh_my_zsh()
-        self.configure_zsh_environment()
         self.install_common_tools()
         self.user_gpio_group()
         self.setup_polkit_rule()
+
+    def post_install(self):
+        """Post installation steps for system components"""
+        self.configure_zsh_environment()
+        
 
     def get_status(self) -> dict:
         """Get system component status"""

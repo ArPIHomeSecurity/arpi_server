@@ -3,7 +3,7 @@ import tempfile
 import click
 
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
@@ -11,9 +11,9 @@ ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 class HardwareInstaller(BaseInstaller):
     """Installer for hardware components (RTC, GSM, WiringPi)"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
-        self._board_version = config.get("board_version", 3)
+        self._board_version = config.board_version
         self._config_txt = "/boot/firmware/config.txt"
 
     def setup_rtc_hardware(self):

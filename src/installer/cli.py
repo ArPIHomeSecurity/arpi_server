@@ -86,7 +86,7 @@ class ArpiOrchestrator:
 
 
 # --- Helper Functions ---
-def get_selected_components(selected):
+def get_selected_installers(selected):
     """
     Determine which components to install/status based on user input
     """
@@ -152,7 +152,7 @@ def bootstrap(ctx, component):
     start_time = datetime.now()
     click.echo("🚀 Starting ArPI installation...")
     click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    components = get_selected_components(component)
+    components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
     click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
     for comp in components:
@@ -197,27 +197,61 @@ def bootstrap(ctx, component):
 
 
 @cli.command()
+@click.argument("component", nargs=-1, type=click.Choice(COMPONENTS), required=False)
 @click.pass_context
-def post_install(ctx):
+def post_install(ctx, component):
     """
     Run post-installation tasks such as database migrations
     """
     ctx.ensure_object(dict)
+    start_time = datetime.now()
+    click.echo("🚀 Starting ArPI installation...")
+    click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-    click.echo("🚀 Starting ArPI post-installation tasks...")
+    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
+    for comp in components:
+        installer = orchestrator.get_installer(comp)
+        if not installer:
+            continue
 
-    service_installer: ServiceInstaller = orchestrator.get_installer("service")
-    if not service_installer:
-        click.echo("⚠️ Service installer not found, skipping post-installation tasks.")
-        return
+        click.echo("=====================================")
+        click.echo(f"Installing {comp}...")
+        try:
+            if hasattr(installer, "post_install"):
+                installer.post_install()
+                click.echo(f"✓ {comp} installed successfully.")
+            else:
+                click.echo(f"⚠️ {comp} does not support post-installation steps.")
+        except Exception as e:
+            click.echo(f"⚠️ Failed to install {comp}: {e}")
+            installer.warnings.append(f"Installation failed: {e}")
 
-    try:
-        service_installer.post_install()
-        click.echo("✓ Post-installation tasks completed successfully.")
-    except Exception as e:
-        click.echo(f"⚠️ Failed to complete post-installation tasks: {e}")
-        if ctx.obj["verbose"]:
-            traceback.print_exc()
+    click.echo(f"Installation completed in {datetime.now() - start_time}")
+
+    if any(
+        orchestrator.get_installer(comp).warnings
+        for comp in components
+        if orchestrator.get_installer(comp)
+    ):
+        click.echo("=====================================")
+        click.echo("Installation completed with warnings:")
+        for comp in components:
+            installer = orchestrator.get_installer(comp)
+            for warning in installer.warnings:
+                click.echo(f"⚠️ Warning during {comp} installation: {warning}")
+
+            for info in installer.infos:
+                click.echo(f"ℹ️ Info during {comp} installation: {info}")
+
+    if any(
+        orchestrator.get_installer(comp).needs_reboot
+        for comp in components
+        if orchestrator.get_installer(comp)
+    ):
+        click.echo("=====================================")
+        click.echo("🔄 A system reboot is required to apply all changes.")
+        click.echo("Please reboot the system at your earliest convenience.")
 
 
 @cli.command()
@@ -228,8 +262,8 @@ def status(ctx, component):
     Display the status of the full environment for the server or a specific component
     """
     ctx.ensure_object(dict)
-    components = get_selected_components(component)
-    orchestrator = ctx.obj["orchestrator"]
+    components = get_selected_installers(component)
+    orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
     for comp in components:
         installer = orchestrator.get_installer(comp)
         if not installer:
@@ -243,7 +277,7 @@ def status(ctx, component):
                 click.echo(f"  {k}: {status_emoji}")
         except Exception as e:
             click.echo(f"⚠️ Failed to get status for {comp}: {e}")
-            if ctx.obj["verbose"]:
+            if ctx.obj["orchestrator"].config.verbose:
                 traceback.print_exc()
 
 

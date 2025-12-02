@@ -3,7 +3,7 @@ import tempfile
 import click
 
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
-from installer.installers.base import BaseInstaller
+from installer.installers.base import BaseInstaller, InstallerConfig
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
@@ -11,7 +11,7 @@ ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 class MqttInstaller(BaseInstaller):
     """Installer for MQTT broker"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: InstallerConfig):
         super().__init__(config)
         self.secrets_manager = config.secrets_manager
 

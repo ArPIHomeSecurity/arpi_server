@@ -14,8 +14,8 @@ class InstallerConfig:
     db_name: str
     data_set_name: str
     user: str
-    board_version: int
     secrets_manager: SecretsManager
+    board_version: int = 3
     verbose: bool = False
 
 
@@ -51,22 +51,23 @@ class BaseInstaller(ABC):
         """
         if username:
             possible_paths = [
-                os.path.expanduser(f"~{username}/.local/share/arpi-server/"),
-                "/usr/local/share/arpi-server/",
-                "/usr/share/arpi-server/",
+                os.path.expanduser(f"~{username}/.local/share/arpi-server"),
+                "/usr/local/share/arpi-server",
+                "/usr/share/arpi-server",
             ]
         else:
             possible_paths = [
-                os.path.expanduser("~/.local/share/arpi-server/"),
-                "/usr/local/share/arpi-server/",
-                "/usr/share/arpi-server/",
+                os.path.expanduser("~/.local/share/arpi-server"),
+                "/usr/local/share/arpi-server",
+                "/usr/share/arpi-server",
             ]
         
         for path in possible_paths:
-            click.echo(f"Checking for shared directory at: {path}")
             if os.path.exists(path):
+                click.echo(f"✓ Found shared directory at: {path}")
                 return path
         
+        click.echo("⚠️ Shared directory not found.")
         return None
 
     @staticmethod
@@ -76,18 +77,19 @@ class BaseInstaller(ABC):
         """
         if username:
             possible_paths = [
-                os.path.expanduser(f"~{username}/.local/etc/arpi-server/"),
-                "/etc/arpi-server/",
+                os.path.expanduser(f"~{username}/.local/etc/arpi-server"),
+                "/etc/arpi-server",
             ]
         else:
             possible_paths = [
-                os.path.expanduser("~/.local/etc/arpi-server/"),
-                "/etc/arpi-server/",
+                os.path.expanduser("~/.local/etc/arpi-server"),
+                "/etc/arpi-server",
             ]
         
         for path in possible_paths:
-            click.echo(f"Checking for config directory at: {path}")
             if os.path.exists(path):
+                click.echo(f"✓ Found config directory at: {path}")
                 return path
-        
+
+        click.echo("⚠️ Config directory not found.")        
         return None

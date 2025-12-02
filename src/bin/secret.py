@@ -5,7 +5,7 @@ import logging
 import fcntl
 
 
-def _check_secret_in_file(file_path):
+def _is_secret_defined(file_path):
     """
     Check if SECRET exists in the secrets file without loading it.
 
@@ -18,7 +18,7 @@ def _check_secret_in_file(file_path):
     if not file_path:
         raise ValueError("file_path must be provided")
 
-    if os.path.exists(file_path):
+    if not os.path.exists(file_path):
         return False
 
     try:
@@ -28,6 +28,7 @@ def _check_secret_in_file(file_path):
                 if line.startswith("SECRET="):
                     return True
     except (IOError, OSError):
+        logging.error("Error reading %s", file_path)
         return False
 
     return False
@@ -60,7 +61,7 @@ def ensure_secret_exists():
             fcntl.flock(secret_file.fileno(), fcntl.LOCK_EX)
 
             # check if secret exists after acquiring lock
-            if not _check_secret_in_file(secrets_file_path):
+            if not _is_secret_defined(secrets_file_path):
                 secret_file.write(f'SECRET="{os.urandom(32).hex()}"\n')
                 secret_file.flush()
                 logging.info("Generated new SECRET")
