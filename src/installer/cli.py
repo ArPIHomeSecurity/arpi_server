@@ -215,14 +215,14 @@ def post_install(ctx, component):
         if not installer:
             continue
 
-        click.echo("=====================================")
-        click.echo(f"Installing {comp}...")
         try:
             if hasattr(installer, "post_install"):
+                click.echo("=====================================")
+                click.echo(f"Installing {comp}...")
                 installer.post_install()
                 click.echo(f"✓ {comp} installed successfully.")
             else:
-                click.echo(f"⚠️ {comp} does not support post-installation steps.")
+                click.echo(f"'{comp}' installer does not have post-installation steps, skipping.")
         except Exception as e:
             click.echo(f"⚠️ Failed to install {comp}: {e}")
             installer.warnings.append(f"Installation failed: {e}")
