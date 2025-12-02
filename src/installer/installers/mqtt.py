@@ -96,7 +96,7 @@ class MqttInstaller(BaseInstaller):
 
         click.echo("   ✓ MQTT SSL certificates configured")
 
-    def configure_mqtt_configs(self):
+    def configure_mqtt(self):
         """Configure MQTT configuration files"""
         click.echo("   ⚙️ Configuring MQTT configuration files...")
 
@@ -121,7 +121,7 @@ class MqttInstaller(BaseInstaller):
 
         click.echo("   ✓ MQTT configuration files setup complete")
 
-    def configure_mqtt_authentication(self):
+    def setup_mqtt_authentication(self):
         """Configure MQTT authentication"""
         click.echo("   🔐 Configuring MQTT authentication...")
 
@@ -144,8 +144,8 @@ class MqttInstaller(BaseInstaller):
         """Install MQTT components"""
         self.install_mosquitto()
         self.configure_mqtt_ssl_certificates()
-        self.configure_mqtt_configs()
-        self.configure_mqtt_authentication()
+        self.configure_mqtt()
+        self.setup_mqtt_authentication()
 
     def get_status(self) -> dict:
         """Get MQTT status"""

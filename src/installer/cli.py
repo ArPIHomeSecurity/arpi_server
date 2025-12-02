@@ -164,7 +164,7 @@ def bootstrap(ctx, component):
         click.echo(f"Installing {comp}...")
         try:
             installer.install()
-            click.echo(f"✓ {comp} installed successfully.")
+            click.echo(f"✓ '{comp}' installed successfully.")
         except Exception as e:
             click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {str(e)}")
             click.echo(traceback.format_exc())
@@ -221,7 +221,7 @@ def post_install(ctx, component):
                 click.echo("=====================================")
                 click.echo(f"Installing {comp}...")
                 installer.post_install()
-                click.echo(f"✓ {comp} installed successfully.")
+                click.echo(f"✓ '{comp}' post-installation completed successfully.")
             else:
                 click.echo(f"'{comp}' installer does not have post-installation steps, skipping.")
         except Exception as e:

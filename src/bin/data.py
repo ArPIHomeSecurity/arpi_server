@@ -7,7 +7,19 @@ import os
 from sqlalchemy.exc import ProgrammingError
 
 from utils.constants import ROLE_ADMIN, ROLE_USER
-from utils.models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorContactTypes, SensorEOLCount, SensorType, User, Zone
+from utils.models import (
+    Area,
+    ChannelTypes,
+    Keypad,
+    KeypadType,
+    Option,
+    Sensor,
+    SensorContactTypes,
+    SensorEOLCount,
+    SensorType,
+    User,
+    Zone,
+)
 from monitor.database import get_database_session
 from utils.models import metadata
 
@@ -417,7 +429,7 @@ def env_test_with_v3():
 
     mqtt_config = {
         "hostname": "localhost",
-        "port": 1883,
+        "port": 8883,
         "username": "argus",
         "password": os.environ["ARGUS_MQTT_PASSWORD"],
         "tls_enabled": False,
@@ -445,6 +457,7 @@ def env_test_with_v3():
     logger.info(" - Created MQTT options")
 
     session.commit()
+
 
 def env_test_with_v2():
     """
@@ -540,7 +553,7 @@ def env_test_with_v2():
 
     mqtt_config = {
         "hostname": "localhost",
-        "port": 1883,
+        "port": 8883,
         "username": "argus",
         "password": os.environ["ARGUS_MQTT_PASSWORD"],
         "tls_enabled": False,
@@ -568,6 +581,7 @@ def env_test_with_v2():
     logger.info(" - Created MQTT options")
 
     session.commit()
+
 
 def env_admin_registration():
     session = get_database_session()
