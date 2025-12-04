@@ -54,13 +54,13 @@ def get_latest_release(api_url, prerelease=False) -> dict:
     raise Exception("No suitable release found.")
 
 
-def download_asset(release):
+def download_asset(release, extension=".tar.gz") -> str:
     """
     Download the tar.gz asset from the release.
     """
     for asset in release["assets"]:
         print(f"      🔎 Checking asset: {asset['name']}")
-        if asset["name"].endswith(".tar.gz"):
+        if asset["name"].endswith(extension):
             url = asset["browser_download_url"]
             local_path = os.path.join(tempfile.gettempdir(), asset["name"])
             print(f"      ⬇️  Downloading asset: {asset['name']} from {url}")
@@ -116,7 +116,7 @@ def get_webapplication_version() -> VersionInfo | None:
         print("⚠️  Warning: Webapplication version file not found")
 
 
-def upgrade_server(tmp_dir, board_version: str):
+def upgrade_server(tmp_dir, wheel_path, board_version: str):
     """
     Execute install.py from the extracted server files.
     """
@@ -129,14 +129,22 @@ def upgrade_server(tmp_dir, board_version: str):
     deploy_command = (
         f"cd {tmp_dir}; "
         f"sudo {' '.join(f'{key}={value}' for key, value in install_config.items())} "
-        f"bin/install.py deploy-code --backup;"
+        f"python3 ./src/installer/cli.py bootstrap"
     )
     subprocess.run(deploy_command, shell=True, check=True)
+
+    # install wheel
+    pip_install_command = (
+        "pip3 install --user "
+        "--break-system-packages " \
+        f"--upgrade --force-reinstall --no-deps /tmp/{wheel_path}"
+    )
+    subprocess.run(pip_install_command, shell=True, check=True)
 
     install_command = (
         f"cd {tmp_dir}; "
         f"sudo {' '.join(f'{key}={value}' for key, value in install_config.items())} "
-        f"bin/install.py install"
+        f"./src/installer/cli.py post-install"
     )
     subprocess.run(install_command, shell=True, check=True)
 
@@ -249,8 +257,11 @@ def upgrade_project(release: dict, project: str, board_version: str):
     print(f"      📂 Decompressed to: {tmp_dir}")
 
     if project == "server":
+        wheel_path = download_asset(release, extension=".whl")
+        print(f"      📦 Downloaded wheel to: {wheel_path}")
+
         print("      ⚙️  Upgrading server files...")
-        upgrade_server(tmp_dir, board_version)
+        upgrade_server(tmp_dir, wheel_path, board_version)
     elif project == "webapplication":
         print("      ⚙️  Upgrading webapplication files...")
         upgrade_webapplication(tmp_dir)
