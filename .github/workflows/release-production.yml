@@ -16,11 +16,11 @@ on:
         default: 'patch'
         type: choice
         options:
-          - no bump
           - major
           - minor
           - patch
           - pre-release
+          - release
       pre_release:
         description: 'Pre-release identifier (optional, e.g., "beta", "rc1")'
         required: false
@@ -84,12 +84,9 @@ jobs:
 
       - name: Bump version 🏷️
         run: |
-          if [ "${{ steps.set_inputs.outputs.version_type }}" = "no bump" ]; then
-            echo "No version bump selected, skipping version bump step."
-            exit 0
-          fi
-
-          if [ "${{ steps.set_inputs.outputs.version_type }}" = "pre-release" ]; then
+          if [ "${{ steps.set_inputs.outputs.version_type }}" = "release" ]; then
+            python scripts/bump_version.py -r -v
+          elif [ "${{ steps.set_inputs.outputs.version_type }}" = "pre-release" ]; then
             python scripts/bump_version.py -p "${{ steps.set_inputs.outputs.pre_release }}" -v
           else
             python scripts/bump_version.py -t ${{ steps.set_inputs.outputs.version_type }} -v
@@ -143,7 +140,7 @@ jobs:
           body: |
             ## What's Changed
 
-            ${{ steps.set_inputs.outputs.release_notes || 'This release includes the latest changes from the main branch.' }}
+            ${{ steps.set_inputs.outputs.release_notes || format('This release includes the latest changes from the {0} branch.', github.ref_name) }}
 
             ### Build Information
             - **Version**: ${{ steps.get_version.outputs.version }}

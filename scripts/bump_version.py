@@ -63,7 +63,7 @@ def get_git_commit() -> str:
     return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode()
 
 
-def bump_version(version: dict, version_type: str, pre_release: str = None) -> tuple:
+def bump_version(version: dict, version_type: str, pre_release: str = None, release: bool = False) -> tuple:
     """Bump the version based on the given version type"""
     major = int(version["major"])
     minor = int(version["minor"])
@@ -85,7 +85,10 @@ def bump_version(version: dict, version_type: str, pre_release: str = None) -> t
     else:
         info("Current version: %s.%s.%s:%s", major, minor, patch, commit)
 
-    if version_type == "major":
+    if release:
+        # Remove pre-release part, keep major.minor.patch unchanged
+        pre_release = None
+    elif version_type == "major":
         major += 1
         minor = 0
         patch = 0
@@ -114,23 +117,24 @@ def main():
         "-t", "--type", required=False, choices=["major", "minor", "patch"], help="Version type"
     )
     parser.add_argument("-p", "--pre-release", help="Pre-release identifier")
+    parser.add_argument("-r", "--release", action="store_true", help="Remove pre-release part")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     if args.verbose:
         basicConfig(level=INFO)
 
-    if args.type is None and args.pre_release is None:
-        parser.error("Either --type or --pre-release must be specified")
+    if args.type is None and args.pre_release is None and not args.release:
+        parser.error("Either --type, --pre-release, or --release must be specified")
 
-    if args.type is not None and args.pre_release is not None:
-        parser.error("Only one of --type or --pre-release can be specified")
+    if sum([args.type is not None, args.pre_release is not None, args.release]) > 1:
+        parser.error("Only one of --type, --pre-release, or --release can be specified")
 
-    info("Bumping version with type: %s and pre-release: %s", args.type, args.pre_release)
+    info("Bumping version with type: %s, pre-release: %s, release: %s", args.type, args.pre_release, args.release)
 
     raw_version = load_version()
     major, minor, patch, pre_release, commit = bump_version(
-        raw_version, args.type, args.pre_release
+        raw_version, args.type, args.pre_release, args.release
     )
 
     save_version(major, minor, patch, pre_release, commit)
