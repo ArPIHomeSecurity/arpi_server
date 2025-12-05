@@ -111,6 +111,25 @@ export PATH="$HOME/.local/bin:$PATH"
             f"sed -i 's/^ZSH_THEME=.*$/ZSH_THEME=\"ys\"/' /home/{self.user}/.zshrc"
         )
 
+    def remove_old_zsh_configuration(self):
+        """
+        Remove old configuration (secrest.env and .env) in .zshrc
+        """
+
+        SystemHelper.remove_from_file(
+            f"/home/{self.user}/.zshrc",
+            [
+                "# active python virtual environment and load env variables",
+                "source ~/.venvs/server/bin/activate",
+                "set -a",
+                "~/secrets.env",
+                "~/.env",
+                "set +a",
+            ],
+        )
+
+
+
     def install_common_tools(self):
         """Install common development tools"""
         click.echo("   🛠️ Installing common development tools...")
@@ -197,6 +216,7 @@ polkit.addRule(function(action, subject) {
     def post_install(self):
         """Post installation steps for system components"""
         self.configure_zsh_environment()
+        self.remove_old_zsh_configuration()
         
 
     def get_status(self) -> dict:

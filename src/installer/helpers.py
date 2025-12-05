@@ -146,17 +146,20 @@ class SystemHelper:
             f.write(text)
 
     @staticmethod
-    def remove_from_file(file_path: str, text: str):
+    def remove_from_file(file_path: str, text: str | list[str]):
         """Remove lines containing specific text from file"""
         if not os.path.exists(file_path):
             return
+        
+        if isinstance(text, str):
+            text = [text]
 
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             for line in lines:
-                if text not in line:
+                if not any(t in line for t in text):
                     f.write(line)
 
     @staticmethod
@@ -374,14 +377,16 @@ class SecretsManager:
         if "DB_PASSWORD" in self._secrets:
             del self._secrets["DB_PASSWORD"]
 
+        # save to the final location
+        secrets_file = os.path.expanduser("/home/" + self.user + "/secrets.env")
         try:
             # the final location
-            with open(self.secrets_file, "w") as f:
+            with open(secrets_file, "w") as f:
                 for key, value in self._secrets.items():
                     f.write(f'{key}="{value}"\n')
 
-            SystemHelper.run_command(f"chown {self.user}:{self.user} {self.secrets_file}")
-            SecurityHelper.set_permissions(self.secrets_file, f"{self.user}:{self.user}", "600")
+            SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
+            SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
 
             click.echo(
                 f"   ✓ Secrets saved to {self.secrets_file}: {', '.join([s for s in self._secrets.keys()])}"
@@ -416,16 +421,6 @@ class ServiceHelper:
         except Exception:
             if not ignore_errors:
                 raise
-
-    @staticmethod
-    def is_raspberry_pi() -> bool:
-        """Check if the system is a Raspberry Pi"""
-        try:
-            with open("/proc/device-tree/model", "r") as f:
-                model = f.read().lower()
-                return "raspberry pi" in model
-        except Exception:
-            return False
 
     @staticmethod
     def disable_service(service: str, ignore_errors: bool = True):

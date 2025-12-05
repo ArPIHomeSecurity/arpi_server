@@ -133,12 +133,8 @@ def upgrade_server(tmp_dir, wheel_path, board_version: str):
     )
     subprocess.run(deploy_command, shell=True, check=True)
 
-    # install wheel
-    pip_install_command = (
-        "pip3 install --user "
-        "--break-system-packages " \
-        f"--upgrade --force-reinstall --no-deps /tmp/{wheel_path}"
-    )
+    # install wheel with "simulator" and "device" extras
+    pip_install_command = f"pip3 install --user --break-system-packages --upgrade {wheel_path}[device,simulator]"
     subprocess.run(pip_install_command, shell=True, check=True)
 
     install_command = (

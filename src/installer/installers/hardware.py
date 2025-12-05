@@ -48,6 +48,7 @@ class HardwareInstaller(BaseInstaller):
         for service in services:
             ServiceHelper.stop_service(service)
             ServiceHelper.disable_service(service)
+            click.echo(f"   ✓ {service} stopped and disabled")
 
         # Configure boot command line
         cmdline_file = "/boot/firmware/cmdline.txt"
