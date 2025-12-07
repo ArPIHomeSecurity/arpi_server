@@ -146,11 +146,12 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, channel_configs, is_advanced_mode=False, **kwargs):
+    def __init__(self, default_states, channel_configs, is_advanced_mode=False, show_voltage=False, **kwargs):
         super().__init__(**kwargs)
         self._default_states = default_states
         self._channel_configs = channel_configs
         self._is_advanced_mode = is_advanced_mode
+        self._show_voltage = show_voltage
 
     def compose(self) -> ComposeResult:
         """Create channel rows with strategy select, contact type select, and sensor buttons in two columns"""
@@ -173,8 +174,9 @@ class Channels(Widget):
                                 wiring_strategy, sensor_a_active, sensor_b_active
                             )
 
+                            value_str = self._format_channel_value(self._default_states[i - 1])
                             yield Static(
-                                f"CH{i:02d} {self._default_states[i - 1]:.2f}V",
+                                f"CH{i:02d} {value_str}",
                                 id=f"channel-label-{i}",
                                 classes=f"channel-label {channel_class or wiring_strategy}",
                             )
@@ -226,6 +228,16 @@ class Channels(Widget):
 
         yield Static("")
         yield Button("POWER", id="power", classes="power")
+
+    def _format_channel_value(self, value):
+        """
+        Format channel value as voltage or raw value
+        """
+        if self._show_voltage:
+            voltage = value * 5.0
+            return f"{voltage:.2f}V"
+        else:
+            return f"{value:.2f}"
 
     @staticmethod
     def get_channel_class(wiring_strategy, sensor_a_active, sensor_b_active):
@@ -355,6 +367,7 @@ class SimulatorApp(App):
         self.channel_values = {}
         self.channel_configs = {}
         self.is_advanced_mode = False
+        self.show_voltage = False
         self.is_v3_board = environ.get("BOARD_VERSION") == "3"
 
     def load_configuration_from_db(self, input_number: int) -> None:
@@ -457,12 +470,18 @@ class SimulatorApp(App):
                     value=self.is_advanced_mode,
                     disabled=not self.is_v3_board or self.has_v3_features(),
                 )
+                yield Checkbox(
+                    "Show Voltage",
+                    id="voltage-toggle",
+                    value=self.show_voltage,
+                )
                 yield Button("Update channels from DB", id="refresh-channels", classes="refresh-button")
             yield Channels(
                 id="channels-pane",
                 default_states=list(self.channel_values.values()),
                 channel_configs=self.channel_configs,
                 is_advanced_mode=self.is_advanced_mode,
+                show_voltage=self.show_voltage,
             )
             yield Keypad(id="keypad-pane")
             yield Outputs(id="outputs-pane")
@@ -630,7 +649,8 @@ class SimulatorApp(App):
     def update_channel_label(self, channel_num, channel_name, config):
         self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
         channel_label = self.query_one(f"#channel-label-{channel_num}")
-        channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel_name]:.2f}V")
+        value_str = self._format_channel_value(self.channel_values[channel_name])
+        channel_label.update(f"CH{channel_num:02d} {value_str}")
         channel_label.set_classes(
             [
                 "channel-label",
@@ -641,10 +661,26 @@ class SimulatorApp(App):
             ]
         )
 
+    def _format_channel_value(self, value):
+        """
+        Format channel value as voltage or raw value
+        """
+        if self.show_voltage:
+            voltage = value * 5.0
+            return f"{voltage:.2f}V"
+        else:
+            return f"{value:.2f}"
+
     @on(Checkbox.Changed, "#mode-toggle")
     async def mode_toggle_changed(self, event: Checkbox.Changed) -> None:
         """Toggle between basic and advanced mode"""
         self.is_advanced_mode = event.value
+        await self.recompose()
+
+    @on(Checkbox.Changed, "#voltage-toggle")
+    async def voltage_toggle_changed(self, event: Checkbox.Changed) -> None:
+        """Toggle between raw values and voltage display"""
+        self.show_voltage = event.value
         await self.recompose()
 
     @on(Button.Pressed, "#refresh-channels")
