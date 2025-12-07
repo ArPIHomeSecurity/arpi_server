@@ -119,11 +119,9 @@ export PATH="$HOME/.local/bin:$PATH"
         SystemHelper.remove_from_file(
             f"/home/{self.user}/.zshrc",
             [
-                "# active python virtual environment and load env variables",
-                "source ~/.venvs/server/bin/activate",
                 "set -a",
-                "~/secrets.env",
-                "~/.env",
+                ". ~/server/secrets.env",
+                ". ~/server/.env",
                 "set +a",
             ],
         )

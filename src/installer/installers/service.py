@@ -112,7 +112,10 @@ d /run/{self.user} 0755 {self.user} {self.user}
         click.echo("   🗑️ Removing source line from .zshrc if it exists...")
         SystemHelper.remove_from_file(
             f"/home/{self.user}/.zshrc",
-            "source ~/.venvs/server/bin/activate",
+            [
+                "# active python virtual environment and load env variables",
+                "source ~/.venvs/server/bin/activate",
+            ],
         )
 
         venv_path = f"/home/{self.user}/.venvs"
