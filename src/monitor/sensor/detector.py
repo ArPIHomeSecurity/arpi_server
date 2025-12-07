@@ -16,7 +16,7 @@ CHANNEL_CUT = 1.0
 CHANNEL_SHORTAGE = 0.0
 
 # pull-up resistor
-R_PULL_UP = 2000
+R_PULL_UP = 2200
 # pull-down resistor
 R_PULL_DOWN = 22000
 
