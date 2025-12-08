@@ -11,8 +11,12 @@ from tools.ssh_keymanager import SSHKeyManager
 
 def main():
     parser = argparse.ArgumentParser(description="Manage SSH keys.")
-    parser.add_argument("command", type=str, choices=["generate", "set", "remove"], help="Command to execute.")
-    parser.add_argument("--key_type", type=str, help="Type of the key to generate (rsa, ecdsa, ed25519).")
+    parser.add_argument(
+        "command", type=str, choices=["generate", "set", "remove"], help="Command to execute."
+    )
+    parser.add_argument(
+        "--key_type", type=str, help="Type of the key to generate (rsa, ecdsa, ed25519)."
+    )
     parser.add_argument("--key_name", type=str, required=True, help="Name of the key.")
     parser.add_argument("--passphrase", type=str, default="", help="Passphrase for the key.")
     parser.add_argument("--public_key", type=str, help="Public key string to set")
@@ -49,8 +53,12 @@ def main():
         logging.error("Key name is required to remove a public key.")
 
 
-if __name__ == "__main__":
+def cli_main():
     try:
         main()
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    cli_main()

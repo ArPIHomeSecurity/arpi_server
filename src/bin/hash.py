@@ -56,6 +56,13 @@ def main():
         logging.info("BCrypt hash: %s", hash_code_2(args.input))
 
 
+def cli_main():
+    try:
+        basicConfig(level=logging.INFO, format="%(message)s")
+        main()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    basicConfig(level=logging.INFO, format="%(message)s")
-    main()
+    cli_main()

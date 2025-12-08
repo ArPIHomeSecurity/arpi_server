@@ -165,15 +165,19 @@ def list_adapters() -> List[str]:
             adapters.append(g.replace("test_", "").replace("_adapter", ""))
     return adapters
 
+
 def check_service_running() -> bool:
     """
     Check if argus_monitor service is running.
     """
     try:
-        output = subprocess.check_output(["systemctl", "is-active", "argus_monitor"], stderr=subprocess.STDOUT)
+        output = subprocess.check_output(
+            ["systemctl", "is-active", "argus_monitor"], stderr=subprocess.STDOUT
+        )
         return output.strip() == b"active"
     except subprocess.CalledProcessError:
         return False
+
 
 def main() -> int:
     """
@@ -215,8 +219,12 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+def cli_main():
     try:
         exit(main())
     except KeyboardInterrupt:
         print("\n")
+
+
+if __name__ == "__main__":
+    cli_main()

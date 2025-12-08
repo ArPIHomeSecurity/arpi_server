@@ -637,5 +637,12 @@ def main():
         return 0
 
 
+def cli_main():
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    exit(main())
+    cli_main()

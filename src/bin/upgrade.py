@@ -10,6 +10,7 @@ Prerelease installation example:
 curl -sSL https://app.arpi-security.info/install.py | /usr/bin/python3 - --prerelease
 
 """
+
 import argparse
 from dataclasses import dataclass
 import json
@@ -134,7 +135,9 @@ def upgrade_server(tmp_dir, wheel_path, board_version: str):
     subprocess.run(deploy_command, shell=True, check=True)
 
     # install wheel with "simulator" and "device" extras
-    pip_install_command = f"pip3 install --user --break-system-packages --upgrade {wheel_path}[device,simulator]"
+    pip_install_command = (
+        f"pip3 install --user --break-system-packages --upgrade {wheel_path}[device,simulator]"
+    )
     subprocess.run(pip_install_command, shell=True, check=True)
 
     install_command = (
@@ -312,10 +315,16 @@ def main():
     print("🎉 Upgrade process finished.")
 
 
-if __name__ == "__main__":
+def cli_main():
     try:
         main()
         exit(0)
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
         print(f"  ❌ Something went wrong: {e}")
         exit(1)
+
+
+if __name__ == "__main__":
+    cli_main()

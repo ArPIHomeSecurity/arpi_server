@@ -41,8 +41,12 @@ def main():
     certbot.update_certificate()
 
 
-if __name__ == "__main__":
+def cli_main():
     try:
         main()
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    cli_main()

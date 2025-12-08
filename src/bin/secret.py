@@ -41,7 +41,7 @@ def ensure_secret_exists():
     """
     secrets_file_paths = [
         os.path.expanduser("~/secrets.env"),
-        os.path.expanduser("~/server/secrets.env")
+        os.path.expanduser("~/server/secrets.env"),
     ]
 
     secrets_file_path = None
@@ -78,5 +78,13 @@ def main():
     ensure_secret_exists()
 
 
+def cli_main():
+    try:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        ensure_secret_exists()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()

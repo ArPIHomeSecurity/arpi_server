@@ -43,5 +43,12 @@ def main():
     logger.info("Uptime: %s", clock.get_uptime())
 
 
+def cli_main():
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()

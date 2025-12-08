@@ -119,9 +119,7 @@ def main():
             raise ArgumentTypeError(f"{value} is an invalid positive integer value")
         return ivalue
 
-    parser = ArgumentParser(
-        description=description, formatter_class=RawTextHelpFormatter
-    )
+    parser = ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
     parser.add_argument("-l", "--list", action="store_true", help="List all users")
     parser.add_argument("-r", "--registration-code", required=False, help="New registration code")
     parser.add_argument("-a", "--access-code", required=False, help="New access code")
@@ -154,5 +152,12 @@ def main():
         parser.print_usage()
 
 
+def cli_main():
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()

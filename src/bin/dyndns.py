@@ -27,10 +27,14 @@ def main():
     dyndns.update_ip(force=args.force)
 
 
-if __name__ == "__main__":
+def cli_main():
     try:
         main()
     except KeyboardInterrupt:
         pass
     except OperationalError as database_error:
         logging.warning("Database error: %s", database_error)
+
+
+if __name__ == "__main__":
+    cli_main()
