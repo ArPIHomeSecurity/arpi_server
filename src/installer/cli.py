@@ -59,7 +59,7 @@ class ArpiOrchestrator:
             postgresql_version=os.getenv("POSTGRESQL_VERSION", "15"),
             nginx_version=os.getenv("NGINX_VERSION", "1.28.0"),
             db_name=os.getenv("ARGUS_DB_NAME", "argus"),
-            data_set_name=os.getenv("DATA_SET_NAME", "prod"),
+            data_set_name=os.getenv("DATA_SET_NAME", ""),
             user=os.getenv("ARGUS_USER", "argus"),
             board_version=int(os.getenv("BOARD_VERSION", "3")),
             secrets_manager=SecretsManager(os.getenv("ARGUS_USER", "argus")),
