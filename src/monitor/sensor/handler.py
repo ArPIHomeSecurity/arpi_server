@@ -99,7 +99,7 @@ class SensorHandler:
         for sensor in self._sensors:
             if sensor.reference_value is None and sensor.channel != -1:
                 self._logger.info(
-                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.description
+                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.name
                 )
                 return True
 
@@ -266,11 +266,10 @@ class SensorHandler:
 
             is_alert = detect_alert(sensor, value)
             self._logger.trace(
-                "Sensor %s (CH%02d) value: %s, ref: %s => alert: %s",
-                sensor.description,
+                "Sensor %s (CH%02d) value: %s => alert: %s",
+                sensor.name,
                 sensor.channel,
                 float(f"{value:.3f}"),
-                float(f"{sensor.reference_value:.3f}"),
                 is_alert,
             )
             if is_alert != sensor.alert:
@@ -280,11 +279,10 @@ class SensorHandler:
 
             is_error = detect_error(sensor, value)
             self._logger.trace(
-                "Sensor %s (CH%02d) value: %s, ref: %s => error: %s",
-                sensor.description,
+                "Sensor %s (CH%02d) value: %s => error: %s",
+                sensor.name,
                 sensor.channel,
                 float(f"{value:.3f}"),
-                float(f"{sensor.reference_value:.3f}"),
                 is_error,
             )
             if is_error != sensor.error:
@@ -350,7 +348,7 @@ class SensorHandler:
             ):
                 self._logger.warning(
                     "Sensor %s (CH%02d) has suppressed alert! %ss%s%| (%r)",
-                    sensor.description,
+                    sensor.name,
                     sensor.channel,
                     sensitivity.monitor_period,
                     sensitivity.monitor_threshold,
