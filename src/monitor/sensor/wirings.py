@@ -692,7 +692,7 @@ class PullUpDownConfig:
                 """
                 Voltage level when both sensors are not triggered.
                 """
-                r_ab = VoltageCalculator.parallel_resistance(self._config.r_a, self._config.r_b)
+                r_ab = VoltageCalculator.series_resistance(self._config.r_a, self._config.r_b)
                 r_total = VoltageCalculator.parallel_resistance(r_ab, self._config.r_pull_down)
                 return VoltageCalculator.voltage_divider(r_total, self._config.r_pull_up)
 
@@ -721,7 +721,7 @@ class PullUpDownConfig:
                 """
                 Voltage level when both sensors are triggered.
                 """
-                r_total = self._config.r_pull_down
+                r_total = 0.0
                 return VoltageCalculator.voltage_divider(r_total, self._config.r_pull_up)
 
         class NC:
