@@ -75,7 +75,6 @@ class OutputAdapter:
             if self.is_initialized():
                 self._states = [0] * OUTPUT_NUMBER
                 self._write_states()
-                self._read_states()
                 self._cleanup()
 
     def _reset_errors(self):
