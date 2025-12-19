@@ -86,7 +86,7 @@ class HardwareInstaller(BaseInstaller):
 
     def setup_spi(self):
         """Enable SPI interface"""
-        click.echo("   🔧 Enabling SPI interface...")
+        click.echo("   🔧 Setup SPI interface...")
 
         if self._board_version == 3:
             # enable SPI for board version 3

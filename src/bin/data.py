@@ -89,7 +89,7 @@ def env_prod():
     session.add(mqtt_option)
 
     mqtt_config = {
-        "hostname": "localhost",
+        "hostname": "<hostname>",
         "port": 8883,
         "username": "argus_reader",
         "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],

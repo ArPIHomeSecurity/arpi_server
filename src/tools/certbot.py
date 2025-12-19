@@ -131,12 +131,12 @@ class Certbot:
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
-    def _update_remote_configurations(self, enable=True, hostname=None):
+    def _update_remote_configurations(self, enable=True):
         """
         Changes the symlinks using the certbot certificates instead of the self-signed
         """
         if enable:
-            self._update_nginx_remote(hostname)
+            self._update_nginx_remote()
             self._enable_configuration(
                 "/usr/local/nginx/conf/sites-enabled/remote.conf",
                 "/usr/local/nginx/conf/sites-available/remote.conf",
@@ -149,18 +149,23 @@ class Certbot:
             self._disable_configuration("/usr/local/nginx/conf/sites-enabled/remote.conf")
             self._disable_configuration("/etc/mosquitto/conf.d/ssl.conf")
 
-    def _update_nginx_remote(self, hostname):
+    def _update_nginx_remote(self):
         """
         Updates the server_name in the remote.conf file
         """
-        self._logger.info("Updating remote configurations")
+        dyndns_config = load_dyndns_config()
+        if not dyndns_config:
+            self._logger.info("Missing dynamic dns configuration")
+            return
+        
+        self._logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
         remote_conf = Path("/usr/local/nginx/conf/sites-available/remote.conf")
         if remote_conf.is_file():
             with open(remote_conf, "r", encoding="utf-8") as file:
                 lines = file.readlines()
                 for i, line in enumerate(lines):
                     if "server_name" in line and "# managed by Certbot" in line:
-                        lines[i] = f"    server_name {hostname}; # managed by Certbot\n"
+                        lines[i] = f"    server_name {dyndns_config.hostname}; # managed by Certbot\n"
                         break
 
             with open(remote_conf, "w", encoding="utf-8") as file:

@@ -102,7 +102,7 @@ class NginxInstaller(BaseInstaller):
 
         # Set proper ownership for SSL directory
         SecurityHelper.set_permissions(
-            "/usr/local/nginx/conf", f"{self.nginx_user}:{self.nginx_user}", "755", recursive=True
+            "/usr/local/nginx/conf", f"{self.user}:{self.nginx_user}", "755", recursive=True
         )
 
         click.echo("   ✓ NGINX configuration setup complete")

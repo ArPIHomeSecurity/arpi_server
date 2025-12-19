@@ -13,6 +13,7 @@ class MqttInstaller(BaseInstaller):
 
     def __init__(self, config: InstallerConfig):
         super().__init__(config)
+        self.user = config.user
         self.secrets_manager = config.secrets_manager
 
     def setup_mosquitto_repository(self):
@@ -91,7 +92,7 @@ class MqttInstaller(BaseInstaller):
 
         # Set proper ownership for certs directory
         SecurityHelper.set_permissions(
-            "/etc/mosquitto/certs", "mosquitto:mosquitto", "755", recursive=True
+            "/etc/mosquitto/certs", f"{self.user}:mosquitto", "755", recursive=True
         )
 
         click.echo("   ✓ MQTT SSL certificates configured")
@@ -119,6 +120,10 @@ class MqttInstaller(BaseInstaller):
             "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
         )
 
+        SecurityHelper.set_permissions(
+            "/etc/mosquitto/conf.d/", f"{self.user}:mosquitto", "755", recursive=True
+        )
+
         click.echo("   ✓ MQTT configuration files setup complete")
 
     def setup_mqtt_authentication(self):
@@ -140,12 +145,19 @@ class MqttInstaller(BaseInstaller):
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
             self.warnings.append(f"MQTT authentication setup failed: {e}")
 
+    def restart_service(self):
+        """Restart Mosquitto service"""
+        click.echo("   🔄 Restarting Mosquitto service...")
+        ServiceHelper.restart_service("mosquitto")
+        click.echo("   ✓ Mosquitto service restarted")
+
     def install(self):
         """Install MQTT components"""
         self.install_mosquitto()
         self.configure_mqtt_ssl_certificates()
         self.configure_mqtt()
         self.setup_mqtt_authentication()
+        self.restart_service()
 
     def get_status(self) -> dict:
         """Get MQTT status"""
