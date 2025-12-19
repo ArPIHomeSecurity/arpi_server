@@ -35,11 +35,11 @@ def hash_code(access_code):
     return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
 
 
-def hash_code_2(secure_text: str) -> str:
+def hash_code_2(plain_text: str) -> str:
     """
     Use hashing with builtin salt.
     """
-    return bcrypt.hashpw(secure_text.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
     
 
 def convert2camel(data):
@@ -761,9 +761,13 @@ class User(BaseModel):
         return matching_user
 
     def check_registration_code(self, registration_code):
+        registration_code = User.sanitize_registration_code(registration_code)
         matching_user = False
         
-        if self.registration_code and self.registration_code.startswith("$2") and bcrypt.checkpw(registration_code.encode('utf-8'), self.registration_code.encode('utf-8')):
+        if (
+            self.registration_code and self.registration_code.startswith("$2") and
+            bcrypt.checkpw(registration_code.encode('utf-8'), self.registration_code.encode('utf-8'))
+        ):
             matching_user = True
 
         if self.registration_code == hash_code(registration_code):

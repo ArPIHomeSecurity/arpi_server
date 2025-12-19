@@ -47,7 +47,7 @@ def create_user():
 @user_blueprint.route("/api/user/<int:user_id>", methods=["GET", "PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
-def user(user_id):
+def user(user_id, request_user_id=None, requester_role=None):
     """
     Get or update a user
     """
@@ -66,15 +66,33 @@ def user(user_id):
     elif request.method == "PUT":
         user_data = request.json
         if user_data.get("newAccessCode"):
-            if not db_user.check_access_code(user_data["oldAccessCode"]):
+            # only admin or the user itself can change the access code
+            if requester_role != ROLE_ADMIN and user_id != request_user_id:
+                return make_response(jsonify({"error": "Cannot change access code of other users"}), 403)
+
+            # at this point only admin or the user itself can change the access code
+
+            if requester_role == ROLE_ADMIN and user_id != request_user_id:
+                # admin can change any user's access code without the old access code
+                pass
+            elif user_id == request_user_id:
+                # users can only change their own access code with the correct old access code
+                if not db_user.check_access_code(user_data["oldAccessCode"]):
+                    return make_response(jsonify({"error": "Invalid old access code"}), 400)
+
                 state = inspect(db_user)
                 if state.modified:
                     db.session.commit()
 
-                return make_response(jsonify({"error": "Invalid old access code"}), 400)
             user_data["accessCode"] = user_data["newAccessCode"]
             del user_data["newAccessCode"]
             del user_data["oldAccessCode"]
+
+
+        if "role" in user_data and user_data["role"] != db_user.role:
+            # only admin can change roles
+            if requester_role != ROLE_ADMIN:
+                return make_response(jsonify({"error": "Cannot change user role"}), 403)
 
         current_app.logger.debug("Updating user %s", db_user)
         if not db_user.update(request.json):
