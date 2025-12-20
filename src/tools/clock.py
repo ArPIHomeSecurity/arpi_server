@@ -83,27 +83,26 @@ class Clock:
 
         if network is not None:
             logger.info("Network time: {} => writing to hw clock".format(network))
-            run(["date", "--set={}".format(network)])
-            run(["/sbin/hwclock", "-w", "--verbose"])
+            run(["sudo", "date", "--set={}".format(network)])
+            run(["sudo", "/sbin/hwclock", "-w", "--verbose"])
         else:
             hw = self.get_time_hw()
             if hw:
                 logger.info("HW clock time: {} => wrinting to system clock".format(hw))
-                run(["date", "--set={}".format(hw)])
+                run(["sudo", "date", "--set={}".format(hw)])
 
     def set_clock(self, settings):
         try:
             if "timezone" in settings and os.path.isfile(
                 "/usr/share/zoneinfo/" + settings["timezone"]
             ):
-                os.remove("/etc/localtime")
-                os.symlink("/usr/share/zoneinfo/" + settings["timezone"], "/etc/localtime")
-                with open("/etc/timezone", "w", encoding="utf-8") as timezone_file:
-                    timezone_file.write(settings["timezone"] + "\n")
+                run(["sudo", "rm", "-f", "/etc/localtime"])
+                run(["sudo", "ln", "-s", "/usr/share/zoneinfo/" + settings["timezone"], "/etc/localtime"])
+                run(["sudo", "bash", "-c", "echo '{}' > /etc/timezone".format(settings["timezone"])])
             if "datetime" in settings and settings["datetime"]:
-                run(["date", "--set={}".format(settings["datetime"])])
-        except PermissionError:
-            logger.error("Permission denied when changing date/time and zone")
+                run(["sudo", "date", "--set={}".format(settings["datetime"])])
+        except (PermissionError, CalledProcessError) as e:
+            logger.error("Permission denied when changing date/time and zone: %s", e)
             return False
 
         return True

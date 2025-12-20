@@ -123,6 +123,25 @@ d /run/{self.user} 0755 {self.user} {self.user}
             click.echo("   🗑️ Removing virtual environment folder...")
             SystemHelper.run_command(f"rm -rf {venv_path}")
 
+    def setup_permissions(self):
+        """Setup permissions for user"""
+        click.echo("   🔐 Setting up permissions...")
+
+        SecurityHelper.set_permissions(
+            "/etc/localtime", f"{self.user}:{self.user}", "644"
+        )
+
+        sudoers_config = """# Allow argus to set system time without password
+argus ALL=(ALL) NOPASSWD: /usr/bin/date --set=*
+argus ALL=(ALL) NOPASSWD: /sbin/hwclock -w --verbose
+argus ALL=(ALL) NOPASSWD: /bin/rm -f /etc/localtime
+argus ALL=(ALL) NOPASSWD: /bin/ln -s /usr/share/zoneinfo/* /etc/localtime
+argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
+"""
+        SystemHelper.write_file(f"/etc/sudoers.d/{self.user}", sudoers_config)
+
+        click.echo("   ✓ Permissions set")
+
     def update_database_schema(self):
         """Update database schema using Alembic"""
         click.echo("   🗄️ Updating database schema...")
@@ -188,6 +207,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         self.create_service_directories()
         self.save_secrets_to_file()
         self.setup_systemd_services()
+        self.setup_permissions()
 
     def post_install(self):
         self.update_database_schema()

@@ -150,8 +150,8 @@ def bootstrap(ctx, component):
     """
     ctx.ensure_object(dict)
     start_time = datetime.now()
-    click.echo("🚀 Starting ArPI installation...")
-    click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    click.echo("🚀 Starting ArPI bootstrap...")
+    click.echo(f"Bootstrap started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
     click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
@@ -170,7 +170,7 @@ def bootstrap(ctx, component):
             click.echo(traceback.format_exc())
             installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
 
-    click.echo(f"Installation completed in {datetime.now() - start_time}")
+    click.echo(f"Bootstrap completed in {datetime.now() - start_time}")
 
     if any(
         orchestrator.get_installer(comp).warnings
@@ -182,10 +182,10 @@ def bootstrap(ctx, component):
         for comp in components:
             installer = orchestrator.get_installer(comp)
             for warning in installer.warnings:
-                click.echo(f"⚠️ Warning during {comp} installation: {warning}")
+                click.echo(f"⚠️ Warning during {comp} bootstrap: {warning}")
 
             for info in installer.infos:
-                click.echo(f"ℹ️ Info during {comp} installation: {info}")
+                click.echo(f"ℹ️ Info during {comp} bootstrap: {info}")
 
     if any(
         orchestrator.get_installer(comp).needs_reboot
@@ -206,8 +206,8 @@ def post_install(ctx, component):
     """
     ctx.ensure_object(dict)
     start_time = datetime.now()
-    click.echo("🚀 Starting ArPI installation...")
-    click.echo(f"Installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    click.echo("🚀 Starting ArPI post-installation...")
+    click.echo(f"Post-installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
     click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
@@ -229,7 +229,7 @@ def post_install(ctx, component):
             click.echo(traceback.format_exc())
             installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
 
-    click.echo(f"Installation completed in {datetime.now() - start_time}")
+    click.echo(f"Post-installation completed in {datetime.now() - start_time}")
 
     if any(
         orchestrator.get_installer(comp).warnings
@@ -237,14 +237,13 @@ def post_install(ctx, component):
         if orchestrator.get_installer(comp)
     ):
         click.echo("=====================================")
-        click.echo("Installation completed with warnings:")
+        click.echo("Post-installation completed with warnings:")
         for comp in components:
             installer = orchestrator.get_installer(comp)
             for warning in installer.warnings:
-                click.echo(f"⚠️ Warning during {comp} installation: {warning}")
-
+                click.echo(f"⚠️ Warning during {comp} post-installation: {warning}")
             for info in installer.infos:
-                click.echo(f"ℹ️ Info during {comp} installation: {info}")
+                click.echo(f"ℹ️ Info during {comp} post-installation: {info}")
 
     if any(
         orchestrator.get_installer(comp).needs_reboot
