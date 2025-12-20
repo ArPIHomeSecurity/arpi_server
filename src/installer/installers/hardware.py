@@ -91,7 +91,7 @@ class HardwareInstaller(BaseInstaller):
         if self._board_version == 3:
             # enable SPI for board version 3
             if os.path.exists(self._config_txt) and not SystemHelper.file_contains_text(
-                self._config_txt, r"^dtparam=spi=on$", regex=True
+                self._config_txt, "dtparam=spi=on"
             ):
                 SystemHelper.append_to_file(self._config_txt, "\ndtparam=spi=on\n")
                 self.needs_reboot = True
