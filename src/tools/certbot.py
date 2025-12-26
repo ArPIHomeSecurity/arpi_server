@@ -159,8 +159,8 @@ class Certbot:
             return
         
         self._logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
-        remote_conf = Path("/usr/local/nginx/conf/sites-available/remote.conf")
-        if remote_conf.is_file():
+        remote_conf = os.path.expanduser("~/.local/etc/arpi-server/remote.conf")
+        if os.path.isfile(remote_conf):
             with open(remote_conf, "r", encoding="utf-8") as file:
                 lines = file.readlines()
                 for i, line in enumerate(lines):

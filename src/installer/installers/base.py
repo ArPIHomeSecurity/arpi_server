@@ -80,11 +80,6 @@ class BaseInstaller(ABC):
                 os.path.expanduser(f"~{username}/.local/etc/arpi-server"),
                 "/etc/arpi-server",
             ]
-        else:
-            possible_paths = [
-                os.path.expanduser("~/.local/etc/arpi-server"),
-                "/etc/arpi-server",
-            ]
         
         for path in possible_paths:
             if os.path.exists(path):
