@@ -80,7 +80,14 @@ class MQTTClient:
             self._logger.debug("Using password authentication user: %s password length = %s",
                                username,
                                len(password))
-            self._client.username_pw_set(username, password)
+            try:
+                # FIXME:theoretically self._client should never be None here
+                # but we see errors in logs, so need to add a check
+                self._client.username_pw_set(username, password)
+            except AttributeError:
+                self._logger.error("Failed to set MQTT username and password")
+                self._client = None
+                return
 
         if mqtt_config.tls_enabled:
             self._client.tls_set(cert_reqs=ssl.CERT_NONE)
