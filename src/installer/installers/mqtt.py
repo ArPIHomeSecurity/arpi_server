@@ -28,23 +28,17 @@ class MqttInstaller(BaseInstaller):
                     click.echo("   ✓ Mosquitto repository already configured")
                     return
 
-        # Download and add repository key
-        with tempfile.TemporaryDirectory() as temp_dir:
-            key_file = os.path.join(temp_dir, "mosquitto-repo.gpg")
+        # download the repository key
+        SystemHelper.run_command(
+            "wget https://repo.mosquitto.org/debian/mosquitto-repo.gpg -O /etc/apt/keyrings/mosquitto-repo.gpg",
+        )
 
-            try:
-                SystemHelper.run_command(
-                    f"wget -O {key_file} http://repo.mosquitto.org/debian/mosquitto-repo.gpg",
-                    cwd="/tmp",
-                )
-                SystemHelper.run_command(f"apt-key add {key_file}")
-            except Exception as e:
-                click.echo(f"    ⚠️ WARNING: Could not add repository key: {e}")
-                self.warnings.append(f"Could not add repository key: {e}")
+        codename = SystemHelper.run_command("lsb_release -cs", capture=True).stdout.strip()
 
         # Add repository to sources list
         SystemHelper.write_file(
-            sources_file, "deb https://repo.mosquitto.org/debian bookworm main\n"
+            sources_file,
+            f"deb [signed-by=/etc/apt/keyrings/mosquitto-repo.gpg] https://repo.mosquitto.org/debian {codename} main\n",
         )
 
         click.echo("   ✓ Mosquitto repository configured")
@@ -75,9 +69,7 @@ class MqttInstaller(BaseInstaller):
         SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
 
         # Copy dhparam file
-        SystemHelper.run_command(
-            f"cp {ETC_DIR}/arpi_dhparam.pem /etc/mosquitto/certs/"
-        )
+        SystemHelper.run_command(f"cp {ETC_DIR}/arpi_dhparam.pem /etc/mosquitto/certs/")
         click.echo("   ✓ Copied dhparam file")
 
         # Copy SSL certificates from nginx config
@@ -102,12 +94,8 @@ class MqttInstaller(BaseInstaller):
         click.echo("   ⚙️ Configuring MQTT configuration files...")
 
         # Copy auth and logging configurations
-        SystemHelper.run_command(
-            f"cp {ETC_DIR}/mosquitto/auth.conf /etc/mosquitto/conf.d/"
-        )
-        SystemHelper.run_command(
-            f"cp {ETC_DIR}/mosquitto/logging.conf /etc/mosquitto/conf.d/"
-        )
+        SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/auth.conf /etc/mosquitto/conf.d/")
+        SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/logging.conf /etc/mosquitto/conf.d/")
 
         # Create configs-available directory and copy SSL configs
         SystemHelper.run_command("mkdir -p /etc/mosquitto/configs-available/")
