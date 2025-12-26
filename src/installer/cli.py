@@ -55,8 +55,7 @@ class ArpiOrchestrator:
 
     def __init__(self):
         self.config = InstallerConfig(
-            python_version=os.getenv("PYTHON_VERSION", "3.11"),
-            postgresql_version=os.getenv("POSTGRESQL_VERSION", "15"),
+            postgresql_version=os.getenv("POSTGRESQL_VERSION"),
             nginx_version=os.getenv("NGINX_VERSION", "1.28.0"),
             db_name=os.getenv("ARGUS_DB_NAME", "argus"),
             data_set_name=os.getenv("DATA_SET_NAME", ""),

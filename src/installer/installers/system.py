@@ -12,7 +12,6 @@ class SystemInstaller(BaseInstaller):
     def __init__(self, config: InstallerConfig):
         super().__init__(config)
         self.user = config.user
-        self.python_version = config.python_version
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -174,17 +173,6 @@ export PATH="$HOME/.local/bin:$PATH"
         else:
             click.echo(f"   ✓ User '{self.user}' is already in gpio group")
 
-    def check_python_version(self) -> bool:
-        """Check if the required Python version is installed"""
-        try:
-            python_executable = f"python{self.python_version}"
-            version_output = SystemHelper.run_command(
-                f"{python_executable} --version", capture=True
-            ).stdout
-            return version_output.startswith(f"Python {self.python_version}")
-        except subprocess.CalledProcessError:
-            return False
-
     def setup_polkit_rule(self):
         """Setup polkit rule for systemd access without password"""
         click.echo("   🛂 Setting up polkit rule for systemd access...")
@@ -224,6 +212,5 @@ polkit.addRule(function(action, subject) {
             "ZSH configured": self.check_zsh_configured(),
             "User in GPIO group": self.is_user_in_gpio_group(),
             "Python 3 installed": PackageHelper.is_package_installed("python3"),
-            f"Python version={self.python_version}": self.check_python_version(),
             "Polkit rule": os.path.exists("/etc/polkit-1/rules.d/49-nopasswd_systemd.rules"),
         }

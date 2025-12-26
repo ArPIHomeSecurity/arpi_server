@@ -87,6 +87,8 @@ server = ["version.json"]
 
 [tool.setuptools.data-files]
 "etc/arpi-server/" = ["config.env"]
+"etc/arpi-server" = ["src/server/gunicorn.conf.py"]
+"etc/arpi-monitor" = ["src/monitor/gunicorn.conf.py"]
 "share/arpi-server/migrations" = [
     "migrations/alembic.ini",
     "migrations/env.py",

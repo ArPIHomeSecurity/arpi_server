@@ -19,14 +19,25 @@ class DatabaseInstaller(BaseInstaller):
         """Install PostgreSQL database"""
         click.echo("   🗄️ Installing PostgreSQL...")
 
-        pg_packages = [
-            f"postgresql-{self.postgresql_version}",
-            f"postgresql-client-{self.postgresql_version}",
-            f"postgresql-contrib-{self.postgresql_version}",
-            "libpq-dev",
-        ]
+        if self.postgresql_version is None:
+            pg_packages = [
+                "postgresql",
+                "postgresql-client",
+                "postgresql-contrib",
+                "libpq-dev",
+            ]
+        else:
+            pg_packages = [
+                f"postgresql-{self.postgresql_version}",
+                f"postgresql-client-{self.postgresql_version}",
+                f"postgresql-contrib-{self.postgresql_version}",
+                "libpq-dev",
+            ]
 
-        if PackageHelper.install_packages(pg_packages, f"PostgreSQL {self.postgresql_version}"):
+        version = (
+            "with default version" if self.postgresql_version is None else self.postgresql_version
+        )
+        if PackageHelper.install_packages(pg_packages, f"PostgreSQL {version}"):
             ServiceHelper.start_service("postgresql")
             ServiceHelper.enable_service("postgresql")
 
@@ -95,9 +106,7 @@ class DatabaseInstaller(BaseInstaller):
 
     def get_system_postgresql_version(self) -> str | None:
         """Get the installed PostgreSQL version"""
-        result = SystemHelper.run_command(
-            "psql --version", check=False, capture=True
-        )
+        result = SystemHelper.run_command("psql --version", check=False, capture=True)
         if result.returncode == 0:
             version_line = result.stdout.strip()
             if "psql (PostgreSQL)" in version_line:
@@ -107,9 +116,7 @@ class DatabaseInstaller(BaseInstaller):
     def is_user_in_gpio_group(self) -> bool:
         """Check if user is in gpio group"""
         try:
-            groups_output = SystemHelper.run_command(
-                f"groups {self.user}", capture=True
-            ).stdout
+            groups_output = SystemHelper.run_command(f"groups {self.user}", capture=True).stdout
             groups = groups_output.strip().split(":")[-1].strip().split()
             return "gpio" in groups
         except subprocess.CalledProcessError:
@@ -127,7 +134,12 @@ class DatabaseInstaller(BaseInstaller):
 
     def needs_installation(self) -> bool:
         """Determine if PostgreSQL needs installation or upgrade"""
-        click.echo(f"   ℹ️ PostgreSQL Actual: {self.get_system_postgresql_version()} | Desired: {self.postgresql_version}")
+        click.echo(
+            f"   ℹ️ PostgreSQL Actual: {self.get_system_postgresql_version()} | Desired: {self.postgresql_version}"
+        )
+        if self.postgresql_version is None:
+            return self.get_system_postgresql_version() is None
+
         return self.get_system_postgresql_version() != self.postgresql_version
 
     def install(self):

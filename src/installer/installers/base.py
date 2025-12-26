@@ -8,7 +8,6 @@ from installer.helpers import SecretsManager
 
 @dataclass
 class InstallerConfig:
-    python_version: str
     postgresql_version: str
     nginx_version: str
     db_name: str
