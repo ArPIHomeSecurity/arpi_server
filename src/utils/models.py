@@ -748,7 +748,10 @@ class User(BaseModel):
     def sanitize_registration_code(registration_code: str) -> str:
         return registration_code.lower().strip().replace("-", "")
 
-    def check_access_code(self, access_code):
+    def check_access_code(self, access_code: str) -> bool:
+        if not isinstance(access_code, str):
+            access_code = str(access_code)
+
         matching_user = False
         if self.access_code.startswith("$2") and bcrypt.checkpw(access_code.encode('utf-8'), self.access_code.encode('utf-8')):
             matching_user = True
