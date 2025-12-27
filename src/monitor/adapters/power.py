@@ -3,7 +3,7 @@
 import logging
 from os import environ
 
-from constants import LOG_ADPOWER
+from utils.constants import LOG_ADPOWER
 from monitor.adapters.power_base import PowerAdapterBase
 
 

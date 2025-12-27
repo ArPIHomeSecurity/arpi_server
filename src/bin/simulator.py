@@ -1,10 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import logging
 from contextlib import suppress
 from copy import deepcopy
-from enum import Enum
 from os import environ
+
+# Database and models for direct DB access
+from monitor.database import get_database_session
+from utils.models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -14,27 +17,20 @@ from textual.logging import TextualHandler
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Select, Static
 
-from models import SensorContactTypes
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
+    ContactTypes,
+    WiringStrategies,
     get_channel_configs,
     get_output_states,
     set_input_states,
     set_keypad_state,
 )
 from monitor.output import OUTPUT_NAMES
+# use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
 
-
-class WiringStrategies(str, Enum):
-    SINGLE_WITH_EOL = "single_with_eol"
-    SINGLE_WITH_2EOL = "single_with_2eol"
-    DUAL = "dual"
-    CUT = "cut"
-    SHORTAGE = "shortage"
-
-
-# Wiring strategies
+# Wiring strategies for control
 WIRING_STRATEGIES = [
     ("Single/EOL", WiringStrategies.SINGLE_WITH_EOL.value),
     ("Single/2 EOL", WiringStrategies.SINGLE_WITH_2EOL.value),
@@ -43,12 +39,20 @@ WIRING_STRATEGIES = [
     ("Shortage", WiringStrategies.SHORTAGE.value),
 ]
 
-# Contact types
-CONTACT_TYPES = [("NC", "nc"), ("NO", "no")]
+# Contact types for control
+CONTACT_TYPES = [
+    ("NC", ContactTypes.NC.value),
+    ("NO", ContactTypes.NO.value)
+]
+
+SENSOR_CONTACT_TYPE_MAP = {
+    SensorContactTypes.NC: ContactTypes.NC.value,
+    SensorContactTypes.NO: ContactTypes.NO.value,
+}
 
 # channel error states
-CHANNEL_CUT = 1.0
-CHANNEL_SHORTAGE = 0.0
+CHANNEL_CUT = wiring_config.open_circuit
+CHANNEL_SHORTAGE = wiring_config.shortcut
 
 POWER_LOW = 0
 POWER_HIGH = 1
@@ -68,8 +72,7 @@ class Channels(Widget):
     }
 
     .channel-column {
-        width: 44;
-        margin-right: 5;
+        width: 45;
     }
 
     .channel-row {
@@ -115,7 +118,7 @@ class Channels(Widget):
     }
 
     .contact-type-select {
-        width: 12;
+        width: 10;
         margin: 0;
     }
 
@@ -143,10 +146,12 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, channel_configs, **kwargs):
+    def __init__(self, default_states, channel_configs, is_advanced_mode=False, show_voltage=False, **kwargs):
         super().__init__(**kwargs)
         self._default_states = default_states
         self._channel_configs = channel_configs
+        self._is_advanced_mode = is_advanced_mode
+        self._show_voltage = show_voltage
 
     def compose(self) -> ComposeResult:
         """Create channel rows with strategy select, contact type select, and sensor buttons in two columns"""
@@ -169,31 +174,33 @@ class Channels(Widget):
                                 wiring_strategy, sensor_a_active, sensor_b_active
                             )
 
+                            value_str = self._format_channel_value(self._default_states[i - 1])
                             yield Static(
-                                f"CH{i:02d} {self._default_states[i - 1]:.2f}V",
+                                f"CH{i:02d} {value_str}",
                                 id=f"channel-label-{i}",
                                 classes=f"channel-label {channel_class or wiring_strategy}",
                             )
 
-                            # Wiring strategy select
-                            yield Select(
-                                [(value, label) for value, label in WIRING_STRATEGIES],
-                                value=wiring_strategy,
-                                id=f"wiring-strategy-{i}",
-                                classes="wiring-strategy-select",
-                                allow_blank=False,
-                            )
+                            # Wiring strategy select (advanced mode only)
+                            if self._is_advanced_mode:
+                                yield Select(
+                                    [(value, label) for value, label in WIRING_STRATEGIES],
+                                    value=wiring_strategy,
+                                    id=f"wiring-strategy-{i}",
+                                    classes="wiring-strategy-select",
+                                    allow_blank=False,
+                                )
 
-                            # Contact type select (disabled for cut/shortage)
-                            contact_disabled = wiring_strategy in ["cut", "shortage"]
-                            yield Select(
-                                [(value, label) for value, label in CONTACT_TYPES],
-                                value=contact_type,
-                                id=f"contact-type-{i}",
-                                classes="contact-type-select",
-                                disabled=contact_disabled,
-                                allow_blank=False,
-                            )
+                                # Contact type select (disabled for cut/shortage)
+                                contact_disabled = wiring_strategy in ["cut", "shortage"]
+                                yield Select(
+                                    [(value, label) for value, label in CONTACT_TYPES],
+                                    value=contact_type,
+                                    id=f"contact-type-{i}",
+                                    classes="contact-type-select",
+                                    disabled=contact_disabled,
+                                    allow_blank=False,
+                                )
 
                             # Sensor activation buttons (only enabled for dual configurations)
                             yield Button(
@@ -210,16 +217,27 @@ class Channels(Widget):
                                     ]
                                 ),
                             )
-                            yield Button(
-                                "B",
-                                id=f"sensor-{i}-b",
-                                classes="sensor-button"
-                                + (" sensor-active" if sensor_b_active else ""),
-                                disabled=wiring_strategy != WiringStrategies.DUAL.value,
-                            )
+                            if self._is_advanced_mode:
+                                yield Button(
+                                    "B",
+                                    id=f"sensor-{i}-b",
+                                    classes="sensor-button"
+                                    + (" sensor-active" if sensor_b_active else ""),
+                                    disabled=wiring_strategy != WiringStrategies.DUAL.value,
+                                )
 
         yield Static("")
         yield Button("POWER", id="power", classes="power")
+
+    def _format_channel_value(self, value):
+        """
+        Format channel value as voltage or raw value
+        """
+        if self._show_voltage:
+            voltage = value * 5.0
+            return f"{voltage:.2f}V"
+        else:
+            return f"{value:.2f}"
 
     @staticmethod
     def get_channel_class(wiring_strategy, sensor_a_active, sensor_b_active):
@@ -322,14 +340,16 @@ class SimulatorApp(App):
 
     #main-grid {
         layout: grid;
-        grid-size: 2 2;
-        grid-gutter: 2 2;
-        grid-rows: 7fr 1fr;
-        grid-columns: 2fr 38;
-        width: 100%;
-        height: 37;
+        grid-size: 2 3;
+        grid-rows: 3 29 4;
+        grid-columns: 92 38;
+        overflow: auto;
     }
 
+    #top-bar {
+        column-span: 2;
+    }
+    
     #channels-pane {
     }
 
@@ -346,6 +366,59 @@ class SimulatorApp(App):
         self.keypad = deepcopy(DEFAULT_KEYPAD)
         self.channel_values = {}
         self.channel_configs = {}
+        self.is_advanced_mode = False
+        self.show_voltage = False
+        self.is_v3_board = environ.get("BOARD_VERSION") == "3"
+
+    def load_configuration_from_db(self, input_number: int) -> None:
+        """
+        Refresh channel configurations from the database.
+        """
+        session = get_database_session()
+        sensors = (
+            session.query(Sensor)
+            .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
+            .order_by(Sensor.channel)
+            .all()
+        )
+
+        self.channel_configs = {
+            f"CH{i:02d}": {
+                "wiring_strategy": WiringStrategies.CUT.value,
+                "contact_type": ContactTypes.NC.value,
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            }
+            for i in range(1, input_number + 1)
+        }
+
+        # Update configs from DB
+        for sensor in sensors:
+            channel_name = f"CH{sensor.channel+1:02d}"
+            # Map DB fields to simulator config
+            wiring_strategy = WiringStrategies.CUT.value
+            if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
+                wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
+            elif sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL:
+                wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
+            elif sensor.channel_type == ChannelTypes.CHANNEL_A or sensor.channel_type == ChannelTypes.CHANNEL_B:
+                wiring_strategy = WiringStrategies.DUAL.value
+
+            contact_type = SENSOR_CONTACT_TYPE_MAP[sensor.sensor_contact_type]
+
+            self.channel_configs[channel_name] = {
+                "wiring_strategy": wiring_strategy,
+                "contact_type": contact_type,
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            }
+            self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+
+        # turn on advanced mode if v3 features are present
+        new_advanced_mode = self.has_v3_features() and self.is_v3_board
+        if new_advanced_mode:
+            self.is_advanced_mode = new_advanced_mode
+
 
     def initialize_channels(self, input_number: int) -> None:
         """
@@ -360,8 +433,8 @@ class SimulatorApp(App):
 
         self.channel_configs = {
             f"CH{i:02d}": {
-                "wiring_strategy": "cut",
-                "contact_type": "nc",
+                "wiring_strategy": WiringStrategies.CUT.value,
+                "contact_type": ContactTypes.NC.value,
                 "sensor_a_active": False,
                 "sensor_b_active": False,
             }
@@ -369,19 +442,46 @@ class SimulatorApp(App):
         }
 
         # Apply saved configurations and calculate values
-        for ch_key, config in saved_configs.items():
-            if ch_key in self.channel_configs:
-                self.channel_configs[ch_key] = config
+        for channel_name, config in saved_configs.items():
+            if channel_name in self.channel_configs:
+                self.channel_configs[channel_name] = config
                 # Calculate initial values based on configuration
-                self.channel_values[ch_key] = self.calculate_channel_value(ch_key)
+                self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
+
+        self.is_advanced_mode = self.has_v3_features() and self.is_v3_board
+
+    def has_v3_features(self):
+        v3_features = [
+            WiringStrategies.DUAL.value,
+            WiringStrategies.SINGLE_WITH_2EOL.value,
+        ]
+        return  any(
+            self.channel_configs[ch]["wiring_strategy"] in v3_features
+            for ch in self.channel_configs
+        )
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a grid layout."""
         with Container(id="main-grid"):
+            with Horizontal(id="top-bar"):
+                yield Checkbox(
+                    "Advanced Mode",
+                    id="mode-toggle",
+                    value=self.is_advanced_mode,
+                    disabled=not self.is_v3_board or self.has_v3_features(),
+                )
+                yield Checkbox(
+                    "Show Voltage",
+                    id="voltage-toggle",
+                    value=self.show_voltage,
+                )
+                yield Button("Update channels from DB", id="refresh-channels", classes="refresh-button")
             yield Channels(
                 id="channels-pane",
                 default_states=list(self.channel_values.values()),
                 channel_configs=self.channel_configs,
+                is_advanced_mode=self.is_advanced_mode,
+                show_voltage=self.show_voltage,
             )
             yield Keypad(id="keypad-pane")
             yield Outputs(id="outputs-pane")
@@ -413,7 +513,9 @@ class SimulatorApp(App):
         self.set_interval(0.5, self.read_output_states)
 
     def calculate_channel_value(self, channel: str) -> float:
-        """Calculate the channel value based on wiring strategy and sensor states"""
+        """
+        Calculate the channel value based on wiring strategy and sensor states
+        """
         config = self.channel_configs[channel]
         wiring_strategy = config["wiring_strategy"]
         contact_type = config["contact_type"]
@@ -484,6 +586,9 @@ class SimulatorApp(App):
     @on(Select.Changed, "#channels-pane .wiring-strategy-select")
     def wiring_strategy_changed(self, event: Select.Changed) -> None:
         """Handle wiring strategy selection changes"""
+        if not self.is_advanced_mode:
+            return
+
         select_id = event.select.id
         channel_num = int(select_id.split("-")[2])
         channel_name = f"CH{channel_num:02d}"
@@ -516,11 +621,18 @@ class SimulatorApp(App):
         # Update channel value and label
         self.update_channel_label(channel_num, channel_name, config)
 
+        # update mode
+        checkbox = self.query_one("#mode-toggle")
+        checkbox.disabled = self.has_v3_features()
+
         self.save_input_states()
 
     @on(Select.Changed, "#channels-pane .contact-type-select")
     def contact_type_changed(self, event: Select.Changed) -> None:
         """Handle contact type selection changes"""
+        if not self.is_advanced_mode:
+            return
+
         select_id = event.select.id
         channel_num = int(select_id.split("-")[2])
         channel_name = f"CH{channel_num:02d}"
@@ -537,7 +649,8 @@ class SimulatorApp(App):
     def update_channel_label(self, channel_num, channel_name, config):
         self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
         channel_label = self.query_one(f"#channel-label-{channel_num}")
-        channel_label.update(f"CH{channel_num:02d} {self.channel_values[channel_name]:.2f}V")
+        value_str = self._format_channel_value(self.channel_values[channel_name])
+        channel_label.update(f"CH{channel_num:02d} {value_str}")
         channel_label.set_classes(
             [
                 "channel-label",
@@ -547,6 +660,36 @@ class SimulatorApp(App):
                 or config["wiring_strategy"],
             ]
         )
+
+    def _format_channel_value(self, value):
+        """
+        Format channel value as voltage or raw value
+        """
+        if self.show_voltage:
+            voltage = value * 5.0
+            return f"{voltage:.2f}V"
+        else:
+            return f"{value:.2f}"
+
+    @on(Checkbox.Changed, "#mode-toggle")
+    async def mode_toggle_changed(self, event: Checkbox.Changed) -> None:
+        """Toggle between basic and advanced mode"""
+        self.is_advanced_mode = event.value
+        await self.recompose()
+
+    @on(Checkbox.Changed, "#voltage-toggle")
+    async def voltage_toggle_changed(self, event: Checkbox.Changed) -> None:
+        """Toggle between raw values and voltage display"""
+        self.show_voltage = event.value
+        await self.recompose()
+
+    @on(Button.Pressed, "#refresh-channels")
+    async def refresh_channels_pressed(self, event: Button.Pressed) -> None:
+        """Reload channel settings from the database and update the UI."""
+        input_number = int(environ.get("INPUT_NUMBER", 15))
+        self.load_configuration_from_db(input_number)
+        self.save_input_states()
+        await self.recompose()
 
     @on(Button.Pressed, "#power")
     def power_button_pressed(self, event: Button.Pressed) -> None:
@@ -587,7 +730,10 @@ logging.basicConfig(
     handlers=[TextualHandler()],
     format="%(asctime)s: %(message)s",
 )
-if __name__ == "__main__":
+
+
+def main():
+    """Main entry point for the simulator application."""
     app = SimulatorApp()
     # Initialize channel values and states from saved data
     app.initialize_channels(int(environ.get("INPUT_NUMBER", 15)))
@@ -596,3 +742,7 @@ if __name__ == "__main__":
     app.save_input_states()
     app.save_keypad_states()
     app.run()
+
+
+if __name__ == "__main__":
+    main()

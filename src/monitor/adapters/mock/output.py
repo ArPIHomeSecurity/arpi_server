@@ -6,7 +6,7 @@ import logging
 import os
 from threading import Lock
 
-from constants import LOG_ADOUTPUT
+from utils.constants import LOG_ADOUTPUT
 from monitor.adapters.mock.utils import set_output_states, get_output_states
 from monitor.adapters.output_base import OutputAdapterBase
 
@@ -35,6 +35,9 @@ class OutputAdapter(OutputAdapterBase):
                         _shared_states[i] = 1 if state else 0
             except (FileNotFoundError, OSError, ValueError):
                 self._logger.debug("Could not read initial state from file, using defaults")
+
+    def is_initialized(self) -> bool:
+        return True
 
     def control_channel(self, channel: int, state: bool):
         """

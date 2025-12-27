@@ -1,21 +1,15 @@
 import json
 import logging
-import os
 import socket
 import ssl
-import sys
 from unicodedata import normalize
 
 from enum import Enum
 
 import paho.mqtt.client as mqtt
 
-from dotenv import load_dotenv
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
-
-from constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
+from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
+from monitor.config_helper import load_mqtt_connection_config, load_mqtt_internal_publish_config, load_mqtt_external_publish_config
 
 
 def sanitize(name):
@@ -57,30 +51,54 @@ class MQTTClient:
         Connect to MQTT broker.
         """
 
+        mqtt_connection = load_mqtt_connection_config()
+        if mqtt_connection is None or not mqtt_connection.enabled:
+            self._logger.info("MQTT connection is not enabled")
+            return
+
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=client_id)
+        if self._client is None:
+            self._logger.error("Failed to create MQTT client")
+            return
+
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
-        username = os.environ.get("ARGUS_MQTT_USERNAME", "")
-        password = os.environ.get("ARGUS_MQTT_PASSWORD", "")
+
+        mqtt_config = None
+        if mqtt_connection.external:
+            mqtt_config = load_mqtt_external_publish_config()
+            self._logger.info("Using external MQTT connection configuration")
+        else:
+            mqtt_config = load_mqtt_internal_publish_config()
+            self._logger.info("Using internal MQTT connection configuration")
+
+        username = mqtt_config.username
+        password = mqtt_config.password
         if username:
             self._logger.debug("Using password authentication user: %s password length = %s",
                                username,
                                len(password))
-            self._client.username_pw_set(username, password)
+            try:
+                # FIXME:theoretically self._client should never be None here
+                # but we see errors in logs, so need to add a check
+                self._client.username_pw_set(username, password)
+            except AttributeError:
+                self._logger.error("Failed to set MQTT username and password")
+                self._client = None
+                return
 
-        if os.environ.get("ARGUS_MQTT_TLS_ENABLED", "false").lower() in ("true", "1"):
+        if mqtt_config.tls_enabled:
             self._client.tls_set(cert_reqs=ssl.CERT_NONE)
+            if mqtt_config.tls_insecure:
+                self._client.tls_insecure_set(True)
 
-        if os.environ.get("ARGUS_MQTT_TLS_INSECURE", "false").lower() in ("true", "1"):
-            self._client.tls_insecure_set(True)
-
-        host = os.environ["ARGUS_MQTT_HOST"]
-        port = int(os.environ["ARGUS_MQTT_PORT"])
+        host = mqtt_config.hostname
+        port = mqtt_config.port
         self._logger.info("Connecting to MQTT broker at %s:%s TLS: %s insecure:%s", host, port,
-                          os.environ.get("ARGUS_MQTT_TLS_ENABLED", "false"),
-                          os.environ.get("ARGUS_MQTT_TLS_INSECURE", "false"))
+                          mqtt_config.tls_enabled,
+                          mqtt_config.tls_insecure)
         try:
             self._client.connect(host, port, keepalive=60)
             self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)

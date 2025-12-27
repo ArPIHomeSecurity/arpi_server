@@ -1,9 +1,10 @@
 
 import logging
 
+import lgpio
 from gpiozero import MCP3008
 
-from constants import LOG_ADPOWER
+from utils.constants import LOG_ADPOWER
 from monitor.adapters import V3BoardPin
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 
@@ -16,6 +17,7 @@ class PowerAdapter:
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADPOWER)
         self._logger.debug("Power sense (MCP3008 AD2 ch0) creating...")
+        self._sense = None
 
         try:
             self._sense = MCP3008(
@@ -25,9 +27,15 @@ class PowerAdapter:
                 select_pin=V3BoardPin.SENSOR_LATCH_PIN_AD2,
                 channel=0
             )
-        except (OSError, ValueError, RuntimeError) as e:
+        except (OSError, ValueError, RuntimeError, lgpio.error) as e:
             self._logger.error("Failed to init MCP3008 for power sense: %s", e)
             self._sense = None
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the power adapter is initialized properly.
+        """
+        return self._sense is not None
 
     def __del__(self):
         self._cleanup()

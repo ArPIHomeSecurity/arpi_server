@@ -17,7 +17,7 @@ from gsmmodem.exceptions import (
     InvalidStateException,
     InterruptedException
 )
-from constants import LOG_ADGSM
+from utils.constants import LOG_ADGSM
 
 
 class CallType(Enum):

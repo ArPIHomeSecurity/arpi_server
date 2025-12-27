@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import logging
 import os
+import subprocess
 from time import sleep
 from typing import List
 
@@ -11,27 +12,16 @@ try:
 except ImportError:
     lgpio = None
 
-from dotenv import load_dotenv
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action
+from monitor.adapters.output import get_output_adapter
+from monitor.adapters.power import get_power_adapter
+from monitor.adapters.sensor import get_sensor_adapter
 from monitor.logger import ArgusLogger
 from monitor.output import OUTPUT_NAMES
 
-try:
-    from monitor.adapters.output import get_output_adapter
-    from monitor.adapters.power import get_power_adapter
-    from monitor.adapters.sensor import get_sensor_adapter
-except Exception as error:
-    if isinstance(error, lgpio.error):
-        logging.error(
-            "Can't connect to GPIO. Please stop the argus_server and argus_monitor services!"
-        )
-    else:
-        logging.exception("Error importing adapters: %s", error)
-
-    exit(1)
 
 def print_channels(correct_channels, values):
     for idx, value in enumerate(values):
@@ -43,11 +33,16 @@ def print_channels(correct_channels, values):
             print(" ❓", end="")
         print()
 
-def test_sensor_adapter(board_version):
+
+def test_sensor_adapter(board_version) -> bool:
     """
     Check the state of the sensor inputs and mark the ones that changed.
     """
     adapter = get_sensor_adapter(board_version)
+    if not adapter.is_initialized():
+        logging.error("Sensor adapter not initialized properly. Exiting test.")
+        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        return False
 
     # mark channels as correct if they changed
     correct_channels = [False] * int(os.environ["INPUT_NUMBER"])
@@ -75,20 +70,26 @@ def test_sensor_adapter(board_version):
 
             # break if all correct
             if all(correct_channels):
-                break
+                logging.info("All channels verified successfully.")
+                return True
     except KeyboardInterrupt:
         print("\n")
 
     if not all(correct_channels):
         print_channels(correct_channels, values)
+        logging.warning("Some channels were not verified.")
+        return False
 
-        
 
-def test_power_adapter(board_version):
+def test_power_adapter(board_version) -> bool:
     """
     Check the power source type.
     """
     adapter = get_power_adapter(board_version)
+    if not adapter.is_initialized():
+        logging.error("Power adapter not initialized properly. Exiting test.")
+        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        return False
 
     logging.info("Press Ctrl-C to exit")
 
@@ -97,18 +98,23 @@ def test_power_adapter(board_version):
         sleep(1)
 
 
-def test_output_adapter(board_version):
+def test_output_adapter(board_version) -> bool:
     """
     Control the output channels.
     """
     adapter = get_output_adapter(board_version)
+    if not adapter.is_initialized():
+        logging.error("Output adapter not initialized properly. Exiting test.")
+        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        return False
+
     output_count = int(os.environ.get("OUTPUT_NUMBER", 8))
 
     # turn on outputs
     for i in range(output_count):
         adapter.control_channel(i, True)
         logging.info(
-            "Output: %s",
+            "Outputs: %s",
             {name: state for name, state in zip(OUTPUT_NAMES.values(), adapter.states)},
         )
         sleep(2)
@@ -122,8 +128,10 @@ def test_output_adapter(board_version):
         )
         sleep(2)
 
+    return True
 
-def test_keypad_adapter(board_version):
+
+def test_keypad_adapter(board_version) -> bool:
     """
     Test the keypad adapter.
     """
@@ -158,7 +166,20 @@ def list_adapters() -> List[str]:
     return adapters
 
 
-def main():
+def check_service_running() -> bool:
+    """
+    Check if argus_monitor service is running.
+    """
+    try:
+        output = subprocess.check_output(
+            ["systemctl", "is-active", "argus_monitor"], stderr=subprocess.STDOUT
+        )
+        return output.strip() == b"active"
+    except subprocess.CalledProcessError:
+        return False
+
+
+def main() -> int:
     """
     Main function to run the adapter tests.
     """
@@ -168,7 +189,12 @@ def main():
     parser.add_argument("adapter", choices=list_adapters())
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument(
-        "-b", "--board-version", type=int, choices=[2, 3], help="Board version (2=GPIO, 3=SPI/AD)"
+        "-b",
+        "--board-version",
+        default=os.getenv("BOARD_VERSION"),
+        type=int,
+        choices=[2, 3],
+        help="Board version (2=GPIO/OPTO, 3=SPI/AD)",
     )
 
     # add the ArgusLogger as handler
@@ -181,13 +207,24 @@ def main():
     else:
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
+    if check_service_running():
+        logging.error("argus_monitor service is running. Please stop it before running the tests.")
+        return 1
+
     test_function = f"test_{args.adapter}_adapter"
-    globals()[test_function](args.board_version)
+    result = globals()[test_function](args.board_version)
+    if not result:
+        return 1
+
+    return 0
+
+
+def cli_main():
+    try:
+        exit(main())
+    except KeyboardInterrupt:
+        print("\n")
 
 
 if __name__ == "__main__":
-    try:
-        load_dotenv()
-        main()
-    except KeyboardInterrupt:
-        print("\n")
+    cli_main()

@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
 
-from models import metadata
+from utils.models import metadata
 
 db = SQLAlchemy(metadata=metadata)

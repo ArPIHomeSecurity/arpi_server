@@ -10,7 +10,7 @@ from time import sleep
 from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
-from constants import (
+from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
     ALERT_STAY,
@@ -27,14 +27,14 @@ from constants import (
     MONITORING_STARTUP,
     MONITORING_UPDATING_CONFIG,
 )
-from models import AlertSensor, Arm, Sensor
+from utils.models import AlertSensor, Arm, Sensor
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.database import get_database_session
 from monitor.sensor.detector import detect_alert, detect_error, wiring_config
 from monitor.sensor.history import SensorsHistory
-from monitor.socket_io import send_sensors_state
+from monitor.socket_io import send_sensors_error, send_sensors_state
 from monitor.storage import State, States
 
 
@@ -57,18 +57,28 @@ class SensorHandler:
 
     def __init__(self, broadcaster):
         self._logger = logging.getLogger(LOG_SENSORS)
-        self._db_session = get_database_session()
+        self._db_session = None
         self._broadcaster = broadcaster
-        self._sensor_adapter = get_sensor_adapter()
+        self._sensor_adapter = None
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
+        self._mqtt_client = None
 
+
+    def initialize(self):
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_sensors")
+        self._db_session = get_database_session()
+        self._sensor_adapter = get_sensor_adapter()
 
-        # log the wiring configuration
-        wiring_config.debug_values()
+    def update_mqtt_config(self):
+        """
+        Update the MQTT configuration.
+        """
+        if self._mqtt_client is not None:
+            self._mqtt_client.close()
+            self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
         """
@@ -89,7 +99,7 @@ class SensorHandler:
         for sensor in self._sensors:
             if sensor.reference_value is None and sensor.channel != -1:
                 self._logger.info(
-                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.description
+                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.name
                 )
                 return True
 
@@ -246,6 +256,7 @@ class SensorHandler:
         """
         changes = False
         found_alert = False
+        found_error = False
         for sensor in self._sensors:
             # skip sensor without a channel
             if sensor.channel == -1:
@@ -255,11 +266,10 @@ class SensorHandler:
 
             is_alert = detect_alert(sensor, value)
             self._logger.trace(
-                "Sensor %s (CH%02d) value: %s, ref: %s => alert: %s",
-                sensor.description,
+                "Sensor %s (CH%02d) value: %s => alert: %s",
+                sensor.name,
                 sensor.channel,
                 float(f"{value:.3f}"),
-                float(f"{sensor.reference_value:.3f}"),
                 is_alert,
             )
             if is_alert != sensor.alert:
@@ -269,11 +279,10 @@ class SensorHandler:
 
             is_error = detect_error(sensor, value)
             self._logger.trace(
-                "Sensor %s (CH%02d) value: %s, ref: %s => error: %s",
-                sensor.description,
+                "Sensor %s (CH%02d) value: %s => error: %s",
+                sensor.name,
                 sensor.channel,
                 float(f"{value:.3f}"),
-                float(f"{sensor.reference_value:.3f}"),
                 is_error,
             )
             if is_error != sensor.error:
@@ -284,11 +293,16 @@ class SensorHandler:
             if sensor.alert and sensor.enabled:
                 found_alert = True
 
+            if sensor.error and sensor.enabled:
+                found_error = True
+
         self._sensors_history.add_states([sensor.alert for sensor in self._sensors])
 
         if changes:
             self._db_session.commit()
             send_sensors_state(found_alert)
+            send_sensors_error(found_error)
+
 
     def handle_alerts(self):
         """
@@ -318,19 +332,29 @@ class SensorHandler:
             self._logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
+            alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
+            delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
+            sensitivity = self._sensors_history.get_sensitivity(idx)
+
             # alert under threshold
             if (
                 not self._sensors_history.is_sensor_alerting(idx)
                 and self._sensors_history.has_sensor_any_alert(idx)
                 and sensor.id not in self._alerting_sensors
                 and current_monitoring == MONITORING_ARMED
+                and sensor.enabled
+                and alert_type is not None
+                and delay is not None
             ):
                 self._logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert! (%r)",
-                    sensor.description,
+                    "Sensor %s (CH%02d) has suppressed alert! %ss%s%| (%r)",
+                    sensor.name,
                     sensor.channel,
+                    sensitivity.monitor_period,
+                    sensitivity.monitor_threshold,
                     self._sensors_history.get_states(idx),
                 )
+                continue
 
             # add new alert, enabled sensors to the alert
             if (
@@ -338,9 +362,6 @@ class SensorHandler:
                 and sensor.id not in self._alerting_sensors
                 and sensor.enabled
             ):
-                alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
-                delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
-                sensitivity = self._sensors_history.get_sensitivity(idx)
 
                 # do not start alert if in delay
                 if (

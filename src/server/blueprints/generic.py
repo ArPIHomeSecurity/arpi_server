@@ -1,7 +1,8 @@
 
 import os
-from time import sleep
+
 from flask.blueprints import Blueprint
+
 from server.decorators import restrict_host
 from server.version import __version__
 

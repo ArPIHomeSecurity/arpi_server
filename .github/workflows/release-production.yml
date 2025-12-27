@@ -5,6 +5,9 @@
 name: Release Production
 
 on:
+  push:
+    branches:
+      - 'dev_*'  # Triggers on any branch starting with 'dev_'
   workflow_dispatch:
     inputs:
       version_type:
@@ -17,6 +20,7 @@ on:
           - minor
           - patch
           - pre-release
+          - release
       pre_release:
         description: 'Pre-release identifier (optional, e.g., "beta", "rc1")'
         required: false
@@ -35,28 +39,32 @@ jobs:
       packages: write
 
     steps:
+      - name: Set input defaults for auto-triggered builds 🎯
+        id: set_inputs
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version_type=pre-release" >> $GITHUB_OUTPUT
+            echo "pre_release=RC" >> $GITHUB_OUTPUT
+            echo "release_notes=Development build" >> $GITHUB_OUTPUT
+          else
+            echo "version_type=${{ inputs.version_type }}" >> $GITHUB_OUTPUT
+            echo "pre_release=${{ inputs.pre_release }}" >> $GITHUB_OUTPUT
+            echo "release_notes=${{ inputs.release_notes }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository 🛎️
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Cache APT packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: apt-cache-${{ runner.os }}
-          restore-keys: |
-            apt-cache-${{ runner.os }}-
-
-      - name: Cache Python packages
+      - name: Cache Python packages 📦
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-cache-${{ runner.os }}-${{ hashFiles('Pipfile.lock') }}
           restore-keys: |
             pip-cache-${{ runner.os }}-
-
 
       - name: Setup Python 🐍
         uses: actions/setup-python@v4
@@ -70,22 +78,25 @@ jobs:
 
       - name: Install dependencies 📦
         run: |
+          sudo apt update && sudo apt install -y jq
           pip install pipenv
           pipenv install --categories=dev-packages,simulator
 
       - name: Bump version 🏷️
         run: |
-          if [ "${{ inputs.version_type }}" = "pre-release" ]; then
-            python scripts/bump_version.py -p "${{ inputs.pre_release }}" -v
+          if [ "${{ steps.set_inputs.outputs.version_type }}" = "release" ]; then
+            python scripts/bump_version.py -r -v
+          elif [ "${{ steps.set_inputs.outputs.version_type }}" = "pre-release" ]; then
+            python scripts/bump_version.py -p "${{ steps.set_inputs.outputs.pre_release }}" -v
           else
-            python scripts/bump_version.py -t ${{ inputs.version_type }} -v
+            python scripts/bump_version.py -t ${{ steps.set_inputs.outputs.version_type }} -v
           fi
 
       - name: Get new version 📋
         id: get_version
         run: |
-          VERSION=$(grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+[^" ]*' src/server/version.py | head -1)
-          VERSION_SIMPLE=$(echo "$VERSION" | sed 's/:.*//')
+          VERSION=$(jq -r '.version' src/server/version.json)
+          VERSION_SIMPLE=$(scripts/get_package_version.sh) # get python formatted version
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "simple_version=$VERSION_SIMPLE" >> $GITHUB_OUTPUT
           echo "New version: $VERSION"
@@ -93,7 +104,7 @@ jobs:
 
       - name: Commit version changes 💾
         run: |
-          git add src/server/version.py
+          git add src/server/version.json
           git commit -m "GitHub Actions: bump version to $(echo '${{ steps.get_version.outputs.version }}' | sed 's/:.*//')"
 
       - name: Create Git tag 🏷️
@@ -107,31 +118,29 @@ jobs:
       
       - name: Build and package server 🏗️
         run: |
-          tar -czf arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz --exclude='__pycache__' --exclude='*.pyc' src/
+          scripts/create_bootstrap_package.sh
+          scripts/create_package.sh
 
       - name: Push changes and tags 🚀
         run: |
-          git push origin master
-          git push origin ${{ steps.get_version.outputs.simple_version }}
+          git push origin
+          git push origin --tags
 
       - name: Create GitHub Release 📦
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.simple_version }}
-          name: Release ${{ steps.get_version.outputs.simple_version }}
+          name: ${{ steps.get_version.outputs.simple_version }}
           draft: false
-          prerelease: ${{ inputs.version_type == 'pre-release' }}
+          prerelease: ${{ steps.set_inputs.outputs.version_type == 'pre-release' }}
           generate_release_notes: true
           files: |
-            arpi-server-${{ steps.get_version.outputs.simple_version }}.tar.gz
+            dist/arpi_server-${{ steps.get_version.outputs.simple_version }}-*.whl
+            dist/arpi_server-bootstrap-${{ steps.get_version.outputs.simple_version }}.tar.gz
           body: |
             ## What's Changed
 
-            ${{ inputs.release_notes || 'This release includes the latest changes from the master branch.' }}
-
-            ### Installation
-
-            Download the `arpi-server-${{ steps.get_version.outputs.version }}.tar.gz` file and extract it to your server directory.
+            ${{ steps.set_inputs.outputs.release_notes || format('This release includes the latest changes from the {0} branch.', github.ref_name) }}
 
             ### Build Information
             - **Version**: ${{ steps.get_version.outputs.version }}

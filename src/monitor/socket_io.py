@@ -1,4 +1,3 @@
-
 import json
 import logging
 import os
@@ -10,15 +9,15 @@ from flask import Flask
 from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
-from constants import LOG_SOCKETIO
-from models import Option
+from utils.constants import LOG_SOCKETIO
+from utils.models import Option
 from monitor.database import get_database_session
 
 
 session = get_database_session()
 logger = logging.getLogger(LOG_SOCKETIO)
 
-sio = socketio.Server(async_mode="threading", cors_allowed_origins='*')
+sio = socketio.Server(async_mode="threading", cors_allowed_origins="*")
 socketio_app = Flask(__name__)
 # wrap Flask application with socketio's middleware
 socketio_app.wsgi_app = socketio.WSGIApp(sio, socketio_app.wsgi_app)
@@ -30,7 +29,9 @@ def connect(sid, environ):
     query_string = parse_qs(environ["QUERY_STRING"])
     remote_address = environ.get("HTTP_X_REAL_IP", environ.get("REMOTE_ADDR", ""))
     try:
-        device_info = jwt.decode(query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256")
+        device_info = jwt.decode(
+            query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256"
+        )
         logger.info("Connecting with device info: %s", device_info)
 
         referer = urlparse(environ["HTTP_REFERER"])
@@ -43,7 +44,9 @@ def connect(sid, environ):
         logger.info("New connection from '%s' =>'%s'", device_info["ip"], device_info["origin"])
         logger.debug("New connection from '%s': %s =>'%s'", sid, environ, device_info)
     except jose.exceptions.JWTError:
-        logger.error("Authentication failed from '%s'! token='%s'", remote_address, query_string["token"][0])
+        logger.error(
+            "Authentication failed from '%s'! token='%s'", remote_address, query_string["token"][0]
+        )
         return False
 
 
@@ -62,6 +65,10 @@ def send_arm_state(arm_state):
 
 def send_sensors_state(sensors_state):
     send_message("sensors_state_change", sensors_state)
+
+
+def send_sensors_error(sensors_error):
+    send_message("sensors_error_change", sensors_error)
 
 
 def send_area_state(area_state):

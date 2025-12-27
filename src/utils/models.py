@@ -9,6 +9,7 @@ from datetime import timedelta, datetime as dt
 from re import search
 from dateutil.tz.tz import tzlocal
 from typing import List
+import bcrypt
 
 from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime, Enum
 from sqlalchemy.ext.declarative import declarative_base
@@ -17,7 +18,7 @@ from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
 from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
-from constants import (
+from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
     ALERT_STAY,
@@ -33,6 +34,13 @@ from utils.dictionary import merge_dicts, replace_keys
 def hash_code(access_code):
     return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
 
+
+def hash_code_2(plain_text: str) -> str:
+    """
+    Use hashing with builtin salt.
+    """
+    return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
+    
 
 def convert2camel(data):
     """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
@@ -217,9 +225,6 @@ class Sensor(BaseModel):
     def __init__(
         self,
         channel: int,
-        channel_type: ChannelTypes,
-        sensor_contact_type: SensorContactTypes,
-        sensor_eol_count: SensorEOLCount,
         sensor_type: SensorType,
         area: 'Area',
         name: str,
@@ -229,11 +234,11 @@ class Sensor(BaseModel):
         silent_alert: bool = False,
         monitor_period: int = None,
         monitor_threshold=None,
+        channel_type: ChannelTypes = ChannelTypes.BASIC,
+        sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
+        sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
     ):
         self.channel = channel
-        self.channel_type = channel_type.value
-        self.sensor_contact_type = sensor_contact_type.value
-        self.sensor_eol_count = sensor_eol_count.value
         self.zone = zone
         self.area = area
         self.type = sensor_type
@@ -243,6 +248,9 @@ class Sensor(BaseModel):
         self.silent_alert = silent_alert
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
+        self.channel_type = channel_type
+        self.sensor_contact_type = sensor_contact_type
+        self.sensor_eol_count = sensor_eol_count
         self.deleted = False
 
     def update(self, data):
@@ -538,7 +546,7 @@ class ArmSensor(BaseModel):
             channel=sensor.channel,
             type_id=sensor.type_id,
             name=sensor.name,
-            description=sensor.description,
+            description=sensor.description or sensor.name,
             timestamp=timestamp,
             delay=delay,
             enabled=sensor.enabled,
@@ -707,8 +715,8 @@ class User(BaseModel):
         self.name = name
         self.email = ""
         self.role = role
-        self.access_code = hash_code(access_code)
-        self.fourkey_code = fourkey_code or hash_code(access_code[:4])
+        self.access_code = hash_code_2(access_code)
+        self.fourkey_code = fourkey_code or hash_code_2(access_code[:4])
         self.comment = comment
 
     def update(self, data):
@@ -721,13 +729,13 @@ class User(BaseModel):
             )
             assert access_code.isdigit(), "Access code only number"
 
-            data["accessCode"] = hash_code(access_code)
+            data["accessCode"] = hash_code_2(access_code)
             if not data.get("fourkeyCode", None):
-                data["fourkeyCode"] = hash_code(access_code[:4])
+                data["fourkeyCode"] = hash_code_2(access_code[:4])
             else:
                 assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
                 assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
-                data["fourkeyCode"] = hash_code(data["fourkeyCode"])
+                data["fourkeyCode"] = hash_code_2(data["fourkeyCode"])
 
             fields += (
                 "access_code",
@@ -735,6 +743,41 @@ class User(BaseModel):
             )
 
         return self.update_record(fields, data)
+
+    @staticmethod
+    def sanitize_registration_code(registration_code: str) -> str:
+        return registration_code.lower().strip().replace("-", "")
+
+    def check_access_code(self, access_code: str) -> bool:
+        if not isinstance(access_code, str):
+            access_code = str(access_code)
+
+        matching_user = False
+        if self.access_code.startswith("$2") and bcrypt.checkpw(access_code.encode('utf-8'), self.access_code.encode('utf-8')):
+            matching_user = True
+
+        if self.access_code == hash_code(access_code):
+            matching_user = True
+            self.access_code = hash_code_2(access_code)
+            self.fourkey_code = hash_code_2(access_code[:4])
+
+        return matching_user
+
+    def check_registration_code(self, registration_code):
+        registration_code = User.sanitize_registration_code(registration_code)
+        matching_user = False
+        
+        if (
+            self.registration_code and self.registration_code.startswith("$2") and
+            bcrypt.checkpw(registration_code.encode('utf-8'), self.registration_code.encode('utf-8'))
+        ):
+            matching_user = True
+
+        if self.registration_code == hash_code(registration_code):
+            matching_user = True
+            self.registration_code = hash_code_2(registration_code)
+
+        return matching_user
 
     def set_card_registration(self):
         self.update_record(
@@ -757,7 +800,7 @@ class User(BaseModel):
         if self.update_record(
             ("registration_code", "registration_expiry"),
             {
-                "registration_code": hash_code(registration_code),
+                "registration_code": hash_code_2(User.sanitize_registration_code(registration_code)),
                 "registration_expiry": registration_expiry,
             },
         ):
@@ -804,12 +847,23 @@ class Card(BaseModel):
     enabled = Column(Boolean, default=True)
     description = Column(String, nullable=True)
 
-    def __init__(self, card, owner_id, description=None):
+    def __init__(self, card_number, owner_id, description=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
-        self.code = hash_code(card)
+        self.code = hash_code_2(card_number)
         self.user_id = owner_id
         self.description = description or self.generate_card_description()
         self.enabled = True
+
+    def check_card(self, card_number):
+        matching_card = False
+        if bcrypt.checkpw(card_number.encode('utf-8'), self.code.encode('utf-8')):
+            matching_card = True
+
+        if self.code == hash_code(card_number):
+            matching_card = True
+            self.code = hash_code_2(card_number.encode('utf-8')).decode('utf-8')
+
+        return matching_card
 
     @staticmethod
     def generate_card_description():
@@ -866,7 +920,8 @@ class Option(BaseModel):
     def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
         replace_keys(filtered_value, {"smtp_password": "******", "replace_empty": False})
-        replace_keys(filtered_value, {"password": "******", "replace_empty": False})
+        if not (self.name == "mqtt" and self.section == "internal_read"):
+            replace_keys(filtered_value, {"password": "******", "replace_empty": False})
         return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
 
     @validates("name", "section")
@@ -876,6 +931,7 @@ class Option(BaseModel):
             assert value in (
                 "notifications",
                 "network",
+                "mqtt",
                 "syren",
                 "alert",
             ), f"Unknown option ({value})"
@@ -888,6 +944,11 @@ class Option(BaseModel):
                 "access",
                 "timing",
                 "sensitivity",
+                # MQTT
+                "connection",
+                "internal_publish",
+                "internal_read",
+                "external_publish",
             ), f"Unknown section ({value})"
         return value
 

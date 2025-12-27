@@ -8,9 +8,10 @@ from enum import Enum
 from threading import Lock
 from typing import List
 
+import lgpio
 from gpiozero import DigitalInputDevice, DigitalOutputDevice
 
-from constants import LOG_ADOUTPUT
+from utils.constants import LOG_ADOUTPUT
 from monitor.output import OUTPUT_NAMES
 
 
@@ -42,11 +43,19 @@ class OutputAdapter:
         self._states = [0] * int(OUTPUT_NUMBER)
 
         # Allow pins to be set after instantiation (for get_output_adapter)
-        self._latch = DigitalOutputDevice(latch_pin) if latch_pin is not None else None
-        self._enable = DigitalOutputDevice(enable_pin) if enable_pin is not None else None
-        self._clock = DigitalOutputDevice(clock_pin) if clock_pin is not None else None
-        self._data_in = DigitalOutputDevice(data_in_pin) if data_in_pin is not None else None
-        self._data_out = DigitalInputDevice(data_out_pin) if data_out_pin is not None else None
+        try:
+            self._latch = DigitalOutputDevice(latch_pin) if latch_pin is not None else None
+            self._enable = DigitalOutputDevice(enable_pin) if enable_pin is not None else None
+            self._clock = DigitalOutputDevice(clock_pin) if clock_pin is not None else None
+            self._data_in = DigitalOutputDevice(data_in_pin) if data_in_pin is not None else None
+            self._data_out = DigitalInputDevice(data_out_pin) if data_out_pin is not None else None
+        except lgpio.error as error:
+            self._latch = None
+            self._enable = None
+            self._clock = None
+            self._data_in = None
+            self._data_out = None
+            self._logger.error("Failed to initialize digital devices: %s", error)
 
         if all([self._latch, self._enable, self._clock, self._data_in, self._data_out]):
             self._logger.debug(
@@ -58,8 +67,15 @@ class OutputAdapter:
             self._clock.off()
             self._reset_errors()
 
+    def is_initialized(self) -> bool:
+        return all([self._latch, self._enable, self._clock, self._data_in, self._data_out])
+
     def __del__(self):
-        self._cleanup()
+        with state_lock:
+            if self.is_initialized():
+                self._states = [0] * OUTPUT_NUMBER
+                self._write_states()
+                self._cleanup()
 
     def _reset_errors(self):
         faults = self._read_faults()
@@ -117,9 +133,9 @@ class OutputAdapter:
 
         # set the state by channel
         with state_lock:
-            self._states[channel] = 1 if state else 0
-
-        self._write_states()
+            if self.is_initialized():
+                self._states[channel] = 1 if state else 0
+                self._write_states()
 
     def _write_states(self):
         self._enable.off()

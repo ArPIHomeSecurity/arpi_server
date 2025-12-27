@@ -2,15 +2,8 @@ import logging
 
 from crontab import CronTab
 
-from constants import LOG_IPC
+from utils.constants import LOG_IPC
 
-
-dyndns_job = (
-    "systemd-cat -t 'argus_dyndns' "
-    "bash -c 'cd /home/argus/server/;"
-    " PYTHONPATH=/home/argus/server/src /home/argus/.venvs/server/bin/python"
-    " /home/argus/server/src/tools/dyndns.py'"
-)
 
 def enable_dyndns_job(enable=True):
     try:
@@ -23,7 +16,7 @@ def enable_dyndns_job(enable=True):
     job = jobs[0] if jobs else None
     if job is None:
         job = argus_cron.new(
-            command=dyndns_job,
+            command="systemd-cat -t 'argus_dyndns' bash -c 'arpi-dyndns'",
             comment="Update the IP address at the dynamic DNS provider",
         )
 

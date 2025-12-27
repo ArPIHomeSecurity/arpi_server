@@ -8,8 +8,8 @@ from flask.helpers import make_response
 from flask import jsonify, request, current_app
 from jose import jwt
 
-from constants import ROLE_ADMIN, ROLE_USER
-from models import User, hash_code
+from utils.constants import ROLE_ADMIN, ROLE_USER
+from utils.models import User
 from server.database import db
 from server.decorators import (
     authenticated,
@@ -20,6 +20,7 @@ from server.decorators import (
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
 from tools.ssh_keymanager import SSHKeyManager
+from sqlalchemy import inspect
 
 user_blueprint = Blueprint("user", __name__)
 
@@ -46,7 +47,7 @@ def create_user():
 @user_blueprint.route("/api/user/<int:user_id>", methods=["GET", "PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
-def user(user_id):
+def user(user_id, request_user_id=None, requester_role=None):
     """
     Get or update a user
     """
@@ -65,11 +66,33 @@ def user(user_id):
     elif request.method == "PUT":
         user_data = request.json
         if user_data.get("newAccessCode"):
-            if hash_code(user_data["oldAccessCode"]) != db_user.access_code:
-                return make_response(jsonify({"error": "Invalid old access code"}), 400)
+            # only admin or the user itself can change the access code
+            if requester_role != ROLE_ADMIN and user_id != request_user_id:
+                return make_response(jsonify({"error": "Cannot change access code of other users"}), 403)
+
+            # at this point only admin or the user itself can change the access code
+
+            if requester_role == ROLE_ADMIN and user_id != request_user_id:
+                # admin can change any user's access code without the old access code
+                pass
+            elif user_id == request_user_id:
+                # users can only change their own access code with the correct old access code
+                if not db_user.check_access_code(user_data["oldAccessCode"]):
+                    return make_response(jsonify({"error": "Invalid old access code"}), 400)
+
+                state = inspect(db_user)
+                if state.modified:
+                    db.session.commit()
+
             user_data["accessCode"] = user_data["newAccessCode"]
             del user_data["newAccessCode"]
             del user_data["oldAccessCode"]
+
+
+        if "role" in user_data and user_data["role"] != db_user.role:
+            # only admin can change roles
+            if requester_role != ROLE_ADMIN:
+                return make_response(jsonify({"error": "Cannot change user role"}), 403)
 
         current_app.logger.debug("Updating user %s", db_user)
         if not db_user.update(request.json):
@@ -157,11 +180,12 @@ def register_device():
     )
 
     if request.json["registration_code"]:
-        db_user: User = (
-            db.session.query(User)
-            .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
-            .first()
-        )
+        users = db.session.query(User).all()
+        db_user = None
+        for tmp_user in users:
+            if tmp_user.check_registration_code(request.json["registration_code"]):
+                db_user = tmp_user
+                break
 
         if db_user:
             if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
@@ -216,20 +240,26 @@ def authenticate():
         request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256"
     )
     db_user: User = db.session.query(User).get(device_token["user_id"])
-    if db_user and db_user.access_code == hash_code(request.json["access_code"]):
-        return jsonify(
-            {
-                "user_token": generate_user_token(
-                    db_user.id,
-                    db_user.name,
-                    db_user.role,
-                    request.environ["HTTP_ORIGIN"],
-                ),
-            }
-        )
+    if db_user:
+        if db_user.check_access_code(request.json["access_code"]):
+            # check if anything changed that needs to be saved
+            state = inspect(db_user)
+            if state.modified:
+                db.session.commit()
+
+            return jsonify(
+                {
+                    "user_token": generate_user_token(
+                        db_user.id,
+                        db_user.name,
+                        db_user.role,
+                        request.environ["HTTP_ORIGIN"],
+                    ),
+                }
+            )
     elif not db_user:
         sleep(2)
-        current_app.logger.warn("Invalid user id %s", device_token["user_id"])
+        current_app.logger.warning("Invalid user id %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
 
     sleep(2)

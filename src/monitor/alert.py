@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from threading import Thread, Event
 
-from models import Alert, AlertSensor, Arm, Disarm, Sensor
+from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
 from monitor.config_helper import AlertSensitivityConfig
 from monitor.storage import States, State
 from monitor.broadcast import Broadcaster
@@ -11,7 +11,7 @@ from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
 from monitor.socket_io import send_syren_state, send_alert_state
 from monitor.syren import Syren
-from constants import (
+from utils.constants import (
     ALERT_SABOTAGE,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,

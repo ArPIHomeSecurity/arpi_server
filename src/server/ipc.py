@@ -3,7 +3,7 @@ import logging
 import socket
 from os import environ
 
-from constants import (
+from utils.constants import (
     ARM_AWAY,
     ARM_STAY,
     DELETE_SMS_MESSAGE,

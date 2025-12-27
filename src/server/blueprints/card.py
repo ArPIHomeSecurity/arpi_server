@@ -2,9 +2,9 @@ from flask import jsonify, request
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
 
-from constants import ROLE_ADMIN, ROLE_USER
+from utils.constants import ROLE_ADMIN, ROLE_USER
 
-from models import Card, User
+from utils.models import Card, User
 from server.database import db
 from server.decorators import authenticated, restrict_host
 

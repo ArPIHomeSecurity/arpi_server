@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-
-import argparse
-from enum import Enum
 import logging
 import os
 import re
 import subprocess
-import sys
+from enum import Enum
 
-from dotenv import load_dotenv
-
-
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
-
-from constants import LOG_SC_ACCESS
+from utils.constants import LOG_SC_ACCESS
 
 SSH_PATH = "~/.ssh"
 AUTHORIZED_KEYS_PATH = "~/.ssh/authorized_keys"
@@ -28,7 +18,6 @@ class KeyTypes(str, Enum):
 
 
 class SSHKeyManager:
-
     def __init__(self) -> None:
         super(SSHKeyManager, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
@@ -39,6 +28,14 @@ class SSHKeyManager:
     ) -> tuple[str, str]:
         """
         Generate SSH keys
+
+        Arguments:
+            key_type: The type of the key (rsa, ecdsa, ed25519)
+            key_name: The name of the key
+            passphrase: The passphrase for the key
+        
+        Returns:
+            A tuple containing the private key and public key as strings
         """
         self._logger.info("Generating SSH keys %s with name %s", key_type, key_name)
         key_path = "/tmp/id_rsa"
@@ -53,9 +50,7 @@ class SSHKeyManager:
                 f"ssh-keygen -q -t {key_type} -b 4096 -f {key_path} -C {key_name} -N '{passphrase}'"
             )
         elif key_type == KeyTypes.ED25519.value:
-            os.system(
-                f"ssh-keygen -q -t {key_type} -f {key_path} -C {key_name} -N '{passphrase}'"
-            )
+            os.system(f"ssh-keygen -q -t {key_type} -f {key_path} -C {key_name} -N '{passphrase}'")
         self._logger.info("SSH keys generated")
 
         with open(key_path, "r", encoding="utf-8") as key_file:
@@ -68,6 +63,10 @@ class SSHKeyManager:
     def set_public_key(self, public_key: str, key_name: str):
         """
         Add public key to authorized_keys or replace existing key
+
+        Arguments:
+            public_key: The public key string
+            key_name: The name of the key to identify it in authorized_keys
         """
         if len(public_key.split(" ")) == 2:
             self._logger.debug(
@@ -105,18 +104,17 @@ class SSHKeyManager:
                 key_name,
             )
 
-        os.system(
-            f'echo "{public_key}" >> {os.path.expanduser(self.authorized_keys_path)}'
-        )
+        os.system(f'echo "{public_key}" >> {os.path.expanduser(self.authorized_keys_path)}')
 
     def remove_public_key(self, key_name: str):
         """
         Remove public key from authorized_keys
+
+        Arguments:
+            key_name: The name of the key to identify it in authorized_keys
         """
         self._logger.info("Removing public key with name %s", key_name)
-        subprocess.run(
-            ["sed", "-i", f"/{key_name}/d", self.authorized_keys_path], check=True
-        )
+        subprocess.run(["sed", "-i", f"/{key_name}/d", self.authorized_keys_path], check=True)
 
     def check_key_exists(self, key_name: str):
         """
@@ -145,10 +143,10 @@ class SSHKeyManager:
         s = user_name.strip()
 
         # Remove non-word characters (everything except numbers and letters)
-        s = re.sub(r'\W', '_', s)
+        s = re.sub(r"\W", "_", s)
 
         # Replace all runs of whitespace with a single underscore
-        s = re.sub(r'\s+', '_', s)
+        s = re.sub(r"\s+", "_", s)
 
         s += f"_{user_id}"
 
@@ -156,50 +154,3 @@ class SSHKeyManager:
         s += f"@{os.uname().nodename}"
 
         return s
-
-def main():
-    parser = argparse.ArgumentParser(description="Manage SSH keys.")
-    parser.add_argument("--key_type", type=str, help="Type of the key to generate.")
-    parser.add_argument("--key_name", type=str, help="Name of the key.")
-    parser.add_argument(
-        "--passphrase", type=str, default="", help="Passphrase for the key."
-    )
-    parser.add_argument("--public_key", type=str, help="Public key to set.")
-    parser.add_argument("--remove_key", type=str, help="Remove key by 'key_name'.")
-    parser.add_argument(
-        "--enable_password", action="store_true", help="Enable password authentication."
-    )
-    parser.add_argument(
-        "--disable_password", action="store_true", help="Disable password authentication."
-    )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Increase output verbosity."
-    )
-
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        format="%(asctime)-15s: %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-
-    manager = SSHKeyManager()
-
-    if args.key_type and args.key_name:
-        private_key, public_key = manager.generate_ssh_keys(
-            args.key_type, args.key_name, args.passphrase
-        )
-        logging.info("Generated private key:\n%s", private_key)
-        logging.info("Generated public key:\n%s", public_key)
-
-    if args.public_key and args.key_name:
-        manager.set_public_key(args.public_key, args.key_name)
-
-    if args.remove_key and args.key_name:
-        manager.remove_public_key(args.key_name)
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass

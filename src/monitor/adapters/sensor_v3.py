@@ -1,8 +1,9 @@
 import logging
 
+import lgpio
 from gpiozero import MCP3008
 
-from constants import LOG_ADSENSOR
+from utils.constants import LOG_ADSENSOR
 from monitor.adapters import V3BoardPin
 
 from monitor.adapters.sensor_base import SensorAdapterBase
@@ -47,8 +48,14 @@ class SensorAdapter(SensorAdapterBase):
                     select_pin=select_pin,
                     channel=ad_channel
                 )
-            except (OSError, ValueError, RuntimeError) as e:
-                self._logger.error("Failed to init MCP3008 chip=%s: %s", ad_chip, e)
+            except (OSError, ValueError, RuntimeError, lgpio.error) as e:
+                self._logger.error("Failed to init MCP3008 output=%s: %s", ad_chip, self._channels[idx], e)
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the sensor adapter is initialized properly.
+        """
+        return len(self._channels) == len(self._channel_map)
 
     def __del__(self):
         self._cleanup()
@@ -60,7 +67,7 @@ class SensorAdapter(SensorAdapterBase):
 
         try:
             value = self._channels.get(channel).value
-        except (OSError, ValueError, RuntimeError) as e:
+        except (OSError, ValueError, RuntimeError, lgpio.error) as e:
             self._logger.error("Read error MCP3008 chip=%s ch=%s: %s", self._channel_map[channel][0], self._channel_map[channel][1], e)
             return 0.0
         else:
@@ -76,8 +83,9 @@ class SensorAdapter(SensorAdapterBase):
         for key, channel in list(self._channels.items()):
             try:
                 channel.close()
-            except (OSError, ValueError, RuntimeError) as e:
+            except (OSError, ValueError, RuntimeError, lgpio.error) as e:
                 self._logger.warning("Error closing channel %s: %s", key, e)
+
         self._channels.clear()
 
     @property

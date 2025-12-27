@@ -2,13 +2,26 @@
 import argparse
 import json
 import logging
+import os
 
 from sqlalchemy.exc import ProgrammingError
 
-from constants import ROLE_ADMIN, ROLE_USER
-from models import Area, ChannelTypes, Keypad, KeypadType, Option, Sensor, SensorContactTypes, SensorEOLCount, SensorType, User, Zone
+from utils.constants import ROLE_ADMIN, ROLE_USER
+from utils.models import (
+    Area,
+    ChannelTypes,
+    Keypad,
+    KeypadType,
+    Option,
+    Sensor,
+    SensorContactTypes,
+    SensorEOLCount,
+    SensorType,
+    User,
+    Zone,
+)
 from monitor.database import get_database_session
-from models import metadata
+from utils.models import metadata
 
 
 # Set up logging
@@ -39,6 +52,9 @@ def cleanup():
 
 
 def env_prod():
+    """
+    This configuration is used for the released production version.
+    """
     session = get_database_session()
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
@@ -61,6 +77,36 @@ def env_prod():
     session.add(a1)
     logger.info(" - Created area")
 
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus",
+        "password": os.environ["ARGUS_MQTT_PASSWORD"],
+        "tls_enabled": True,
+        "tls_insecure": False,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_config = {
+        "hostname": "<hostname>",
+        "port": 8883,
+        "username": "argus_reader",
+        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
+        "tls_enabled": True,
+        "tls_insecure": False,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_connection = {
+        "enabled": True,
+        "external": False,
+    }
+    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
+    session.add(mqtt_option)
+    logger.info(" - Created MQTT options")
+
     access_config = {
         "service_enabled": True,
         "restrict_local_network": False,
@@ -74,6 +120,9 @@ def env_prod():
 
 
 def env_live_01():
+    """
+    This configuration is used for live testing with real hardware.
+    """
     session = get_database_session()
     session.add_all(
         [
@@ -209,10 +258,43 @@ def env_live_01():
     session.add_all([k1])
     logger.info(" - Created keypads")
 
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus",
+        "password": os.environ["ARGUS_MQTT_PASSWORD"],
+        "tls_enabled": True,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="network", section="mqtt", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus_reader",
+        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
+        "tls_enabled": True,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_connection = {
+        "enabled": True,
+        "external": False,
+    }
+    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
+    session.add(mqtt_option)
+    logger.info(" - Created MQTT options")
+
     session.commit()
 
 
-def env_test_01():
+def env_test_with_v3():
+    """
+    This configuration is used for testing with V3 board.
+    """
     session = get_database_session()
     admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
@@ -345,10 +427,42 @@ def env_test_01():
     session.add_all([k1])
     logger.info(" - Created keypads")
 
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus",
+        "password": os.environ["ARGUS_MQTT_PASSWORD"],
+        "tls_enabled": False,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus_reader",
+        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
+        "tls_enabled": False,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_connection = {
+        "enabled": True,
+        "external": False,
+    }
+    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
+    session.add(mqtt_option)
+    logger.info(" - Created MQTT options")
+
     session.commit()
 
 
-def env_test_live_01():
+def env_test_with_v2():
+    """
+    This configuration is used for testing with V2 board.
+    """
     session = get_database_session()
     admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
@@ -404,7 +518,7 @@ def env_test_live_01():
         silent_alert=True,
     )
     s2 = Sensor(
-        channel=0,
+        channel=1,
         channel_type=ChannelTypes.CHANNEL_B,
         sensor_contact_type=SensorContactTypes.NC,
         sensor_eol_count=SensorEOLCount.SINGLE,
@@ -415,7 +529,7 @@ def env_test_live_01():
         description="Test room 0 door sensor",
     )
     s3 = Sensor(
-        channel=5,
+        channel=2,
         channel_type=ChannelTypes.BASIC,
         sensor_type=SENSOR_TYPES[1],
         sensor_contact_type=SensorContactTypes.NC,
@@ -437,7 +551,37 @@ def env_test_live_01():
     session.add_all([k1])
     logger.info(" - Created keypads")
 
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus",
+        "password": os.environ["ARGUS_MQTT_PASSWORD"],
+        "tls_enabled": False,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+    mqtt_config = {
+        "hostname": "localhost",
+        "port": 8883,
+        "username": "argus_reader",
+        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
+        "tls_enabled": False,
+        "tls_insecure": True,
+    }
+    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
+    session.add(mqtt_option)
+
+    mqtt_connection = {
+        "enabled": True,
+        "external": False,
+    }
+    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
+    session.add(mqtt_option)
+    logger.info(" - Created MQTT options")
+
     session.commit()
+
 
 def env_admin_registration():
     session = get_database_session()
@@ -467,6 +611,10 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.delete and not args.create:
+        parser.print_help()
+        return 0
+
     # Configure logging based on verbose flag
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
@@ -477,11 +625,24 @@ def main():
         cleanup()
 
     if args.create:
-        create_method = globals()[f"env_{args.create}"]
+        try:
+            create_method = globals()[f"env_{args.create}"]
+        except KeyError:
+            logger.error("Unknown environment: %s", args.create)
+            return 1
+
         logger.info("Creating '%s' environment...", args.create)
         create_method()
         logger.info("Environment created")
+        return 0
+
+
+def cli_main():
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
-    main()
+    cli_main()

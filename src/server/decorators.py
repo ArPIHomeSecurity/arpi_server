@@ -14,8 +14,8 @@ import jose
 
 import inspect
 
-from models import Option
-from constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from utils.models import Option
+from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.database import db
 
 
@@ -132,6 +132,9 @@ def authenticated(role=ROLE_ADMIN):
                     sig = inspect.signature(request_handler)
                     if "request_user_id" in sig.parameters and "request_user_id" not in kws:
                         kws["request_user_id"] = user_token["id"]
+
+                    if "requester_role" in sig.parameters and "requester_role" not in kws:
+                        kws["requester_role"] = user_token["role"]
 
                     response = request_handler(*args, **kws)
                     # generate new user token to extend the user session

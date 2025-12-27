@@ -7,8 +7,8 @@ from flask import jsonify, request, current_app
 from sqlalchemy import or_
 from sqlalchemy.dialects import postgresql
 
-from constants import ROLE_USER, ARM_DISARM
-from models import Alert, Arm, Disarm, ArmSensor
+from utils.constants import ROLE_USER, ARM_DISARM
+from utils.models import Alert, Arm, Disarm, ArmSensor
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 

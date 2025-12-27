@@ -20,7 +20,7 @@ def get_clock():
     clock = Clock()
     result = {
         "timezone": clock.get_timezone(),
-        "system": dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "system": dt.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z"),
         "hw": clock.get_time_hw(),
         "network": clock.get_time_ntp(),
         "uptime": clock.get_uptime(),

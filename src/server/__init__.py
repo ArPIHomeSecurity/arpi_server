@@ -32,13 +32,12 @@ if __name__ != "server":
     app.logger.setLevel(gunicorn_logger.level)
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % {
-    "user": environ.get("DB_USER", None),
-    "pw": environ.get("DB_PASSWORD", None),
-    "db": environ.get("DB_SCHEMA", None),
-    "host": environ.get("DB_HOST", None),
-    "port": environ.get("DB_PORT", None),
-}
+
+db_user = environ.get("DB_USER")
+if db_user:
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}"
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql:///{environ['DB_SCHEMA']}"
 
 app.logger.debug("App config: %s", app.config)
 

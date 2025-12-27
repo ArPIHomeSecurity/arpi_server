@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import logging
 from typing import Optional, List
 
-from constants import LOG_NOTIFIER
+from utils.constants import LOG_NOTIFIER
 from monitor.notifications.templates import (
     ALERT_STARTED_EMAIL,
     ALERT_STARTED_SMS,

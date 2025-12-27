@@ -9,7 +9,7 @@ else:
     import monitor.adapters.mock.gpio as GPIO
 
 from monitor.adapters.keypads.base import KeypadBase
-from constants import LOG_ADKEYPAD
+from utils.constants import LOG_ADKEYPAD
 
 # Magic numbers
 NULL = 0x00

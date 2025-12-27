@@ -1,28 +1,16 @@
 #!/usr/bin/env python3
-import argparse
 import logging
-import os
-import sys
-
 from dataclasses import asdict
 from ipaddress import ip_address
 from time import sleep, time
 
 import requests
-from dotenv import load_dotenv
-
 from noipy.main import execute_update
-from psycopg2 import OperationalError
 
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
-
-from constants import LOG_SC_DYNDNS
-from monitor.config_helper import load_dyndns_config, DyndnsConfig
+from utils.constants import LOG_SC_DYNDNS
+from monitor.config_helper import DyndnsConfig, load_dyndns_config
 from utils.dictionary import filter_keys
 from utils.lock import file_lock
-
 
 logger = logging.getLogger(LOG_SC_DYNDNS)
 
@@ -165,28 +153,3 @@ class DynDns:
 
         logger.error("Timeout waiting for IP address update!")
         return False
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Update IP address at DNS provider")
-    parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
-    parser.add_argument("-f", "--force", action="store_true", help="force update")
-
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        format="%(asctime)-15s: %(message)s",
-        level=logging.DEBUG if args.verbose else logging.INFO,
-    )
-
-    dyndns = DynDns()
-    dyndns.update_ip(force=args.force)
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass
-    except OperationalError as database_error:
-        logging.warning("Database error: %s", database_error)

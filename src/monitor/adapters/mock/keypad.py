@@ -4,7 +4,7 @@ import os
 from time import sleep, time
 
 from monitor.adapters.keypads.base import Function, KeypadBase
-from constants import LOG_ADKEYPAD
+from utils.constants import LOG_ADKEYPAD
 
 
 class MockKeypad(KeypadBase):

@@ -5,7 +5,7 @@ import os
 from threading import Event
 from signal import SIGTERM, signal, Signals
 
-from constants import LOG_SERVICE
+from utils.constants import LOG_SERVICE
 from monitor.background_service import BackgroundService
 from monitor.logging import initialize_logging
 from monitor.socket_io import socketio_app

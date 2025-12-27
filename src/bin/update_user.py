@@ -1,18 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # pylint: disable=wrong-import-position,wrong-import-order
 import contextlib
 import logging
-
-from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentTypeError
+from argparse import ArgumentParser, ArgumentTypeError, RawTextHelpFormatter
 from datetime import datetime as dt
-from dateutil.tz.tz import tzlocal
-from logging import basicConfig
-import sqlalchemy
 from time import sleep
 
-from models import User
+import sqlalchemy
+from dateutil.tz.tz import tzlocal
+from utils.models import User
 from monitor.database import get_database_session
-
 
 description = """
 Update the given user with a new registration or access code.
@@ -122,9 +119,7 @@ def main():
             raise ArgumentTypeError(f"{value} is an invalid positive integer value")
         return ivalue
 
-    parser = ArgumentParser(
-        description=description, formatter_class=RawTextHelpFormatter
-    )
+    parser = ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
     parser.add_argument("-l", "--list", action="store_true", help="List all users")
     parser.add_argument("-r", "--registration-code", required=False, help="New registration code")
     parser.add_argument("-a", "--access-code", required=False, help="New access code")
@@ -157,5 +152,12 @@ def main():
         parser.print_usage()
 
 
+def cli_main():
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    cli_main()

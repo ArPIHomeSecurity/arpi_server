@@ -13,7 +13,7 @@ else:
     from monitor.adapters.mock.wiegand import WiegandReader
 
 from monitor.adapters.keypads.base import Function, KeypadBase
-from constants import LOG_ADKEYPAD
+from utils.constants import LOG_ADKEYPAD
 
 
 # Function key combinations

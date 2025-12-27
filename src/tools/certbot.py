@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-import argparse
-from dataclasses import asdict
-import logging
 import os
+
+import logging
 import subprocess
-import sys
+from dataclasses import asdict
+from pathlib import Path
 from time import time
 
 from cryptography import x509
-from dotenv import load_dotenv
-from os import symlink
-from pathlib import Path, PosixPath
-from pydbus import SystemBus
 
-
-load_dotenv()
-load_dotenv("secrets.env")
-sys.path.insert(0, os.getenv("PYTHONPATH"))
-
-from constants import LOG_SC_CERTBOT
+from utils.constants import LOG_SC_CERTBOT
 from monitor.config_helper import load_dyndns_config
 from utils.dictionary import filter_keys
 
@@ -140,12 +131,12 @@ class Certbot:
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
-    def _update_remote_configurations(self, enable=True, hostname=None):
+    def _update_remote_configurations(self, enable=True):
         """
         Changes the symlinks using the certbot certificates instead of the self-signed
         """
         if enable:
-            self._update_nginx_remote(hostname)
+            self._update_nginx_remote()
             self._enable_configuration(
                 "/usr/local/nginx/conf/sites-enabled/remote.conf",
                 "/usr/local/nginx/conf/sites-available/remote.conf",
@@ -158,18 +149,23 @@ class Certbot:
             self._disable_configuration("/usr/local/nginx/conf/sites-enabled/remote.conf")
             self._disable_configuration("/etc/mosquitto/conf.d/ssl.conf")
 
-    def _update_nginx_remote(self, hostname):
+    def _update_nginx_remote(self):
         """
         Updates the server_name in the remote.conf file
         """
-        self._logger.info("Updating remote configurations")
-        remote_conf = Path("/usr/local/nginx/conf/sites-available/remote.conf")
-        if remote_conf.is_file():
+        dyndns_config = load_dyndns_config()
+        if not dyndns_config:
+            self._logger.info("Missing dynamic dns configuration")
+            return
+        
+        self._logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
+        remote_conf = os.path.expanduser("~/.local/etc/arpi-server/remote.conf")
+        if os.path.isfile(remote_conf):
             with open(remote_conf, "r", encoding="utf-8") as file:
                 lines = file.readlines()
                 for i, line in enumerate(lines):
                     if "server_name" in line and "# managed by Certbot" in line:
-                        lines[i] = f"    server_name {hostname}; # managed by Certbot\n"
+                        lines[i] = f"    server_name {dyndns_config.hostname}; # managed by Certbot\n"
                         break
 
             with open(remote_conf, "w", encoding="utf-8") as file:
@@ -178,22 +174,26 @@ class Certbot:
     def _enable_configuration(self, destination_config, source_config):
         self._logger.info("Updating configuration %s with %s", destination_config, source_config)
         if Path(destination_config).exists():
-            os.remove(destination_config)
+            try:
+                subprocess.run(["sudo", "rm", destination_config], check=True)
+            except subprocess.CalledProcessError as error:
+                self._logger.error("Error removing file %s: %s", destination_config, error)
 
-        symlink(source_config, destination_config)
+        os.symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
         self._logger.info("Disabling configuration %s", destination_config)
         try:
-            os.remove(destination_config)
-        except FileNotFoundError:
-            self._logger.error("File not found: %s", destination_config)
+            subprocess.run(["sudo", "rm", destination_config], check=True)
+        except subprocess.CalledProcessError as error:
+            self._logger.error("Error removing file %s: %s", destination_config, error)
 
     def _restart_systemd_service(self, service_name):
-        self._logger.info("Restarting '%s' with DBUS", service_name)
-        bus = SystemBus()
-        systemd = bus.get(".systemd1")
-        systemd.RestartUnit(service_name, "fail")
+        self._logger.info("Restarting '%s' with systemctl", service_name)
+        try:
+            subprocess.run(["sudo", "systemctl", "restart", service_name], check=True)
+        except subprocess.CalledProcessError as error:
+            self._logger.error("Failed to restart %s: %s", service_name, error)
 
     def check_domain_changed(self):
         """
@@ -211,7 +211,7 @@ class Certbot:
                 cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[
                     0
                 ].value
-                self._logger.debug("Domain in certificate: %s", cert_domain)
+                self._logger.info("Domain in certificate: %s", cert_domain)
 
         dyndns_config = load_dyndns_config()
         if dyndns_config and dyndns_config.hostname == cert_domain:
@@ -294,42 +294,3 @@ class Certbot:
             self._restart_systemd_service("nginx.service")
 
         return False
-
-
-def main():
-    """
-    Main function to update certificates
-    """
-    parser = argparse.ArgumentParser(
-        description="Update the system using certificates, or manage the certificate"
-    )
-    group = parser.add_mutually_exclusive_group(required=False)
-    group.add_argument("-g", "--generate", action="store_true", help="generate the certificate")
-    group.add_argument("-r", "--renew", action="store_true", help="renew the certificate")
-    group.add_argument("-d", "--delete", action="store_true", help="delete the certificate")
-    parser.add_argument("-v", "--verbose", action="store_true", help="increase output verbosity")
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO
-    )
-
-    certbot = Certbot(logging.getLogger("argus_certbot"))
-    if args.generate:
-        certbot.generate_certificate()
-        return
-    if args.renew:
-        certbot.renew_certificate()
-        return
-    if args.delete:
-        certbot.delete_certificate()
-        return
-
-    certbot.update_certificate()
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        pass

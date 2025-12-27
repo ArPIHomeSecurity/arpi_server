@@ -9,7 +9,7 @@ from grp import getgrnam
 from threading import Event, Thread
 from time import sleep
 
-from constants import (
+from utils.constants import (
     DELETE_SMS_MESSAGE,
     GET_SMS_MESSAGES,
     LOG_IPC,

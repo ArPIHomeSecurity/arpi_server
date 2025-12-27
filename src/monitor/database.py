@@ -7,19 +7,17 @@ from sqlalchemy import create_engine
 
 
 # database connection common to all threads
-url = "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % {
-    "user": environ["DB_USER"],
-    "pw": environ["DB_PASSWORD"],
-    "db": environ["DB_SCHEMA"],
-    "host": environ["DB_HOST"],
-    "port": environ["DB_PORT"],
-}
+db_user = environ.get("DB_USER")
+if db_user:
+    url = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}"
+else:
+    url = f"postgresql:///{environ['DB_SCHEMA']}"
 
 common_engine = create_engine(url)
 
 
 def get_database_session(new_connection=False):
-    logging.info("Creating new database connection: %s", url)
+    logging.debug("Creating new database connection: %s", url)
     if new_connection:
         # create a new connection
         # for multiprocessing

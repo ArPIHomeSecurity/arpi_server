@@ -11,7 +11,7 @@ from queue import Empty, Queue
 from threading import Thread, Timer
 from time import sleep
 
-from constants import (
+from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
     ARM_STAY,
@@ -36,7 +36,7 @@ from constants import (
     THREAD_MONITOR,
     UPDATE_SECURE_CONNECTION,
 )
-from models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
+from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
@@ -176,6 +176,7 @@ class Monitor(Thread):
         self._area_handler.publish_areas()
 
         self._sensor_handler = SensorHandler(broadcaster=self._broadcaster)
+        self._sensor_handler.initialize()
         self._sensor_handler.load_sensors()
         self._sensor_handler.publish_sensors()
 
@@ -230,6 +231,7 @@ class Monitor(Thread):
                 elif message["action"] == MONITOR_UPDATE_CONFIG:
                     self._area_handler.load_areas()
                     self._area_handler.publish_areas()
+                    self._sensor_handler.update_mqtt_config()
                     self._sensor_handler.load_sensors()
                     self._sensor_handler.publish_sensors()
                 elif message["action"] == UPDATE_SECURE_CONNECTION:

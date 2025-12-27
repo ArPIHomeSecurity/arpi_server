@@ -1,9 +1,9 @@
 from flask.blueprints import Blueprint
 from flask import jsonify, request, current_app
 from flask.helpers import make_response
-from models import Sensor, SensorType, Zone, Area
+from utils.models import Sensor, SensorType, Zone, Area
 
-from constants import ROLE_USER
+from utils.constants import ROLE_USER
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
@@ -48,6 +48,9 @@ def create_sensor():
         name=data["name"],
         description=data["description"],
         enabled=data["enabled"],
+        channel_type=data.get("channelType"),
+        sensor_contact_type=data.get("sensorContactType"),
+        sensor_eol_count=data.get("sensorEolCount"),
     )
     db.session.add(db_sensor)
     db.session.commit()
@@ -124,6 +127,22 @@ def get_sensor_alert():
             is not None
         )
 
+@sensor_blueprint.route("/api/sensor/error", methods=["GET"])
+@registered
+@restrict_host
+def get_sensor_error():
+    if request.args.get("sensorId"):
+        return jsonify(
+            db.session.query(Sensor)
+            .filter_by(id=request.args.get("sensorId"), enabled=True, error=True, deleted=False)
+            .first()
+            is not None
+        )
+    else:
+        return jsonify(
+            db.session.query(Sensor).filter_by(enabled=True, error=True).first()
+            is not None
+        )
 
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered
