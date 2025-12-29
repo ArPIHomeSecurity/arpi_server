@@ -59,20 +59,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
             click.echo("   ✓ Tmpfiles configuration already exists")
 
     def save_secrets_to_file(self):
-        """Save generated secrets to file"""
-
-        click.echo("   🔐 Checking MQTT secrets...")
-        if self.secrets_manager.get_secret("ARGUS_MQTT_PASSWORD"):
-            click.echo("   ✓ MQTT password already in secrets file")
-        else:
-            self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
-            click.echo("   ✓ MQTT password created")
-
-        if self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD"):
-            click.echo("   ✓ Reader MQTT password already in secrets file")
-        else:
-            self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
-            click.echo("   ✓ Reader MQTT password created")
+        """Save secrets to file"""
 
         self.secrets_manager.save_secrets()
 

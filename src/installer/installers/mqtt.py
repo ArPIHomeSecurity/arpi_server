@@ -84,7 +84,7 @@ class MqttInstaller(BaseInstaller):
 
         # Set proper ownership for certs directory
         SecurityHelper.set_permissions(
-            "/etc/mosquitto/certs", f"{self.user}:mosquitto", "755", recursive=True
+            "/etc/mosquitto/certs", "mosquitto:mosquitto", "700", recursive=True
         )
 
         click.echo("   ✓ MQTT SSL certificates configured")
@@ -109,7 +109,7 @@ class MqttInstaller(BaseInstaller):
         )
 
         SecurityHelper.set_permissions(
-            "/etc/mosquitto/conf.d/", f"{self.user}:mosquitto", "755", recursive=True
+            "/etc/mosquitto/conf.d/", f"mosquitto:{self.user}", "774", recursive=True
         )
 
         click.echo("   ✓ MQTT configuration files setup complete")
@@ -119,16 +119,31 @@ class MqttInstaller(BaseInstaller):
         click.echo("   🔐 Configuring MQTT authentication...")
 
         try:
-            # create password for argus user
+            click.echo("   🔐 Checking MQTT secrets...")
+            argus_password = self.secrets_manager.get_secret("ARGUS_MQTT_PASSWORD")
+            if argus_password:
+                click.echo("   ✓ MQTT password exists")
+            else:
+                argus_password = self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
+                click.echo("   ✓ MQTT password created")
+
+            argus_reader_password = self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD")
+            if argus_reader_password:
+                click.echo("   ✓ Reader MQTT password already exists")
+            else:
+                argus_reader_password = self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
+                click.echo("   ✓ Reader MQTT password created")
+            
+            # configure password for argus user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {self.secrets_manager.get_secret('ARGUS_MQTT_PASSWORD')}"
+                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {argus_password}"
             )
-            # create password for argus_reader user
+            # configure password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {self.secrets_manager.get_secret('ARGUS_READER_MQTT_PASSWORD')}"
+                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {argus_reader_password}"
             )
-            SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "644")
-            click.echo("   ✓ MQTT authentication configured")
+            SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
+            click.echo(f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}")
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
             self.warnings.append(f"MQTT authentication setup failed: {e}")

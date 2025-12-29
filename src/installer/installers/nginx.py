@@ -66,11 +66,6 @@ class NginxInstaller(BaseInstaller):
         """Configure NGINX setup matching bash script"""
         click.echo("   ⚙️ Configuring NGINX...")
 
-        # Add user to group
-        if not self.check_user_in_group(self.user, self.nginx_user):
-            SystemHelper.run_command(f"adduser {self.nginx_user} {self.user}")
-            click.echo(f"   ✓ Added {self.nginx_user} to {self.user} group")
-
         is_remote_enabled = os.path.exists("/usr/local/nginx/conf/sites-enabled/remote.conf")
 
         # Remove existing config and copy new one
@@ -109,7 +104,7 @@ class NginxInstaller(BaseInstaller):
 
         # set proper ownership for SSL directory
         SecurityHelper.set_permissions(
-            "/usr/local/nginx/conf", f"{self.user}:{self.nginx_user}", "755", recursive=True
+            "/usr/local/nginx/conf", f"{self.user}:{self.nginx_user}", "744", recursive=True
         )
 
         click.echo("   ✓ NGINX configuration setup complete")
@@ -155,16 +150,8 @@ class NginxInstaller(BaseInstaller):
             click.echo("   ✓ Created symlink for remote.conf in sites-enabled")
 
         SecurityHelper.set_permissions(
-            "/usr/local/nginx/conf", f"{self.user}:{self.nginx_user}", "755", recursive=True
+            "/usr/local/nginx/conf", f"{self.user}:{self.nginx_user}", "744", recursive=True
         )
-
-    def check_user_in_group(self, user: str, group: str) -> bool:
-        """Check if a user is in a specific group"""
-        try:
-            result = SystemHelper.run_command(f"groups {user}", capture=True, check=False)
-            return group in result.stdout.split()
-        except Exception:
-            return False
 
     def check_config_valid(self) -> bool:
         """Check if NGINX configuration is valid"""
@@ -227,7 +214,6 @@ class NginxInstaller(BaseInstaller):
             "NGINX version": os.path.exists("/usr/local/nginx/sbin/nginx")
             and not self.needs_installation(),
             "NGINX configured": os.path.exists("/usr/local/nginx/conf/sites-enabled/http.conf"),
-            "NGINX user": self.check_user_in_group(self.nginx_user, self.user),
             "NGINX config valid": self.check_config_valid(),
             "NGINX running": ServiceHelper.is_service_running("nginx"),
             "NGINX SSL certificates": (

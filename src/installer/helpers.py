@@ -199,6 +199,15 @@ class SecurityHelper:
         SystemHelper.run_command(f"chown {recursive_flag} {owner} {file_path}")
         SystemHelper.run_command(f"chmod {recursive_flag} {mode} {file_path}")
 
+    @staticmethod
+    def check_user_in_group(user: str, group: str) -> bool:
+        """Check if a user is in a specific group"""
+        try:
+            result = SystemHelper.run_command(f"groups {user}", capture=True, check=False)
+            return group in result.stdout.split()
+        except Exception:
+            return False
+
 
 class PackageHelper:
     """Helper class for package management operations"""

@@ -113,25 +113,6 @@ class DatabaseInstaller(BaseInstaller):
                 # format: psql (PostgreSQL) 15.3 (Ubuntu 15.3-1.pgdg22.04+1)
                 return version_line.split()[2].split(".")[0]
 
-    def is_user_in_gpio_group(self) -> bool:
-        """Check if user is in gpio group"""
-        try:
-            groups_output = SystemHelper.run_command(f"groups {self.user}", capture=True).stdout
-            groups = groups_output.strip().split(":")[-1].strip().split()
-            return "gpio" in groups
-        except subprocess.CalledProcessError:
-            return False
-
-    def user_postgres_group(self):
-        """Add user to postgres group for DB access"""
-        click.echo("   👥 Adding user to postgres group...")
-
-        if not self.is_user_in_postgres_group():
-            SystemHelper.run_command(f"usermod -aG postgres {self.user}")
-            click.echo(f"   ✓ User '{self.user}' added to postgres group")
-        else:
-            click.echo(f"   ✓ User '{self.user}' is already in postgres group")
-
     def needs_installation(self) -> bool:
         """Determine if PostgreSQL needs installation or upgrade"""
         click.echo(
@@ -160,7 +141,6 @@ class DatabaseInstaller(BaseInstaller):
             "PostgreSQL version": not self.needs_installation(),
             "PostgreSQL running": ServiceHelper.is_service_running("postgresql"),
             "PostgreSQL enabled": ServiceHelper.is_service_enabled("postgresql"),
-            "User in postgres group": self.is_user_in_gpio_group(),
             "Database user exists": self.check_user_exists(),
             "Database exists": self.check_database_exists(),
         }

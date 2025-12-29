@@ -83,7 +83,7 @@ def env_prod():
         "username": "argus",
         "password": os.environ["ARGUS_MQTT_PASSWORD"],
         "tls_enabled": True,
-        "tls_insecure": False,
+        "tls_insecure": True,
     }
     mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
     session.add(mqtt_option)
@@ -94,7 +94,7 @@ def env_prod():
         "username": "argus_reader",
         "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
         "tls_enabled": True,
-        "tls_insecure": False,
+        "tls_insecure": True,
     }
     mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
     session.add(mqtt_option)
