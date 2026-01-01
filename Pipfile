@@ -30,7 +30,7 @@ psycopg2-binary = "~=2.9"
 python-crontab = "~=2.7.0"
 python-gsmmodem-new = "~=0.13.0"
 python-jose = "~=3.5"
-python-socketio = "~=5.14"
+python-socketio = "~=5.16"
 stringcase = "~=1.2.0"
 build = "*"
 
