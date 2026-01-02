@@ -16,7 +16,7 @@ def enable_dyndns_job(enable=True):
     job = jobs[0] if jobs else None
     if job is None:
         job = argus_cron.new(
-            command="systemd-cat -t 'argus_dyndns' bash -c 'arpi-dyndns'",
+            command="systemd-cat -t 'argus_dyndns' zsh -l -c 'arpi-dyndns'",
             comment="Update the IP address at the dynamic DNS provider",
         )
 
