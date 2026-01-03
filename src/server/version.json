@@ -1,9 +1,9 @@
 {
-  "version": "v2.1.0:afec1dd",
+  "version": "v2.1.0_RC01:6723eb5",
   "major": 2,
   "minor": 1,
   "patch": 0,
-  "prerelease": null,
-  "prerelease_num": null,
-  "commit_id": "afec1dd"
+  "prerelease": "RC",
+  "prerelease_num": "01",
+  "commit_id": "6723eb5"
 }
