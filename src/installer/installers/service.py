@@ -151,7 +151,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
         if self.data_set_name:
             SystemHelper.run_command(
                 f"sudo -u {self.user} -E -H zsh --login -c '"
-                f"arpi-data -d -c {self.data_set_name}'",
+                f"argus-data -d -c {self.data_set_name}'",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
         else:

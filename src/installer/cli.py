@@ -283,7 +283,7 @@ def status(ctx, component):
 
 def status_standalone():
     """
-    Standalone entry point for arpi-status command.
+    Standalone entry point for argus-status command.
     This wraps the status command with proper CLI context initialization.
     """
     # check root privileges

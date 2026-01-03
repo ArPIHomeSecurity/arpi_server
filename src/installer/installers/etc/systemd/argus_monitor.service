@@ -8,7 +8,7 @@ User=argus
 WorkingDirectory=/home/argus/
 EnvironmentFile=/home/argus/.local/etc/arpi-server/config.env
 EnvironmentFile=/home/argus/secrets.env
-ExecStartPre=/usr/bin/python3 /home/argus/.local/bin/arpi-secret
+ExecStartPre=/usr/bin/python3 /home/argus/.local/bin/argus-secret
 ExecStart=/usr/bin/python3 -m gunicorn \
     -c /home/argus/.local/etc/arpi-monitor/gunicorn.conf.py \
     --timeout 60 \
