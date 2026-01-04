@@ -127,8 +127,6 @@ export PATH="$HOME/.local/bin:$PATH"
             ],
         )
 
-
-
     def install_common_tools(self):
         """Install common development tools"""
         click.echo("   🛠️ Installing common development tools...")
@@ -157,9 +155,7 @@ export PATH="$HOME/.local/bin:$PATH"
     def is_user_in_gpio_group(self) -> bool:
         """Check if user is in gpio group"""
         try:
-            groups_output = SystemHelper.run_command(
-                f"groups {self.user}", capture=True
-            ).stdout
+            groups_output = SystemHelper.run_command(f"groups {self.user}", capture=True).stdout
             groups = groups_output.strip().split(":")[-1].strip().split()
             return "gpio" in groups
         except subprocess.CalledProcessError:
@@ -205,9 +201,7 @@ polkit.addRule(function(action, subject) {
             )
             click.echo(f"   ✓ Updated BOARD_VERSION to {self.board_version}")
         else:
-            SystemHelper.append_to_file(
-                config_file, f"BOARD_VERSION={self.board_version}\n"
-            )
+            SystemHelper.append_to_file(config_file, f"BOARD_VERSION={self.board_version}\n")
             click.echo(f"   ✓ Set BOARD_VERSION to {self.board_version}")
 
     def update_simulator_mode(self):
@@ -216,19 +210,20 @@ polkit.addRule(function(action, subject) {
         """
         config_file = os.path.join(self.config_directory, "config.env")
 
-        if self.use_simulator:
-            if not SystemHelper.file_contains_text(
-                config_file, "USE_SIMULATOR=true"
-            ):
-                SystemHelper.append_to_file(
-                    config_file, "USE_SIMULATOR=true\n"
-                )
-                click.echo("   ✓ Configured to use simulator")
-            else:
-                click.echo("   ✓ Simulator usage already configured")
+        if SystemHelper.file_contains_text(config_file, "USE_SIMULATOR="):
+            SystemHelper.run_command(
+                f"sed -i 's/^USE_SIMULATOR=.*$/USE_SIMULATOR={str(self.use_simulator).lower()}/' {config_file}"
+            )
         else:
-            click.echo("   ✓ Not using simulator")
-    
+            SystemHelper.append_to_file(
+                config_file, f"USE_SIMULATOR={str(self.use_simulator).lower()}\n"
+            )
+
+        if self.use_simulator:
+            click.echo("   ✓ Configured to use simulator")
+        else:
+            click.echo("   ✓ Configured not to use simulator")
+
     def install(self):
         """Install system components"""
         self.install_system_packages()
@@ -243,7 +238,6 @@ polkit.addRule(function(action, subject) {
         self.remove_old_zsh_configuration()
         self.update_board_version()
         self.update_simulator_mode()
-        
 
     def get_status(self) -> dict:
         """Get system component status"""
