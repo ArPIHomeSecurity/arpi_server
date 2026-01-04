@@ -13,6 +13,7 @@ class SystemInstaller(BaseInstaller):
         super().__init__(config)
         self.user = config.user
         self.board_version = config.board_version
+        self.use_simulator = config.use_simulator
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -209,13 +210,13 @@ polkit.addRule(function(action, subject) {
             )
             click.echo(f"   ✓ Set BOARD_VERSION to {self.board_version}")
 
-    def use_simulator(self):
+    def update_simulator_mode(self):
         """
         Configure the system to use simulator if specified
         """
         config_file = os.path.join(self.config_directory, "config.env")
 
-        if self.config.use_simulator:
+        if self.use_simulator:
             if not SystemHelper.file_contains_text(
                 config_file, "USE_SIMULATOR=true"
             ):
@@ -241,7 +242,7 @@ polkit.addRule(function(action, subject) {
         self.configure_zsh_environment()
         self.remove_old_zsh_configuration()
         self.update_board_version()
-        self.use_simulator()
+        self.update_simulator_mode()
         
 
     def get_status(self) -> dict:
