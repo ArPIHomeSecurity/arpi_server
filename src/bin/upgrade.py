@@ -319,6 +319,7 @@ def main():
         "webapplication",
         args.prerelease,
         args.board_version,
+        args.use_simulator,
     )
 
     print("  🔄 Restarting services: argus_server, argus_monitor, nginx ...")
