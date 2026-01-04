@@ -12,6 +12,7 @@ class SystemInstaller(BaseInstaller):
     def __init__(self, config: InstallerConfig):
         super().__init__(config)
         self.user = config.user
+        self.board_version = config.board_version
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -190,6 +191,42 @@ polkit.addRule(function(action, subject) {
 """
         if not os.path.exists(rule_file):
             SystemHelper.write_file(rule_file, rule_content)
+
+    def update_board_version(self):
+        """
+        Update the board version in the config.env file
+        """
+        config_file = os.path.join(self.config_directory, "config.env")
+
+        if SystemHelper.file_contains_text(config_file, "BOARD_VERSION="):
+            SystemHelper.run_command(
+                f"sed -i 's/^BOARD_VERSION=.*$/BOARD_VERSION={self.board_version}/' {config_file}"
+            )
+            click.echo(f"   ✓ Updated BOARD_VERSION to {self.board_version}")
+        else:
+            SystemHelper.append_to_file(
+                config_file, f"BOARD_VERSION={self.board_version}\n"
+            )
+            click.echo(f"   ✓ Set BOARD_VERSION to {self.board_version}")
+
+    def use_simulator(self):
+        """
+        Configure the system to use simulator if specified
+        """
+        config_file = os.path.join(self.config_directory, "config.env")
+
+        if self.config.use_simulator:
+            if not SystemHelper.file_contains_text(
+                config_file, "USE_SIMULATOR=true"
+            ):
+                SystemHelper.append_to_file(
+                    config_file, "USE_SIMULATOR=true\n"
+                )
+                click.echo("   ✓ Configured to use simulator")
+            else:
+                click.echo("   ✓ Simulator usage already configured")
+        else:
+            click.echo("   ✓ Not using simulator")
     
     def install(self):
         """Install system components"""
@@ -203,6 +240,8 @@ polkit.addRule(function(action, subject) {
         """Post installation steps for system components"""
         self.configure_zsh_environment()
         self.remove_old_zsh_configuration()
+        self.update_board_version()
+        self.use_simulator()
         
 
     def get_status(self) -> dict:

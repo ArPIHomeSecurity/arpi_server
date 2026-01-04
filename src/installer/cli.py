@@ -62,6 +62,7 @@ class ArpiOrchestrator:
             user=os.getenv("ARGUS_USER", "argus"),
             board_version=int(os.getenv("BOARD_VERSION", "3")),
             secrets_manager=SecretsManager(os.getenv("ARGUS_USER", "argus")),
+            use_simulator=os.getenv("USE_SIMULATOR", "false").lower() == "true",
             verbose=False,
         )
         self._installer_cache = {}

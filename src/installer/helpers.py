@@ -136,7 +136,7 @@ class SystemHelper:
                 if regex:
                     return bool(re.search(text, content))
                 return text in content
-        except Exception:
+        except FileNotFoundError:
             return False
 
     @staticmethod
