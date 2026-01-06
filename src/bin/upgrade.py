@@ -12,15 +12,17 @@ curl -sSL https://app.arpi-security.info/install.py | /usr/bin/python3 - --prere
 """
 
 import argparse
-from dataclasses import dataclass
 import json
-import re
-import requests
-import tempfile
-import tarfile
-import shutil
 import os
+import re
+import shutil
 import subprocess
+import tarfile
+import tempfile
+from dataclasses import dataclass
+from typing import Callable
+
+import requests
 
 GITHUB_API_SERVER = "https://api.github.com/repos/ArPIHomeSecurity/arpi_server/releases"
 GITHUB_API_WEBAPP = "https://api.github.com/repos/ArPIHomeSecurity/arpi_webapplication/releases"
@@ -117,13 +119,14 @@ def get_webapplication_version() -> VersionInfo | None:
         print("⚠️  Warning: Webapplication version file not found")
 
 
-def upgrade_server(tmp_dir, wheel_path, board_version: str):
+def upgrade_server(tmp_dir: str, wheel_path: str, board_version: str, use_simulator: bool):
     """
     Execute install.py from the extracted server files.
     """
     install_config = {
         "PYTHONPATH": "src",
         "BOARD_VERSION": board_version,
+        "USE_SIMULATOR": "true" if use_simulator else "false",
     }
 
     # deploy source code
@@ -224,7 +227,14 @@ def compare_versions(v1: str, v2: VersionInfo):
     return 0
 
 
-def check_and_upgrade(api_url, get_version_func, project_name, prerelease, board_version):
+def check_and_upgrade(
+    api_url: str,
+    get_version_func: Callable[[], str],
+    project_name: str,
+    prerelease: bool,
+    board_version: str,
+    use_simulator: bool,
+):
     """
     Check for updates and upgrade the specified project if a newer version is available.
     """
@@ -241,10 +251,10 @@ def check_and_upgrade(api_url, get_version_func, project_name, prerelease, board
         )
     elif result == 1:
         print(f"    ⬆️  New version {latest_release['tag_name']} available for {project_name}")
-        upgrade_project(latest_release, project_name, board_version)
+        upgrade_project(latest_release, project_name, board_version, use_simulator)
 
 
-def upgrade_project(release: dict, project: str, board_version: str):
+def upgrade_project(release: dict, project: str, board_version: str, use_simulator: bool):
     """
     Upgrade the specified project using the latest release.
     """
@@ -260,7 +270,7 @@ def upgrade_project(release: dict, project: str, board_version: str):
         print(f"      📦 Downloaded wheel to: {wheel_path}")
 
         print("      ⚙️  Upgrading server files...")
-        upgrade_server(tmp_dir, wheel_path, board_version)
+        upgrade_server(tmp_dir, wheel_path, board_version, use_simulator)
     elif project == "webapplication":
         print("      ⚙️  Upgrading webapplication files...")
         upgrade_webapplication(tmp_dir)
@@ -286,7 +296,8 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--prerelease", action="store_true", help="Use latest prerelease")
-    parser.add_argument("--board-version", type=str, help="Board version (2 or 3)", default="2")
+    parser.add_argument("--board-version", type=str, default="2", help="Board version (2 or 3)")
+    parser.add_argument("--use-simulator", action="store_true", default=False, help="Use simulator")
     args = parser.parse_args()
 
     print("🔧 Starting ArPI upgrade process...")
@@ -300,6 +311,7 @@ def main():
         "server",
         args.prerelease,
         args.board_version,
+        args.use_simulator,
     )
     check_and_upgrade(
         GITHUB_API_WEBAPP,
@@ -307,6 +319,7 @@ def main():
         "webapplication",
         args.prerelease,
         args.board_version,
+        args.use_simulator,
     )
 
     print("  🔄 Restarting services: argus_server, argus_monitor, nginx ...")

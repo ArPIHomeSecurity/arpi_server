@@ -59,20 +59,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
             click.echo("   ✓ Tmpfiles configuration already exists")
 
     def save_secrets_to_file(self):
-        """Save generated secrets to file"""
-
-        click.echo("   🔐 Checking MQTT secrets...")
-        if self.secrets_manager.get_secret("ARGUS_MQTT_PASSWORD"):
-            click.echo("   ✓ MQTT password already in secrets file")
-        else:
-            self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
-            click.echo("   ✓ MQTT password created")
-
-        if self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD"):
-            click.echo("   ✓ Reader MQTT password already in secrets file")
-        else:
-            self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
-            click.echo("   ✓ Reader MQTT password created")
+        """Save secrets to file"""
 
         self.secrets_manager.save_secrets()
 
@@ -164,7 +151,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
         if self.data_set_name:
             SystemHelper.run_command(
                 f"sudo -u {self.user} -E -H zsh --login -c '"
-                f"arpi-data -d -c {self.data_set_name}'",
+                f"argus-data -d -c {self.data_set_name}'",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
         else:

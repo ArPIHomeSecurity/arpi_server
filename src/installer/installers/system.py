@@ -12,6 +12,8 @@ class SystemInstaller(BaseInstaller):
     def __init__(self, config: InstallerConfig):
         super().__init__(config)
         self.user = config.user
+        self.board_version = config.board_version
+        self.use_simulator = config.use_simulator
 
     def check_zsh_configured(self) -> bool:
         """Check if zsh is configured with oh-my-zsh and ArPI environment"""
@@ -125,8 +127,6 @@ export PATH="$HOME/.local/bin:$PATH"
             ],
         )
 
-
-
     def install_common_tools(self):
         """Install common development tools"""
         click.echo("   🛠️ Installing common development tools...")
@@ -155,9 +155,7 @@ export PATH="$HOME/.local/bin:$PATH"
     def is_user_in_gpio_group(self) -> bool:
         """Check if user is in gpio group"""
         try:
-            groups_output = SystemHelper.run_command(
-                f"groups {self.user}", capture=True
-            ).stdout
+            groups_output = SystemHelper.run_command(f"groups {self.user}", capture=True).stdout
             groups = groups_output.strip().split(":")[-1].strip().split()
             return "gpio" in groups
         except subprocess.CalledProcessError:
@@ -190,7 +188,42 @@ polkit.addRule(function(action, subject) {
 """
         if not os.path.exists(rule_file):
             SystemHelper.write_file(rule_file, rule_content)
-    
+
+    def update_board_version(self):
+        """
+        Update the board version in the config.env file
+        """
+        config_file = os.path.join(self.config_directory, "config.env")
+
+        if SystemHelper.file_contains_text(config_file, "BOARD_VERSION="):
+            SystemHelper.run_command(
+                f"sed -i 's/^BOARD_VERSION=.*$/BOARD_VERSION={self.board_version}/' {config_file}"
+            )
+            click.echo(f"   ✓ Updated BOARD_VERSION to {self.board_version}")
+        else:
+            SystemHelper.append_to_file(config_file, f"BOARD_VERSION={self.board_version}\n")
+            click.echo(f"   ✓ Set BOARD_VERSION to {self.board_version}")
+
+    def update_simulator_mode(self):
+        """
+        Configure the system to use simulator if specified
+        """
+        config_file = os.path.join(self.config_directory, "config.env")
+
+        if SystemHelper.file_contains_text(config_file, "USE_SIMULATOR="):
+            SystemHelper.run_command(
+                f"sed -i 's/^USE_SIMULATOR=.*$/USE_SIMULATOR={str(self.use_simulator).lower()}/' {config_file}"
+            )
+        else:
+            SystemHelper.append_to_file(
+                config_file, f"USE_SIMULATOR={str(self.use_simulator).lower()}\n"
+            )
+
+        if self.use_simulator:
+            click.echo("   ✓ Configured to use simulator")
+        else:
+            click.echo("   ✓ Configured not to use simulator")
+
     def install(self):
         """Install system components"""
         self.install_system_packages()
@@ -203,7 +236,8 @@ polkit.addRule(function(action, subject) {
         """Post installation steps for system components"""
         self.configure_zsh_environment()
         self.remove_old_zsh_configuration()
-        
+        self.update_board_version()
+        self.update_simulator_mode()
 
     def get_status(self) -> dict:
         """Get system component status"""

@@ -136,7 +136,7 @@ class SystemHelper:
                 if regex:
                     return bool(re.search(text, content))
                 return text in content
-        except Exception:
+        except FileNotFoundError:
             return False
 
     @staticmethod
@@ -198,6 +198,15 @@ class SecurityHelper:
         recursive_flag = "-R" if recursive else ""
         SystemHelper.run_command(f"chown {recursive_flag} {owner} {file_path}")
         SystemHelper.run_command(f"chmod {recursive_flag} {mode} {file_path}")
+
+    @staticmethod
+    def check_user_in_group(user: str, group: str) -> bool:
+        """Check if a user is in a specific group"""
+        try:
+            result = SystemHelper.run_command(f"groups {user}", capture=True, check=False)
+            return group in result.stdout.split()
+        except Exception:
+            return False
 
 
 class PackageHelper:

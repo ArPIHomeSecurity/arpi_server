@@ -15,6 +15,7 @@ class InstallerConfig:
     user: str
     secrets_manager: SecretsManager
     board_version: int = 3
+    use_simulator: bool = False
     verbose: bool = False
 
 
