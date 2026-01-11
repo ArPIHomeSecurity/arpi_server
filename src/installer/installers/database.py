@@ -137,7 +137,8 @@ class DatabaseInstaller(BaseInstaller):
         return {
             "PostgreSQL installed": PackageHelper.is_package_installed(
                 f"postgresql-{self.postgresql_version}"
-            ),
+            )
+            or PackageHelper.is_package_installed("postgresql"),
             "PostgreSQL version": not self.needs_installation(),
             "PostgreSQL running": ServiceHelper.is_service_running("postgresql"),
             "PostgreSQL enabled": ServiceHelper.is_service_enabled("postgresql"),

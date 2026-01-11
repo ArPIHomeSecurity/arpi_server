@@ -91,7 +91,7 @@ class HardwareInstaller(BaseInstaller):
         if self._board_version == 3:
             # enable SPI for board version 3
             if os.path.exists(self._config_txt) and not SystemHelper.file_contains_text(
-                self._config_txt, "dtparam=spi=on"
+                self._config_txt, r"^dtparam=spi=on$", regex=True
             ):
                 SystemHelper.append_to_file(self._config_txt, "\ndtparam=spi=on\n")
                 self.needs_reboot = True
@@ -99,7 +99,7 @@ class HardwareInstaller(BaseInstaller):
         elif self._board_version == 2:
             # disable SPI for board version 2
             if os.path.exists(self._config_txt) and SystemHelper.file_contains_text(
-                self._config_txt, "dtparam=spi=on"
+                self._config_txt, r"^dtparam=spi=on$", regex=True
             ):
                 SystemHelper.remove_from_file(self._config_txt, "dtparam=spi=on")
                 self.needs_reboot = True
@@ -148,13 +148,13 @@ class HardwareInstaller(BaseInstaller):
         return {
             "i2c_tools installed": PackageHelper.is_package_installed("i2c-tools"),
             "SPI enabled": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", r"^dtparam=spi=on$", regex=True
+                "/boot/firmware/config.txt", r"(?m)^dtparam=spi=on$", regex=True
             ),
             "RTC configured": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", "dtoverlay=i2c-rtc,ds1307"
+                "/boot/firmware/config.txt", r"(?m)^dtoverlay=i2c-rtc,ds1307$", regex=True
             ),
             "GSM UART configured": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", "enable_uart=1"
+                "/boot/firmware/config.txt", r"(?m)^enable_uart=1$", regex=True
             ),
             "WiringPi available": SystemHelper.run_command("gpio -v", check=False).returncode == 0,
         }
