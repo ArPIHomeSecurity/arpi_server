@@ -129,7 +129,7 @@ class SensorType(BaseModel):
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
-            f"Incorrect name field length ({len(name)})"
+            f"Incorrect 'name' field length ({len(name)})"
         )
         return name
 
@@ -255,7 +255,7 @@ class Sensor(BaseModel):
 
     def update(self, data):
         # reset reference value if channel changed
-        if data["channel"] != self.channel:
+        if "channel" in data and data["channel"] != self.channel:
             self.reference_value = None
 
         return self.update_record(
@@ -308,14 +308,14 @@ class Sensor(BaseModel):
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
-            f"Incorrect name field length ({len(name)})"
+            f"Incorrect 'name' field length ({len(name)})"
         )
         return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
         assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), (
-            f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+            f"Incorrect 'channel' (0..{os.environ['INPUT_NUMBER']})"
         )
         return channel
 
@@ -623,6 +623,9 @@ class Zone(BaseModel):
             data,
         )
 
+    def can_be_deleted(self):
+        return len(self.sensors) == 0
+
     @property
     def serialized(self):
         return convert2camel(
@@ -654,7 +657,7 @@ class Zone(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect 'name' field length ({len(name)})"
         return name
 
 
@@ -825,12 +828,12 @@ class User(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect user name field length ({len(name)})"
+        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect 'user name' field length ({len(name)})"
         return name
 
     @validates("email")
     def validates_email(self, key, email):
-        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect email field length ({len(email)})"
+        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect 'email' field length ({len(email)})"
         if len(email):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
@@ -926,7 +929,7 @@ class Option(BaseModel):
 
     @validates("name", "section")
     def validates_name(self, key, value):
-        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(value)})"
+        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect '{key}' field length ({len(value)})"
         if key == "name":
             assert value in (
                 "notifications",
@@ -1010,10 +1013,11 @@ class Output(BaseModel):
 
     __tablename__ = "output"
 
+    NAME_LENGTH = 16
     ENDLESS_DURATION = 0
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(16), nullable=True)
+    name = Column(String(NAME_LENGTH), nullable=True)
     description = Column(String, nullable=True)
     channel = Column(Integer, default=None, nullable=True)
     state = Column(Boolean, default=False, nullable=False)
@@ -1037,15 +1041,15 @@ class Output(BaseModel):
 
     def __init__(
         self,
-        name,
-        description,
-        channel,
-        trigger_type,
-        area_id,
-        delay,
-        duration,
-        default_state,
-        enabled,
+        name: str,
+        description: str,
+        channel: int,
+        trigger_type: str,
+        area_id: int,
+        delay: int,
+        duration: int,
+        default_state: bool,
+        enabled: bool,
     ):
         self.name = name
         self.description = description
@@ -1095,12 +1099,19 @@ class Output(BaseModel):
                 )
             )
         )
+    
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= Output.NAME_LENGTH, (
+            f"Incorrect 'name' field length ({len(name)})"
+        )
+        return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
         if channel is not None:
             assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]), (
-                f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+                f"Incorrect 'channel' (0..{os.environ['OUTPUT_NUMBER']})"
             )
         return channel
 

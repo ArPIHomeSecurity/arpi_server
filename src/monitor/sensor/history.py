@@ -116,6 +116,7 @@ class SensorsHistory:
         """
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
+
         self._sensors[idx].set_sensitivity(size, threshold)
 
     def add_state(self, idx: int, state: bool):

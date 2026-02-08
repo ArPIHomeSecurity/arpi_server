@@ -1,13 +1,16 @@
-from flask.blueprints import Blueprint
 from flask import jsonify, request
+from flask.blueprints import Blueprint
 from flask.helpers import make_response
-from utils.models import Zone
-from utils.constants import ROLE_USER
 
 from server.database import db
-from server.decorators import authenticated, restrict_host, registered
+from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
+from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
+                                  ObjectNotFound)
+from server.services.zone import ZoneService
 from server.tools import process_ipc_response
+from utils.constants import ROLE_USER
+from utils.models import Zone
 
 zone_blueprint = Blueprint("zone", __name__)
 
@@ -25,45 +28,59 @@ def get_zones():
 @authenticated()
 @restrict_host
 def create_zone():
-    db_zone = Zone()
-    db_zone.update(request.json)
-    if not db_zone.description:
-        db_zone.description = db_zone.name
-    db.session.add(db_zone)
-    db.session.commit()
-    IPCClient().update_configuration()
-    return jsonify(db_zone.serialized)
+    """
+    Create a new zone.
+    """
+    try:
+        zone_service = ZoneService(db.session)
+        new_zone = zone_service.create_zone(
+            name=request.json["name"],
+            description=request.json.get("description", ""),
+            disarmed_delay=request.json.get("disarmedDelay"),
+            away_alert_delay=request.json.get("awayAlertDelay", 0),
+            stay_alert_delay=request.json.get("stayAlertDelay", 0),
+            away_arm_delay=request.json.get("awayArmDelay", 0),
+            stay_arm_delay=request.json.get("stayArmDelay", 0),
+        )
+        return jsonify(new_zone.serialized), 201
+    except ConfigChangesNotAllowed:
+        return make_response(jsonify({"error": "Configuration changes are not allowed currently"}), 409)
 
 
 @zone_blueprint.route("/api/zone/<int:zone_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
 @restrict_host
-def zone(zone_id):
-    if request.method == "GET":
-        db_zone = db.session.query(Zone).get(zone_id)
-        if db_zone:
-            return jsonify(db_zone.serialized)
+def manage_zone(zone_id):
+    """
+    Manage zones.
+    """
+    try:
+        zone_service = ZoneService(db.session)
+        if request.method == "GET":
+            zone = zone_service.get_zone(zone_id)
+            return jsonify(zone.serialized)
+        elif request.method == "PUT":
+            updated_zone = zone_service.update_zone(zone_id,
+                name=request.json["name"],
+                description=request.json.get("description", ""),
+                disarmed_delay=request.json.get("disarmedDelay"),
+                away_alert_delay=request.json.get("awayAlertDelay", 0),
+                stay_alert_delay=request.json.get("stayAlertDelay", 0),
+                away_arm_delay=request.json.get("awayArmDelay", 0),
+                stay_arm_delay=request.json.get("stayArmDelay", 0),
+            )
+            return jsonify(updated_zone.serialized)
+        elif request.method == "DELETE":
+            zone_service.delete_zone(zone_id)
+            return make_response("Deleted", 204)
 
+        return make_response(jsonify({"error": "Method not allowed"}), 405)
+    except ConfigChangesNotAllowed:
+        return make_response(jsonify({"error": "Configuration changes are not allowed in the current state"}), 409)
+    except ObjectNotFound:
         return make_response(jsonify({"error": "Zone not found"}), 404)
-    elif request.method == "DELETE":
-        db_zone = db.session.query(Zone).get(zone_id)
-        if db_zone:
-            db_zone.deleted = True
-            db.session.commit()
-            return process_ipc_response(IPCClient().update_configuration())
-
-        return make_response(jsonify({"error": "Zone not found"}), 404)
-    elif request.method == "PUT":
-        db_zone = db.session.query(Zone).get(zone_id)
-        if not db_zone:
-            return make_response(jsonify({"error": "Zone not found"}), 404)
-
-        if not db_zone.update(request.json):
-            return make_response("", 204)
-
-        db.session.commit()
-        return process_ipc_response(IPCClient().update_configuration())
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+    except ObjectNotChanged:
+        return make_response(jsonify({"info": "No changes made"}), 204)
 
 
 @zone_blueprint.route("/api/zones/reorder", methods=["PUT"])

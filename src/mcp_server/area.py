@@ -1,0 +1,136 @@
+from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+
+from monitor.database import get_database_session
+from server.services.area import AreaService
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+
+area_mcp = FastMCP("ArPI - area service")
+
+
+session = get_database_session()
+
+
+@area_mcp.resource(
+    uri="areas://list",
+    name="all",
+    mime_type="application/json",
+)
+def get_areas():
+    """
+    Retrieve all existing areas.
+    """
+    area_service = AreaService(session)
+    return [area.serialized for area in area_service.get_areas()]
+
+
+@area_mcp.tool(
+    name="get_all_areas",
+)
+def get_areas_tool():
+    """
+    Tool to retrieve all existing areas.
+    """
+    area_service = AreaService(session)
+    return [area.serialized for area in area_service.get_areas()]
+
+
+@area_mcp.resource(
+    uri="areas://{area_id}",
+    name="area_by_id",
+    mime_type="application/json",
+)
+def get_area(area_id: int):
+    """
+    Retrieve an area by its ID.
+    """
+    try:
+        area_service = AreaService(session)
+        area = area_service.get_area(area_id)
+        return area.serialized if area else None
+    except ObjectNotFound:
+        raise ToolError("Area not found")
+
+
+@area_mcp.tool(
+    name="get_area_by_id",
+)
+def get_area_tool(area_id: int):
+    """
+    Tool to retrieve an area by its ID.
+
+    Args:
+        area_id: ID of the area to retrieve
+    """
+    try:
+        area_service = AreaService(session)
+        area = area_service.get_area(area_id)
+        return area.serialized if area else None
+    except ObjectNotFound:
+        raise ToolError("Area not found")
+
+
+@area_mcp.tool(
+    name="create",
+)
+def create_area(name: str):
+    """
+    Create a new area in the database.
+
+    Args:
+        name: Name of the new area
+    """
+    try:
+        new_area = AreaService(session).create_area(name=name)
+        return new_area.serialized
+    except ConfigChangesNotAllowed:
+        raise ToolError("Configuration changes are not allowed currently")
+    except AssertionError as e:
+        raise ToolError(str(e))
+
+
+@area_mcp.tool(
+    name="update",
+)
+def update_area(area_id: int, area_name: str):
+    """
+    Update an existing area in the database.
+
+    Args:
+        area_id: ID of the area to update
+        area_name: New name for the area
+    """
+    try:
+        area_service = AreaService(session)
+        updated_area = area_service.update_area(area_id, area_name)
+        return updated_area.serialized if updated_area else None
+    except ConfigChangesNotAllowed:
+        raise ToolError("Configuration changes are not allowed currently")
+    except ObjectNotFound:
+        raise ToolError("Area not found")
+    except ObjectNotChanged:
+        raise ToolError("No changes made to the area")
+    except AssertionError as e:
+        raise ToolError(str(e))
+
+
+@area_mcp.tool(
+    name="delete",
+    description="Tool to delete an area by its ID",
+)
+def delete_area(area_id: int):
+    """
+    Delete an area by its ID.
+    Args:
+        area_id: The ID of the area to delete
+    """
+    try:
+        area_service = AreaService(session)
+        area_service.delete_area(area_id)
+        return "Success"
+    except ConfigChangesNotAllowed:
+        raise ToolError("Configuration changes are not allowed currently")
+    except ObjectNotFound:
+        raise ToolError("Area not found")
+    except ObjectNotChanged:
+        raise ToolError("Area cannot be deleted")

@@ -51,7 +51,7 @@ def keypad(keypad_id):
 
         db.session.commit()
         return process_ipc_response(IPCClient().update_keypad())
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 405)
 
 
 @keypad_blueprint.route("/api/keypadtypes", methods=["GET"])

@@ -3,6 +3,8 @@ from flask.blueprints import Blueprint
 from flask.helpers import make_response
 
 
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.output import OutputService
 from utils.constants import ROLE_USER
 from utils.models import Output
 from server.database import db
@@ -24,51 +26,71 @@ def get_outputs():
 @authenticated()
 @restrict_host
 def create_output():
-    data = request.json
-    # set attributes name, description, channel, trigger_type, area_id, delay, duration, default_state, enabled
-    output = Output(
-        name=data["name"],
-        description=data["description"],
-        channel=data["channel"],
-        trigger_type=data["triggerType"],
-        area_id=data["areaId"],
-        delay=data["delay"],
-        duration=data["duration"],
-        default_state=data["defaultState"],
-        enabled=data["enabled"],
-    )
-    db.session.add(output)
-    db.session.commit()
-
-    return process_ipc_response(IPCClient().update_configuration())
+    """
+    Create a new output.
+    """
+    try:
+        output_service = OutputService(db.session)
+        data = request.json
+        # set attributes name, description, channel, trigger_type, area_id, delay, duration, default_state, enabled
+        output = output_service.create_output(
+            name=data["name"],
+            description=data["description"],
+            channel=data["channel"],
+            trigger_type=data["triggerType"],
+            area_id=data["areaId"],
+            delay=data["delay"],
+            duration=data["duration"],
+            default_state=data["defaultState"],
+            enabled=data["enabled"],
+        )
+        return jsonify(output.serialized), 201
+    except ConfigChangesNotAllowed:
+        return make_response(
+            jsonify({"error": "Configuration changes are not allowed currently"}), 409
+        )
 
 
 @output_blueprint.route("/api/output/<int:output_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
 @restrict_host
 def manage_output(output_id):
-    if request.method == "GET":
-        db_output = db.session.query(Output).filter_by(id=output_id).first()
-        if db_output:
-            return jsonify(db_output.serialized)
+    """
+    Manage outputs.
+    """
+    try:
+        output_service = OutputService(db.session)
+        if request.method == "GET":
+            output = output_service.get_output_by_id(output_id)
+            return jsonify(output.serialized)
+        elif request.method == "PUT":
+            data = request.json
+            updated_output = output_service.update_output(
+                output_id,
+                name=data.get("name"),
+                description=data.get("description"),
+                channel=data.get("channel"),
+                trigger_type=data.get("triggerType"),
+                area_id=data.get("areaId"),
+                delay=data.get("delay"),
+                duration=data.get("duration"),
+                default_state=data.get("defaultState"),
+                enabled=data.get("enabled"),
+            )
+            return jsonify(updated_output.serialized)
+        elif request.method == "DELETE":
+            output_service.delete_output(output_id)
+            return make_response("Deleted", 204)
+
+        make_response(jsonify({"error": "Method not allowed"}), 405)
+    except ConfigChangesNotAllowed:
+        return make_response(
+            jsonify({"error": "Configuration changes are not allowed currently"}), 409
+        )
+    except ObjectNotChanged:
+        return make_response(jsonify({"info": "No changes made"}), 204)
+    except ObjectNotFound:
         return make_response(jsonify({"error": "Output not found"}), 404)
-    elif request.method == "PUT":
-        db_output = db.session.query(Output).get(output_id)
-        if not db_output:
-            return make_response(jsonify({"error": "Output not found"}), 404)
-
-        if not db_output.update(request.json):
-            return make_response("", 204)
-
-        db.session.commit()
-        return process_ipc_response(IPCClient().update_configuration())
-    elif request.method == "DELETE":
-        db_output = db.session.query(Output).get(output_id)
-        db.session.delete(db_output)
-        db.session.commit()
-        return process_ipc_response(IPCClient().update_configuration())
-
-    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @output_blueprint.route("/api/output/<int:output_id>/activate", methods=["PUT"])

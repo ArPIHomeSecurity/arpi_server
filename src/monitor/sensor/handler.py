@@ -347,7 +347,7 @@ class SensorHandler:
                 and delay is not None
             ):
                 self._logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert! %ss%s%| (%r)",
+                    "Sensor %s (CH%02d) has suppressed alert! %ss%s | (%r)",
                     sensor.name,
                     sensor.channel,
                     sensitivity.monitor_period,

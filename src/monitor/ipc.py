@@ -70,7 +70,6 @@ class IPCServer(Thread):
         self._logger.info("IPC server created")
 
     def _initialize_socket(self):
-
         _socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         _socket.settimeout(60)
         _socket.setblocking(False)
@@ -80,11 +79,15 @@ class IPCServer(Thread):
 
         self.create_socket_file()
         _socket.bind(MONITOR_INPUT_SOCKET)
-        _socket.listen(1)
+        _socket.listen(2)
 
         try:
             chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
-            chown(MONITOR_INPUT_SOCKET, getpwnam(environ["USERNAME"]).pw_uid, getgrnam(environ["GROUPNAME"]).gr_gid)
+            chown(
+                MONITOR_INPUT_SOCKET,
+                getpwnam(environ["USERNAME"]).pw_uid,
+                getgrnam(environ["GROUPNAME"]).gr_gid,
+            )
             self._logger.info("Socket permissions fixed")
         except KeyError as error:
             self._logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
@@ -119,7 +122,6 @@ class IPCServer(Thread):
         """
         # read all the messages
         while not self._stop_event.is_set():
-
             self._logger.trace("Waiting for connection...")
             readable, _, exceptional = select(self._sockets, [], self._sockets, 1)
 

@@ -164,7 +164,7 @@ def registration_code(user_id):
         else:
             return make_response(jsonify({"error": "User not found"}), 404)
 
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 405)
 
 
 @user_blueprint.route("/api/user/register_device", methods=["POST"])
