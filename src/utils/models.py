@@ -708,6 +708,7 @@ class User(BaseModel):
     card_registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
     fourkey_code = Column(String(64), nullable=False)
+    mcp_key = Column(String(64), nullable=True)
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 

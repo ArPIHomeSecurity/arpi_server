@@ -1,6 +1,7 @@
 from fastmcp import FastMCP
 
 from mcp_server.area import area_mcp
+from mcp_server.auth import JWTVerifier
 from mcp_server.card import card_mcp
 from mcp_server.monitoring import monitoring_mcp
 from mcp_server.output import output_mcp
@@ -64,7 +65,11 @@ def generate_system_prompt():
     return system_prompt
 
 
-main_mcp = FastMCP("ArPI home security system", instructions=generate_system_prompt())
+main_mcp = FastMCP(
+    "ArPI home security system",
+    instructions=generate_system_prompt(),
+    auth=JWTVerifier(),
+)
 mount_servers()
 
 if __name__ == "__main__":

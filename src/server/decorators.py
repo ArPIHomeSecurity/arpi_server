@@ -86,10 +86,56 @@ def registered(request_handler):
     return _registered
 
 
-def generate_user_token(id, name, role, origin):
-    token = {"id": id, "name": name, "role": role, "origin": origin, "timestamp": int(dt.now(tz=UTC).timestamp())}
+def generate_user_token(user_id: int, name: str, role: str, origin: str, ttl: int = None):
+    """
+    Generate a JWT token for a user with the given information and optional TTL.
 
-    return jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
+    :param user_id: User ID
+    :param name: User name
+    :param role: User role
+    :param origin: Origin of the request
+    :param ttl: Time-to-live for the token (optional)
+    """
+    payload = {
+        "id": user_id,
+        "name": name,
+        "role": role,
+        "origin": origin,
+        "timestamp": int(dt.now(tz=UTC).timestamp())
+    }
+
+    if ttl is not None:
+        payload["ttl"] = ttl
+
+    return _generate_token(payload, os.environ.get("SECRET"))
+
+
+def generate_mcp_token(user_id: int, key: str, ttl: int):
+    """
+    Generate a JWT token for accessing MCP Server with the given information and optional TTL.
+
+    :param user_id: User ID
+    :param key: User's MCP key
+    :param ttl: Time-to-live for the token (in seconds)
+    """
+    payload = {
+        "id": user_id,
+        "secret": key,
+        "timestamp": int(dt.now(tz=UTC).timestamp()),
+        "ttl": ttl,
+    }
+
+    return _generate_token(payload, os.environ.get("MCP_SECRET"))
+
+
+def _generate_token(payload: dict, secret: str) -> str:
+    """
+    Generate a JWT token with the given payload.
+
+    :param payload: A dictionary containing the token claims
+    :return: A JWT token as a string
+    """
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 def authenticated(role=ROLE_ADMIN):

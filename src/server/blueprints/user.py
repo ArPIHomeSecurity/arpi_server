@@ -13,6 +13,7 @@ from utils.models import User
 from server.database import db
 from server.decorators import (
     authenticated,
+    generate_mcp_token,
     generate_user_token,
     registered,
     restrict_host,
@@ -37,7 +38,12 @@ def get_users():
 @restrict_host
 def create_user():
     data = request.json
-    db_user: User = User(name=data["name"], role=data["role"], access_code=data["accessCode"], comment=data.get("comment"))
+    db_user: User = User(
+        name=data["name"],
+        role=data["role"],
+        access_code=data["accessCode"],
+        comment=data.get("comment"),
+    )
     db.session.add(db_user)
     db.session.commit()
 
@@ -68,7 +74,9 @@ def user(user_id, request_user_id=None, requester_role=None):
         if user_data.get("newAccessCode"):
             # only admin or the user itself can change the access code
             if requester_role != ROLE_ADMIN and user_id != request_user_id:
-                return make_response(jsonify({"error": "Cannot change access code of other users"}), 403)
+                return make_response(
+                    jsonify({"error": "Cannot change access code of other users"}), 403
+                )
 
             # at this point only admin or the user itself can change the access code
 
@@ -87,7 +95,6 @@ def user(user_id, request_user_id=None, requester_role=None):
             user_data["accessCode"] = user_data["newAccessCode"]
             del user_data["newAccessCode"]
             del user_data["oldAccessCode"]
-
 
         if "role" in user_data and user_data["role"] != db_user.role:
             # only admin can change roles
@@ -138,8 +145,10 @@ def registration_code(user_id):
     )
 
     # only the user itself or an admin can manage the registration code
-    if (request.environ.get("requester_role") == ROLE_USER and 
-        request.environ.get("requester_id") != user_id):
+    if (
+        request.environ.get("requester_role") == ROLE_USER
+        and request.environ.get("requester_id") != user_id
+    ):
         return make_response(jsonify({"error": "Unauthorized"}), 401)
 
     if request.method == "GET":
@@ -264,6 +273,74 @@ def authenticate():
 
     sleep(2)
     return jsonify(False)
+
+
+@user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["POST"])
+@authenticated()
+@restrict_host
+def get_mcp_token(user_id: int, ttl: int = 0):
+    """
+    Generate a token for accessing MCP Server with the given TTL (in seconds).
+    """
+    requester_role = request.environ.get("requester_role")
+    if requester_role == ROLE_ADMIN:
+        db_user: User = db.session.query(User).get(user_id)
+        if not db_user:
+            return make_response(jsonify({"error": "User not found"}), 404)
+
+        if db_user.mcp_key is None:
+            # generate a random key if not set
+            db_user.mcp_key = os.urandom(32).hex().upper()
+            db.session.commit()
+
+        token = generate_mcp_token(
+            user_id=db_user.id,
+            key=db_user.mcp_key,
+            ttl=ttl,
+        )
+        return jsonify(token)
+    else:
+        return make_response(jsonify({"error": "Only admin users can generate MCP tokens"}), 403)
+
+
+@user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["GET"])
+@authenticated()
+@restrict_host
+def has_mcp_token(user_id: int):
+    """
+    Check if the user has an MCP token.
+    """
+    requester_role = request.environ.get("requester_role")
+    if requester_role == ROLE_ADMIN:
+        db_user: User = db.session.query(User).get(user_id)
+        if not db_user:
+            return make_response(jsonify({"error": "User not found"}), 404)
+
+        return jsonify({
+            "has_mcp_token": db_user.mcp_key is not None
+        })
+    else:
+        return make_response(jsonify({"error": "operation not permitted"}), 403)
+
+
+@user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["DELETE"])
+@authenticated()
+@restrict_host
+def remove_mcp_token(user_id: int):
+    """
+    Remove the user's MCP token.
+    """
+    requester_role = request.environ.get("requester_role")
+    if requester_role == ROLE_ADMIN:
+        db_user: User = db.session.query(User).get(user_id)
+        if not db_user:
+            return make_response(jsonify({"error": "User not found"}), 404)
+
+        db_user.mcp_key = None
+        db.session.commit()
+        return jsonify(None)
+    else:
+        return make_response(jsonify({"error": "operation not permitted"}), 403)
 
 
 @user_blueprint.route("/api/user/<int:user_id>/register_card", methods=["PUT"])
