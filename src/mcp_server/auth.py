@@ -37,14 +37,14 @@ class JWTVerifier(TokenVerifier):
             return None
 
         timestamp = int(claims.get("timestamp", 0))
-        now = int(dt.now(tz=UTC).timestamp())
-        if timestamp < now - USER_TOKEN_EXPIRY:
+        ttl = claims.get("ttl", USER_TOKEN_EXPIRY)
+        if ttl > 0 and timestamp < int(dt.now(tz=UTC).timestamp()) - ttl:
             return None
 
         role = claims.get("role")
         scopes = _role_to_scopes(role)
         client_id = claims.get("id") or claims.get("name") or claims.get("sub") or "unknown"
-        expires_at = timestamp + USER_TOKEN_EXPIRY
+        expires_at = timestamp + ttl if ttl > 0 else None
         return AccessToken(
             token=token,
             client_id=str(client_id),
