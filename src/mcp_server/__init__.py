@@ -5,10 +5,15 @@ from mcp_server.auth import JWTVerifier
 from mcp_server.card import card_mcp
 from mcp_server.monitoring import monitoring_mcp
 from mcp_server.output import output_mcp
+from mcp_server.option.syren import syren_option_mcp
+from mcp_server.option.alert_sensitivity import alert_sensitivity_option_mcp
+from mcp_server.option.ssh import ssh_option_mcp
+from mcp_server.option.dyndns import dyndns_option_mcp
 from mcp_server.prompts import prompts_mcp
 from mcp_server.sensor import sensor_mcp
 from mcp_server.user import user_mcp
 from mcp_server.zone import zone_mcp
+
 from monitor.database import get_database_session
 from utils.models import (
     ChannelTypes,
@@ -16,6 +21,7 @@ from utils.models import (
     SensorEOLCount,
     SensorType,
 )
+
 
 PROMPT_DYNAMIC_DATA = """
 #################################################
@@ -39,6 +45,11 @@ def mount_servers():
     main_mcp.mount(sensor_mcp, prefix="sensor")
     main_mcp.mount(user_mcp, prefix="user")
     main_mcp.mount(zone_mcp, prefix="zone")
+
+    main_mcp.mount(syren_option_mcp, prefix="option_syren")
+    main_mcp.mount(alert_sensitivity_option_mcp, prefix="option_alert_sensitivity")
+    main_mcp.mount(ssh_option_mcp, prefix="option_ssh")
+    main_mcp.mount(dyndns_option_mcp, prefix="option_dyndns")
 
 
 def generate_system_prompt():

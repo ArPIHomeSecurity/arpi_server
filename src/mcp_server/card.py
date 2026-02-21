@@ -9,10 +9,10 @@ card_mcp = FastMCP("ArPI - card service")
 session = get_database_session()
 
 @card_mcp.resource(
-        uri="resources://cards/{user_id}",
-        name="all",
-        description="Retrieve all existing cards or cards for a specific user when user_id is provided",
-        mime_type="application/json",
+    uri="cards://user/{user_id}",
+    name="user_cards",
+    description="Retrieve all existing cards or cards for a specific user when user_id is provided",
+    mime_type="application/json",
 )
 def get_cards(user_id=None):
     """

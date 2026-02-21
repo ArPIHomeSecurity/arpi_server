@@ -8,8 +8,8 @@ from enum import Enum
 
 import paho.mqtt.client as mqtt
 
+from monitor.config.models import MQTTConfigExternalPublish, MQTTConfigInternalPublish, MQTTConnection
 from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
-from monitor.config_helper import load_mqtt_connection_config, load_mqtt_internal_publish_config, load_mqtt_external_publish_config
 
 
 def sanitize(name):
@@ -51,7 +51,7 @@ class MQTTClient:
         Connect to MQTT broker.
         """
 
-        mqtt_connection = load_mqtt_connection_config()
+        mqtt_connection = MQTTConnection.load_config()
         if mqtt_connection is None or not mqtt_connection.enabled:
             self._logger.info("MQTT connection is not enabled")
             return
@@ -68,10 +68,10 @@ class MQTTClient:
 
         mqtt_config = None
         if mqtt_connection.external:
-            mqtt_config = load_mqtt_external_publish_config()
+            mqtt_config = MQTTConfigExternalPublish.load_config()
             self._logger.info("Using external MQTT connection configuration")
         else:
-            mqtt_config = load_mqtt_internal_publish_config()
+            mqtt_config = MQTTConfigInternalPublish.load_config()
             self._logger.info("Using internal MQTT connection configuration")
 
         username = mqtt_config.username

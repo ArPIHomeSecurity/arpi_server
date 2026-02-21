@@ -14,6 +14,12 @@ class ObjectNotChanged(Exception):
     """Raised when an object is not changed."""
 
 
+class TestingNotAllowed(Exception):
+    """Raised when testing is not allowed."""
+
+    def __init__(self):
+        super().__init__("Testing is not allowed currently.")
+
 class ConfigChangesNotAllowed(Exception):
     """Exception raised when configuration changes are not allowed."""
 
@@ -36,6 +42,17 @@ class BaseService:
 
         Returns:
             bool: True if changes are allowed, False otherwise.
+        """
+        arm_state = get_arm_state(session=self._db_session)
+        return arm_state == ARM_DISARM
+
+    @property
+    def is_testing_allowed(self):
+        """
+        Check if testing is allowed in the current context.
+
+        Returns:
+            bool: True if testing is allowed, False otherwise.
         """
         arm_state = get_arm_state(session=self._db_session)
         return arm_state == ARM_DISARM

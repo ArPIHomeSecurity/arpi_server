@@ -5,6 +5,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import Field
 
+from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from mcp_server.models.zone import ArmType
 from monitor.database import get_database_session
 from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
@@ -54,9 +55,12 @@ def get_zone(zone_id: int):
     """
     Retrieve a zone by its ID.
     """
-    zone_service = ZoneService(session)
-    zone = zone_service.get_zone(zone_id)
-    return zone.serialized if zone else None
+    try:
+        zone_service = ZoneService(session)
+        zone = zone_service.get_zone(zone_id)
+        return zone.serialized if zone else None
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Zone")
 
 
 @zone_mcp.tool(
@@ -69,9 +73,12 @@ def get_zone_tool(zone_id: int):
     Args:
         zone_id: The ID of the zone to retrieve
     """
-    zone_service = ZoneService(session)
-    zone = zone_service.get_zone(zone_id)
-    return zone.serialized if zone else None
+    try:
+        zone_service = ZoneService(session)
+        zone = zone_service.get_zone(zone_id)
+        return zone.serialized if zone else None
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Zone")
 
 
 @zone_mcp.tool(
@@ -115,7 +122,7 @@ def create_zone(
         )
         return new_zone.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except AssertionError as e:
         raise ToolError(str(e))
 
@@ -169,14 +176,14 @@ def update_zone(
             del zone_data[key]
 
     try:
-        updated_zone = zone_service.update_zone(zone_id=zone_id, zone_data=zone_data)
+        updated_zone = zone_service.update_zone(zone_id=zone_id, **zone_data)
         return updated_zone.serialized if updated_zone else None
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotChanged:
         raise ToolError("No changes made to the zone")
     except ObjectNotFound:
-        raise ToolError("Zone not found")
+        raise ToolObjectNotFound("Zone")
     except AssertionError as e:
         raise ToolError(str(e))
 
@@ -192,19 +199,22 @@ def disable_zone_alarm(zone_id: int, arm_type: ArmType):
         zone_id: ID of the zone to disable the alarm for
         arm_type: The arm type to set after disabling the alarm
     """
-    zone_service = ZoneService(session)
-    zone_data = {}
-    if arm_type == ArmType.STAY:
-        zone_data["stay_arm_delay"] = None
-        zone_data["stay_alert_delay"] = None
-    elif arm_type == ArmType.AWAY:
-        zone_data["away_arm_delay"] = None
-        zone_data["away_alert_delay"] = None
-    elif arm_type == ArmType.DISARM:
-        zone_data["disarmed_delay"] = None
+    try:
+        zone_service = ZoneService(session)
+        zone_data = {}
+        if arm_type == ArmType.STAY:
+            zone_data["stay_arm_delay"] = None
+            zone_data["stay_alert_delay"] = None
+        elif arm_type == ArmType.AWAY:
+            zone_data["away_arm_delay"] = None
+            zone_data["away_alert_delay"] = None
+        elif arm_type == ArmType.DISARM:
+            zone_data["disarmed_delay"] = None
 
-    updated_zone = zone_service.update_zone(zone_id=zone_id, zone_data=zone_data)
-    return updated_zone.serialized if updated_zone else None
+        updated_zone = zone_service.update_zone(zone_id=zone_id, **zone_data)
+        return updated_zone.serialized if updated_zone else None
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Zone")
 
 
 @zone_mcp.tool(
@@ -222,6 +232,6 @@ def delete_zone(zone_id: int):
         ZoneService(session).delete_zone(zone_id)
         return "Success"
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Zone not found")
+        raise ToolObjectNotFound("Zone")

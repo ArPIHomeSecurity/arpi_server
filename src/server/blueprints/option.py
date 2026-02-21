@@ -2,17 +2,22 @@ import hashlib
 import json
 import os
 
-from flask import jsonify, request, Response
+from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
 from flask.helpers import make_response
-from utils.models import Option
 
-from server.decorators import authenticated, restrict_host
+from monitor.config.models import DyndnsConfig, SSHConfig, SyrenConfig, AlertSensitivityConfig
 from server.database import db
+from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
+from server.services.base import TestingNotAllowed
+from server.services.option.alert_sensitivity import AlertSensitivityService
+from server.services.option.syren import SyrenService
+from server.services.option.ssh import SSHService
+from server.services.option.dyndns import DyndnsService
 from server.tools import process_ipc_response
 from tools.certbot import Certbot
-
+from utils.models import Option
 
 config_blueprint = Blueprint("configuration", __name__)
 
@@ -21,38 +26,55 @@ config_blueprint = Blueprint("configuration", __name__)
 @authenticated()
 @restrict_host
 def option_get(option, section) -> Response:
+    if option not in ["syren", "alert", "notifications", "network", "mqtt", "dyndns"]:
+        return make_response(jsonify(None), 404)
+
     db_option = db.session.query(Option).filter_by(name=option, section=section).first()
-    if db_option:
-        return jsonify(db_option.serialized) if db_option else jsonify(None)
-
-    return make_response(jsonify(None), 404)
+    return jsonify(db_option.serialized) if db_option else jsonify(None)
 
 
-@config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["PUT"])
+@config_blueprint.route("/api/config/<string:option_name>/<string:section>", methods=["PUT"])
 @authenticated()
 @restrict_host
-def option_put(option, section) -> Response:
-    db_option = db.session.query(Option).filter_by(name=option, section=section).first()
+def option_put(option_name, section) -> Response:
+    # handle syren configuration separately
+    # we will move all the other options to services later
+    if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
+        syren_service = SyrenService(db.session)
+        syren_service.set_syren_config(SyrenConfig(**request.json))
+        return make_response("", 200)
+    elif (
+        option_name == AlertSensitivityConfig.OPTION_NAME
+        and section == AlertSensitivityConfig.SECTION_NAME
+    ):
+        alert_sensitivity_service = AlertSensitivityService(db.session)
+        alert_sensitivity_service.set_alert_sensitivity_config(
+            AlertSensitivityConfig(**request.json)
+        )
+        return make_response("", 200)
+    elif option_name == SSHConfig.OPTION_NAME and section == SSHConfig.SECTION_NAME:
+        ssh_service = SSHService(db.session)
+        ssh_service.set_ssh_config(SSHConfig(**request.json))
+        return make_response("", 200)
+    elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
+        dyndns_service = DyndnsService(db.session)
+        dyndns_service.set_dyndns_config(DyndnsConfig(**request.json))
+        return make_response("", 200)
+
+    # handle other options
+    db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
     if not db_option:
         # create the new option
-        db_option = Option(name=option, section=section, value="")
+        db_option = Option(name=option_name, section=section, value="")
         db.session.add(db_option)
 
     # do update
     changed = db_option.update_value(request.json)
     db.session.commit()
 
-    if option == "notifications":
+    if option_name == "notifications":
         if changed:
             return process_ipc_response(IPCClient().update_configuration())
-    elif db_option.name == "network" and db_option.section == "dyndns":
-        # update dyndns in production mode
-        if os.environ.get("USE_SECURE_CONNECTION", "true").lower() == "true":
-            return process_ipc_response(IPCClient().update_dyndns())
-    elif db_option.name == "network" and db_option.section == "access":
-        # update ssh service in production mode
-        if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
-            return process_ipc_response(IPCClient().update_ssh())
     elif (
         db_option.name == "mqtt"
         and db_option.section == "connection"
@@ -99,12 +121,13 @@ def test_call():
 @authenticated()
 @restrict_host
 def test_syren():
-    if request.method == "GET":
-        return process_ipc_response(
-            IPCClient().send_test_syren(int(request.args.get("duration", None)))
+    try:
+        option_service = SyrenService(db.session)
+        return process_ipc_response(option_service.test_syren(duration=5))
+    except TestingNotAllowed:
+        return make_response(
+            jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
         )
-
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
 
 
 @config_blueprint.route("/api/config/sms", methods=["GET"])

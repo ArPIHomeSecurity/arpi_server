@@ -4,6 +4,7 @@ from fastmcp.exceptions import ToolError
 from pydantic import Field
 from typing_extensions import Annotated
 
+from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.output import OutputService
@@ -50,9 +51,10 @@ def get_output_by_id(output_id: int):
     """
     try:
         output_service = OutputService(session)
-        return output_service.get_output_by_id(output_id)
+        output = output_service.get_output_by_id(output_id)
+        return output.serialized if output else None
     except ObjectNotFound:
-        raise ToolError("Output not found")
+        raise ToolObjectNotFound("Output")
 
 
 @output_mcp.tool(
@@ -66,9 +68,10 @@ def get_output_tool(output_id: int):
     """
     try:
         output_service = OutputService(session)
-        return output_service.get_output_by_id(output_id)
+        output = output_service.get_output_by_id(output_id)
+        return output.serialized if output else None
     except ObjectNotFound:
-        raise ToolError("Output not found")
+        raise ToolObjectNotFound("Output")
 
 
 @output_mcp.resource(
@@ -130,7 +133,7 @@ def create_output(
         )
         return new_output.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except AssertionError as e:
         raise ToolError(str(e))
 
@@ -140,7 +143,9 @@ def create_output(
 )
 def update_output(
     output_id: int,
-    name: Annotated[str, Field(description="The new name of the output", length=Output.NAME_LENGTH)] = None,
+    name: Annotated[
+        str, Field(description="The new name of the output", length=Output.NAME_LENGTH)
+    ] = None,
     description: Annotated[str, "The new description of the output"] = None,
     channel: Annotated[int, "The new channel number for the output"] = None,
     trigger_type: Annotated[OutputTriggerType, "The new trigger type for the output"] = None,
@@ -186,9 +191,9 @@ def update_output(
         updated_output = output_service.update_output(output_id, **kwargs)
         return updated_output.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Output not found")
+        raise ToolObjectNotFound("Output")
     except ObjectNotChanged:
         raise ToolError("No changes made to the output")
     except AssertionError as e:
@@ -208,6 +213,6 @@ def delete_output(output_id: int):
         OutputService(session).delete_output(output_id)
         return "Success"
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Output not found")
+        raise ToolObjectNotFound("Output")

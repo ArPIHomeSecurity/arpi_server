@@ -1,9 +1,12 @@
+# pylint: disable=raise-missing-from
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
+from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from server.services.area import AreaService
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
+                                  ObjectNotFound)
 
 area_mcp = FastMCP("ArPI - area service")
 
@@ -49,7 +52,7 @@ def get_area(area_id: int):
         area = area_service.get_area(area_id)
         return area.serialized if area else None
     except ObjectNotFound:
-        raise ToolError("Area not found")
+        raise ToolObjectNotFound("Area")
 
 
 @area_mcp.tool(
@@ -67,7 +70,7 @@ def get_area_tool(area_id: int):
         area = area_service.get_area(area_id)
         return area.serialized if area else None
     except ObjectNotFound:
-        raise ToolError("Area not found")
+        raise ToolObjectNotFound("Area")
 
 
 @area_mcp.tool(
@@ -84,7 +87,7 @@ def create_area(name: str):
         new_area = AreaService(session).create_area(name=name)
         return new_area.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except AssertionError as e:
         raise ToolError(str(e))
 
@@ -105,9 +108,9 @@ def update_area(area_id: int, area_name: str):
         updated_area = area_service.update_area(area_id, area_name)
         return updated_area.serialized if updated_area else None
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Area not found")
+        raise ToolObjectNotFound("Area")
     except ObjectNotChanged:
         raise ToolError("No changes made to the area")
     except AssertionError as e:
@@ -129,8 +132,8 @@ def delete_area(area_id: int):
         area_service.delete_area(area_id)
         return "Success"
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Area not found")
+        raise ToolObjectNotFound("Area")
     except ObjectNotChanged:
         raise ToolError("Area cannot be deleted")

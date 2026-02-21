@@ -1,11 +1,10 @@
 import logging
-import os
 
 from threading import Thread, Event
 from time import time, sleep
 
 from utils.models import Alert
-from monitor.config_helper import SyrenConfig, load_syren_config
+from monitor.config.models import SyrenConfig
 from monitor.database import get_database_session
 from monitor.socket_io import send_syren_state
 
@@ -40,7 +39,7 @@ class Syren(Thread):
         logger = logging.getLogger(LOG_ALERT)
         logger.debug("Starting syren...")
 
-        config = load_syren_config()
+        config = SyrenConfig.load_config()
         if config is None:
             logging.info("Missing ssh settings!")
             config = SyrenConfig(cls.SILENT, cls.DELAY, cls.DURATION)

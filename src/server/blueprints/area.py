@@ -54,7 +54,7 @@ def manage_area(area_id):
             area = area_service.get_area(area_id)
             return jsonify(area.serialized)
         elif request.method == "PUT":
-            area = area_service.update_area(area_id, request.json)
+            area = area_service.update_area(area_id, request.json.get("name"))
             return jsonify(area.serialized)
         elif request.method == "DELETE":
             area_service.delete_area(area_id)

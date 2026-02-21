@@ -1,8 +1,9 @@
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from monitor.database import get_database_session
 from server.ipc import IPCClient
-from server.tools import get_ipc_response
+from server.tools import evaluate_ipc_response
 from utils.constants import ARM_DISARM
 from utils.queries import get_arm_state
 
@@ -21,10 +22,14 @@ def update_configuration_tool():
     """
     arm_state = get_arm_state(session=session)
     if arm_state != ARM_DISARM:
-        raise Exception("Cannot update configuration while system is armed.")
+        raise ToolError("Cannot update configuration while system is armed.")
 
-    result,_ = get_ipc_response(IPCClient().update_configuration())
-    return result
+    response = IPCClient().update_configuration()
+    if response is not None:
+        _, success = evaluate_ipc_response(response)
+        return "Success" if success else "Failed"
+
+    return "Success"
 
 @monitoring_mcp.tool(
     name="get_arm_state",

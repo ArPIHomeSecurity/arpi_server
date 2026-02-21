@@ -10,7 +10,7 @@ from time import time
 from cryptography import x509
 
 from utils.constants import LOG_SC_CERTBOT
-from monitor.config_helper import load_dyndns_config
+from monitor.config.models import DyndnsConfig
 from utils.dictionary import filter_keys
 
 
@@ -27,7 +27,7 @@ class Certbot:
         Returns: True if the certificate was generated, False otherwise
         """
         self._logger.info("Generating certbot certificate...")
-        dyndns_config = load_dyndns_config()
+        dyndns_config = DyndnsConfig.load_config()
         if not dyndns_config.provider:
             self._logger.info("No dynamic dns provider found")
             return False
@@ -153,7 +153,7 @@ class Certbot:
         """
         Updates the server_name in the remote.conf file
         """
-        dyndns_config = load_dyndns_config()
+        dyndns_config = DyndnsConfig.load_config()
         if not dyndns_config:
             self._logger.info("Missing dynamic dns configuration")
             return
@@ -213,7 +213,7 @@ class Certbot:
                 ].value
                 self._logger.info("Domain in certificate: %s", cert_domain)
 
-        dyndns_config = load_dyndns_config()
+        dyndns_config = DyndnsConfig.load_config()
         if dyndns_config and dyndns_config.hostname == cert_domain:
             self._logger.info("Domain not changed")
             return False

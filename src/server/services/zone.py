@@ -1,5 +1,5 @@
 """
-Card service module to handle card-related operations.
+Zone service module to handle zone-related operations.
 """
 
 from server.ipc import IPCClient

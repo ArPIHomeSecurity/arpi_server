@@ -3,7 +3,7 @@ import os
 from typing import List
 
 from utils.constants import LOG_MONITOR
-from monitor.config_helper import AlertSensitivityConfig
+from monitor.config.models import AlertSensitivityConfig
 
 
 class SensorHistory:

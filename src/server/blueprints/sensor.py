@@ -68,24 +68,30 @@ def manage_sensor(sensor_id):
             sensor = sensor_service.get_sensor(sensor_id)
             return jsonify(sensor.serialized)
         elif request.method == "PUT":
-            updated_sensor = sensor_service.update_sensor(sensor_id, 
-                name=request.json.get("name"),
-                description=request.json.get("description"),
-                area_id=request.json.get("areaId"),
-                zone_id=request.json.get("zoneId"),
-                channel=request.json.get("channel"),
-                channel_type=request.json.get("channelType"),
-                enabled=request.json.get("enabled"),
-                sensor_contact_type=request.json.get("sensorContactType"),
-                sensor_eol_count=request.json.get("sensorEolCount"),
-                sensor_type_id=request.json.get("typeId"),
-            )
+            sensor_data = request.json or {}
+            update_kwargs = {}
+            field_mapping = {
+                "name": "name",
+                "description": "description",
+                "area_id": "areaId",
+                "zone_id": "zoneId",
+                "channel": "channel",
+                "channel_type": "channelType",
+                "enabled": "enabled",
+                "sensor_contact_type": "sensorContactType",
+                "sensor_eol_count": "sensorEolCount",
+                "sensor_type_id": "typeId",
+            }
+            for arg_name, json_key in field_mapping.items():
+                if json_key in sensor_data:
+                    update_kwargs[arg_name] = sensor_data[json_key]
+            updated_sensor = sensor_service.update_sensor(sensor_id, **update_kwargs)
             return jsonify(updated_sensor.serialized)
         elif request.method == "DELETE":
             sensor_service.delete_sensor(sensor_id)
             return make_response("Deleted", 204)
 
-        make_response(jsonify({"error": "Method not allowed"}), 405)
+        return make_response(jsonify({"error": "Method not allowed"}), 405)
     except ConfigChangesNotAllowed:
         return make_response(
             jsonify({"error": "Configuration changes are not allowed currently"}), 409

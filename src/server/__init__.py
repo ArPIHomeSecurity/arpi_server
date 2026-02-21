@@ -10,7 +10,7 @@ from server.blueprints.area import area_blueprint
 from server.blueprints.arm import arm_blueprint
 from server.blueprints.card import card_blueprint
 from server.blueprints.clock import clock_blueprint
-from server.blueprints.config import config_blueprint
+from server.blueprints.option import config_blueprint
 from server.blueprints.generic import generic_blueprint
 from server.blueprints.keypad import keypad_blueprint
 from server.blueprints.monitor import monitor_blueprint

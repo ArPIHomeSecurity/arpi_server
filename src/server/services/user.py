@@ -1,5 +1,5 @@
 """
-Card service module to handle card-related operations.
+User service module to handle user-related operations.
 """
 
 from server.services.base import BaseService

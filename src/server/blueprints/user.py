@@ -278,10 +278,15 @@ def authenticate():
 @user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["POST"])
 @authenticated()
 @restrict_host
-def get_mcp_token(user_id: int, ttl: int = 0):
+def get_mcp_token(user_id: int):
     """
     Generate a token for accessing MCP Server with the given TTL (in seconds).
+
+    Args:
+        user_id: The ID of the user for whom to generate the token
+        ttl: Time to live for the token in seconds (optional, default is 0 for no expiration)
     """
+    ttl = int(request.args.get("ttl", 0))
     requester_role = request.environ.get("requester_role")
     if requester_role == ROLE_ADMIN:
         db_user: User = db.session.query(User).get(user_id)

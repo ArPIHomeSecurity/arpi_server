@@ -40,12 +40,7 @@ from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
-from monitor.config_helper import (
-    load_alert_sensitivity_config,
-    load_dyndns_config,
-    load_ssh_config,
-    load_syren_config,
-)
+from monitor.config.models import DyndnsConfig, SSHConfig, SyrenConfig, AlertSensitivityConfig
 from monitor.sensor.handler import SensorHandler
 from monitor.storage import States, State
 from monitor.adapters.power import get_power_adapter
@@ -434,8 +429,8 @@ class Monitor(Thread):
             send_alert_state(None)
 
         # overwrite invalid values in the database with default values
-        load_ssh_config(cleanup=True, session=self._db_session)
-        load_syren_config(cleanup=True, session=self._db_session)
-        load_alert_sensitivity_config(cleanup=True, session=self._db_session)
-        load_dyndns_config(cleanup=True, session=self._db_session)
+        SSHConfig.load_config(cleanup=True, session=self._db_session)
+        SyrenConfig.load_config(cleanup=True, session=self._db_session)
+        AlertSensitivityConfig.load_config(cleanup=True, session=self._db_session)
+        DyndnsConfig.load_config(cleanup=True, session=self._db_session)
         self._db_session.commit()

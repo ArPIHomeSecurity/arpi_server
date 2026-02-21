@@ -19,7 +19,8 @@ output_blueprint = Blueprint("output", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_outputs():
-    return jsonify([i.serialized for i in db.session.query(Output).all()])
+    output_service = OutputService(db.session)
+    return jsonify([i.serialized for i in output_service.get_outputs()])
 
 
 @output_blueprint.route("/api/outputs/", methods=["POST"])
@@ -82,7 +83,7 @@ def manage_output(output_id):
             output_service.delete_output(output_id)
             return make_response("Deleted", 204)
 
-        make_response(jsonify({"error": "Method not allowed"}), 405)
+        return make_response(jsonify({"error": "Method not allowed"}), 405)
     except ConfigChangesNotAllowed:
         return make_response(
             jsonify({"error": "Configuration changes are not allowed currently"}), 409

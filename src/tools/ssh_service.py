@@ -5,8 +5,8 @@ import os
 import subprocess
 from ipaddress import ip_network
 
+from monitor.config.models import SSHConfig
 from utils.constants import LOG_SC_ACCESS
-from monitor.config_helper import load_ssh_config
 from monitor.database import get_database_session
 
 
@@ -14,7 +14,7 @@ class SSHService:
     def __init__(self):
         super(SSHService, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
-        self._ssh_config = load_ssh_config(get_database_session(new_connection=True))
+        self._ssh_config = SSHConfig.load_config(get_database_session(new_connection=True))
 
     def update_service_state(self):
         self._logger.debug("Updating SSH service state...")

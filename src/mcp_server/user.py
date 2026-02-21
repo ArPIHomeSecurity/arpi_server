@@ -11,7 +11,7 @@ session = get_database_session()
 
 
 @user_mcp.resource(
-    uri="resources://users",
+    uri="users://all",
     name="all",
     description="Retrieve all existing users",
     mime_type="application/json",
@@ -36,7 +36,7 @@ def get_users_tool():
 
 
 @user_mcp.resource(
-    uri="resources://users/{user_id}",
+    uri="users://{user_id}",
     name="User by ID",
     description="Retrieve a specific user by their ID",
     mime_type="application/json",

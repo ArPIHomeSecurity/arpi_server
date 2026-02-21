@@ -60,15 +60,16 @@ def manage_zone(zone_id):
             zone = zone_service.get_zone(zone_id)
             return jsonify(zone.serialized)
         elif request.method == "PUT":
-            updated_zone = zone_service.update_zone(zone_id,
-                name=request.json["name"],
-                description=request.json.get("description", ""),
-                disarmed_delay=request.json.get("disarmedDelay"),
-                away_alert_delay=request.json.get("awayAlertDelay", 0),
-                stay_alert_delay=request.json.get("stayAlertDelay", 0),
-                away_arm_delay=request.json.get("awayArmDelay", 0),
-                stay_arm_delay=request.json.get("stayArmDelay", 0),
-            )
+            zone_data = {
+                "name": request.json["name"],
+                "description": request.json.get("description", ""),
+                "disarmed_delay": request.json.get("disarmedDelay"),
+                "away_alert_delay": request.json.get("awayAlertDelay", 0),
+                "stay_alert_delay": request.json.get("stayAlertDelay", 0),
+                "away_arm_delay": request.json.get("awayArmDelay", 0),
+                "stay_arm_delay": request.json.get("stayArmDelay", 0),
+            }
+            updated_zone = zone_service.update_zone(zone_id=zone_id, **zone_data)
             return jsonify(updated_zone.serialized)
         elif request.method == "DELETE":
             zone_service.delete_zone(zone_id)

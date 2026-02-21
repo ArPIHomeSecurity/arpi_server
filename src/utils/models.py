@@ -1100,7 +1100,7 @@ class Output(BaseModel):
                 )
             )
         )
-    
+
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= Output.NAME_LENGTH, (

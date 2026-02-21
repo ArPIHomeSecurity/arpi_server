@@ -4,6 +4,7 @@ import os
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
+from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.sensor import ChannelConflictError, SensorService
@@ -53,9 +54,10 @@ def get_sensor(sensor_id: int):
     """
     try:
         sensor_service = SensorService(session)
-        return sensor_service.get_sensor(sensor_id)
+        sensor = sensor_service.get_sensor(sensor_id)
+        return sensor.serialized if sensor else None
     except ObjectNotFound:
-        raise ToolError("Sensor not found")
+        raise ToolObjectNotFound("Sensor")
 
 
 @sensor_mcp.tool(
@@ -70,9 +72,10 @@ def get_sensor_tool(sensor_id: int):
     """
     try:
         sensor_service = SensorService(session)
-        return sensor_service.get_sensor(sensor_id)
+        sensor = sensor_service.get_sensor(sensor_id)
+        return sensor.serialized if sensor else None
     except ObjectNotFound:
-        raise ToolError("Sensor not found")
+        raise ToolObjectNotFound("Sensor")
 
 
 @sensor_mcp.resource(
@@ -199,7 +202,7 @@ def create_sensor(
         )
         return new_sensor.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ChannelConflictError:
         raise ToolError("Channel conflict with existing sensors")
     except AssertionError as e:
@@ -271,15 +274,15 @@ def update_sensor(
 
     try:
         updated_sensor = SensorService(session).update_sensor(
-            sensor_id=sensor_id, sensor_data=sensor_data
+            sensor_id=sensor_id, **sensor_data
         )
         return updated_sensor.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotChanged:
         raise ToolError("No changes made to the sensor")
     except ObjectNotFound:
-        raise ToolError("Sensor not found")
+        raise ToolObjectNotFound("Sensor")
     except ChannelConflictError:
         raise ToolError("Channel conflict with existing sensors")
     except AssertionError as e:
@@ -303,15 +306,15 @@ def disable_sensor_custom_sensitivity(sensor_id: int):
 
     try:
         updated_sensor = SensorService(session).update_sensor(
-            sensor_id=sensor_id, sensor_data=sensor_data
+            sensor_id=sensor_id, **sensor_data
         )
         return updated_sensor.serialized
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotChanged:
         raise ToolError("No changes made to the sensor")
     except ObjectNotFound:
-        raise ToolError("Sensor not found")
+        raise ToolObjectNotFound("Sensor")
     except ChannelConflictError:
         raise ToolError("Channel conflict with existing sensors")
 
@@ -327,6 +330,6 @@ def delete_sensor(sensor_id):
         SensorService(session).delete_sensor(sensor_id=sensor_id)
         return "Success"
     except ConfigChangesNotAllowed:
-        raise ToolError("Configuration changes are not allowed currently")
+        raise ToolChangesNotAllowed()
     except ObjectNotFound:
-        raise ToolError("Sensor not found")
+        raise ToolObjectNotFound("Sensor")
