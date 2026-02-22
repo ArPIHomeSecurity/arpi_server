@@ -4,7 +4,6 @@ from time import sleep
 from dateutil.tz.tz import tzlocal
 
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 from flask import jsonify, request, current_app
 from jose import jwt
 
@@ -61,11 +60,11 @@ def user(user_id, request_user_id=None, requester_role=None):
         request.environ.get("requester_role") == ROLE_USER
         and request.environ.get("requester_id") != user_id
     ):
-        return make_response(jsonify({"error": "Unauthorized"}), 401)
+        return jsonify({"error": "Unauthorized"}), 401
 
     db_user: User = db.session.query(User).get(user_id)
     if not db_user:
-        return make_response(jsonify({"error": "User not found"}), 404)
+        return jsonify({"error": "User not found"}), 404
 
     if request.method == "GET":
         return jsonify(db_user.serialized)
@@ -74,9 +73,7 @@ def user(user_id, request_user_id=None, requester_role=None):
         if user_data.get("newAccessCode"):
             # only admin or the user itself can change the access code
             if requester_role != ROLE_ADMIN and user_id != request_user_id:
-                return make_response(
-                    jsonify({"error": "Cannot change access code of other users"}), 403
-                )
+                return jsonify({"error": "Cannot change access code of other users"}), 403
 
             # at this point only admin or the user itself can change the access code
 
@@ -86,7 +83,7 @@ def user(user_id, request_user_id=None, requester_role=None):
             elif user_id == request_user_id:
                 # users can only change their own access code with the correct old access code
                 if not db_user.check_access_code(user_data["oldAccessCode"]):
-                    return make_response(jsonify({"error": "Invalid old access code"}), 400)
+                    return jsonify({"error": "Invalid old access code"}), 400
 
                 state = inspect(db_user)
                 if state.modified:
@@ -99,12 +96,12 @@ def user(user_id, request_user_id=None, requester_role=None):
         if "role" in user_data and user_data["role"] != db_user.role:
             # only admin can change roles
             if requester_role != ROLE_ADMIN:
-                return make_response(jsonify({"error": "Cannot change user role"}), 403)
+                return jsonify({"error": "Cannot change user role"}), 403
 
         current_app.logger.debug("Updating user %s", db_user)
         if not db_user.update(request.json):
             # nothing changed
-            return make_response("", 204)
+            return "", 204
 
         current_app.logger.debug("Updated user %s", db_user)
         db.session.commit()
@@ -117,7 +114,7 @@ def user(user_id, request_user_id=None, requester_role=None):
 def delete_user(user_id):
     db_user: User = db.session.query(User).get(user_id)
     if not db_user:
-        return make_response(jsonify({"error": "User not found"}), 404)
+        return jsonify({"error": "User not found"}), 404
 
     db.session.delete(db_user)
     db.session.commit()
@@ -149,20 +146,20 @@ def registration_code(user_id):
         request.environ.get("requester_role") == ROLE_USER
         and request.environ.get("requester_id") != user_id
     ):
-        return make_response(jsonify({"error": "Unauthorized"}), 401)
+        return jsonify({"error": "Unauthorized"}), 401
 
     if request.method == "GET":
         db_user: User = db.session.query(User).get(user_id)
         if db_user:
             if db_user.registration_code:
-                return make_response(jsonify({"error": "Already has registration code"}), 400)
+                return jsonify({"error": "Already has registration code"}), 400
 
             expiry = int(request.args.get("expiry")) if request.args.get("expiry") else None
             code = db_user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
 
-        return make_response(jsonify({"error": "User not found"}), 404)
+        return jsonify({"error": "User not found"}), 404
     elif request.method == "DELETE":
         db_user: User = db.session.query(User).get(user_id)
         if db_user:
@@ -171,9 +168,9 @@ def registration_code(user_id):
             db.session.commit()
             return jsonify(None)
         else:
-            return make_response(jsonify({"error": "User not found"}), 404)
+            return jsonify({"error": "User not found"}), 404
 
-    return make_response(jsonify({"error": "Unknown action"}), 405)
+    return jsonify({"error": "Unknown action"}), 405
 
 
 @user_blueprint.route("/api/user/register_device", methods=["POST"])
@@ -199,15 +196,12 @@ def register_device():
         if db_user:
             if db_user.registration_expiry and dt.now(tzlocal()) > db_user.registration_expiry:
                 sleep(5)
-                return make_response(
-                    jsonify(
-                        {
-                            "error": "Failed to register device",
-                            "reason": "Expired registration code",
-                        }
-                    ),
-                    400,
-                )
+                return jsonify(
+                    {
+                        "error": "Failed to register device",
+                        "reason": "Expired registration code",
+                    }
+                ), 400
 
             db_user.registration_code = None
             db.session.commit()
@@ -221,21 +215,16 @@ def register_device():
             )
         else:
             sleep(5)
-            return make_response(
-                jsonify({"error": "Failed to register device", "reason": "User not found"}),
-                400,
-            )
+            return jsonify({"error": "Failed to register device", "reason": "User not found"}), 400
+            
 
     sleep(5)
-    return make_response(
-        jsonify(
+    return jsonify(
             {
                 "error": "Failed to register device",
                 "reason": "Missing registration code",
             }
-        ),
-        400,
-    )
+        ), 400
 
 
 @user_blueprint.route("/api/user/authenticate", methods=["POST"])
@@ -291,7 +280,7 @@ def get_mcp_token(user_id: int):
     if requester_role == ROLE_ADMIN:
         db_user: User = db.session.query(User).get(user_id)
         if not db_user:
-            return make_response(jsonify({"error": "User not found"}), 404)
+            return jsonify({"error": "User not found"}), 404
 
         if db_user.mcp_key is None:
             # generate a random key if not set
@@ -305,7 +294,7 @@ def get_mcp_token(user_id: int):
         )
         return jsonify(token)
     else:
-        return make_response(jsonify({"error": "Only admin users can generate MCP tokens"}), 403)
+        return jsonify({"error": "Only admin users can generate MCP tokens"}), 403
 
 
 @user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["GET"])
@@ -319,13 +308,13 @@ def has_mcp_token(user_id: int):
     if requester_role == ROLE_ADMIN:
         db_user: User = db.session.query(User).get(user_id)
         if not db_user:
-            return make_response(jsonify({"error": "User not found"}), 404)
+            return jsonify({"error": "User not found"}), 404
 
         return jsonify({
             "has_mcp_token": db_user.mcp_key is not None
         })
     else:
-        return make_response(jsonify({"error": "operation not permitted"}), 403)
+        return jsonify({"error": "operation not permitted"}), 403
 
 
 @user_blueprint.route("/api/user/<int:user_id>/mcp_token", methods=["DELETE"])
@@ -339,13 +328,13 @@ def remove_mcp_token(user_id: int):
     if requester_role == ROLE_ADMIN:
         db_user: User = db.session.query(User).get(user_id)
         if not db_user:
-            return make_response(jsonify({"error": "User not found"}), 404)
+            return jsonify({"error": "User not found"}), 404
 
         db_user.mcp_key = None
         db.session.commit()
         return jsonify(None)
     else:
-        return make_response(jsonify({"error": "operation not permitted"}), 403)
+        return jsonify({"error": "operation not permitted"}), 403
 
 
 @user_blueprint.route("/api/user/<int:user_id>/register_card", methods=["PUT"])
@@ -379,7 +368,7 @@ def has_ssh_key(user_id):
         key_exists = key_manager.check_key_exists(key_name)
         return jsonify(key_exists)
 
-    return make_response(jsonify({"error": "User not found"}), 404)
+    return jsonify({"error": "User not found"}), 404
 
 
 @user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["DELETE"])
@@ -394,7 +383,7 @@ def delete_ssh_key(user_id):
         key_manager.remove_public_key(key_name)
         return jsonify(True)
 
-    return make_response(jsonify({"error": "User not found"}), 404)
+    return jsonify({"error": "User not found"}), 404
 
 
 @user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["POST"])
@@ -417,7 +406,7 @@ def generate_ssh_key(user_id):
 
         return jsonify(private_key)
 
-    return make_response(jsonify({"error": "User not found"}), 404)
+    return jsonify({"error": "User not found"}), 404
 
 
 @user_blueprint.route("/api/user/<int:user_id>/ssh_key", methods=["PUT"])
@@ -435,4 +424,4 @@ def set_public_key(user_id):
 
         return jsonify(True)
 
-    return make_response(jsonify({"error": "User not found"}), 404)
+    return jsonify({"error": "User not found"}), 404

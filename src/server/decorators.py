@@ -1,23 +1,22 @@
 import functools
+import inspect
 import json
 import logging
 import os
-
 from datetime import datetime as dt
 from urllib.parse import urlparse
-from dateutil.tz import UTC
+
 import flask
+import jose
+from dateutil.tz import UTC
 from flask.globals import request
+from flask.helpers import make_response
 from flask.json import jsonify
 from jose import jwt
-import jose
 
-import inspect
-
-from utils.models import Option
-from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.database import db
-
+from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from utils.models import Option
 
 logger = logging.getLogger("server")
 
@@ -182,12 +181,17 @@ def authenticated(role=ROLE_ADMIN):
                     if "requester_role" in sig.parameters and "requester_role" not in kws:
                         kws["requester_role"] = user_token["role"]
 
-                    response = request_handler(*args, **kws)
+                    response = make_response(request_handler(*args, **kws))
                     # generate new user token to extend the user session
                     referer = urlparse(request.environ.get("HTTP_REFERER", ""))
-                    response.headers["User-Token"] = generate_user_token(
-                        user_token["id"], user_token["name"], user_token["role"], f"{referer.scheme}://{referer.netloc}"
-                    )
+                    try:
+
+                        response.headers["User-Token"] = generate_user_token(
+                            user_token["id"], user_token["name"], user_token["role"], f"{referer.scheme}://{referer.netloc}"
+                        )
+                    except Exception as e:
+                        logger.error("Failed to generate user token: %s, request_handler=%s, response=%s", e, request_handler, response)
+                        raise e
                     return response
                 except jose.exceptions.JWTError:
                     logger.warning("Bad token (%s) from %s", raw_token, remote_address)

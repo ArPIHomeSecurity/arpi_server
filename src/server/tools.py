@@ -1,6 +1,5 @@
 import logging
 
-from flask.helpers import make_response
 from flask.json import jsonify
 
 from utils.constants import LOG_IPC
@@ -48,4 +47,4 @@ def process_ipc_response(ipc_response):
     else:
         http_code = 200 if success else 500
 
-    return make_response(jsonify(response), http_code)
+    return jsonify(response), http_code

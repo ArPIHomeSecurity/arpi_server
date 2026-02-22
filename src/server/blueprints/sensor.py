@@ -1,6 +1,5 @@
 from flask import current_app, jsonify, request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
@@ -34,8 +33,9 @@ def create_sensor():
     Create a new sensor.
     """
     try:
-        sensor_data = request.json
         sensor_service = SensorService(db.session)
+        # we need to do the mapping from camelCase to snake_case here
+        sensor_data = request.json
         new_sensor = sensor_service.create_sensor(
             name=sensor_data["name"],
             description=sensor_data.get("description"),
@@ -50,9 +50,7 @@ def create_sensor():
         )
         return jsonify(new_sensor.serialized), 201
     except ConfigChangesNotAllowed:
-        return make_response(
-            jsonify({"error": "Configuration changes are not allowed currently"}), 409
-        )
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
 
 
 @sensor_blueprint.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
@@ -68,40 +66,21 @@ def manage_sensor(sensor_id):
             sensor = sensor_service.get_sensor(sensor_id)
             return jsonify(sensor.serialized)
         elif request.method == "PUT":
-            sensor_data = request.json or {}
-            update_kwargs = {}
-            field_mapping = {
-                "name": "name",
-                "description": "description",
-                "area_id": "areaId",
-                "zone_id": "zoneId",
-                "channel": "channel",
-                "channel_type": "channelType",
-                "enabled": "enabled",
-                "sensor_contact_type": "sensorContactType",
-                "sensor_eol_count": "sensorEolCount",
-                "sensor_type_id": "typeId",
-            }
-            for arg_name, json_key in field_mapping.items():
-                if json_key in sensor_data:
-                    update_kwargs[arg_name] = sensor_data[json_key]
-            updated_sensor = sensor_service.update_sensor(sensor_id, **update_kwargs)
+            updated_sensor = sensor_service.update_sensor(sensor_id=sensor_id, **request.json)
             return jsonify(updated_sensor.serialized)
         elif request.method == "DELETE":
             sensor_service.delete_sensor(sensor_id)
-            return make_response("Deleted", 204)
+            return jsonify({"message": "Deleted"}), 204
 
-        return make_response(jsonify({"error": "Method not allowed"}), 405)
+        return jsonify({"error": "Method not allowed"}), 405
     except ConfigChangesNotAllowed:
-        return make_response(
-            jsonify({"error": "Configuration changes are not allowed currently"}), 409
-        )
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
     except ChannelConflictError:
-        return make_response(jsonify({"error": "Channel conflict with existing sensors"}), 409)
+        return jsonify({"error": "Channel conflict with existing sensors"}), 409
     except ObjectNotChanged:
-        return make_response(jsonify({"info": "No changes made"}), 204)
+        return jsonify({"info": "No changes made"}), 204
     except ObjectNotFound:
-        return make_response(jsonify({"error": "Sensor not found"}), 404)
+        return jsonify({"error": "Sensor not found"}), 404
 
 
 @sensor_blueprint.route("/api/sensor/<int:sensor_id>/reset-reference", methods=["PUT"])
@@ -174,4 +153,4 @@ def reorder_sensors():
 
     db.session.commit()
 
-    return make_response("", 200)
+    return ""

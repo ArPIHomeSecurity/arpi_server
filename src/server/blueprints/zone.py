@@ -1,14 +1,11 @@
 from flask import jsonify, request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.ipc import IPCClient
 from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
                                   ObjectNotFound)
 from server.services.zone import ZoneService
-from server.tools import process_ipc_response
 from utils.constants import ROLE_USER
 from utils.models import Zone
 
@@ -44,7 +41,7 @@ def create_zone():
         )
         return jsonify(new_zone.serialized), 201
     except ConfigChangesNotAllowed:
-        return make_response(jsonify({"error": "Configuration changes are not allowed currently"}), 409)
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
 
 
 @zone_blueprint.route("/api/zone/<int:zone_id>", methods=["GET", "PUT", "DELETE"])
@@ -60,28 +57,19 @@ def manage_zone(zone_id):
             zone = zone_service.get_zone(zone_id)
             return jsonify(zone.serialized)
         elif request.method == "PUT":
-            zone_data = {
-                "name": request.json["name"],
-                "description": request.json.get("description", ""),
-                "disarmed_delay": request.json.get("disarmedDelay"),
-                "away_alert_delay": request.json.get("awayAlertDelay", 0),
-                "stay_alert_delay": request.json.get("stayAlertDelay", 0),
-                "away_arm_delay": request.json.get("awayArmDelay", 0),
-                "stay_arm_delay": request.json.get("stayArmDelay", 0),
-            }
-            updated_zone = zone_service.update_zone(zone_id=zone_id, **zone_data)
+            updated_zone = zone_service.update_zone(zone_id=zone_id, **request.json)
             return jsonify(updated_zone.serialized)
         elif request.method == "DELETE":
             zone_service.delete_zone(zone_id)
-            return make_response("Deleted", 204)
+            return jsonify({"message": "Deleted"}), 204
 
-        return make_response(jsonify({"error": "Method not allowed"}), 405)
+        return jsonify({"error": "Method not allowed"}), 405
     except ConfigChangesNotAllowed:
-        return make_response(jsonify({"error": "Configuration changes are not allowed in the current state"}), 409)
+        return jsonify({"error": "Configuration changes are not allowed in the current state"}), 409
     except ObjectNotFound:
-        return make_response(jsonify({"error": "Zone not found"}), 404)
+        return jsonify({"error": "Zone not found"}), 404
     except ObjectNotChanged:
-        return make_response(jsonify({"info": "No changes made"}), 204)
+        return jsonify({"info": "No changes made"}), 204
 
 
 @zone_blueprint.route("/api/zones/reorder", methods=["PUT"])
@@ -98,4 +86,4 @@ def reorder_zones():
 
     db.session.commit()
 
-    return make_response("", 200)
+    return ""

@@ -1,7 +1,5 @@
 from flask import jsonify, request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
-
 
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.output import OutputService
@@ -34,6 +32,7 @@ def create_output():
         output_service = OutputService(db.session)
         data = request.json
         # set attributes name, description, channel, trigger_type, area_id, delay, duration, default_state, enabled
+        # we need to do the mapping from camelCase to snake_case here
         output = output_service.create_output(
             name=data["name"],
             description=data["description"],
@@ -47,9 +46,7 @@ def create_output():
         )
         return jsonify(output.serialized), 201
     except ConfigChangesNotAllowed:
-        return make_response(
-            jsonify({"error": "Configuration changes are not allowed currently"}), 409
-        )
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
 
 
 @output_blueprint.route("/api/output/<int:output_id>", methods=["GET", "PUT", "DELETE"])
@@ -65,33 +62,20 @@ def manage_output(output_id):
             output = output_service.get_output_by_id(output_id)
             return jsonify(output.serialized)
         elif request.method == "PUT":
-            data = request.json
-            updated_output = output_service.update_output(
-                output_id,
-                name=data.get("name"),
-                description=data.get("description"),
-                channel=data.get("channel"),
-                trigger_type=data.get("triggerType"),
-                area_id=data.get("areaId"),
-                delay=data.get("delay"),
-                duration=data.get("duration"),
-                default_state=data.get("defaultState"),
-                enabled=data.get("enabled"),
-            )
+            updated_output = output_service.update_output(output_id=output_id,**request.json)
             return jsonify(updated_output.serialized)
         elif request.method == "DELETE":
             output_service.delete_output(output_id)
-            return make_response("Deleted", 204)
+            return jsonify({"message": "Deleted"}), 204
 
-        return make_response(jsonify({"error": "Method not allowed"}), 405)
+        return jsonify({"error": "Method not allowed"}), 405
     except ConfigChangesNotAllowed:
-        return make_response(
-            jsonify({"error": "Configuration changes are not allowed currently"}), 409
-        )
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
     except ObjectNotChanged:
-        return make_response(jsonify({"info": "No changes made"}), 204)
+        return jsonify({"info": "No changes made"}), 204
     except ObjectNotFound:
-        return make_response(jsonify({"error": "Output not found"}), 404)
+        return jsonify({"error": "Output not found"}), 404
+
 
 
 @output_blueprint.route("/api/output/<int:output_id>/activate", methods=["PUT"])
@@ -100,7 +84,7 @@ def manage_output(output_id):
 def activate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
     if not db_output:
-        return make_response(jsonify({"error": "Output not found"}), 404)
+        return jsonify({"error": "Output not found"}), 404
 
     return process_ipc_response(IPCClient().activate_output(output_id))
 
@@ -111,7 +95,7 @@ def activate_output(output_id):
 def deactivate_output(output_id):
     db_output = db.session.query(Output).get(output_id)
     if not db_output:
-        return make_response(jsonify({"error": "Output not found"}), 404)
+        return jsonify({"error": "Output not found"}), 404
 
     return process_ipc_response(IPCClient().deactivate_output(output_id))
 
@@ -130,4 +114,4 @@ def reorder_outputs():
 
     db.session.commit()
 
-    return make_response("", 200)
+    return ""

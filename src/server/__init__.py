@@ -59,7 +59,7 @@ app.register_blueprint(power_blueprint)
 app.register_blueprint(sensor_blueprint)
 app.register_blueprint(user_blueprint)
 app.register_blueprint(zone_blueprint)
-
+    
 
 @app.errorhandler(AssertionError)
 def handle_validation_errors(error):

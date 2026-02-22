@@ -4,17 +4,16 @@ import os
 
 from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 
-from monitor.config.models import DyndnsConfig, SSHConfig, SyrenConfig, AlertSensitivityConfig
+from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, SSHConfig, SyrenConfig
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
 from server.services.base import TestingNotAllowed
 from server.services.option.alert_sensitivity import AlertSensitivityService
-from server.services.option.syren import SyrenService
-from server.services.option.ssh import SSHService
 from server.services.option.dyndns import DyndnsService
+from server.services.option.ssh import SSHService
+from server.services.option.syren import SyrenService
 from server.tools import process_ipc_response
 from tools.certbot import Certbot
 from utils.models import Option
@@ -27,7 +26,7 @@ config_blueprint = Blueprint("configuration", __name__)
 @restrict_host
 def option_get(option, section) -> Response:
     if option not in ["syren", "alert", "notifications", "network", "mqtt", "dyndns"]:
-        return make_response(jsonify(None), 404)
+        return jsonify(None), 404
 
     db_option = db.session.query(Option).filter_by(name=option, section=section).first()
     return jsonify(db_option.serialized) if db_option else jsonify(None)
@@ -42,7 +41,7 @@ def option_put(option_name, section) -> Response:
     if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
         syren_service = SyrenService(db.session)
         syren_service.set_syren_config(SyrenConfig(**request.json))
-        return make_response("", 200)
+        return ""
     elif (
         option_name == AlertSensitivityConfig.OPTION_NAME
         and section == AlertSensitivityConfig.SECTION_NAME
@@ -51,15 +50,15 @@ def option_put(option_name, section) -> Response:
         alert_sensitivity_service.set_alert_sensitivity_config(
             AlertSensitivityConfig(**request.json)
         )
-        return make_response("", 200)
+        return ""
     elif option_name == SSHConfig.OPTION_NAME and section == SSHConfig.SECTION_NAME:
         ssh_service = SSHService(db.session)
         ssh_service.set_ssh_config(SSHConfig(**request.json))
-        return make_response("", 200)
+        return ""
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         dyndns_service = DyndnsService(db.session)
         dyndns_service.set_dyndns_config(DyndnsConfig(**request.json))
-        return make_response("", 200)
+        return ""
 
     # handle other options
     db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
@@ -84,7 +83,7 @@ def option_put(option_name, section) -> Response:
         # update mqtt connection in monitor service
         return process_ipc_response(IPCClient().update_configuration())
 
-    return make_response("", 200)
+    return ""
 
 
 @config_blueprint.route("/api/config/test_email", methods=["GET"])
@@ -94,7 +93,7 @@ def test_email():
     if request.method == "GET":
         return process_ipc_response(IPCClient().send_test_email())
 
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+    return jsonify({"result": False, "message": "Something went wrong"}), 500
 
 
 @config_blueprint.route("/api/config/test_sms", methods=["GET"])
@@ -104,7 +103,7 @@ def test_sms():
     if request.method == "GET":
         return process_ipc_response(IPCClient().send_test_sms())
 
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+    return jsonify({"result": False, "message": "Something went wrong"}), 500
 
 
 @config_blueprint.route("/api/config/test_call", methods=["GET"])
@@ -114,7 +113,7 @@ def test_call():
     if request.method == "GET":
         return process_ipc_response(IPCClient().make_test_call())
 
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+    return jsonify({"result": False, "message": "Something went wrong"}), 500
 
 
 @config_blueprint.route("/api/config/test_syren", methods=["GET"])
@@ -125,9 +124,7 @@ def test_syren():
         option_service = SyrenService(db.session)
         return process_ipc_response(option_service.test_syren(duration=5))
     except TestingNotAllowed:
-        return make_response(
-            jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
-        )
+        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
 
 
 @config_blueprint.route("/api/config/sms", methods=["GET"])
@@ -143,7 +140,7 @@ def get_sms_messages():
 
         return jsonify(None)
 
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+    return jsonify({"result": False, "message": "Something went wrong"}), 500
 
 
 @config_blueprint.route("/api/config/sms/<int:message_id>", methods=["DELETE"])
@@ -153,7 +150,7 @@ def delete_sms_messages(message_id):
     if request.method == "DELETE":
         return process_ipc_response(IPCClient().delete_sms_message(message_id))
 
-    return make_response(jsonify({"result": False, "message": "Something went wrong"}), 500)
+    return jsonify({"result": False, "message": "Something went wrong"}), 500
 
 
 @config_blueprint.route("/api/config/public_access", methods=["GET"])
@@ -167,9 +164,9 @@ def public_access():
     * nginx listens on port 443
     """
     if Certbot().check_certificate_exists():
-        return make_response(jsonify(True), 200)
+        return jsonify(True)
 
-    return make_response(jsonify(False), 200)
+    return jsonify(False)
 
 
 @config_blueprint.route("/api/config/installation", methods=["GET"])

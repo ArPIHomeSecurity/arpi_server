@@ -1,5 +1,5 @@
 from flask.blueprints import Blueprint
-from flask import jsonify, request, make_response
+from flask import jsonify, request
 from utils.models import Keypad, KeypadType
 
 from utils.constants import ROLE_USER
@@ -31,7 +31,7 @@ def keypad(keypad_id):
         if keypad:
             return jsonify(keypad.serialized)
 
-        return make_response(jsonify({"error": "Option not found"}), 404)
+        return jsonify({"error": "Option not found"}), 404
     elif request.method == "DELETE":
         keypad = db.session.query(Keypad).get(keypad_id)
         if keypad:
@@ -39,7 +39,7 @@ def keypad(keypad_id):
             db.session.commit()
             return process_ipc_response(IPCClient().update_keypad())
 
-        return make_response(jsonify({"error": "Option not found"}), 404)
+        return jsonify({"error": "Option not found"}), 404
     elif request.method == "PUT":
         keypad = db.session.query(Keypad).get(keypad_id)
         if not keypad:
@@ -47,11 +47,11 @@ def keypad(keypad_id):
             keypad = Keypad(keypad_type=db.session.query(KeypadType).get(request.json["typeId"]))
 
         if not keypad.update(request.json):
-            return make_response("", 204)
+            return "", 204
 
         db.session.commit()
         return process_ipc_response(IPCClient().update_keypad())
-    return make_response(jsonify({"error": "Unknown action"}), 405)
+    return jsonify({"error": "Unknown action"}), 405
 
 
 @keypad_blueprint.route("/api/keypadtypes", methods=["GET"])

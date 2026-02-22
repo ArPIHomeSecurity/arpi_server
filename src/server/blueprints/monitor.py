@@ -1,6 +1,5 @@
 from flask import request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 from flask.json import jsonify
 
 from utils.constants import ROLE_USER
@@ -17,7 +16,7 @@ monitor_blueprint = Blueprint("monitor", __name__)
 @registered
 @restrict_host
 def get_arm():
-    return make_response(jsonify({"type": get_arm_state(db.session)}))
+    return jsonify({"type": get_arm_state(db.session)})
 
 
 @monitor_blueprint.route("/api/monitoring/arm", methods=["PUT"])

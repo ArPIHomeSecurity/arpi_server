@@ -1,15 +1,15 @@
-from flask.blueprints import Blueprint
 from flask import jsonify, request
-from flask.helpers import make_response
-from server.services.area import AreaService
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
-from utils.models import Area
-from utils.constants import ROLE_USER
+from flask.blueprints import Blueprint
 
 from server.database import db
-from server.decorators import authenticated, restrict_host, registered
+from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
+from server.services.area import AreaService
+from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
+                                  ObjectNotFound)
 from server.tools import process_ipc_response
+from utils.constants import ROLE_USER
+from utils.models import Area
 
 area_blueprint = Blueprint("area", __name__)
 
@@ -38,7 +38,7 @@ def create_area():
         area = area_service.create_area(request.json.get("name"))
         return jsonify(area.serialized), 201
     except ConfigChangesNotAllowed:
-        return make_response(jsonify({"error": "Configuration changes are not allowed in the current state"}), 409)
+        return jsonify({"error": "Configuration changes are not allowed in the current state"}), 409
 
 
 @area_blueprint.route("/api/area/<int:area_id>", methods=["GET", "PUT", "DELETE"])
@@ -58,15 +58,15 @@ def manage_area(area_id):
             return jsonify(area.serialized)
         elif request.method == "DELETE":
             area_service.delete_area(area_id)
-            return make_response("Deleted", 204)
+            return "Deleted", 204
 
-        return make_response(jsonify({"error": "Unknown action"}), 405)
+        return jsonify({"error": "Unknown action"}), 405
     except ConfigChangesNotAllowed:
-        return make_response(jsonify({"error": "Configuration changes are not allowed in the current state"}), 409)
+        return jsonify({"error": "Configuration changes are not allowed in the current state"}), 409
     except ObjectNotFound:
-        return make_response(jsonify({"error": "Area not found"}), 404)
+        return jsonify({"error": "Area not found"}), 404
     except ObjectNotChanged:
-        return make_response(jsonify({"info": "No changes made"}), 204)
+        return jsonify({"info": "No changes made"}), 204
 
 
 @area_blueprint.route("/api/area/arm", methods=["PUT"])
@@ -105,4 +105,4 @@ def reorder_areas():
 
     db.session.commit()
 
-    return make_response("", 200)
+    return ""

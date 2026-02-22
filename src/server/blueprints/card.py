@@ -1,6 +1,5 @@
 from flask import jsonify, request
 from flask.blueprints import Blueprint
-from flask.helpers import make_response
 
 from server.database import db
 from server.decorators import authenticated, restrict_host
@@ -28,18 +27,18 @@ def get_cards():
 def manage_card(card_id, request_user_id):
     card = db.session.query(Card).get(card_id)
     if not card:
-        return make_response(jsonify({"error": "Card not found"}), 404)
+        return jsonify({"error": "Card not found"}), 404
 
     user = db.session.query(User).get(request_user_id)
     if card.user_id != request_user_id and user.role != ROLE_ADMIN:
-        return make_response(jsonify({"error": "Not authorized"}), 403)
+        return jsonify({"error": "Not authorized"}), 403
 
     if request.method == "GET":
         return jsonify(card.serialized)
 
     if request.method == "PUT":
         if not card.update(request.json):
-            return make_response("", 204)
+            return "", 204
 
         db.session.commit()
         return jsonify(card.serialized)
@@ -49,4 +48,4 @@ def manage_card(card_id, request_user_id):
         db.session.commit()
         return jsonify(None)
 
-    return make_response(jsonify({"error": "Unknown action"}), 405)
+    return jsonify({"error": "Unknown action"}), 405

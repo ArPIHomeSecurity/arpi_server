@@ -37,10 +37,6 @@ def generate_greeting(name: str) -> str:
 @prompts_mcp.prompt(name="add_sensor", description="Add a new sensor with given parameters.")
 def add_sensor(
     name: str,
-    channel: str,
-    area: str,
-    zone: str,
-    sensor_type: str,
     description: str = "",
     enabled: bool = True,
     silent_alert: bool = False,
@@ -53,11 +49,7 @@ def add_sensor(
     """
     Add a new sensor with given parameters.
     Args:
-        channel: The channel number of the sensor.
-        sensor_type_id: The type ID of the sensor.
-        area_id: The area ID where the sensor is located.
         name: The name of the sensor.
-        zone_id: The zone ID associated with the sensor.
         description: Optional description of the sensor.
         enabled: Whether the sensor is enabled.
         silent_alert: Whether the sensor has silent alerts.
@@ -71,9 +63,10 @@ def add_sensor(
     """
     return f"""We want to add a new sensor, but first we need to gather the details
         for the area, zone, and sensor type based on the provided names.
-        Find the corresponding IDs for area={area}, zone={zone}, and sensor_type={sensor_type}" 
-        and then create the sensor with the following details: 
-        Sensor '{name}' as '{description}' added to channel {channel}, enabled={enabled}, 
+        Find the corresponding values for 'channel', 'area', 'zone', and 'sensor_type' 
+        and then create the sensor with the following details:
+
+        Sensor '{name}' as '{description}' added to channel, enabled={enabled}, 
         with the following settings:
         
         Monitoring settings:

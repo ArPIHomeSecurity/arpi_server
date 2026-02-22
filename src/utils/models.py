@@ -4,18 +4,20 @@ import json
 import locale
 import os
 import uuid
-from copy import deepcopy
-from datetime import timedelta, datetime as dt
-from re import search
-from dateutil.tz.tz import tzlocal
-from typing import List
-import bcrypt
 
-from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime, Enum
+from copy import deepcopy
+from datetime import datetime as dt
+from datetime import timedelta
+from re import search
+from typing import List
+
+import bcrypt
+from dateutil.tz.tz import tzlocal
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql.schema import ForeignKey
-from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
+from sqlalchemy.sql.schema import ForeignKey
 from stringcase import camelcase, snakecase
 
 from utils.constants import (
@@ -23,9 +25,9 @@ from utils.constants import (
     ALERT_SABOTAGE,
     ALERT_STAY,
     ARM_AWAY,
-    ARM_STAY,
     ARM_DISARM,
     ARM_MIXED,
+    ARM_STAY,
     ROLE_USER,
 )
 from utils.dictionary import merge_dicts, replace_keys
@@ -163,10 +165,12 @@ class Sensor(BaseModel):
     The disconnected channel value is "-1".
     """
 
+    NAME_LENGTH = 16
+
     __tablename__ = "sensor"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(16), nullable=False)
+    name = Column(String(NAME_LENGTH), nullable=False)
     description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
     channel_type = Column(
@@ -318,6 +322,20 @@ class Sensor(BaseModel):
             f"Incorrect 'channel' (0..{os.environ['INPUT_NUMBER']})"
         )
         return channel
+
+    @validates("monitor_period")
+    def validates_monitor_period(self, key, monitor_period):
+        if monitor_period is not None:
+            assert monitor_period > 0, "Incorrect 'monitor_period' (must be greater than 0)"
+
+        return monitor_period
+
+    @validates("monitor_threshold")
+    def validates_monitor_threshold(self, key, monitor_threshold):
+        if monitor_threshold is not None:
+            assert 0 <= monitor_threshold <= 100, "Incorrect 'monitor_threshold' (0..100)"
+
+        return monitor_threshold
 
 
 class Alert(BaseModel):
@@ -681,6 +699,9 @@ class Area(BaseModel):
     def __init__(self, name="area"):
         self.name = name
         self.arm_state = ArmStates.DISARM
+
+    def can_be_deleted(self):
+        return len(self.sensors) == 0 and not self.output
 
     @property
     def serialized(self):
@@ -1104,15 +1125,15 @@ class Output(BaseModel):
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= Output.NAME_LENGTH, (
-            f"Incorrect 'name' field length ({len(name)})"
+            f"Incorrect 'name' field length ({len(name)}>{Output.NAME_LENGTH})"
         )
         return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
         if channel is not None:
-            assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]), (
-                f"Incorrect 'channel' (0..{os.environ['OUTPUT_NUMBER']})"
+            assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]) - 1, (
+                f"Incorrect 'channel' (0..{int(os.environ['OUTPUT_NUMBER']) - 1})"
             )
         return channel
 
