@@ -1,12 +1,20 @@
 # pylint: disable=raise-missing-from
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import Field
 from typing_extensions import Annotated
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from monitor.output import OUTPUT_NAMES
+from server.services.area import AreaService
+from server.services.base import (
+    ChannelConflictError,
+    ConfigChangesNotAllowed,
+    InvalidConfiguration,
+    ObjectNotChanged,
+    ObjectNotFound,
+)
 from server.services.output import OutputService
 from utils.models import Output, OutputTriggerType
 
@@ -93,10 +101,11 @@ def get_output_trigger_type_names():
 @output_mcp.tool(
     name="create",
 )
-def create_output(
+async def create_output(
+    ctx: Context,
     name: Annotated[str, Field(description="The name of the output", length=Output.NAME_LENGTH)],
     description: Annotated[str, "The description of the output"] = "",
-    channel: Annotated[int, "The channel number for the output"] = 0,
+    channel: Annotated[int, "The channel number for the output"] = None,
     trigger_type: Annotated[
         OutputTriggerType, "The trigger type for the output"
     ] = OutputTriggerType.BUTTON,
@@ -119,6 +128,33 @@ def create_output(
         default_state: The default state of the output
         enabled: Whether the output is enabled
     """
+    if trigger_type == OutputTriggerType.AREA and area_id is None:
+        area_service = AreaService(session)
+        # TODO: use titled elicit responses once supported in the UI to avoid showing IDs to users
+        result = await ctx.elicit(
+            "Which area is the sensor located in?",
+            response_type=[f"{area.name} ({area.id})" for area in area_service.get_areas()],
+        )
+        if result.action == "accept":
+            area_id = int(result.data.split("(")[-1].rstrip(")"))
+        else:
+            area_id = None
+
+    if channel is None:
+        # skip the first output name since it's for channel 0 which is reserved for the siren
+        result = await ctx.elicit(
+            "Which channel is the sensor connected to?",
+            response_type=[
+                f"{output} ({channel_id})"
+                for channel_id, output in OUTPUT_NAMES.items()
+                if channel_id != 0
+            ],
+        )
+        if result.action == "accept":
+            channel = int(result.data.split("(")[-1].rstrip(")"))
+        else:
+            channel = None
+
     try:
         new_output = OutputService(session).create_output(
             name=name,
@@ -134,6 +170,10 @@ def create_output(
         return new_output.serialized
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
+    except InvalidConfiguration as e:
+        raise ToolError(str(e))
+    except ChannelConflictError:
+        raise ToolError("Channel conflict with existing outputs.")
     except AssertionError as e:
         raise ToolError(str(e))
 
@@ -141,7 +181,8 @@ def create_output(
 @output_mcp.tool(
     name="update",
 )
-def update_output(
+async def update_output(
+    ctx: Context,
     output_id: int,
     name: Annotated[
         str, Field(description="The new name of the output", length=Output.NAME_LENGTH)
@@ -169,6 +210,19 @@ def update_output(
         default_state: The new default state of the output (optional)
         enabled: Whether the output is enabled (optional)
     """
+
+    if trigger_type == OutputTriggerType.AREA and area_id is None:
+        area_service = AreaService(session)
+        # TODO: use titled elicit responses once supported in the UI to avoid showing IDs to users
+        result = await ctx.elicit(
+            "Which area is the sensor located in?",
+            response_type=[f"{area.name} ({area.id})" for area in area_service.get_areas()],
+        )
+        if result.action == "accept":
+            area_id = int(result.data.split("(")[-1].rstrip(")"))
+        else:
+            area_id = None
+
     kwargs = {}
     params = {
         "name": name,
@@ -196,6 +250,10 @@ def update_output(
         raise ToolObjectNotFound("Output")
     except ObjectNotChanged:
         raise ToolError("No changes made to the output")
+    except InvalidConfiguration as e:
+        raise ToolError(str(e))
+    except ChannelConflictError:
+        raise ToolError("Channel conflict with existing outputs.")
     except AssertionError as e:
         raise ToolError(str(e))
 

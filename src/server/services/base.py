@@ -14,17 +14,26 @@ class ObjectNotChanged(Exception):
     """Raised when an object is not changed."""
 
 
+class InvalidConfiguration(Exception):
+    """Raised when the provided configuration is invalid."""
+
+
 class TestingNotAllowed(Exception):
     """Raised when testing is not allowed."""
 
     def __init__(self):
         super().__init__("Testing is not allowed currently.")
 
+
 class ConfigChangesNotAllowed(Exception):
     """Exception raised when configuration changes are not allowed."""
 
     def __init__(self):
         super().__init__("Changes are not allowed currently.")
+
+
+class ChannelConflictError(Exception):
+    """Raised when there is a channel conflict with existing outputs."""
 
 
 class BaseService:

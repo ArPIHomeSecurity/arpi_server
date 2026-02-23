@@ -3,8 +3,15 @@ Output service module to handle output-related operations.
 """
 
 from server.ipc import IPCClient
-from server.services.base import BaseService, ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
-from utils.models import Output
+from server.services.base import (
+    BaseService,
+    ChannelConflictError,
+    ConfigChangesNotAllowed,
+    InvalidConfiguration,
+    ObjectNotChanged,
+    ObjectNotFound,
+)
+from utils.models import Output, OutputTriggerType
 
 
 class OutputService(BaseService):
@@ -36,7 +43,7 @@ class OutputService(BaseService):
         output = self._db_session.query(Output).get(output_id)
         if not output:
             raise ObjectNotFound("Output not found")
-        
+
         return output
 
     def create_output(
@@ -44,7 +51,7 @@ class OutputService(BaseService):
         name: str,
         description: str = "",
         channel: int = 0,
-        trigger_type: str = "manual",
+        trigger_type: OutputTriggerType = OutputTriggerType.BUTTON,
         area_id: int = None,
         delay: int = 0,
         duration: int = 0,
@@ -63,6 +70,15 @@ class OutputService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
+        if (
+            trigger_type in [OutputTriggerType.BUTTON, OutputTriggerType.SYSTEM]
+            and area_id is not None
+        ):
+            raise ValueError("Area ID must be None for BUTTON and SYSTEM trigger types")
+
+        if trigger_type == OutputTriggerType.AREA and area_id is None:
+            raise ValueError("Area ID must be provided for AREA trigger type")
+
         new_output = Output(
             name=name,
             description=description,
@@ -74,6 +90,15 @@ class OutputService(BaseService):
             default_state=default_state,
             enabled=enabled,
         )
+
+        try:
+            self.validate_configuration(new_output)
+        except ValueError as e:
+            raise InvalidConfiguration(str(e))
+
+        if not self.validate_channel(new_output):
+            raise ChannelConflictError("Channel conflict with existing outputs.")
+
         self._db_session.add(new_output)
         self._db_session.commit()
         IPCClient().update_configuration()
@@ -93,6 +118,14 @@ class OutputService(BaseService):
         output_changed = output.update(kwargs)
         if not output_changed:
             raise ObjectNotChanged("Output not changed")
+        
+        try:
+            self.validate_configuration(output)
+        except ValueError as e:
+            raise InvalidConfiguration(str(e))
+        
+        if not self.validate_channel(output):
+            raise ChannelConflictError("Channel conflict with existing outputs.")
 
         self._db_session.commit()
         self._db_session.refresh(output)
@@ -118,3 +151,38 @@ class OutputService(BaseService):
         self._db_session.delete(output)
         self._db_session.commit()
         IPCClient().update_configuration()
+
+    def validate_configuration(self, output: Output) -> None:
+        """
+        Validate the output configuration to ensure it meets the required constraints.
+
+        Args:
+            output: The Output object to validate
+
+        Raises:
+            ValueError: If the configuration is invalid
+        """
+        if (
+            output.trigger_type in [OutputTriggerType.BUTTON, OutputTriggerType.SYSTEM]
+            and output.area_id is not None
+        ):
+            raise ValueError("Area ID must be None for BUTTON and SYSTEM trigger types")
+
+        if output.trigger_type == OutputTriggerType.AREA and output.area_id is None:
+            raise ValueError("Area ID must be provided for AREA trigger type")
+
+    def validate_channel(self, output: Output) -> bool:
+        """
+        Validate that the output's channel does not conflict with existing outputs.
+
+        Args:
+            output: The Output object to validate
+
+        Returns:
+            True if the channel is valid, False otherwise
+        """
+        query = self._db_session.query(Output).filter(
+            Output.channel == output.channel, Output.id != output.id
+        )
+
+        return not self._db_session.query(query.exists()).scalar()

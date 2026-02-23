@@ -3,7 +3,13 @@ Sensor service module to handle sensor-related operations.
 """
 
 from server.ipc import IPCClient
-from server.services.base import BaseService, ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import (
+    BaseService,
+    ChannelConflictError,
+    ConfigChangesNotAllowed,
+    ObjectNotChanged,
+    ObjectNotFound,
+)
 from utils.models import (
     Area,
     ChannelTypes,
@@ -13,10 +19,6 @@ from utils.models import (
     SensorType,
     Zone,
 )
-
-
-class ChannelConflictError(Exception):
-    """Raised when there is a channel conflict with existing sensors."""
 
 
 class SensorService(BaseService):
@@ -147,14 +149,13 @@ class SensorService(BaseService):
         self._db_session.commit()
         IPCClient().update_configuration()
 
-
     def get_sensor_types(self):
         """
         Get all sensor types.
         """
         return self._db_session.query(SensorType).all()
 
-    def validate_channel(self, sensor: Sensor = None):
+    def validate_channel(self, sensor: Sensor = None) -> bool:
         """
         Validate that the sensor's channel does not conflict with existing sensors.
         """
