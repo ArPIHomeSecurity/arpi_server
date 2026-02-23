@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "d30230ba2f105b13bae9870ee05b4c6c829c2d5adcecb0346f167849b8c3b992"
+            "sha256": "22a951d0a306c0352c1c4d631135abda303d1578cb031b74836a3684f1c9d6bd"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -505,11 +505,11 @@
         },
         "cyclopts": {
             "hashes": [
-                "sha256:ad001986ec403ca1dc1ed20375c439d62ac796295ea32b451dfe25d6696bc71a",
-                "sha256:eed4d6c76d4391aa796d8fcaabd50e5aad7793261792beb19285f62c5c456c8b"
+                "sha256:0a891cb55bfd79a3cdce024db8987b33316aba11071e5258c21ac12a640ba9f2",
+                "sha256:483c4704b953ea6da742e8de15972f405d2e748d19a848a4d61595e8e5360ee5"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==4.5.4"
+            "version": "==4.6.0"
         },
         "diskcache": {
             "hashes": [
@@ -578,12 +578,12 @@
         },
         "fastmcp": {
             "hashes": [
-                "sha256:38944dc582c541d55357082bda2241cedb42cd3a78faea8a9d6a2662c62a42d7",
-                "sha256:d81e8ec813f5089d3624bec93944beaefa86c0c3a4ef1111cbef676a761ebccf"
+                "sha256:6bd73b4a3bab773ee6932df5249dcbcd78ed18365ed0aeeb97bb42702a7198d7",
+                "sha256:f513d80d4b30b54749fe8950116b1aab843f3c293f5cb971fc8665cb48dbb028"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.10'",
-            "version": "==2.14.5"
+            "version": "==3.0.2"
         },
         "flask": {
             "hashes": [
@@ -729,7 +729,7 @@
                 "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb",
                 "sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151"
             ],
-            "markers": "python_version < '3.12'",
+            "markers": "python_version >= '3.9'",
             "version": "==8.7.1"
         },
         "itsdangerous": {
@@ -798,11 +798,11 @@
         },
         "jsonschema-path": {
             "hashes": [
-                "sha256:727d8714158c41327908677e6119f9db9d5e0f486d4cc79ca4b4016eee2f33e8",
-                "sha256:ffca3bd37f66364ae3afeaa2804d6078a9ab3b9359ade4dd9923aabbbd475e71"
+                "sha256:5f5ff183150030ea24bb51cf1ddac9bf5dbf030272e2792a7ffe8262f7eea2a5",
+                "sha256:9c3d88e727cc4f1a88e51dbbed4211dbcd815d27799d2685efd904435c3d39e7"
             ],
             "markers": "python_version >= '3.10' and python_full_version < '4.0.0'",
-            "version": "==0.4.1"
+            "version": "==0.4.2"
         },
         "jsonschema-specifications": {
             "hashes": [
@@ -1228,21 +1228,20 @@
         "py-key-value-aio": {
             "extras": [
                 "disk",
-                "disk",
+                "filetree",
                 "filetree",
                 "keyring",
                 "keyring",
                 "memory",
                 "memory",
-                "redis",
                 "redis"
             ],
             "hashes": [
-                "sha256:1c781915766078bfd608daa769fefb97e65d1d73746a3dfb640460e322071b64",
-                "sha256:858e852fcf6d696d231266da66042d3355a7f9871650415feef9fca7a6cd4155"
+                "sha256:18e17564ecae61b987f909fc2cd41ee2012c84b4b1dcb8c055cf8b4bc1bf3f5d",
+                "sha256:e3012e6243ed7cc09bb05457bd4d03b1ba5c2b1ca8700096b3927db79ffbbe55"
             ],
             "markers": "python_version >= '3.10'",
-            "version": "==0.3.0"
+            "version": "==0.4.4"
         },
         "py-key-value-shared": {
             "hashes": [

@@ -37,19 +37,19 @@ def mount_servers():
     """
     Setup and import all MCP servers.
     """
-    main_mcp.mount(area_mcp, prefix="area")
-    main_mcp.mount(card_mcp, prefix="card")
-    main_mcp.mount(monitoring_mcp, prefix="monitoring")
-    main_mcp.mount(output_mcp, prefix="output")
-    main_mcp.mount(prompts_mcp, prefix="prompts")
-    main_mcp.mount(sensor_mcp, prefix="sensor")
-    main_mcp.mount(user_mcp, prefix="user")
-    main_mcp.mount(zone_mcp, prefix="zone")
+    main_mcp.mount(area_mcp, namespace="area")
+    main_mcp.mount(card_mcp, namespace="card")
+    main_mcp.mount(monitoring_mcp, namespace="monitoring")
+    main_mcp.mount(output_mcp, namespace="output")
+    main_mcp.mount(prompts_mcp, namespace="prompts")
+    main_mcp.mount(sensor_mcp, namespace="sensor")
+    main_mcp.mount(user_mcp, namespace="user")
+    main_mcp.mount(zone_mcp, namespace="zone")
 
-    main_mcp.mount(syren_option_mcp, prefix="option_syren")
-    main_mcp.mount(alert_sensitivity_option_mcp, prefix="option_alert_sensitivity")
-    main_mcp.mount(ssh_option_mcp, prefix="option_ssh")
-    main_mcp.mount(dyndns_option_mcp, prefix="option_dyndns")
+    main_mcp.mount(syren_option_mcp, namespace="option_syren")
+    main_mcp.mount(alert_sensitivity_option_mcp, namespace="option_alert_sensitivity")
+    main_mcp.mount(ssh_option_mcp, namespace="option_ssh")
+    main_mcp.mount(dyndns_option_mcp, namespace="option_dyndns")
 
 
 def generate_system_prompt():

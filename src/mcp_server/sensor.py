@@ -92,8 +92,17 @@ def get_channel_mappings():
     Retrieve mapping of channel names to their IDs.
     """
     channel_count = os.environ["INPUT_NUMBER"]
-    return {f"CH{i + 1:02}": i for i in range(int(channel_count))}
+    return [{"name": f"CH{i + 1:02}", "id": i} for i in range(int(channel_count))]
 
+@sensor_mcp.tool(
+    name="get_channel_mappings",
+)
+def get_channel_mappings_tool():
+    """
+    Tool to retrieve mapping of channel names to their IDs.
+    """
+    channel_count = os.environ["INPUT_NUMBER"]
+    return [{"name": f"CH{i + 1:02}", "id": i} for i in range(int(channel_count))]
 
 @sensor_mcp.resource(
     uri="sensorTypes://list",
