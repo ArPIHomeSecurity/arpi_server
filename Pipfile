@@ -5,7 +5,7 @@ name = "pypi"
 
 [scripts]
 start-server = "flask --debug --app server run --host=0.0.0.0 --port=8080"
-start-mcp = "fastmcp run src/mcp_server/__init__.py:main_mcp --transport http --port 7000 --reload --reload-dir src"
+start-mcp = "fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --reload --reload-dir src"
 start-mcp-inspector = "./scripts/start_mcp_inspector.sh"
 start-monitor = "flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081"
 start-nginx = "./scripts/start_nginx.sh"
