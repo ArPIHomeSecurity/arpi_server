@@ -120,7 +120,7 @@ def get_sensor_alert():
         )
     else:
         return jsonify(
-            db.session.query(Sensor).filter_by(enabled=True, alert=True).first() is not None
+            db.session.query(Sensor).filter_by(enabled=True, alert=True, deleted=False).first() is not None
         )
 
 
@@ -137,7 +137,7 @@ def get_sensor_error():
         )
     else:
         return jsonify(
-            db.session.query(Sensor).filter_by(enabled=True, error=True).first() is not None
+            db.session.query(Sensor).filter_by(enabled=True, error=True, deleted=False).first() is not None
         )
 
 
