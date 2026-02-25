@@ -5,7 +5,7 @@ import os
 from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
 
-from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, GSMConfig, SMTPConfig, SSHConfig, SyrenConfig
+from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, GSMConfig, SMTPConfig, SSHConfig, SubscriptionsConfig, SyrenConfig
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
@@ -15,6 +15,7 @@ from server.services.option.dyndns import DyndnsService
 from server.services.option.gsm import GSMService
 from server.services.option.smtp import SMTPService
 from server.services.option.ssh import SSHService
+from server.services.option.subscriptions import SubscriptionsService
 from server.services.option.syren import SyrenService
 from server.tools import process_ipc_response
 from tools.certbot import Certbot
@@ -56,6 +57,10 @@ def option_put(option_name, section) -> Response:
     elif option_name == SMTPConfig.OPTION_NAME and section == SMTPConfig.SECTION_NAME:
         smtp_service = SMTPService(db.session)
         smtp_service.set_smtp_config(SMTPConfig(**request.json))
+        return ""
+    elif option_name == SubscriptionsConfig.OPTION_NAME and section == SubscriptionsConfig.SECTION_NAME:
+        subscriptions_service = SubscriptionsService(db.session)
+        subscriptions_service.set_subscriptions_config(SubscriptionsConfig(**request.json))
         return ""
     elif option_name == GSMConfig.OPTION_NAME and section == GSMConfig.SECTION_NAME:
         gsm_service = GSMService(db.session)
