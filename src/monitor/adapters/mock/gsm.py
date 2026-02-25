@@ -68,7 +68,7 @@ class GSM:
     def call(self, phone_number, call_type: CallType):
         sleep(3)
         self._logger.info("Calling (%s) number: %s", call_type, phone_number)
-        return False
+        return True
 
     @property
     def incoming_dtmf(self):

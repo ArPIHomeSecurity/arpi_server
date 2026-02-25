@@ -191,10 +191,10 @@ class IPCServer(Thread):
             ssh.update_access_local_network()
             ssh.update_password_authentication()
         elif message["action"] == SEND_TEST_SMS:
-            succeeded, results = Notifier.send_test_sms()
-            return_value["result"] = succeeded
-            return_value["message"] = "Error in SMS sending!" if not succeeded else ""
-            return_value["other"] = results
+            result, message = Notifier.send_test_sms()
+            return_value["result"] = result
+            return_value["message"] = "Error in SMS sending!" if not result else ""
+            return_value["other"] = message
         elif message["action"] == GET_SMS_MESSAGES:
             result, messages = Notifier.get_sms_messages()
             return_value["result"] = result
@@ -203,15 +203,15 @@ class IPCServer(Thread):
             result = Notifier.delete_sms_message(message["message_id"])
             return_value["result"] = result
         elif message["action"] == SEND_TEST_EMAIL:
-            succeeded, results = Notifier.send_test_email()
-            return_value["result"] = succeeded
-            return_value["message"] = "Error in email sending!" if not succeeded else ""
-            return_value["other"] = results
+            result, message = Notifier.send_test_email()
+            return_value["result"] = result
+            return_value["message"] = "Error in email sending!" if not result else ""
+            return_value["other"] = message
         elif message["action"] == MAKE_TEST_CALL:
-            succeeded, results = Notifier.make_test_call()
-            return_value["result"] = succeeded
-            return_value["message"] = "Error in call sending!" if not succeeded else ""
-            return_value["other"] = results
+            result, message = Notifier.make_test_call()
+            return_value["result"] = result
+            return_value["message"] = "Error in call sending!" if not result else ""
+            return_value["other"] = message
         elif message["action"] == SEND_TEST_SYREN:
             self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:
