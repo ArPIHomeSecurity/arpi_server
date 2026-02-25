@@ -9,6 +9,7 @@ from mcp_server.option.syren import syren_option_mcp
 from mcp_server.option.alert_sensitivity import alert_sensitivity_option_mcp
 from mcp_server.option.dyndns import dyndns_option_mcp
 from mcp_server.option.gsm import gsm_option_mcp
+from mcp_server.option.smtp import smtp_option_mcp
 from mcp_server.option.ssh import ssh_option_mcp
 from mcp_server.prompts import prompts_mcp
 from mcp_server.sensor import sensor_mcp
@@ -50,6 +51,7 @@ def mount_servers():
     main_mcp.mount(syren_option_mcp, namespace="option_syren")
     main_mcp.mount(alert_sensitivity_option_mcp, namespace="option_alert_sensitivity")
     main_mcp.mount(gsm_option_mcp, namespace="option_gsm")
+    main_mcp.mount(smtp_option_mcp, namespace="option_smtp")
     main_mcp.mount(ssh_option_mcp, namespace="option_ssh")
     main_mcp.mount(dyndns_option_mcp, namespace="option_dyndns")
 
