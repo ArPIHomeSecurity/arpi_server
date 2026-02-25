@@ -1,42 +1,88 @@
 """
-This module defines the dataclasses for configurations used in the monitor.
-
+This module defines the configuration dataclasses for the monitor.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
-from monitor.config.helper import load_config, save_config
+from monitor.config.base import BaseConfig
 
 
-class BaseConfig:
-    """
-    Base class for all configs, provides common methods for loading and saving configs
-    We use class methods for option and section to avoid conflicts with dataclass fields.
-    """
+@dataclass
+class Subscription:
+    alert_started: bool = False
+    alert_stopped: bool = False
+    power_outage_started: bool = False
+    power_outage_stopped: bool = False
 
-    OPTION_NAME = None
-    SECTION_NAME = None
 
-    @classmethod
-    def load_config(cls, cleanup=False, session=None):
-        """
-        Load the config from the database and return it as a dataclass or the default values
-        if it doesn't exist.
+@dataclass
+class SubscriptionsConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "subscriptions"
 
-        Args:
-            cleanup (bool): If True, save the values back to the database to ensure they are stored
-            session: The database session to use for loading and saving the config
-        """
-        if cls.OPTION_NAME is None or cls.SECTION_NAME is None:
-            raise NotImplementedError(
-                "Option name and section name must be defined in the subclass"
-            )
+    call1: Subscription = None
+    call2: Subscription = None
+    sms1: Subscription = None
+    sms2: Subscription = None
+    email1: Subscription = None
+    email2: Subscription = None
 
-        config = load_config(cls.OPTION_NAME, cls.SECTION_NAME, cls, session) or cls()
-        if cleanup:
-            save_config(cls.OPTION_NAME, cls.SECTION_NAME, asdict(config), session=session)
+    def __post_init__(self):
+        self.call1 = (
+            Subscription(**self.call1)
+            if isinstance(self.call1, dict)
+            else (self.call1 or Subscription())
+        )
+        self.call2 = (
+            Subscription(**self.call2)
+            if isinstance(self.call2, dict)
+            else (self.call2 or Subscription())
+        )
+        self.sms1 = (
+            Subscription(**self.sms1)
+            if isinstance(self.sms1, dict)
+            else (self.sms1 or Subscription())
+        )
+        self.sms2 = (
+            Subscription(**self.sms2)
+            if isinstance(self.sms2, dict)
+            else (self.sms2 or Subscription())
+        )
+        self.email1 = (
+            Subscription(**self.email1)
+            if isinstance(self.email1, dict)
+            else (self.email1 or Subscription())
+        )
+        self.email2 = (
+            Subscription(**self.email2)
+            if isinstance(self.email2, dict)
+            else (self.email2 or Subscription())
+        )
 
-        return config
+
+@dataclass
+class SMTPConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "smtp"
+
+    enabled: bool = False
+    smtp_hostname: str = None
+    smtp_port: int = None
+    smtp_username: str = None
+    smtp_password: str = None
+    email_address_1: str = None
+    email_address_2: str = None
+
+
+@dataclass
+class GSMConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "gsm"
+
+    enabled: bool = False
+    pin_code: str = None
+    phone_number_1: str = None
+    phone_number_2: str = None
 
 
 @dataclass

@@ -1,6 +1,6 @@
 import logging
 
-from smtplib import SMTP, SMTPException, SMTPServerDisconnected
+from smtplib import SMTP, SMTPException, SMTPRecipientsRefused, SMTPServerDisconnected
 from socket import gaierror
 
 from utils.constants import LOG_NOTIFIER
@@ -65,6 +65,13 @@ class SMTPSender:
 
     def _send_email(self, to_address, subject, content):
         """Send an email and detect disconnected state."""
+        if not self._server:
+            self._logger.error("SMTP server is not connected!")
+
+        if not to_address:
+            self._logger.debug("No email address provided, skipping email notification")
+            return
+
         try:
             self._logger.info("Sending email to '%s' ...", to_address)
             message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
@@ -76,6 +83,8 @@ class SMTPSender:
             self._logger.info("Sent email")
         except SMTPServerDisconnected as error:
             raise error
+        except SMTPRecipientsRefused:
+            self._logger.error("Recipient refused: %s", to_address)
         except SMTPException as error:
             self._logger.error("Failed to send email! %s", error)
             code, message, _ = error.args
