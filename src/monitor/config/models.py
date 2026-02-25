@@ -132,12 +132,15 @@ class MQTTConnection(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "connection"
 
-    enabled: bool
-    external: bool
+    enabled: bool = True
+    external: bool = False
 
 
 @dataclass
 class MQTTConfigInternalRead(BaseConfig):
+    """
+    Access configuration to the internal MQTT broker for reading.
+    """
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_read"
 
@@ -145,12 +148,15 @@ class MQTTConfigInternalRead(BaseConfig):
     port: int
     username: str
     password: str
-    tls_enabled: bool
-    tls_insecure: bool
+    tls_enabled: bool = True
+    tls_insecure: bool = True
 
 
 @dataclass
 class MQTTConfigInternalPublish(BaseConfig):
+    """
+    Access configuration to the internal MQTT broker for publishing.
+    """
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_publish"
 
@@ -158,12 +164,15 @@ class MQTTConfigInternalPublish(BaseConfig):
     port: int
     username: str
     password: str
-    tls_enabled: bool
-    tls_insecure: bool
+    tls_enabled: bool | None = None
+    tls_insecure: bool | None = None
 
 
 @dataclass
 class MQTTConfigExternalPublish(BaseConfig):
+    """
+    Access configuration to the external MQTT broker for publishing.
+    """
     OPTION_NAME = "mqtt"
     SECTION_NAME = "external_publish"
 
@@ -171,5 +180,5 @@ class MQTTConfigExternalPublish(BaseConfig):
     port: int
     username: str
     password: str
-    tls_enabled: bool
-    tls_insecure: bool
+    tls_enabled: bool | None = None
+    tls_insecure: bool | None = None

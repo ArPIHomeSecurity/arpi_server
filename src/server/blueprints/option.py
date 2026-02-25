@@ -5,7 +5,7 @@ import os
 from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
 
-from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, GSMConfig, SMTPConfig, SSHConfig, SubscriptionsConfig, SyrenConfig
+from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, GSMConfig, MQTTConfigExternalPublish, MQTTConnection, SMTPConfig, SSHConfig, SubscriptionsConfig, SyrenConfig
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
@@ -13,6 +13,7 @@ from server.services.base import TestingNotAllowed
 from server.services.option.alert_sensitivity import AlertSensitivityService
 from server.services.option.dyndns import DyndnsService
 from server.services.option.gsm import GSMService
+from server.services.option.mqtt import MQTTService
 from server.services.option.smtp import SMTPService
 from server.services.option.ssh import SSHService
 from server.services.option.subscriptions import SubscriptionsService
@@ -70,6 +71,14 @@ def option_put(option_name, section) -> Response:
         ssh_service = SSHService(db.session)
         ssh_service.set_ssh_config(SSHConfig(**request.json))
         return ""
+    elif option_name == MQTTConnection.OPTION_NAME and section == MQTTConnection.SECTION_NAME:
+        mqtt_service = MQTTService(db.session)
+        mqtt_service.set_connection_config(MQTTConnection(**request.json))
+        return ""
+    elif option_name == MQTTConfigExternalPublish.OPTION_NAME and section == MQTTConfigExternalPublish.SECTION_NAME:
+        mqtt_service = MQTTService(db.session)
+        mqtt_service.set_external_publish_config(MQTTConfigExternalPublish(**request.json))
+        return ""
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         dyndns_service = DyndnsService(db.session)
         dyndns_service.set_dyndns_config(DyndnsConfig(**request.json))
@@ -89,15 +98,6 @@ def option_put(option_name, section) -> Response:
     if option_name == "notifications":
         if changed:
             return process_ipc_response(IPCClient().update_configuration())
-    elif (
-        db_option.name == "mqtt"
-        and db_option.section == "connection"
-        or db_option.name == "mqtt"
-        and db_option.section == "external_publish"
-    ):
-        # update mqtt connection in monitor service
-        return process_ipc_response(IPCClient().update_configuration())
-
     return ""
 
 
