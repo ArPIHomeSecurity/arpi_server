@@ -5,7 +5,6 @@ from monitor.config.helper import save_config
 from monitor.config.models import DyndnsConfig
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed
-from server.tools import evaluate_ipc_response
 
 
 class DyndnsService(BaseService):

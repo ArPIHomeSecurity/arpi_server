@@ -73,22 +73,33 @@ def manage_area(area_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_arm():
-    return process_ipc_response(
-        IPCClient().arm(
-            arm_type=request.args.get("type"),
-            user_id=request.environ["requester_id"],
-            area_id=request.args["area_id"],
+    try:
+        area_service = AreaService(db.session)
+        return process_ipc_response(
+            area_service.arm(
+                area_id=request.args["area_id"],
+                arm_type=request.args.get("type"),
+                user_id=request.environ["requester_id"],
+            )
         )
-    )
+    except ObjectNotFound:
+        return jsonify({"error": "Area not found"}), 404
 
 
 @area_blueprint.route("/api/area/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_disarm():
-    return process_ipc_response(
-        IPCClient().disarm(request.environ["requester_id"], request.args["area_id"])
-    )
+    try:
+        area_service = AreaService(db.session)
+        return process_ipc_response(
+            area_service.disarm(
+                area_id=request.args["area_id"],
+                user_id=request.environ["requester_id"],
+            )
+        )
+    except ObjectNotFound:
+        return jsonify({"error": "Area not found"}), 404
 
 
 @area_blueprint.route("/api/areas/reorder", methods=["PUT"])

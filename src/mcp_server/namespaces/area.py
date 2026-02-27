@@ -1,12 +1,13 @@
 # pylint: disable=raise-missing-from
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from fastmcp.exceptions import ToolError
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
+from mcp_server.models.zone import ArmType
 from monitor.database import get_database_session
 from server.services.area import AreaService
-from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
-                                  ObjectNotFound)
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.tools import evaluate_ipc_response
 
 area_mcp = FastMCP("ArPI - area service")
 
@@ -137,3 +138,44 @@ def delete_area(area_id: int):
         raise ToolObjectNotFound("Area")
     except ObjectNotChanged:
         raise ToolError("Area cannot be deleted")
+
+
+@area_mcp.tool(
+    name="arm",
+    description="Tool to arm an area by its ID",
+)
+def arm_area(area_id: int, arm_type: ArmType, ctx: Context):
+    """
+    Arm an area by its ID.
+
+    Args:
+        area_id: The ID of the area to arm
+        arm_type: The type of arming to perform (stay, away, mixed, disarm)
+    """
+    try:
+        area_service = AreaService(session)
+        return evaluate_ipc_response(area_service.arm(area_id, arm_type.value, ctx.client_id))
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Area")
+
+
+@area_mcp.tool(
+    name="disarm",
+    description="Tool to disarm an area by its ID",
+)
+def disarm_area(area_id: int, ctx: Context):
+    """
+    Disarm an area by its ID.
+
+    Args:
+        area_id: The ID of the area to disarm
+    """
+    try:
+        area_service = AreaService(session)
+        return evaluate_ipc_response(area_service.disarm(area_id, ctx.client_id))
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Area")

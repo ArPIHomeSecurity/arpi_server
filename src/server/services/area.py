@@ -2,6 +2,7 @@
 Area service module to handle area-related operations.
 """
 
+from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
     ConfigChangesNotAllowed,
@@ -113,3 +114,47 @@ class AreaService(BaseService):
 
         area.deleted = True
         self._db_session.commit()
+
+
+    def arm(self, area_id: int, arm_type: str, user_id: int) -> Area:
+        """
+        Arm an area by its ID.
+
+        Args:
+            area_id: ID of the area to arm
+            arm_type: Type of arming
+            user_id: ID of the user performing the arming
+
+        Returns:
+            The armed Area object or None if not found
+        """
+        area = self.get_area(area_id)
+        if not area:
+            raise ObjectNotFound("Area not found")
+
+        return IPCClient().arm(
+            arm_type=arm_type,
+            user_id=user_id,
+            area_id=area_id,
+        )
+    
+
+    def disarm(self, area_id: int, user_id: int) -> Area:
+        """
+        Disarm an area by its ID.
+
+        Args:
+            area_id: ID of the area to disarm
+            user_id: ID of the user performing the arming
+
+        Returns:
+            The armed Area object or None if not found
+        """
+        area = self.get_area(area_id)
+        if not area:
+            raise ObjectNotFound("Area not found")
+
+        return IPCClient().disarm(
+            user_id=user_id,
+            area_id=area_id,
+        )

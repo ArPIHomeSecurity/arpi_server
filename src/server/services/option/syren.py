@@ -4,10 +4,6 @@ from monitor.config.models import SyrenConfig
 from monitor.syren import Syren
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed, TestingNotAllowed
-from server.tools import evaluate_ipc_response
-
-OPTION_NAME = "syren"
-OPTION_SECTION = "timing"
 
 
 class SyrenService(BaseService):
@@ -33,7 +29,7 @@ class SyrenService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        save_config(OPTION_NAME, OPTION_SECTION, asdict(config), session=self._db_session)
+        save_config(SyrenConfig.OPTION_NAME, SyrenConfig.OPTION_SECTION, asdict(config), session=self._db_session)
 
     def test_syren(self, duration: int = 5) -> dict:
         """
