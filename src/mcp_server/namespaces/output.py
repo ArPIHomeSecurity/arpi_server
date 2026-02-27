@@ -103,13 +103,13 @@ def get_output_trigger_type_names():
 )
 async def create_output(
     ctx: Context,
-    name: Annotated[str, Field(description="The name of the output", length=Output.NAME_LENGTH)],
+    name: Annotated[str, Field(description="The name of the output", max_length=Output.NAME_LENGTH)],
     description: Annotated[str, "The description of the output"] = "",
     channel: Annotated[int, "The channel number for the output"] = None,
     trigger_type: Annotated[
         OutputTriggerType, "The trigger type for the output"
     ] = OutputTriggerType.BUTTON,
-    area_id: Annotated[int, "The area ID the output belongs to"] = None,
+    area_id: Annotated[int | None, "The area ID the output belongs to"] = None,
     delay: Annotated[int, "The delay before the output is activated"] = 0,
     duration: Annotated[int, "The duration the output remains active"] = 0,
     default_state: Annotated[bool, "The default state of the output"] = False,
@@ -185,16 +185,16 @@ async def update_output(
     ctx: Context,
     output_id: int,
     name: Annotated[
-        str, Field(description="The new name of the output", length=Output.NAME_LENGTH)
+        str, Field(description="The new name of the output", max_length=Output.NAME_LENGTH)
     ] = None,
-    description: Annotated[str, "The new description of the output"] = None,
-    channel: Annotated[int, "The new channel number for the output"] = None,
-    trigger_type: Annotated[OutputTriggerType, "The new trigger type for the output"] = None,
-    area_id: Annotated[int, "The new area ID the output belongs to"] = None,
-    delay: Annotated[int, "The new delay before the output is activated"] = None,
-    duration: Annotated[int, "The new duration the output remains active"] = None,
-    default_state: Annotated[bool, "The new default state of the output"] = None,
-    enabled: Annotated[bool, "Whether the output is enabled"] = None,
+    description: Annotated[str | None, "The new description of the output"] = None,
+    channel: Annotated[int | None, "The new channel number for the output"] = None,
+    trigger_type: Annotated[OutputTriggerType | None, "The new trigger type for the output"] = None,
+    area_id: Annotated[int | None, "The new area ID the output belongs to"] = None,
+    delay: Annotated[int | None, "The new delay before the output is activated"] = None,
+    duration: Annotated[int | None, "The new duration the output remains active"] = None,
+    default_state: Annotated[bool | None, "The new default state of the output"] = None,
+    enabled: Annotated[bool | None, "Whether the output is enabled"] = None,
 ):
     """
     Update an existing output in the database.

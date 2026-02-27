@@ -21,28 +21,28 @@ session = get_database_session()
 
 
 @sensor_mcp.resource(
-    uri="sensors://list",
+    uri="sensors://list/{alerting_only}",
     name="all",
     mime_type="application/json",
 )
-def get_sensors():
+def get_sensors(alerting_only: bool):
     """
     Retrieve all existing sensors.
     """
     sensor_service = SensorService(session)
-    return [sensor.serialized for sensor in sensor_service.get_sensors()]
+    return [sensor.serialized for sensor in sensor_service.get_sensors(alerting=alerting_only)]
 
 
 @sensor_mcp.tool(
     name="get_all_sensors",
 )
-def get_sensors_tool():
+def get_sensors_tool(alerting_only: bool = False):
     """
     Tool to retrieve all existing sensors.
     """
     try:
         sensor_service = SensorService(session)
-        return [sensor.serialized for sensor in sensor_service.get_sensors()]
+        return [sensor.serialized for sensor in sensor_service.get_sensors(alerting=alerting_only)]
     except ObjectNotFound:
         raise ToolError("No sensors found")
 
@@ -94,6 +94,7 @@ def get_channel_mappings():
     channel_count = os.environ["INPUT_NUMBER"]
     return [{"name": f"CH{i + 1:02}", "id": i} for i in range(int(channel_count))]
 
+
 @sensor_mcp.tool(
     name="get_channel_mappings",
 )
@@ -103,6 +104,7 @@ def get_channel_mappings_tool():
     """
     channel_count = os.environ["INPUT_NUMBER"]
     return [{"name": f"CH{i + 1:02}", "id": i} for i in range(int(channel_count))]
+
 
 @sensor_mcp.resource(
     uri="sensorTypes://list",
@@ -201,10 +203,18 @@ async def create_sensor(
     sensor_eol_count: Annotated[
         SensorEOLCount, "The end-of-line count of the sensor"
     ] = SensorEOLCount.SINGLE,
-    area_id: Annotated[int | None, "The ID of the area where the sensor is located (elicited if not provided)"] = None,
-    zone_id: Annotated[int | None, "The ID of the zone where the sensor is located (elicited if not provided)"] = None,
-    sensor_type_id: Annotated[int | None, "The ID of the sensor type (elicited if not provided)"] = None,
-    channel: Annotated[int | None, "The channel number the sensor is connected to (elicited if not provided)"] = None,
+    area_id: Annotated[
+        int | None, "The ID of the area where the sensor is located (elicited if not provided)"
+    ] = None,
+    zone_id: Annotated[
+        int | None, "The ID of the zone where the sensor is located (elicited if not provided)"
+    ] = None,
+    sensor_type_id: Annotated[
+        int | None, "The ID of the sensor type (elicited if not provided)"
+    ] = None,
+    channel: Annotated[
+        int | None, "The channel number the sensor is connected to (elicited if not provided)"
+    ] = None,
 ):
     """
     Create a new sensor in the database.
@@ -252,7 +262,10 @@ async def create_sensor(
         sensor_service = SensorService(session)
         result = await ctx.elicit(
             "What type of sensor is this?",
-            response_type=[f"{sensor_type.name} ({sensor_type.id})" for sensor_type in sensor_service.get_sensor_types()],
+            response_type=[
+                f"{sensor_type.name} ({sensor_type.id})"
+                for sensor_type in sensor_service.get_sensor_types()
+            ],
         )
         if result.action == "accept":
             sensor_type_id = int(result.data.split("(")[-1].rstrip(")"))
@@ -302,27 +315,43 @@ async def create_sensor(
 )
 def update_sensor(
     sensor_id,
-    name=None,
-    description=None,
-    channel=None,
-    channel_type=None,
-    sensor_contact_type=None,
-    sensor_eol_count=None,
-    enabled=None,
-    zone_id=None,
-    area_id=None,
-    type_id=None,
-    ui_hidden=None,
-    monitor_period=None,
-    monitor_threshold=None,
-    silent_alert=None,
+    name: Annotated[
+        str, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
+    ] = None,
+    description: Annotated[str, Field(description="The new description of the sensor")] = None,
+    channel: Annotated[int, Field(description="The new channel number for the sensor")] = None,
+    channel_type: Annotated[str, Field(description="The new channel type of the sensor")] = None,
+    sensor_contact_type: Annotated[
+        str, Field(description="The new contact type of the sensor")
+    ] = None,
+    sensor_eol_count: Annotated[
+        int, Field(description="The new end-of-line count of the sensor")
+    ] = None,
+    enabled: Annotated[bool, Field(description="Whether the sensor is enabled")] = None,
+    zone_id: Annotated[
+        int, Field(description="The new zone ID where the sensor is located")
+    ] = None,
+    area_id: Annotated[
+        int, Field(description="The new area ID where the sensor is located")
+    ] = None,
+    type_id: Annotated[int, Field(description="The new type ID of the sensor")] = None,
+    ui_hidden: Annotated[bool, Field(description="Whether the sensor is hidden in the UI")] = None,
+    monitor_period: Annotated[
+        int, Field(description="The new monitoring period for the sensor")
+    ] = None,
+    monitor_threshold: Annotated[
+        int, Field(description="The new monitoring threshold for the sensor")
+    ] = None,
+    silent_alert: Annotated[
+        bool, Field(description="Whether the sensor has silent alerts enabled")
+    ] = None,
 ):
     """
     Update an existing sensor in the database.
     Attributes we don't want to update can be left as None.
 
     Args:
-        sensor_id: ID of the sensor to update
+        sensor_id: The ID of the sensor to update
         name: The new name of the sensor
         description: The new description of the sensor
         channel: The new channel number for the sensor
