@@ -1,22 +1,24 @@
+import pathlib
+
 from fastmcp import FastMCP
 
-from mcp_server.area import area_mcp
 from mcp_server.auth import JWTVerifier
-from mcp_server.card import card_mcp
-from mcp_server.monitoring import monitoring_mcp
-from mcp_server.output import output_mcp
-from mcp_server.option.syren import syren_option_mcp
-from mcp_server.option.alert_sensitivity import alert_sensitivity_option_mcp
-from mcp_server.option.dyndns import dyndns_option_mcp
-from mcp_server.option.gsm import gsm_option_mcp
-from mcp_server.option.mqtt import mqtt_option_mcp
-from mcp_server.option.smtp import smtp_option_mcp
-from mcp_server.option.ssh import ssh_option_mcp
-from mcp_server.option.subscriptions import subscriptions_option_mcp
-from mcp_server.prompts import prompts_mcp
-from mcp_server.sensor import sensor_mcp
-from mcp_server.user import user_mcp
-from mcp_server.zone import zone_mcp
+from mcp_server.namespaces.area import area_mcp
+from mcp_server.namespaces.card import card_mcp
+from mcp_server.namespaces.monitoring import monitoring_mcp
+from mcp_server.namespaces.output import output_mcp
+from mcp_server.namespaces.option.syren import syren_option_mcp
+from mcp_server.namespaces.option.alert_sensitivity import alert_sensitivity_option_mcp
+from mcp_server.namespaces.option.dyndns import dyndns_option_mcp
+from mcp_server.namespaces.option.gsm import gsm_option_mcp
+from mcp_server.namespaces.option.mqtt import mqtt_option_mcp
+from mcp_server.namespaces.option.smtp import smtp_option_mcp
+from mcp_server.namespaces.option.ssh import ssh_option_mcp
+from mcp_server.namespaces.option.subscriptions import subscriptions_option_mcp
+from mcp_server.namespaces.prompts import prompts_mcp
+from mcp_server.namespaces.sensor import sensor_mcp
+from mcp_server.namespaces.user import user_mcp
+from mcp_server.namespaces.zone import zone_mcp
 
 from monitor.database import get_database_session
 from utils.models import (
@@ -26,6 +28,7 @@ from utils.models import (
     SensorType,
 )
 
+CURRENT_DIRECTORY = pathlib.Path(__file__).parent
 
 PROMPT_DYNAMIC_DATA = """
 #################################################
@@ -67,7 +70,7 @@ def generate_system_prompt():
     Add dynamic data from the database and source code.
     """
     system_prompt = ""
-    with open("src/mcp_server/prompts/general_system.txt", "r", encoding="utf-8") as f:
+    with open(CURRENT_DIRECTORY / "prompts/general_system.txt", "r", encoding="utf-8") as f:
         system_prompt = f.read()
 
     # get sensor types from the database

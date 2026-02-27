@@ -1,9 +1,12 @@
+import pathlib
+
 from fastmcp import FastMCP
 from fastmcp.prompts import Message
 
 
 from utils.models import ChannelTypes, SensorContactTypes, SensorEOLCount
 
+CURRENT_DIRECTORY = pathlib.Path(__file__).parent
 
 prompts_mcp = FastMCP("ArPI - prompts service")
 
@@ -92,7 +95,7 @@ def first_setup_sensors() -> list[Message]:
         A confirmation message indicating successful deployment.
     """
     system_prompt = ""
-    with open("src/mcp_server/prompts/setup_wizard_sensors_system.txt", "r", encoding="utf-8") as f:
+    with open(CURRENT_DIRECTORY / "../prompts/setup_wizard_sensors_system.txt", "r", encoding="utf-8") as f:
         system_prompt = f.read()
 
     return [
