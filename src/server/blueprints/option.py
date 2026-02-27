@@ -105,30 +105,33 @@ def option_put(option_name, section) -> Response:
 @authenticated()
 @restrict_host
 def test_email():
-    if request.method == "GET":
-        return process_ipc_response(IPCClient().send_test_email())
-
-    return jsonify({"result": False, "message": "Something went wrong"}), 500
+    try:
+        smtp_service = SMTPService(db.session)
+        return process_ipc_response(smtp_service.test_email())
+    except TestingNotAllowed:
+        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
 
 
 @config_blueprint.route("/api/config/test_sms", methods=["GET"])
 @authenticated()
 @restrict_host
 def test_sms():
-    if request.method == "GET":
-        return process_ipc_response(IPCClient().send_test_sms())
-
-    return jsonify({"result": False, "message": "Something went wrong"}), 500
+    try:
+        gsm_service = GSMService(db.session)
+        return process_ipc_response(gsm_service.test_sms())
+    except TestingNotAllowed:
+        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
 
 
 @config_blueprint.route("/api/config/test_call", methods=["GET"])
 @authenticated()
 @restrict_host
 def test_call():
-    if request.method == "GET":
-        return process_ipc_response(IPCClient().make_test_call())
-
-    return jsonify({"result": False, "message": "Something went wrong"}), 500
+    try:
+        gsm_service = GSMService(db.session)
+        return process_ipc_response(gsm_service.test_call())
+    except TestingNotAllowed:
+        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
 
 
 @config_blueprint.route("/api/config/test_syren", methods=["GET"])
