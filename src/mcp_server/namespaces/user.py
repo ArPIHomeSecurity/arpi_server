@@ -1,6 +1,9 @@
+# pylint: disable=raise-missing-from
 from fastmcp import FastMCP
 
+from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
+from server.services.base import ConfigChangesNotAllowed, ObjectNotFound
 from server.services.user import UserService
 
 
@@ -44,12 +47,15 @@ def get_users_tool():
 def get_user(user_id: int):
     """
     Retrieve a specific user from the database.
+
     Args:
-    user_id: The ID of the user to retrieve
+        user_id: The ID of the user to retrieve
     """
-    user_service = UserService(session)
-    user = user_service.get_user(user_id)
-    return user.serialized if user else None
+    try:
+        user_service = UserService(session)
+        return user_service.get_user(user_id).serialized
+    except ObjectNotFound:
+        raise ToolObjectNotFound("User")
 
 
 @user_mcp.tool(
@@ -58,48 +64,76 @@ def get_user(user_id: int):
 def get_user_tool(user_id: int):
     """
     Tool to retrieve a specific user from the database.
+
     Args:
         user_id: The ID of the user to retrieve
     """
-    user_service = UserService(session)
-    user = user_service.get_user(user_id)
-    return user.serialized if user else None
+    try:
+        user_service = UserService(session)
+        return user_service.get_user(user_id).serialized
+    except ObjectNotFound:
+        raise ToolObjectNotFound("User")
 
 
-# @user_mcp.tool
-# def create_user(username, email):
-#     """
-#     Create a new user in the database.
-#     Args:
-#         username: The username of the new user
-#         email: The email of the new user
-#     """
-#     user_service = UserService(session)
-#     new_user = user_service.create_user(username=username, email=email)
-#     return new_user.serialized
+@user_mcp.tool()
+def create_user(name: str, role: str, access_code: str, comment: str = None) -> dict:
+    """
+    Create a new user in the database.
+
+    Args:
+        name: The name of the new user
+        role: The role of the new user (e.g. admin, user)
+        access_code: The numeric access code for the new user (4-12 digits)
+        comment: Optional comment for the user
+    """
+    try:
+        user_service = UserService(session)
+        new_user = user_service.create_user(
+            name=name, role=role, access_code=access_code, comment=comment
+        )
+        return new_user.serialized
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
 
 
-# @user_mcp.tool
-# def update_user(user_id, username=None, email=None):
-#     """
-#     Update an existing user in the database.
-#     Args:
-#         user_id: The ID of the user to update
-#         username: The new username of the user (optional)
-#         email: The new email of the user (optional)
-#     """
-#     user_service = UserService(session)
-#     updated_user = user_service.update_user(user_id=user_id, username=username, email=email)
-#     return updated_user.serialized
+@user_mcp.tool
+def update_user(
+    user_id: int, name: str = None, role: str = None, comment: str = None
+):
+    """
+    Update an existing user in the database.
+
+    Args:
+        user_id: The ID of the user to update
+        name: The new name of the user (optional)
+        role: The new role of the user (optional)
+        comment: The new comment of the user (optional)
+    """
+    try:
+        user_service = UserService(session)
+        updated_user = user_service.update_user(
+            user_id=user_id, name=name, role=role, comment=comment
+        )
+        return updated_user.serialized
+    except ObjectNotFound:
+        raise ToolObjectNotFound("User")
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
 
 
-# @user_mcp.tool
-# def delete_user(user_id):
-#     """
-#     Delete a user from the database.
-#     Args:
-#         user_id: The ID of the user to delete
-#     """
-#     user_service = UserService(session)
-#     success = user_service.delete_user(user_id=user_id)
-#     return "Success" if success else "Failure"
+@user_mcp.tool
+def delete_user(user_id: int):
+    """
+    Delete a user from the database.
+
+    Args:
+        user_id: The ID of the user to delete
+    """
+    try:
+        user_service = UserService(session)
+        user_service.delete_user(user_id=user_id)
+        return "Success"
+    except ObjectNotFound:
+        raise ToolObjectNotFound("User")
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
