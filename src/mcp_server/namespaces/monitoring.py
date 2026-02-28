@@ -1,5 +1,6 @@
 from dataclasses import asdict
 import json
+import os
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -21,6 +22,7 @@ from server.services.output import OutputService
 from server.services.sensor import SensorService
 from server.services.zone import ZoneService
 from server.tools import evaluate_ipc_response
+from server.version import __version__
 from utils.constants import ARM_DISARM
 from utils.queries import get_arm_state
 
@@ -74,15 +76,19 @@ def get_all_options() -> str:
     subscriptions = SubscriptionsService(db_session).get_subscriptions_config()
     syren_config = SyrenService(db_session).get_syren_config()
     return json.dumps({
-        "alert_sensitivity": asdict(alert_sensitivity),
-        "dyndns": asdict(dyndns_config),
-        "gsm": asdict(gsm_config),
-        "mqtt_external_publish": asdict(mqtt_external_publish),
-        "mqtt_internal_read": asdict(mqtt_internal_read),
-        "smtp": asdict(smtp_config),
-        "ssh": asdict(ssh_config),
-        "subscriptions": asdict(subscriptions),
-        "syren": asdict(syren_config),
+        "options": {
+            "alert_sensitivity": asdict(alert_sensitivity),
+            "dyndns": asdict(dyndns_config),
+            "gsm": asdict(gsm_config),
+            "mqtt_external_publish": asdict(mqtt_external_publish),
+            "mqtt_internal_read": asdict(mqtt_internal_read),
+            "smtp": asdict(smtp_config),
+            "ssh": asdict(ssh_config),
+            "subscriptions": asdict(subscriptions),
+            "syren": asdict(syren_config),
+        },
+        "version": __version__,
+        "board_version": os.environ["BOARD_VERSION"],
     })
 
 

@@ -5,10 +5,10 @@ from fastmcp import FastMCP
 from server.version import __version__
 
 
-user_mcp = FastMCP("ArPI - user service")
+generic_mcp = FastMCP("ArPI - generic service")
 
 
-@user_mcp.tool(
+@generic_mcp.tool(
     name="get_version",
 )
 def get_version():
@@ -18,7 +18,7 @@ def get_version():
     return __version__
 
 
-@user_mcp.tool(
+@generic_mcp.tool(
     name="get_board_version",
 )
 def get_board_version():
