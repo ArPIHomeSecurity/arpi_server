@@ -6,8 +6,8 @@ from fastmcp.exceptions import ToolError
 from mcp_server.errors import ToolChangesNotAllowed
 from monitor.config.models import SMTPConfig
 from monitor.database import get_database_session
-from server.services.base import ConfigChangesNotAllowed
-from server.services.option.smtp import SMTPService, TestingNotAllowed
+from server.services.base import ConfigChangesNotAllowed, TestingNotAllowed
+from server.services.option import SMTPService
 from server.tools import evaluate_ipc_response
 
 smtp_option_mcp = FastMCP("ArPI - SMTP configuration service")

@@ -5,7 +5,7 @@ from fastmcp import FastMCP
 from mcp_server.errors import ToolChangesNotAllowed
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed
-from server.services.option.ssh import SSHService
+from server.services.option import SSHService
 from server.tools import evaluate_ipc_response
 
 ssh_option_mcp = FastMCP("ArPI - SSH configuration service")

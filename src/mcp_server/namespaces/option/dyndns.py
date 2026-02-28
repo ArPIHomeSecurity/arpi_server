@@ -6,7 +6,7 @@ from mcp_server.errors import ToolChangesNotAllowed
 from monitor.config.models import DyndnsConfig
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed
-from server.services.option.dyndns import DyndnsService
+from server.services.option import DyndnsService
 from server.tools import evaluate_ipc_response
 
 dyndns_option_mcp = FastMCP("ArPI - dynamic DNS configuration service")

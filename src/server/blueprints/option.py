@@ -10,14 +10,16 @@ from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
 from server.services.base import TestingNotAllowed
-from server.services.option.alert_sensitivity import AlertSensitivityService
-from server.services.option.dyndns import DyndnsService
-from server.services.option.gsm import GSMService
-from server.services.option.mqtt import MQTTService
-from server.services.option.smtp import SMTPService
-from server.services.option.ssh import SSHService
-from server.services.option.subscriptions import SubscriptionsService
-from server.services.option.syren import SyrenService
+from server.services.option import (
+    AlertSensitivityService,
+    DyndnsService,
+    GSMService,
+    MQTTService,
+    SMTPService,
+    SSHService,
+    SubscriptionsService,
+    SyrenService,
+)
 from server.tools import process_ipc_response
 from tools.certbot import Certbot
 from utils.models import Option

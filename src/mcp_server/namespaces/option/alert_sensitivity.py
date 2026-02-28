@@ -7,7 +7,7 @@ from mcp_server.errors import ToolChangesNotAllowed
 from monitor.config.models import AlertSensitivityConfig
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed
-from server.services.option.alert_sensitivity import AlertSensitivityService
+from server.services.option import AlertSensitivityService
 
 alert_sensitivity_option_mcp = FastMCP("ArPI - alert sensitivity service")
 

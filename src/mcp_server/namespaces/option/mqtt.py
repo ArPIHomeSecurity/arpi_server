@@ -6,7 +6,7 @@ from mcp_server.errors import ToolChangesNotAllowed
 from monitor.config.models import MQTTConfigExternalPublish, MQTTConnection
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed
-from server.services.option.mqtt import MQTTService
+from server.services.option import MQTTService
 from server.tools import evaluate_ipc_response
 
 mqtt_option_mcp = FastMCP("ArPI - MQTT configuration service")

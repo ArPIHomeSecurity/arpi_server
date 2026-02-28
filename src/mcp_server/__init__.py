@@ -6,20 +6,21 @@ from mcp_server.auth import JWTVerifier
 from mcp_server.namespaces.area import area_mcp
 from mcp_server.namespaces.card import card_mcp
 from mcp_server.namespaces.monitoring import monitoring_mcp
+from mcp_server.namespaces.option import (
+    alert_sensitivity_option_mcp,
+    dyndns_option_mcp,
+    gsm_option_mcp,
+    mqtt_option_mcp,
+    smtp_option_mcp,
+    ssh_option_mcp,
+    subscriptions_option_mcp,
+    syren_option_mcp,
+)
 from mcp_server.namespaces.output import output_mcp
-from mcp_server.namespaces.option.syren import syren_option_mcp
-from mcp_server.namespaces.option.alert_sensitivity import alert_sensitivity_option_mcp
-from mcp_server.namespaces.option.dyndns import dyndns_option_mcp
-from mcp_server.namespaces.option.gsm import gsm_option_mcp
-from mcp_server.namespaces.option.mqtt import mqtt_option_mcp
-from mcp_server.namespaces.option.smtp import smtp_option_mcp
-from mcp_server.namespaces.option.ssh import ssh_option_mcp
-from mcp_server.namespaces.option.subscriptions import subscriptions_option_mcp
 from mcp_server.namespaces.prompts import prompts_mcp
 from mcp_server.namespaces.sensor import sensor_mcp
 from mcp_server.namespaces.user import user_mcp
 from mcp_server.namespaces.zone import zone_mcp
-
 from monitor.database import get_database_session
 from utils.models import (
     ChannelTypes,

@@ -6,7 +6,7 @@ from mcp_server.errors import ToolChangesNotAllowed
 from monitor.config.models import SubscriptionsConfig
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed
-from server.services.option.subscriptions import SubscriptionsService
+from server.services.option import SubscriptionsService
 from server.tools import evaluate_ipc_response
 
 subscriptions_option_mcp = FastMCP("ArPI - notification subscriptions configuration service")
