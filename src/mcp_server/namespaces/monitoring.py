@@ -1,13 +1,14 @@
 from dataclasses import asdict
 import json
 import os
+from typing import Annotated
 
-from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp import Context, FastMCP
 
+from mcp_server.models.arm import ArmState, ArmType
 from monitor.database import get_database_session
-from server.ipc import IPCClient
 from server.services.area import AreaService
+from server.services.monitor import MonitoringService
 from server.services.option import (
     AlertSensitivityService,
     DyndnsService,
@@ -21,10 +22,8 @@ from server.services.option import (
 from server.services.output import OutputService
 from server.services.sensor import SensorService
 from server.services.zone import ZoneService
-from server.tools import evaluate_ipc_response
 from server.version import __version__
-from utils.constants import ARM_DISARM
-from utils.queries import get_arm_state
+
 
 monitoring_mcp = FastMCP("ArPI - monitoring service")
 
@@ -93,29 +92,56 @@ def get_all_options() -> str:
 
 
 @monitoring_mcp.tool(
-    name="update_configuration",
-)
-def update_configuration_tool():
-    """
-    Tool to trigger configuration update.
-    """
-    arm_state = get_arm_state(session=session)
-    if arm_state != ARM_DISARM:
-        raise ToolError("Cannot update configuration while system is armed.")
-
-    response = IPCClient().update_configuration()
-    if response is not None:
-        _, success = evaluate_ipc_response(response)
-        return "Success" if success else "Failed"
-
-    return "Success"
-
-
-@monitoring_mcp.tool(
     name="get_arm_state",
 )
-def get_arm_state_tool():
+def get_arm_state_tool() -> ArmState:
     """
     Tool to retrieve the current arm state.
     """
-    return get_arm_state(session=session)
+    monitoring_service = MonitoringService(get_database_session())
+    return monitoring_service.get_arm_state()
+
+
+@monitoring_mcp.tool(
+    name="get_monitoring_state",
+)
+def get_monitoring_state_tool():
+    """
+    Tool to retrieve the current monitoring state.
+    """
+    monitoring_service = MonitoringService(get_database_session())
+    return monitoring_service.get_state()
+
+
+@monitoring_mcp.tool(
+    name="arm_system",
+)
+def arm_system_tool(
+    arm_type: Annotated[ArmType, "The type of arming"],
+    ctx: Context,
+):
+    """
+    Tool to arm the monitoring system.
+
+    Args:
+        arm_type: The type of arming
+        ctx: The MCP context containing requester information
+    """
+    user_id = ctx.client_id
+    monitoring_service = MonitoringService(get_database_session())
+    return monitoring_service.arm(arm_type, user_id)
+
+
+@monitoring_mcp.tool(
+    name="disarm_system",
+)
+def disarm_system_tool(ctx: Context):
+    """
+    Tool to disarm the monitoring system.
+
+    Args:
+        ctx: The MCP context containing requester information
+    """
+    user_id = ctx.client_id
+    monitoring_service = MonitoringService(get_database_session())
+    return monitoring_service.disarm(user_id)

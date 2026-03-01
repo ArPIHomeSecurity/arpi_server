@@ -57,7 +57,7 @@ def get_user_with_access_code(session, code) -> User:
             return tmp_user
 
 
-def get_arm_state(session):
+def get_arm_state(session) -> str:
     """
     Get the state of the areas.
     """

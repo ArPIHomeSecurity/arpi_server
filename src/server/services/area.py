@@ -115,7 +115,6 @@ class AreaService(BaseService):
         area.deleted = True
         self._db_session.commit()
 
-
     def arm(self, area_id: int, arm_type: str, user_id: int) -> Area:
         """
         Arm an area by its ID.
@@ -137,7 +136,6 @@ class AreaService(BaseService):
             user_id=user_id,
             area_id=area_id,
         )
-    
 
     def disarm(self, area_id: int, user_id: int) -> Area:
         """

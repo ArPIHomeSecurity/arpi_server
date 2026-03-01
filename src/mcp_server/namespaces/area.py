@@ -3,7 +3,7 @@ from fastmcp import FastMCP, Context
 from fastmcp.exceptions import ToolError
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
-from mcp_server.models.zone import ArmType
+from mcp_server.models.arm import ArmType
 from monitor.database import get_database_session
 from server.services.area import AreaService
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
