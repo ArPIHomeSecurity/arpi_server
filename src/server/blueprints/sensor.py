@@ -88,58 +88,47 @@ def manage_sensor(sensor_id):
 @authenticated()
 @restrict_host
 def sensors_reset_references(sensor_id=None):
-    if sensor_id:
-        db_sensor = db.session.query(Sensor).get(sensor_id)
-        db_sensor.reference_value = None
-    else:
-        for db_sensor in db.session.query(Sensor).all():
-            db_sensor.reference_value = None
-
-    db.session.commit()
-
-    return process_ipc_response(IPCClient().update_configuration())
-
+    try:
+        sensor_service = SensorService(db.session)
+        return process_ipc_response(sensor_service.reset_references(sensor_id=sensor_id))
+    except ConfigChangesNotAllowed:
+        return jsonify({"error": "Configuration changes are not allowed currently"}), 409
+    except ObjectNotFound:
+        return jsonify({"error": "Sensor not found"}), 404
+    except ObjectNotChanged:
+        return jsonify({"info": "No changes made"}), 204
 
 @sensor_blueprint.route("/api/sensortypes")
 @authenticated(role=ROLE_USER)
 @restrict_host
 def sensor_types():
-    return jsonify([i.serialized for i in db.session.query(SensorType).all()])
+    """
+    Get all sensor types.
+    """
+    sensor_service = SensorService(db.session)
+    return jsonify([i.serialized for i in sensor_service.get_sensor_types()])
 
 
 @sensor_blueprint.route("/api/sensor/alert", methods=["GET"])
 @registered
 @restrict_host
 def get_sensor_alert():
-    if request.args.get("sensorId"):
-        return jsonify(
-            db.session.query(Sensor)
-            .filter_by(id=request.args.get("sensorId"), enabled=True, alert=True, deleted=False)
-            .first()
-            is not None
-        )
-    else:
-        return jsonify(
-            db.session.query(Sensor).filter_by(enabled=True, alert=True, deleted=False).first() is not None
-        )
+    """
+    Get the alert status of a specific sensor or all sensors.
+    """
+    sensor_service = SensorService(db.session)
+    return jsonify(sensor_service.get_sensor_alert(sensor_id=request.args.get("sensorId")))
 
 
 @sensor_blueprint.route("/api/sensor/error", methods=["GET"])
 @registered
 @restrict_host
 def get_sensor_error():
-    if request.args.get("sensorId"):
-        return jsonify(
-            db.session.query(Sensor)
-            .filter_by(id=request.args.get("sensorId"), enabled=True, error=True, deleted=False)
-            .first()
-            is not None
-        )
-    else:
-        return jsonify(
-            db.session.query(Sensor).filter_by(enabled=True, error=True, deleted=False).first() is not None
-        )
-
+    """
+    Get the error status of a specific sensor or all sensors.
+    """
+    sensor_service = SensorService(db.session)
+    return jsonify(sensor_service.get_sensor_error(sensor_id=request.args.get("sensorId")))
 
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered

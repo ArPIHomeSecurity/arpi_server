@@ -187,3 +187,52 @@ class SensorService(BaseService):
                     return False
 
         return True
+
+    def reset_references(self, sensor_id: int = None) -> None:
+        """
+        Reset reference values for a specific sensor or all sensors.
+        """
+        if not self.are_changes_allowed:
+            raise ConfigChangesNotAllowed()
+
+        if sensor_id:
+            sensor = self._db_session.query(Sensor).get(sensor_id)
+            if not sensor:
+                raise ObjectNotFound("Sensor not found")
+            sensor.reference_value = None
+        else:
+            sensors = self._db_session.query(Sensor).all()
+            for sensor in sensors:
+                sensor.reference_value = None
+
+        self._db_session.commit()
+
+        return IPCClient().update_configuration()
+
+    def get_sensor_alert(self, sensor_id: int) -> bool:
+        """
+        Returns true when the specified sensor is in alert state,
+        or if any sensor is in alert state.
+        """
+        query = self._db_session.query(Sensor).filter(
+            Sensor.enabled == True, Sensor.alert == True, Sensor.deleted == False
+        )
+
+        if sensor_id:
+            query = query.filter(Sensor.id == sensor_id)
+
+        return query.first() is not None
+
+    def get_sensor_error(self, sensor_id: int) -> bool:
+        """
+        Returns true when the specified sensor is in error state,
+        or if any sensor is in error state.
+        """
+        query = self._db_session.query(Sensor).filter(
+            Sensor.enabled == True, Sensor.error == True, Sensor.deleted == False
+        )
+
+        if sensor_id:
+            query = query.filter(Sensor.id == sensor_id)
+
+        return query.first() is not None

@@ -446,3 +446,58 @@ def delete_sensor(sensor_id):
         raise ToolChangesNotAllowed()
     except ObjectNotFound:
         raise ToolObjectNotFound("Sensor")
+
+
+@sensor_mcp.tool(
+    name="reset_reference",
+)
+def reset_sensor_reference(sensor_id=None):
+    """
+    Reset the reference value for a specific sensor or all sensors if no ID is provided.
+
+    Args:
+        sensor_id: ID of the sensor to reset reference for (if None, resets all sensors)
+    """
+    try:
+        sensor_service = SensorService(session)
+        return sensor_service.reset_references(sensor_id=sensor_id)
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Sensor")
+    except ObjectNotChanged:
+        raise ToolError("No changes made to the sensor(s)")
+
+
+@sensor_mcp.tool(
+    name="get_sensor_alert",
+)
+def get_sensor_alert(sensor_id=None):
+    """
+    Get the alert status of a specific sensor or all sensors.
+
+    Args:
+        sensor_id: ID of the sensor to get alert status for (if None, gets alert status for all sensors)
+    """
+    try:
+        sensor_service = SensorService(session)
+        return sensor_service.get_sensor_alert(sensor_id=sensor_id)
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Sensor")
+
+
+@sensor_mcp.tool(
+    name="get_sensor_error",
+)
+def get_sensor_error(sensor_id=None):
+    """
+    Get the error status of a specific sensor or all sensors.
+
+    Args:
+        sensor_id: ID of the sensor to get error status for (if None, gets error status for all sensors)
+    """
+    try:
+        sensor_service = SensorService(session)
+        return sensor_service.get_sensor_error(sensor_id=sensor_id)
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Sensor")
