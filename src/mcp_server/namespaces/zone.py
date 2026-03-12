@@ -16,7 +16,6 @@ from utils.models import Zone
 zone_mcp = FastMCP("ArPI - zone service")
 
 
-session = get_database_session()
 
 
 @zone_mcp.resource(
@@ -29,7 +28,7 @@ def get_zones():
     """
     Retrieve all existing zones.
     """
-    zone_service = ZoneService(session)
+    zone_service = ZoneService(get_database_session())
     return [zone.serialized for zone in zone_service.get_zones()]
 
 
@@ -41,7 +40,7 @@ def get_zones_tool():
     """
     Tool to retrieve all existing zones.
     """
-    zone_service = ZoneService(session)
+    zone_service = ZoneService(get_database_session())
     return [zone.serialized for zone in zone_service.get_zones()]
 
 
@@ -56,7 +55,7 @@ def get_zone(zone_id: int):
     Retrieve a zone by its ID.
     """
     try:
-        zone_service = ZoneService(session)
+        zone_service = ZoneService(get_database_session())
         zone = zone_service.get_zone(zone_id)
         return zone.serialized if zone else None
     except ObjectNotFound:
@@ -74,7 +73,7 @@ def get_zone_tool(zone_id: int):
         zone_id: The ID of the zone to retrieve
     """
     try:
-        zone_service = ZoneService(session)
+        zone_service = ZoneService(get_database_session())
         zone = zone_service.get_zone(zone_id)
         return zone.serialized if zone else None
     except ObjectNotFound:
@@ -111,7 +110,8 @@ def create_zone(
         stay_arm_delay: The stay arm delay
     """
     try:
-        new_zone = ZoneService(session).create_zone(
+        db_session = get_database_session()
+        new_zone = ZoneService(db_session).create_zone(
             name=name,
             description=description,
             disarmed_delay=disarmed_delay,
@@ -159,7 +159,7 @@ def update_zone(
         away_arm_delay: The new away arm delay
         stay_arm_delay: The new stay arm delay
     """
-    zone_service = ZoneService(session)
+    zone_service = ZoneService(get_database_session())
 
     zone_data = {
         "name": name,
@@ -200,7 +200,7 @@ def disable_zone_alarm(zone_id: int, arm_type: ArmType):
         arm_type: The arm type to set after disabling the alarm
     """
     try:
-        zone_service = ZoneService(session)
+        zone_service = ZoneService(get_database_session())
         zone_data = {}
         if arm_type == ArmType.STAY:
             zone_data["stay_arm_delay"] = None
@@ -229,7 +229,7 @@ def delete_zone(zone_id: int):
         zone_id: ID of the zone to delete
     """
     try:
-        ZoneService(session).delete_zone(zone_id)
+        ZoneService(get_database_session()).delete_zone(zone_id)
         return "Success"
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()

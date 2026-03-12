@@ -6,7 +6,6 @@ from server.services.card import CardService
 card_mcp = FastMCP("ArPI - card service")
 
 
-session = get_database_session()
 
 @card_mcp.resource(
     uri="cards://user/{user_id}",
@@ -20,5 +19,5 @@ def get_cards(user_id=None):
     Args:
         user_id: Optional user ID to filter cards by owner
     """
-    card_service = CardService(session)
+    card_service = CardService(get_database_session())
     return [card.serialized for card in card_service.get_cards(user_id=user_id)]

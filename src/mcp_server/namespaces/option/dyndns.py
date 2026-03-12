@@ -12,7 +12,6 @@ from server.tools import evaluate_ipc_response
 dyndns_option_mcp = FastMCP("ArPI - dynamic DNS configuration service")
 
 
-session = get_database_session()
 
 
 @dyndns_option_mcp.tool(
@@ -23,7 +22,7 @@ def get_config() -> dict:
     """
     Get the current dynamic DNS configuration
     """
-    dyndns_service = DyndnsService(session)
+    dyndns_service = DyndnsService(get_database_session())
     config = dyndns_service.get_dyndns_config()
     return asdict(config)
 
@@ -37,7 +36,7 @@ def set_config(config: DyndnsConfig) -> str:
     Set the dynamic DNS configuration
     """
     try:
-        dyndns_service = DyndnsService(session)
+        dyndns_service = DyndnsService(get_database_session())
         response = dyndns_service.set_dyndns_config(config)
 
         if response is not None:

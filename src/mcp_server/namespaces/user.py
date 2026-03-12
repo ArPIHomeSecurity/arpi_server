@@ -10,7 +10,6 @@ from server.services.user import UserService
 user_mcp = FastMCP("ArPI - user service")
 
 
-session = get_database_session()
 
 
 @user_mcp.resource(
@@ -23,7 +22,7 @@ def get_users():
     """
     Retrieve all users from the database.
     """
-    user_service = UserService(session)
+    user_service = UserService(get_database_session())
     return [user.serialized for user in user_service.get_users()]
 
 
@@ -34,7 +33,7 @@ def get_users_tool():
     """
     Tool to retrieve all users from the database.
     """
-    user_service = UserService(session)
+    user_service = UserService(get_database_session())
     return [user.serialized for user in user_service.get_users()]
 
 
@@ -52,7 +51,7 @@ def get_user(user_id: int):
         user_id: The ID of the user to retrieve
     """
     try:
-        user_service = UserService(session)
+        user_service = UserService(get_database_session())
         return user_service.get_user(user_id).serialized
     except ObjectNotFound:
         raise ToolObjectNotFound("User")
@@ -69,7 +68,7 @@ def get_user_tool(user_id: int):
         user_id: The ID of the user to retrieve
     """
     try:
-        user_service = UserService(session)
+        user_service = UserService(get_database_session())
         return user_service.get_user(user_id).serialized
     except ObjectNotFound:
         raise ToolObjectNotFound("User")
@@ -87,7 +86,7 @@ def create_user(name: str, role: str, access_code: str, comment: str = None) -> 
         comment: Optional comment for the user
     """
     try:
-        user_service = UserService(session)
+        user_service = UserService(get_database_session())
         new_user = user_service.create_user(
             name=name, role=role, access_code=access_code, comment=comment
         )
@@ -110,7 +109,7 @@ def update_user(
         comment: The new comment of the user (optional)
     """
     try:
-        user_service = UserService(session)
+        user_service = UserService(get_database_session())
         updated_user = user_service.update_user(
             user_id=user_id, name=name, role=role, comment=comment
         )
@@ -130,7 +129,7 @@ def delete_user(user_id: int):
         user_id: The ID of the user to delete
     """
     try:
-        user_service = UserService(session)
+        user_service = UserService(get_database_session())
         user_service.delete_user(user_id=user_id)
         return "Success"
     except ObjectNotFound:

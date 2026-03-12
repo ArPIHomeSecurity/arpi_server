@@ -17,7 +17,6 @@ from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCoun
 sensor_mcp = FastMCP("ArPI - sensor service")
 
 
-session = get_database_session()
 
 
 @sensor_mcp.resource(
@@ -29,7 +28,7 @@ def get_sensors(alerting_only: bool):
     """
     Retrieve all existing sensors.
     """
-    sensor_service = SensorService(session)
+    sensor_service = SensorService(get_database_session())
     return [sensor.serialized for sensor in sensor_service.get_sensors(alerting=alerting_only)]
 
 
@@ -41,7 +40,7 @@ def get_sensors_tool(alerting_only: bool = False):
     Tool to retrieve all existing sensors.
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         return [sensor.serialized for sensor in sensor_service.get_sensors(alerting=alerting_only)]
     except ObjectNotFound:
         raise ToolError("No sensors found")
@@ -57,7 +56,7 @@ def get_sensor(sensor_id: int):
     Retrieve a specific sensor by ID.
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         sensor = sensor_service.get_sensor(sensor_id)
         return sensor.serialized if sensor else None
     except ObjectNotFound:
@@ -75,7 +74,7 @@ def get_sensor_tool(sensor_id: int):
         sensor_id: The ID of the sensor to retrieve
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         sensor = sensor_service.get_sensor(sensor_id)
         return sensor.serialized if sensor else None
     except ObjectNotFound:
@@ -115,7 +114,7 @@ def get_sensor_type_mappings():
     """
     Retrieve mapping of sensor type names to their IDs.
     """
-    sensor_service = SensorService(session)
+    sensor_service = SensorService(get_database_session())
     return {sensor_type.name: sensor_type.id for sensor_type in sensor_service.get_sensor_types()}
 
 
@@ -127,7 +126,7 @@ def get_sensor_type_mappings_tool():
     Tool to retrieve mapping of sensor type names to their IDs.
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         return {
             sensor_type.name: sensor_type.id for sensor_type in sensor_service.get_sensor_types()
         }
@@ -236,7 +235,7 @@ async def create_sensor(
         channel: The channel number the sensor is connected to (will be elicited if not provided)
     """
     if area_id is None:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         # TODO: use titled elicit responses once supported in the UI to avoid showing IDs to users
         result = await ctx.elicit(
             "Which area is the sensor located in?",
@@ -248,7 +247,7 @@ async def create_sensor(
             area_id = None
 
     if zone_id is None:
-        zone_service = ZoneService(session)
+        zone_service = ZoneService(get_database_session())
         result = await ctx.elicit(
             "Which zone is the sensor located in?",
             response_type=[f"{zone.name} ({zone.id})" for zone in zone_service.get_zones()],
@@ -259,7 +258,7 @@ async def create_sensor(
             zone_id = None
 
     if sensor_type_id is None:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         result = await ctx.elicit(
             "What type of sensor is this?",
             response_type=[
@@ -286,7 +285,8 @@ async def create_sensor(
         raise ToolError("Missing required information to create sensor")
 
     try:
-        new_sensor = SensorService(session).create_sensor(
+        db_session = get_database_session()
+        new_sensor = SensorService(db_session).create_sensor(
             channel=channel,
             sensor_type_id=sensor_type_id,
             area_id=area_id,
@@ -390,7 +390,8 @@ def update_sensor(
             sensor_data[key] = value
 
     try:
-        updated_sensor = SensorService(session).update_sensor(sensor_id=sensor_id, **sensor_data)
+        db_session = get_database_session()
+        updated_sensor = SensorService(db_session).update_sensor(sensor_id=sensor_id, **sensor_data)
         return updated_sensor.serialized
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -420,7 +421,8 @@ def disable_sensor_custom_sensitivity(sensor_id: int):
     }
 
     try:
-        updated_sensor = SensorService(session).update_sensor(sensor_id=sensor_id, **sensor_data)
+        db_session = get_database_session()
+        updated_sensor = SensorService(db_session).update_sensor(sensor_id=sensor_id, **sensor_data)
         return updated_sensor.serialized
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -440,7 +442,7 @@ def delete_sensor(sensor_id):
     Delete a sensor from the database.
     """
     try:
-        SensorService(session).delete_sensor(sensor_id=sensor_id)
+        SensorService(get_database_session()).delete_sensor(sensor_id=sensor_id)
         return "Success"
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -459,7 +461,7 @@ def reset_sensor_reference(sensor_id=None):
         sensor_id: ID of the sensor to reset reference for (if None, resets all sensors)
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         return sensor_service.reset_references(sensor_id=sensor_id)
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -480,7 +482,7 @@ def get_sensor_alert(sensor_id=None):
         sensor_id: ID of the sensor to get alert status for (if None, gets alert status for all sensors)
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         return sensor_service.get_sensor_alert(sensor_id=sensor_id)
     except ObjectNotFound:
         raise ToolObjectNotFound("Sensor")
@@ -497,7 +499,7 @@ def get_sensor_error(sensor_id=None):
         sensor_id: ID of the sensor to get error status for (if None, gets error status for all sensors)
     """
     try:
-        sensor_service = SensorService(session)
+        sensor_service = SensorService(get_database_session())
         return sensor_service.get_sensor_error(sensor_id=sensor_id)
     except ObjectNotFound:
         raise ToolObjectNotFound("Sensor")

@@ -12,7 +12,6 @@ from server.tools import evaluate_ipc_response
 area_mcp = FastMCP("ArPI - area service")
 
 
-session = get_database_session()
 
 
 @area_mcp.resource(
@@ -24,7 +23,7 @@ def get_areas():
     """
     Retrieve all existing areas.
     """
-    area_service = AreaService(session)
+    area_service = AreaService(get_database_session())
     return [area.serialized for area in area_service.get_areas()]
 
 
@@ -35,7 +34,7 @@ def get_areas_tool():
     """
     Tool to retrieve all existing areas.
     """
-    area_service = AreaService(session)
+    area_service = AreaService(get_database_session())
     return [area.serialized for area in area_service.get_areas()]
 
 
@@ -49,7 +48,7 @@ def get_area(area_id: int):
     Retrieve an area by its ID.
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         area = area_service.get_area(area_id)
         return area.serialized if area else None
     except ObjectNotFound:
@@ -67,7 +66,7 @@ def get_area_tool(area_id: int):
         area_id: ID of the area to retrieve
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         area = area_service.get_area(area_id)
         return area.serialized if area else None
     except ObjectNotFound:
@@ -85,7 +84,8 @@ def create_area(name: str):
         name: Name of the new area
     """
     try:
-        new_area = AreaService(session).create_area(name=name)
+        db_session = get_database_session()
+        new_area = AreaService(db_session).create_area(name=name)
         return new_area.serialized
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -105,7 +105,7 @@ def update_area(area_id: int, area_name: str):
         area_name: New name for the area
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         updated_area = area_service.update_area(area_id, area_name)
         return updated_area.serialized if updated_area else None
     except ConfigChangesNotAllowed:
@@ -129,7 +129,7 @@ def delete_area(area_id: int):
         area_id: The ID of the area to delete
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         area_service.delete_area(area_id)
         return "Success"
     except ConfigChangesNotAllowed:
@@ -153,7 +153,7 @@ def arm_area(area_id: int, arm_type: ArmType, ctx: Context):
         arm_type: The type of arming to perform (stay, away, mixed, disarm)
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         return evaluate_ipc_response(area_service.arm(area_id, arm_type.value, ctx.client_id))
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
@@ -173,7 +173,7 @@ def disarm_area(area_id: int, ctx: Context):
         area_id: The ID of the area to disarm
     """
     try:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         return evaluate_ipc_response(area_service.disarm(area_id, ctx.client_id))
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()

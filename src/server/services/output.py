@@ -152,6 +152,44 @@ class OutputService(BaseService):
         self._db_session.commit()
         IPCClient().update_configuration()
 
+    def activate_output(self, output_id: int) -> dict:
+        """
+        Activate an output by its ID.
+
+        Args:
+            output_id: ID of the output to activate
+
+        Returns:
+            IPC response dict
+        """
+        output = self._db_session.query(Output).get(output_id)
+        if not output:
+            raise ObjectNotFound("Output not found")
+        
+        if output.trigger_type != OutputTriggerType.BUTTON:
+            raise ObjectNotChanged("Only buttons can be activated manually")
+
+        return IPCClient().activate_output(output_id)
+
+    def deactivate_output(self, output_id: int) -> dict:
+        """
+        Deactivate an output by its ID.
+
+        Args:
+            output_id: ID of the output to deactivate
+
+        Returns:
+            IPC response dict
+        """
+        output = self._db_session.query(Output).get(output_id)
+        if not output:
+            raise ObjectNotFound("Output not found")
+        
+        if output.trigger_type != OutputTriggerType.BUTTON:
+            raise ObjectNotChanged("Only buttons can be deactivated manually")
+
+        return IPCClient().deactivate_output(output_id)
+
     def validate_configuration(self, output: Output) -> None:
         """
         Validate the output configuration to ensure it meets the required constraints.

@@ -9,7 +9,6 @@ from server.services.arm import ArmService
 arm_mcp = FastMCP("ArPI - arm service")
 
 
-session = get_database_session()
 
 
 @arm_mcp.resource(
@@ -21,7 +20,7 @@ def get_arms_resource():
     """
     Retrieve arm/disarm events with default parameters.
     """
-    arm_service = ArmService(session)
+    arm_service = ArmService(get_database_session())
     return arm_service.get_arms()
 
 
@@ -52,7 +51,7 @@ def get_arms_tool(
         offset: number of results to skip (default 0)
     """
     try:
-        arm_service = ArmService(session)
+        arm_service = ArmService(get_database_session())
         return arm_service.get_arms(
             has_alert=has_alert,
             user_id=user_id,
@@ -90,7 +89,7 @@ def get_arms_count_tool(
         end: end date in YYYY-MM-DD format (inclusive)
     """
     try:
-        arm_service = ArmService(session)
+        arm_service = ArmService(get_database_session())
         return arm_service.get_arms_count(
             has_alert=has_alert,
             user_id=user_id,

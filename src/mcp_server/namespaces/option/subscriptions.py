@@ -12,7 +12,6 @@ from server.tools import evaluate_ipc_response
 subscriptions_option_mcp = FastMCP("ArPI - notification subscriptions configuration service")
 
 
-session = get_database_session()
 
 
 @subscriptions_option_mcp.tool(
@@ -23,7 +22,7 @@ def get_config() -> dict:
     """
     Get the current notification subscriptions configuration
     """
-    subscriptions_service = SubscriptionsService(session)
+    subscriptions_service = SubscriptionsService(get_database_session())
     config = subscriptions_service.get_subscriptions_config()
     return asdict(config)
 
@@ -37,7 +36,7 @@ def set_config(config: SubscriptionsConfig) -> str:
     Set the notification subscriptions configuration
     """
     try:
-        subscriptions_service = SubscriptionsService(session)
+        subscriptions_service = SubscriptionsService(get_database_session())
         response = subscriptions_service.set_subscriptions_config(config)
 
         if response is not None:

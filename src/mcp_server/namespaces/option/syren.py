@@ -16,7 +16,6 @@ syren_option_mcp = FastMCP("ArPI - syren configuration service")
 OPTION_NAME = "syren"
 OPTION_SECTION = "timing"
 
-session = get_database_session()
 
 @syren_option_mcp.tool(
     name="get_config",
@@ -26,7 +25,7 @@ def get_config() -> dict:
     """
     Get the current syren configuration
     """
-    syren_service = SyrenService(session)
+    syren_service = SyrenService(get_database_session())
     config = syren_service.get_syren_config()
     return asdict(config)
 
@@ -40,7 +39,7 @@ def change_volume(silent: bool) -> str:
     Change the mode of the syren (silent, normal)
     """
     try:
-        syren_service = SyrenService(session)
+        syren_service = SyrenService(get_database_session())
         config = syren_service.get_syren_config()
         config.silent = silent
         syren_service.set_syren_config(config)
@@ -60,7 +59,7 @@ def change_timing(delay: int, duration: int) -> str:
     Duration of 0 means that the syren will not stop until disarmed.
     """
     try:
-        syren_service = SyrenService(session)
+        syren_service = SyrenService(get_database_session())
         config = syren_service.get_syren_config()
         config.delay = delay
         config.duration = duration
@@ -79,7 +78,7 @@ def test_syren(duration: int = 5) -> str:
     Execute a test syren activation
     """
     try:
-        option_service = SyrenService(session)
+        option_service = SyrenService(get_database_session())
         response = option_service.test_syren(duration)
         if response is not None:
             _, success = evaluate_ipc_response(response)

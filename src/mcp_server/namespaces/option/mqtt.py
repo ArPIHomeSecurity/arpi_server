@@ -12,7 +12,6 @@ from server.tools import evaluate_ipc_response
 mqtt_option_mcp = FastMCP("ArPI - MQTT configuration service")
 
 
-session = get_database_session()
 
 
 @mqtt_option_mcp.tool(
@@ -23,7 +22,7 @@ def get_connection_config() -> dict:
     """
     Get the current MQTT connection configuration
     """
-    mqtt_service = MQTTService(session)
+    mqtt_service = MQTTService(get_database_session())
     config = mqtt_service.get_connection_config()
     return asdict(config) if config else {}
 
@@ -37,7 +36,7 @@ def set_connection_config(config: MQTTConnection) -> str:
     Set the MQTT connection configuration
     """
     try:
-        mqtt_service = MQTTService(session)
+        mqtt_service = MQTTService(get_database_session())
         response = mqtt_service.set_connection_config(config)
 
         if response is not None:
@@ -57,7 +56,7 @@ def get_internal_read_config() -> dict:
     """
     Get the internal MQTT broker read configuration
     """
-    mqtt_service = MQTTService(session)
+    mqtt_service = MQTTService(get_database_session())
     config = mqtt_service.get_internal_read_config()
     return asdict(config) if config else {}
 
@@ -70,7 +69,7 @@ def get_external_publish_config() -> dict:
     """
     Get the external MQTT broker publish configuration
     """
-    mqtt_service = MQTTService(session)
+    mqtt_service = MQTTService(get_database_session())
     config = mqtt_service.get_external_publish_config()
     return asdict(config) if config else {}
 
@@ -84,7 +83,7 @@ def set_external_publish_config(config: MQTTConfigExternalPublish) -> str:
     Set the external MQTT broker publish configuration
     """
     try:
-        mqtt_service = MQTTService(session)
+        mqtt_service = MQTTService(get_database_session())
         response = mqtt_service.set_external_publish_config(config)
 
         if response is not None:

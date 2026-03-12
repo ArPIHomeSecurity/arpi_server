@@ -15,7 +15,6 @@ alert_sensitivity_option_mcp = FastMCP("ArPI - alert sensitivity service")
 OPTION_NAME = "alert"
 OPTION_SECTION = "sensitivity"
 
-session = get_database_session()
 
 
 @alert_sensitivity_option_mcp.tool(
@@ -26,7 +25,7 @@ def get_custom_sensitivity() -> dict:
     """
     Get the current alert sensitivity configuration
     """
-    alert_sensitivity_service = AlertSensitivityService(session)
+    alert_sensitivity_service = AlertSensitivityService(get_database_session())
     config = alert_sensitivity_service.get_alert_sensitivity_config()
     return asdict(config)
 
@@ -40,7 +39,7 @@ def set_custom_sensitivity(period: int, threshold: int) -> str:
     Change the alert sensitivity configuration to custom values
     """
     try:
-        alert_sensitivity_service = AlertSensitivityService(session)
+        alert_sensitivity_service = AlertSensitivityService(get_database_session())
         alert_sensitivity_service.set_alert_sensitivity_config(
             AlertSensitivityConfig(monitor_period=period, monitor_threshold=threshold)
         )
@@ -58,7 +57,7 @@ def remove_custom_sensitivity() -> str:
     Remove the custom alert sensitivity configuration and reset it to default values
     """
     try:
-        AlertSensitivityService(session).remove_custom_sensitivity()
+        AlertSensitivityService(get_database_session()).remove_custom_sensitivity()
         return "Success"
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()

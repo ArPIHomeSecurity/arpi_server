@@ -14,7 +14,6 @@ from server.tools import evaluate_ipc_response
 gsm_option_mcp = FastMCP("ArPI - GSM configuration service")
 
 
-session = get_database_session()
 
 
 @gsm_option_mcp.tool(
@@ -25,7 +24,7 @@ def get_config() -> dict:
     """
     Get the current GSM configuration
     """
-    gsm_service = GSMService(session)
+    gsm_service = GSMService(get_database_session())
     config = gsm_service.get_gsm_config()
     return asdict(config)
 
@@ -39,7 +38,7 @@ def set_config(config: GSMConfig) -> str:
     Set the GSM configuration
     """
     try:
-        gsm_service = GSMService(session)
+        gsm_service = GSMService(get_database_session())
         response = gsm_service.set_gsm_config(config)
 
         if response is not None:
@@ -60,7 +59,7 @@ def test_sms() -> str:
     Send a test SMS message
     """
     try:
-        gsm_service = GSMService(session)
+        gsm_service = GSMService(get_database_session())
         response = gsm_service.test_sms()
         if response is not None:
             _, success = evaluate_ipc_response(response)
@@ -80,7 +79,7 @@ def test_call() -> str:
     Make a test phone call
     """
     try:
-        gsm_service = GSMService(session)
+        gsm_service = GSMService(get_database_session())
         response = gsm_service.test_call()
         if response is not None:
             _, success = evaluate_ipc_response(response)

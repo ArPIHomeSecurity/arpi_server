@@ -7,7 +7,6 @@ from utils.constants import ROLE_USER
 from utils.models import Output
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.ipc import IPCClient
 from server.tools import process_ipc_response
 
 output_blueprint = Blueprint("output", __name__)
@@ -62,7 +61,7 @@ def manage_output(output_id):
             output = output_service.get_output_by_id(output_id)
             return jsonify(output.serialized)
         elif request.method == "PUT":
-            updated_output = output_service.update_output(output_id=output_id,**request.json)
+            updated_output = output_service.update_output(output_id=output_id, **request.json)
             return jsonify(updated_output.serialized)
         elif request.method == "DELETE":
             output_service.delete_output(output_id)
@@ -77,27 +76,30 @@ def manage_output(output_id):
         return jsonify({"error": "Output not found"}), 404
 
 
-
 @output_blueprint.route("/api/output/<int:output_id>/activate", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def activate_output(output_id):
-    db_output = db.session.query(Output).get(output_id)
-    if not db_output:
+    try:
+        output_service = OutputService(db.session)
+        return process_ipc_response(output_service.activate_output(output_id))
+    except ObjectNotFound:
         return jsonify({"error": "Output not found"}), 404
-
-    return process_ipc_response(IPCClient().activate_output(output_id))
+    except ObjectNotChanged as error:
+        return jsonify({"error": str(error)}), 409
 
 
 @output_blueprint.route("/api/output/<int:output_id>/deactivate", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def deactivate_output(output_id):
-    db_output = db.session.query(Output).get(output_id)
-    if not db_output:
+    try:
+        output_service = OutputService(db.session)
+        return process_ipc_response(output_service.deactivate_output(output_id))
+    except ObjectNotFound:
         return jsonify({"error": "Output not found"}), 404
-
-    return process_ipc_response(IPCClient().deactivate_output(output_id))
+    except ObjectNotChanged as error:
+        return jsonify({"error": str(error)}), 409
 
 
 @output_blueprint.route("/api/output/reorder", methods=["PUT"])
@@ -108,9 +110,7 @@ def reorder_outputs():
     Change only the ui_order of the outputs
     """
     for output_data in request.json:
-        db.session.query(Output).get(output_data["id"]).update_record(
-            ["ui_order"], output_data
-        )
+        db.session.query(Output).get(output_data["id"]).update_record(["ui_order"], output_data)
 
     db.session.commit()
 

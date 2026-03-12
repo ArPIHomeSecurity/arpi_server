@@ -21,9 +21,6 @@ from utils.models import Output, OutputTriggerType
 output_mcp = FastMCP("ArPI - output service")
 
 
-session = get_database_session()
-
-
 @output_mcp.resource(
     uri="outputs://list",
     name="all",
@@ -33,7 +30,7 @@ def get_outputs():
     """
     Retrieve all existing outputs.
     """
-    output_service = OutputService(session)
+    output_service = OutputService(get_database_session())
     return [output.serialized for output in output_service.get_outputs()]
 
 
@@ -44,7 +41,7 @@ def get_outputs_tool():
     """
     Tool to retrieve all existing outputs.
     """
-    output_service = OutputService(session)
+    output_service = OutputService(get_database_session())
     return [output.serialized for output in output_service.get_outputs()]
 
 
@@ -58,7 +55,7 @@ def get_output_by_id(output_id: int):
     Retrieve an output by its ID.
     """
     try:
-        output_service = OutputService(session)
+        output_service = OutputService(get_database_session())
         output = output_service.get_output_by_id(output_id)
         return output.serialized if output else None
     except ObjectNotFound:
@@ -75,7 +72,7 @@ def get_output_tool(output_id: int):
         output_id: The ID of the output to retrieve
     """
     try:
-        output_service = OutputService(session)
+        output_service = OutputService(get_database_session())
         output = output_service.get_output_by_id(output_id)
         return output.serialized if output else None
     except ObjectNotFound:
@@ -103,9 +100,11 @@ def get_output_trigger_type_names():
 )
 async def create_output(
     ctx: Context,
-    name: Annotated[str, Field(description="The name of the output", max_length=Output.NAME_LENGTH)],
+    name: Annotated[
+        str, Field(description="The name of the output", max_length=Output.NAME_LENGTH)
+    ],
     description: Annotated[str, "The description of the output"] = "",
-    channel: Annotated[int, "The channel number for the output"] = None,
+    channel: Annotated[int | None, "The channel number for the output"] = None,
     trigger_type: Annotated[
         OutputTriggerType, "The trigger type for the output"
     ] = OutputTriggerType.BUTTON,
@@ -129,7 +128,7 @@ async def create_output(
         enabled: Whether the output is enabled
     """
     if trigger_type == OutputTriggerType.AREA and area_id is None:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         # TODO: use titled elicit responses once supported in the UI to avoid showing IDs to users
         result = await ctx.elicit(
             "Which area is the sensor located in?",
@@ -156,7 +155,8 @@ async def create_output(
             channel = None
 
     try:
-        new_output = OutputService(session).create_output(
+        output_service = OutputService(get_database_session())
+        new_output = output_service.create_output(
             name=name,
             description=description,
             channel=channel,
@@ -212,7 +212,7 @@ async def update_output(
     """
 
     if trigger_type == OutputTriggerType.AREA and area_id is None:
-        area_service = AreaService(session)
+        area_service = AreaService(get_database_session())
         # TODO: use titled elicit responses once supported in the UI to avoid showing IDs to users
         result = await ctx.elicit(
             "Which area is the sensor located in?",
@@ -241,7 +241,7 @@ async def update_output(
             kwargs[key] = value
 
     try:
-        output_service = OutputService(session)
+        output_service = OutputService(get_database_session())
         updated_output = output_service.update_output(output_id, **kwargs)
         return updated_output.serialized
     except ConfigChangesNotAllowed:
@@ -268,9 +268,64 @@ def delete_output(output_id: int):
         output_id: The ID of the output to delete
     """
     try:
-        OutputService(session).delete_output(output_id)
+        output_service = OutputService(get_database_session())
+        output_service.delete_output(output_id)
         return "Success"
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()
     except ObjectNotFound:
         raise ToolObjectNotFound("Output")
+
+
+@output_mcp.tool(
+    name="activate",
+)
+def activate_output(output_id: int):
+    """
+    Activate an output by its ID.
+    Args:
+        output_id: The ID of the output to activate
+    """
+    try:
+        output_service = OutputService(get_database_session())
+        response = output_service.activate_output(output_id)
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Output")
+    except ObjectNotChanged as error:
+        raise ToolError(str(error))
+
+    if not response or not response.get("result"):
+        raise ToolError(
+            response.get("message", "Failed to activate output")
+            if response
+            else "No response from monitoring service"
+        )
+
+    return "Success"
+
+
+@output_mcp.tool(
+    name="deactivate",
+)
+def deactivate_output(output_id: int):
+    """
+    Deactivate an output by its ID.
+    Args:
+        output_id: The ID of the output to deactivate
+    """
+    try:
+        output_service = OutputService(get_database_session())
+        response = output_service.deactivate_output(output_id)
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Output")
+    except ObjectNotChanged as error:
+        raise ToolError(str(error))
+
+    if not response or not response.get("result"):
+        raise ToolError(
+            response.get("message", "Failed to deactivate output")
+            if response
+            else "No response from monitoring service"
+        )
+
+    return "Success"

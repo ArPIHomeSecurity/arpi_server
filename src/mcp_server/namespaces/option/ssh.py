@@ -11,7 +11,6 @@ from server.tools import evaluate_ipc_response
 ssh_option_mcp = FastMCP("ArPI - SSH configuration service")
 
 
-session = get_database_session()
 
 
 @ssh_option_mcp.tool(
@@ -22,7 +21,7 @@ def get_config() -> dict:
     """
     Get the current SSH configuration
     """
-    ssh_service = SSHService(session)
+    ssh_service = SSHService(get_database_session())
     config = ssh_service.get_ssh_config()
     return asdict(config)
 
@@ -36,7 +35,7 @@ def enable_connection(enabled: bool) -> str:
     Enable or disable the SSH connection
     """
     try:
-        ssh_service = SSHService(session)
+        ssh_service = SSHService(get_database_session())
         config = ssh_service.get_ssh_config()
         config.service_enabled = enabled
         response = ssh_service.set_ssh_config(config)
@@ -58,7 +57,7 @@ def restrict_local_network(restrict: bool) -> str:
     Restrict SSH access to local network only
     """
     try:
-        ssh_service = SSHService(session)
+        ssh_service = SSHService(get_database_session())
         config = ssh_service.get_ssh_config()
         config.restrict_local_network = restrict
         response = ssh_service.set_ssh_config(config)
@@ -80,7 +79,7 @@ def enable_password_authentication(enabled: bool) -> str:
     Enable or disable password authentication for SSH
     """
     try:
-        ssh_service = SSHService(session)
+        ssh_service = SSHService(get_database_session())
         config = ssh_service.get_ssh_config()
         config.password_authentication_enabled = enabled
         response = ssh_service.set_ssh_config(config)

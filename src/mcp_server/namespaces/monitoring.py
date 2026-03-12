@@ -28,7 +28,6 @@ from server.version import __version__
 monitoring_mcp = FastMCP("ArPI - monitoring service")
 
 
-session = get_database_session()
 
 
 @monitoring_mcp.resource(

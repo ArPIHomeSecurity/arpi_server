@@ -13,7 +13,6 @@ from server.tools import evaluate_ipc_response
 smtp_option_mcp = FastMCP("ArPI - SMTP configuration service")
 
 
-session = get_database_session()
 
 
 @smtp_option_mcp.tool(
@@ -24,7 +23,7 @@ def get_config() -> dict:
     """
     Get the current SMTP configuration
     """
-    smtp_service = SMTPService(session)
+    smtp_service = SMTPService(get_database_session())
     config = smtp_service.get_smtp_config()
     return asdict(config)
 
@@ -38,7 +37,7 @@ def set_config(config: SMTPConfig) -> str:
     Set the SMTP configuration
     """
     try:
-        smtp_service = SMTPService(session)
+        smtp_service = SMTPService(get_database_session())
         response = smtp_service.set_smtp_config(config)
 
         if response is not None:
@@ -59,7 +58,7 @@ def test_email() -> str:
     Send a test email
     """
     try:
-        smtp_service = SMTPService(session)
+        smtp_service = SMTPService(get_database_session())
         response = smtp_service.test_email()
         if response is not None:
             _, success = evaluate_ipc_response(response)
