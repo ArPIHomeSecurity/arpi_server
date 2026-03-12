@@ -18,6 +18,7 @@ from mcp_server.namespaces.option import (
     subscriptions_option_mcp,
     syren_option_mcp,
 )
+from mcp_server.namespaces.keypad import keypad_mcp
 from mcp_server.namespaces.output import output_mcp
 from mcp_server.namespaces.prompts import prompts_mcp
 from mcp_server.namespaces.sensor import sensor_mcp
@@ -51,6 +52,7 @@ def mount_servers():
     main_mcp.mount(arm_mcp, namespace="arm")
     main_mcp.mount(card_mcp, namespace="card")
     main_mcp.mount(generic_mcp, namespace="generic")
+    main_mcp.mount(keypad_mcp, namespace="keypad")
     main_mcp.mount(monitoring_mcp, namespace="monitoring")
     main_mcp.mount(output_mcp, namespace="output")
     main_mcp.mount(prompts_mcp, namespace="prompts")

@@ -88,6 +88,12 @@ def manage_sensor(sensor_id):
 @authenticated()
 @restrict_host
 def sensors_reset_references(sensor_id=None):
+    """
+    Reset the reference value of a specific sensor or all sensors.
+    
+    - If sensor_id is provided, reset the reference value of that specific sensor.
+    - If sensor_id is not provided, reset the reference values of all sensors.
+    """
     try:
         sensor_service = SensorService(db.session)
         return process_ipc_response(sensor_service.reset_references(sensor_id=sensor_id))
