@@ -8,6 +8,8 @@ from fastmcp import Context, FastMCP
 from mcp_server.models.arm import ArmState, ArmType
 from monitor.database import get_database_session
 from server.services.area import AreaService
+from server.services.clock import ClockService
+from server.services.keypad import KeypadService
 from server.services.monitor import MonitoringService
 from server.services.option import (
     AlertSensitivityService,
@@ -73,6 +75,8 @@ def get_all_options() -> str:
     ssh_config = SSHService(db_session).get_ssh_config()
     subscriptions = SubscriptionsService(db_session).get_subscriptions_config()
     syren_config = SyrenService(db_session).get_syren_config()
+    clock_info = ClockService().get_clock_info()
+    keypads = [keypad.serialized for keypad in KeypadService(db_session).get_keypads()]
     return json.dumps({
         "options": {
             "alert_sensitivity": asdict(alert_sensitivity),
@@ -85,6 +89,8 @@ def get_all_options() -> str:
             "subscriptions": asdict(subscriptions),
             "syren": asdict(syren_config),
         },
+        "clock": clock_info,
+        "keypads": keypads,
         "version": __version__,
         "board_version": os.environ["BOARD_VERSION"],
     })
