@@ -6,6 +6,7 @@ from mcp_server.auth import JWTVerifier
 from mcp_server.namespaces.area import area_mcp
 from mcp_server.namespaces.arm import arm_mcp
 from mcp_server.namespaces.card import card_mcp
+from mcp_server.namespaces.clock import clock_mcp
 from mcp_server.namespaces.generic import generic_mcp
 from mcp_server.namespaces.monitoring import monitoring_mcp
 from mcp_server.namespaces.option import (
@@ -51,6 +52,7 @@ def mount_servers():
     main_mcp.mount(area_mcp, namespace="area")
     main_mcp.mount(arm_mcp, namespace="arm")
     main_mcp.mount(card_mcp, namespace="card")
+    main_mcp.mount(clock_mcp, namespace="clock")
     main_mcp.mount(generic_mcp, namespace="generic")
     main_mcp.mount(keypad_mcp, namespace="keypad")
     main_mcp.mount(monitoring_mcp, namespace="monitoring")
