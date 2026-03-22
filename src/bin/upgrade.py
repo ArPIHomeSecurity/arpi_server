@@ -322,8 +322,8 @@ def main():
         args.use_simulator,
     )
 
-    print("  🔄 Restarting services: argus_server, argus_monitor, nginx ...")
-    os.system("sudo systemctl restart argus_server argus_monitor nginx")  # noqa: F821
+    print("  🔄 Restarting services: argus_server, argus_mcp, argus_monitor, nginx ...")
+    os.system("sudo systemctl restart argus_server argus_mcp argus_monitor nginx")  # noqa: F821
     print("  ✅ Services restarted successfully")
     print("🎉 Upgrade process finished.")
 

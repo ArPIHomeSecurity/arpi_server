@@ -1,5 +1,5 @@
 [Unit]
-Description=Argus REST API service
+Description=Argus MCP server service
 After=network.target
  
 [Service]
@@ -9,11 +9,12 @@ Group=www-data
 WorkingDirectory=/home/argus/
 EnvironmentFile=/home/argus/.local/etc/arpi-server/config.env
 EnvironmentFile=/home/argus/secrets.env
-ExecStartPre=/usr/bin/python3 /home/argus/.local/bin/argus-secret --type rest
-ExecStart=/usr/bin/python3 -m gunicorn \
-    -c /home/argus/.local/etc/arpi-server/gunicorn.conf.py \
+ExecStartPre=/usr/bin/python3 /home/argus/.local/bin/argus-secret --type mcp
+ExecStart=/usr/bin/python3 -m uvicorn \
+    --uds /run/argus/argus_mcp.sock \
+    --workers 1 \
     --log-level info \
-    server:app
+    mcp_server:app
 ExecReload=/bin/kill -s HUP $MAINPID
 ExecStop=/bin/kill -s TERM $MAINPID
 Restart=always

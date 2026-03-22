@@ -22,6 +22,7 @@ class ClockService:
             "network": clock.get_time_ntp(),
             "uptime": clock.get_uptime(),
             "uptime_server": clock.get_service_uptime("argus_server.service"),
+            "uptime_mcp": clock.get_service_uptime("argus_mcp.service"),
             "uptime_monitor": clock.get_service_uptime("argus_monitor.service"),
             "uptime_nginx": clock.get_service_uptime("nginx.service"),
         }

@@ -1,4 +1,4 @@
-import pathlib
+from importlib.resources import files
 
 from fastmcp import FastMCP
 
@@ -32,8 +32,6 @@ from utils.models import (
     SensorEOLCount,
     SensorType,
 )
-
-CURRENT_DIRECTORY = pathlib.Path(__file__).parent
 
 PROMPT_DYNAMIC_DATA = """
 #################################################
@@ -78,9 +76,7 @@ def generate_system_prompt():
 
     Add dynamic data from the database and source code.
     """
-    system_prompt = ""
-    with open(CURRENT_DIRECTORY / "prompts/general_system.txt", "r", encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = files('mcp_server').joinpath('prompts/general_system.txt').read_text(encoding='utf-8')
 
     # get sensor types from the database
     db_session = get_database_session()
@@ -102,6 +98,7 @@ main_mcp = FastMCP(
     auth=JWTVerifier(),
 )
 mount_servers()
+app = main_mcp.http_app()
 
 if __name__ == "__main__":
     main_mcp.run()
