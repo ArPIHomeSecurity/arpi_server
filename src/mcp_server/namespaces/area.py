@@ -136,8 +136,6 @@ def delete_area(area_id: int):
         raise ToolChangesNotAllowed()
     except ObjectNotFound:
         raise ToolObjectNotFound("Area")
-    except ObjectNotChanged:
-        raise ToolError("Area cannot be deleted")
 
 
 @area_mcp.tool(
