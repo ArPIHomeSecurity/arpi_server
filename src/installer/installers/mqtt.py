@@ -135,8 +135,9 @@ class MqttInstaller(BaseInstaller):
                 click.echo("   ✓ Reader MQTT password created")
             
             # configure password for argus user
+            create_flag = "-c" if not os.path.exists("/etc/mosquitto/.passwd") else ""
             SystemHelper.run_command(
-                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus \"{argus_password}\""
+                f"mosquitto_passwd -b {create_flag} /etc/mosquitto/.passwd argus \"{argus_password}\""
             )
             # configure password for argus_reader user
             SystemHelper.run_command(
