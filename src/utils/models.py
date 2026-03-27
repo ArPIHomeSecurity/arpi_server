@@ -14,8 +14,7 @@ from typing import List
 import bcrypt
 from dateutil.tz.tz import tzlocal
 from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey
 from stringcase import camelcase, snakecase
