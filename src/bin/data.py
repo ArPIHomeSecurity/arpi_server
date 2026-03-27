@@ -2,7 +2,7 @@
 import argparse
 import json
 import logging
-import os
+from dataclasses import asdict
 
 from sqlalchemy.exc import ProgrammingError
 
@@ -22,6 +22,7 @@ from utils.models import (
 )
 from monitor.database import get_database_session
 from utils.models import metadata
+from monitor.config.models import SSHConfig
 
 
 # Set up logging
@@ -77,43 +78,13 @@ def env_prod():
     session.add(a1)
     logger.info(" - Created area")
 
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus",
-        "password": os.environ["ARGUS_MQTT_PASSWORD"],
-        "tls_enabled": True,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_config = {
-        "hostname": "<hostname>",
-        "port": 8883,
-        "username": "argus_reader",
-        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
-        "tls_enabled": True,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_connection = {
-        "enabled": True,
-        "external": False,
-    }
-    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
-    session.add(mqtt_option)
-    logger.info(" - Created MQTT options")
-
-    access_config = {
-        "service_enabled": True,
-        "restrict_local_network": False,
-        "password_authentication_enabled": True,
-    }
-    ssh_access = Option(name="network", section="access", value=json.dumps(access_config))
-    session.add(ssh_access)
+    ssh_access = SSHConfig()
+    ssh_option = Option(
+        name="network",
+        section="access",
+        value=json.dumps(asdict(ssh_access))
+    )
+    session.add(ssh_option)
     logger.info(" - Created access options")
 
     session.commit()
@@ -258,36 +229,6 @@ def env_live_01():
     session.add_all([k1])
     logger.info(" - Created keypads")
 
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus",
-        "password": os.environ["ARGUS_MQTT_PASSWORD"],
-        "tls_enabled": True,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="network", section="mqtt", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus_reader",
-        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
-        "tls_enabled": True,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_connection = {
-        "enabled": True,
-        "external": False,
-    }
-    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
-    session.add(mqtt_option)
-    logger.info(" - Created MQTT options")
-
     session.commit()
 
 
@@ -427,35 +368,6 @@ def env_test_with_v3():
     session.add_all([k1])
     logger.info(" - Created keypads")
 
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus",
-        "password": os.environ["ARGUS_MQTT_PASSWORD"],
-        "tls_enabled": False,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus_reader",
-        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
-        "tls_enabled": False,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_connection = {
-        "enabled": True,
-        "external": False,
-    }
-    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
-    session.add(mqtt_option)
-    logger.info(" - Created MQTT options")
-
     session.commit()
 
 
@@ -550,35 +462,6 @@ def env_test_with_v2():
     k1 = Keypad(keypad_type=kt2, enabled=True)
     session.add_all([k1])
     logger.info(" - Created keypads")
-
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus",
-        "password": os.environ["ARGUS_MQTT_PASSWORD"],
-        "tls_enabled": False,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_publish", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-    mqtt_config = {
-        "hostname": "localhost",
-        "port": 8883,
-        "username": "argus_reader",
-        "password": os.environ["ARGUS_READER_MQTT_PASSWORD"],
-        "tls_enabled": False,
-        "tls_insecure": True,
-    }
-    mqtt_option = Option(name="mqtt", section="internal_read", value=json.dumps(mqtt_config))
-    session.add(mqtt_option)
-
-    mqtt_connection = {
-        "enabled": True,
-        "external": False,
-    }
-    mqtt_option = Option(name="mqtt", section="connection", value=json.dumps(mqtt_connection))
-    session.add(mqtt_option)
-    logger.info(" - Created MQTT options")
 
     session.commit()
 

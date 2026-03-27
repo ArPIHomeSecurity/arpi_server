@@ -2,7 +2,8 @@
 This module defines the configuration dataclasses for the monitor.
 """
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 
 from monitor.config.base import BaseConfig
 
@@ -139,15 +140,15 @@ class MQTTConnection(BaseConfig):
 @dataclass
 class MQTTConfigInternalRead(BaseConfig):
     """
-    Access configuration to the internal MQTT broker for reading.
+    Access configuration to the internal MQTT broker for reading by other services.
     """
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_read"
 
-    hostname: str
-    port: int
-    username: str
-    password: str
+    hostname: str = "arpi.local"
+    port: int = 8883
+    username: str = "argus_reader"
+    password: str = field(default_factory=lambda: os.environ.get("ARGUS_READER_MQTT_PASSWORD"))
     tls_enabled: bool = True
     tls_insecure: bool = True
 
@@ -155,17 +156,17 @@ class MQTTConfigInternalRead(BaseConfig):
 @dataclass
 class MQTTConfigInternalPublish(BaseConfig):
     """
-    Access configuration to the internal MQTT broker for publishing.
+    Access configuration to the internal MQTT broker for publishing by the monitor.
     """
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_publish"
 
-    hostname: str
-    port: int
-    username: str
-    password: str
-    tls_enabled: bool | None = None
-    tls_insecure: bool | None = None
+    hostname: str = "localhost"
+    port: int = 8883
+    username: str = "argus"
+    password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
+    tls_enabled: bool = True
+    tls_insecure: bool = True
 
 
 @dataclass
@@ -176,9 +177,9 @@ class MQTTConfigExternalPublish(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "external_publish"
 
-    hostname: str
-    port: int
-    username: str
-    password: str
-    tls_enabled: bool | None = None
-    tls_insecure: bool | None = None
+    hostname: str = None
+    port: int = 8883
+    username: str = None
+    password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
+    tls_enabled: bool = True
+    tls_insecure: bool = True
