@@ -136,11 +136,11 @@ class MqttInstaller(BaseInstaller):
             
             # configure password for argus user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus {argus_password}"
+                f"mosquitto_passwd -b -c /etc/mosquitto/.passwd argus \"{argus_password}\""
             )
             # configure password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader {argus_reader_password}"
+                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader \"{argus_reader_password}\""
             )
             SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
             click.echo(f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}")
