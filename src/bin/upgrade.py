@@ -27,6 +27,12 @@ import requests
 GITHUB_API_SERVER = "https://api.github.com/repos/ArPIHomeSecurity/arpi_server/releases"
 GITHUB_API_WEBAPP = "https://api.github.com/repos/ArPIHomeSecurity/arpi_webapplication/releases"
 
+VERSION_PARSER = re.compile(
+    r"v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
+    r"(?:(?:[_-])?(?P<pre_release>[a-zA-Z]+)(?P<pre_release_num>\d+))?"
+    r"(?::(?P<commit>[a-z0-9]{7}))?"
+)
+
 
 class AssetNotFoundError(Exception):
     pass
@@ -99,6 +105,26 @@ def get_server_version() -> VersionInfo | None:
     """
     Get the actual version of the server component.
     """
+    try:
+        import server.version as server_version
+        m = VERSION_PARSER.match(server_version.__version__)
+        if not m:
+            raise ValueError(f"Invalid version string: {server_version.__version__}")
+
+        p = m.groupdict()
+        return VersionInfo(
+            version=server_version.__version__,
+            major=int(p["major"]),
+            minor=int(p["minor"]),
+            patch=int(p["patch"]),
+            prerelease=p["pre_release"],
+            prerelease_num=int(p["pre_release_num"]) if p["pre_release_num"] else None,
+            commit_id=p["commit"] or "",
+        )
+    except ImportError:
+        print("⚠️  Warning: Could not find server.version module, trying fallback method")
+
+    # fallback for old-style (non-package) installations
     try:
         with open("/home/argus/server/src/assets/version.json", "r", encoding="utf-8") as f:
             version_info = json.load(f)
@@ -175,19 +201,14 @@ def compare_versions(v1: str, v2: VersionInfo):
     Compare two versions: v1 as string, v2 as VersionInfo.
     Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal.
     """
-    version_parser = re.compile(
-        r"v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
-        r"(?:_(?P<pre_release>[a-zA-Z]+)(?P<pre_release_num>\d{2}))?"
-        r"(?::(?P<commit>[a-z0-9]{7}))?"
-    )
-    v1_match = version_parser.match(v1)
+    v1_match = VERSION_PARSER.match(v1)
     if not v1_match:
-        print(f"V1: {v1}")
+        print(f"Version: {v1}")
         raise ValueError("Invalid version string format.")
 
     v1_parts = v1_match.groupdict()
 
-    # Compare major, minor, patch
+    # compare major, minor, patch
     for key in ["major", "minor", "patch"]:
         n1 = int(v1_parts[key])
         n2 = getattr(v2, key)
@@ -196,9 +217,10 @@ def compare_versions(v1: str, v2: VersionInfo):
         elif n1 < n2:
             return -1
 
-    # Compare pre_release (None means stable, which is considered higher than any pre-release)
-    pre1 = v1_parts["pre_release"]
-    pre2 = v2.prerelease
+    # compare pre_release (None means stable, which is considered higher than any pre-release)
+    # normalize to lowercase for case-insensitive comparison
+    pre1 = v1_parts["pre_release"].lower() if v1_parts["pre_release"] else None
+    pre2 = v2.prerelease.lower() if v2.prerelease else None
     if pre1 != pre2:
         if pre1 is None:
             return 1
@@ -209,7 +231,7 @@ def compare_versions(v1: str, v2: VersionInfo):
         elif pre1 < pre2:
             return -1
 
-    # Compare pre_release_num (None is considered lower)
+    # compare pre_release_num (None is considered lower)
     num1 = v1_parts["pre_release_num"]
     num2 = v2.prerelease_num
     if num1 != (f"{num2:02}" if num2 is not None else None):
@@ -234,14 +256,18 @@ def check_and_upgrade(
     prerelease: bool,
     board_version: str,
     use_simulator: bool,
-):
+) -> bool:
     """
     Check for updates and upgrade the specified project if a newer version is available.
+
+    Returns True if an upgrade was performed, False otherwise.
     """
     print(f"  🔍 Checking for {project_name} updates...")
     latest_release = get_latest_release(api_url, prerelease=prerelease)
     actual_version = get_version_func()
 
+    print(f"    - Latest release: {latest_release['tag_name']}")
+    print(f"    - Current version: {actual_version.version}")
     # if we cannot determine the actual version, assume upgrade/reinstall is needed
     result = compare_versions(latest_release["tag_name"], actual_version) if actual_version else 1
     if result < 1:
@@ -252,6 +278,9 @@ def check_and_upgrade(
     elif result == 1:
         print(f"    ⬆️  New version {latest_release['tag_name']} available for {project_name}")
         upgrade_project(latest_release, project_name, board_version, use_simulator)
+        return True
+
+    return False
 
 
 def upgrade_project(release: dict, project: str, board_version: str, use_simulator: bool):
@@ -298,6 +327,8 @@ def install_packages(packages):
         subprocess.run(["sudo", "apt-get", "update"], check=True)
         subprocess.run(["sudo", "apt-get", "install", "-y"] + missing_packages, check=True)
         print("  ✅ Packages installed.")
+    else:
+        print("  ✅ All required packages are already installed.")
 
 
 def main():
@@ -315,7 +346,7 @@ def main():
     # ensure required packages are installed
     install_packages(["pipenv", "python3-click"])
 
-    check_and_upgrade(
+    server_upgraded = check_and_upgrade(
         GITHUB_API_SERVER,
         get_server_version,
         "server",
@@ -323,7 +354,7 @@ def main():
         args.board_version,
         args.use_simulator,
     )
-    check_and_upgrade(
+    webapplication_upgraded = check_and_upgrade(
         GITHUB_API_WEBAPP,
         get_webapplication_version,
         "webapplication",
@@ -332,9 +363,11 @@ def main():
         args.use_simulator,
     )
 
-    print("  🔄 Restarting services: argus_server, argus_mcp, argus_monitor, nginx ...")
-    os.system("sudo systemctl restart argus_server argus_mcp argus_monitor nginx")  # noqa: F821
-    print("  ✅ Services restarted successfully")
+    if server_upgraded or webapplication_upgraded:
+        print("  🔄 Restarting services: argus_server, argus_mcp, argus_monitor, nginx ...")
+        os.system("sudo systemctl restart argus_server argus_mcp argus_monitor nginx")  # noqa: F821
+        print("  ✅ Services restarted successfully")
+
     print("🎉 Upgrade process finished.")
 
 
