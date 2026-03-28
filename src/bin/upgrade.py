@@ -284,10 +284,20 @@ def install_packages(packages):
     """
     Install the specified packages using apt-get.
     """
-    print(f"  📦 Installing required packages: {', '.join(packages)}")
-    subprocess.run(["sudo", "apt-get", "update"], check=True)
-    subprocess.run(["sudo", "apt-get", "install", "-y"] + packages, check=True)
-    print("  ✅ Packages installed.")
+    # check if packages are already installed
+    missing_packages = []
+    for pkg in packages:
+        result = subprocess.run(
+            ["dpkg", "-s", pkg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
+        )
+        if result.returncode != 0:
+            missing_packages.append(pkg)
+
+    if missing_packages:
+        print(f"  📦 Installing required packages: {', '.join(missing_packages)}")
+        subprocess.run(["sudo", "apt-get", "update"], check=True)
+        subprocess.run(["sudo", "apt-get", "install", "-y"] + missing_packages, check=True)
+        print("  ✅ Packages installed.")
 
 
 def main():
