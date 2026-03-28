@@ -1,11 +1,24 @@
 import hashlib
 import json
 import os
+from dataclasses import asdict
 
 from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
 
-from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, GSMConfig, MQTTConfigExternalPublish, MQTTConnection, SMTPConfig, SSHConfig, SubscriptionsConfig, SyrenConfig
+from monitor.config.models import (
+    AlertSensitivityConfig,
+    DyndnsConfig,
+    GSMConfig,
+    MQTTConfigExternalPublish,
+    MQTTConfigInternalPublish,
+    MQTTConfigInternalRead,
+    MQTTConnection,
+    SMTPConfig,
+    SSHConfig,
+    SubscriptionsConfig,
+    SyrenConfig,
+)
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.ipc import IPCClient
@@ -27,15 +40,58 @@ from utils.models import Option
 config_blueprint = Blueprint("configuration", __name__)
 
 
-@config_blueprint.route("/api/config/<string:option>/<string:section>", methods=["GET"])
+@config_blueprint.route("/api/config/<string:option_name>/<string:section>", methods=["GET"])
 @authenticated()
 @restrict_host
-def option_get(option, section) -> Response:
-    if option not in ["syren", "alert", "notifications", "network", "mqtt", "dyndns"]:
-        return jsonify(None), 404
+def option_get(option_name, section) -> Response:
+    value = None
+    if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
+        value = asdict(SyrenService(db.session).get_syren_config())
+    elif (
+        option_name == AlertSensitivityConfig.OPTION_NAME
+        and section == AlertSensitivityConfig.SECTION_NAME
+    ):
+        value = asdict(AlertSensitivityService(db.session).get_alert_sensitivity_config())
+    elif option_name == SMTPConfig.OPTION_NAME and section == SMTPConfig.SECTION_NAME:
+        value = asdict(SMTPService(db.session).get_smtp_config())
+    elif (
+        option_name == SubscriptionsConfig.OPTION_NAME
+        and section == SubscriptionsConfig.SECTION_NAME
+    ):
+        value = asdict(SubscriptionsService(db.session).get_subscriptions_config())
+    elif option_name == GSMConfig.OPTION_NAME and section == GSMConfig.SECTION_NAME:
+        value = asdict(GSMService(db.session).get_gsm_config())
+    elif option_name == SSHConfig.OPTION_NAME and section == SSHConfig.SECTION_NAME:
+        value = asdict(SSHService(db.session).get_ssh_config())
+    elif option_name == MQTTConnection.OPTION_NAME and section == MQTTConnection.SECTION_NAME:
+        value = asdict(MQTTService(db.session).get_connection_config())
+    elif (
+        option_name == MQTTConfigExternalPublish.OPTION_NAME
+        and section == MQTTConfigExternalPublish.SECTION_NAME
+    ):
+        value = asdict(MQTTService(db.session).get_external_publish_config())
+    elif (
+        option_name == MQTTConfigInternalPublish.OPTION_NAME
+        and section == MQTTConfigInternalPublish.SECTION_NAME
+    ):
+        value = asdict(MQTTService(db.session).get_connection_config())
+    elif (
+        option_name == MQTTConfigInternalRead.OPTION_NAME
+        and section == MQTTConfigInternalRead.SECTION_NAME
+    ):
+        value = asdict(MQTTService(db.session).get_internal_read_config())
+    elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
+        value = asdict(DyndnsService(db.session).get_dyndns_config())
+    
+    if value is not None:
+        return jsonify({
+            "name": option_name,
+            "section": section,
+            "value": value,
+        })
 
-    db_option = db.session.query(Option).filter_by(name=option, section=section).first()
-    return jsonify(db_option.serialized) if db_option else jsonify(None)
+    db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
+    return jsonify(db_option.serialized) if db_option else jsonify(None), 404
 
 
 @config_blueprint.route("/api/config/<string:option_name>/<string:section>", methods=["PUT"])
@@ -61,7 +117,10 @@ def option_put(option_name, section) -> Response:
         smtp_service = SMTPService(db.session)
         smtp_service.set_smtp_config(SMTPConfig(**request.json))
         return ""
-    elif option_name == SubscriptionsConfig.OPTION_NAME and section == SubscriptionsConfig.SECTION_NAME:
+    elif (
+        option_name == SubscriptionsConfig.OPTION_NAME
+        and section == SubscriptionsConfig.SECTION_NAME
+    ):
         subscriptions_service = SubscriptionsService(db.session)
         subscriptions_service.set_subscriptions_config(SubscriptionsConfig(**request.json))
         return ""
@@ -77,7 +136,10 @@ def option_put(option_name, section) -> Response:
         mqtt_service = MQTTService(db.session)
         mqtt_service.set_connection_config(MQTTConnection(**request.json))
         return ""
-    elif option_name == MQTTConfigExternalPublish.OPTION_NAME and section == MQTTConfigExternalPublish.SECTION_NAME:
+    elif (
+        option_name == MQTTConfigExternalPublish.OPTION_NAME
+        and section == MQTTConfigExternalPublish.SECTION_NAME
+    ):
         mqtt_service = MQTTService(db.session)
         mqtt_service.set_external_publish_config(MQTTConfigExternalPublish(**request.json))
         return ""
