@@ -134,7 +134,7 @@ class SystemHelper:
             with open(file_path, "r") as f:
                 content = f.read()
                 if regex:
-                    return bool(re.search(text, content))
+                    return bool(re.search(text, content, re.MULTILINE))
                 return text in content
         except FileNotFoundError:
             return False

@@ -1,4 +1,3 @@
-import subprocess
 import click
 
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper

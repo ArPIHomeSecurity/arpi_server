@@ -86,27 +86,35 @@ class HardwareInstaller(BaseInstaller):
 
     def setup_spi(self):
         """Enable SPI interface"""
-        click.echo("   🔧 Setup SPI interface...")
+        click.echo(f"   🔧 Setup SPI interface for board version {self._board_version}...")
 
-        if self._board_version == 3:
-            # enable SPI for board version 3
-            if os.path.exists(self._config_txt) and not SystemHelper.file_contains_text(
-                self._config_txt, r"^dtparam=spi=on$", regex=True
-            ):
-                SystemHelper.append_to_file(self._config_txt, "\ndtparam=spi=on\n")
-                self.needs_reboot = True
-                click.echo("   ✓ SPI interface enabled")
-        elif self._board_version == 2:
-            # disable SPI for board version 2
-            if os.path.exists(self._config_txt) and SystemHelper.file_contains_text(
-                self._config_txt, r"^dtparam=spi=on$", regex=True
-            ):
-                SystemHelper.remove_from_file(self._config_txt, "dtparam=spi=on")
-                self.needs_reboot = True
-                click.echo("   ✓ SPI interface disabled")
+        if os.path.exists(self._config_txt): 
+            if self._board_version == 3:
+                # enable SPI for board version 3
+                if not SystemHelper.file_contains_text(
+                    self._config_txt, r"^dtparam=spi=on$", regex=True
+                ):
+                    SystemHelper.append_to_file(self._config_txt, "\ndtparam=spi=on\n")
+                    self.needs_reboot = True
+                    click.echo("   ✓ SPI interface enabled")
+                else:
+                    click.echo("   ✓ SPI interface already enabled")
+            elif self._board_version == 2:
+                # disable SPI for board version 2
+                if SystemHelper.file_contains_text(
+                    self._config_txt, r"^dtparam=spi=on$", regex=True
+                ):
+                    SystemHelper.remove_from_file(self._config_txt, "dtparam=spi=on")
+                    self.needs_reboot = True
+                    click.echo("   ✓ SPI interface disabled")
+                else:
+                    click.echo("   ✓ SPI interface already disabled")
+            else:
+                click.echo(f"   ⚠️ Unknown board version: {self._board_version}")
+                self.warnings.append(f"Unknown board version: {self._board_version}")
         else:
-            click.echo(f"   ⚠️ Unknown board version: {self._board_version}")
-            self.warnings.append(f"Unknown board version: {self._board_version}")
+            click.echo(f"   ⚠️ config.txt not found at {self._config_txt}")
+            self.warnings.append(f"config.txt not found at {self._config_txt}")
 
     def install_wiringpi(self):
         """Install WiringPi library"""
@@ -148,13 +156,13 @@ class HardwareInstaller(BaseInstaller):
         return {
             "i2c_tools installed": PackageHelper.is_package_installed("i2c-tools"),
             "SPI enabled": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", r"(?m)^dtparam=spi=on$", regex=True
+                "/boot/firmware/config.txt", r"^dtparam=spi=on$", regex=True
             ),
             "RTC configured": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", r"(?m)^dtoverlay=i2c-rtc,ds1307$", regex=True
+                "/boot/firmware/config.txt", r"^dtoverlay=i2c-rtc,ds1307$", regex=True
             ),
             "GSM UART configured": SystemHelper.file_contains_text(
-                "/boot/firmware/config.txt", r"(?m)^enable_uart=1$", regex=True
+                "/boot/firmware/config.txt", r"^enable_uart=1$", regex=True
             ),
             "WiringPi available": SystemHelper.run_command("gpio -v", check=False).returncode == 0,
         }
