@@ -39,7 +39,7 @@ build = "*"
 uvicorn = "~=0.42"
 
 [dev-packages]
-black = "~=23.12"
+black = "~=26.3"
 # the cryptography package is installed with apt on raspberry pi, this is just for dev env
 cryptography = "~=46.0"
 rope = "~=1.13"
