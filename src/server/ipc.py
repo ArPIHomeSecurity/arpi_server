@@ -132,7 +132,7 @@ class IPCClient(object):
     def deactivate_output(self, output_id):
         return self._send_message({"action": MONITOR_DEACTIVATE_OUTPUT, "output_id": output_id})
 
-    def _send_message(self, message):
+    def _send_message(self, message) -> dict:
         if self._socket:
             try:
                 self._socket.send(json.dumps(message).encode())

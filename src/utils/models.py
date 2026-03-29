@@ -4,18 +4,19 @@ import json
 import locale
 import os
 import uuid
-from copy import deepcopy
-from datetime import timedelta, datetime as dt
-from re import search
-from dateutil.tz.tz import tzlocal
-from typing import List
-import bcrypt
 
-from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime, Enum
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql.schema import ForeignKey
-from sqlalchemy.orm import relationship, backref, Mapped, mapped_column
+from copy import deepcopy
+from datetime import datetime as dt
+from datetime import timedelta
+from re import search
+from typing import List
+
+import bcrypt
+from dateutil.tz.tz import tzlocal
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
+from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
+from sqlalchemy.sql.schema import ForeignKey
 from stringcase import camelcase, snakecase
 
 from utils.constants import (
@@ -23,9 +24,9 @@ from utils.constants import (
     ALERT_SABOTAGE,
     ALERT_STAY,
     ARM_AWAY,
-    ARM_STAY,
     ARM_DISARM,
     ARM_MIXED,
+    ARM_STAY,
     ROLE_USER,
 )
 from utils.dictionary import merge_dicts, replace_keys
@@ -129,7 +130,7 @@ class SensorType(BaseModel):
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
-            f"Incorrect name field length ({len(name)})"
+            f"Incorrect 'name' field length ({len(name)})"
         )
         return name
 
@@ -163,10 +164,12 @@ class Sensor(BaseModel):
     The disconnected channel value is "-1".
     """
 
+    NAME_LENGTH = 16
+
     __tablename__ = "sensor"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(16), nullable=False)
+    name = Column(String(NAME_LENGTH), nullable=False)
     description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
     channel_type = Column(
@@ -255,7 +258,7 @@ class Sensor(BaseModel):
 
     def update(self, data):
         # reset reference value if channel changed
-        if data["channel"] != self.channel:
+        if "channel" in data and data["channel"] != self.channel:
             self.reference_value = None
 
         return self.update_record(
@@ -308,16 +311,30 @@ class Sensor(BaseModel):
     @validates("name")
     def validates_name(self, key, name):
         assert 0 <= len(name) <= SensorType.NAME_LENGTH, (
-            f"Incorrect name field length ({len(name)})"
+            f"Incorrect 'name' field length ({len(name)})"
         )
         return name
 
     @validates("channel")
     def validates_channel(self, key, channel):
         assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), (
-            f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+            f"Incorrect 'channel' (0..{os.environ['INPUT_NUMBER']})"
         )
         return channel
+
+    @validates("monitor_period")
+    def validates_monitor_period(self, key, monitor_period):
+        if monitor_period is not None:
+            assert monitor_period > 0, "Incorrect 'monitor_period' (must be greater than 0)"
+
+        return monitor_period
+
+    @validates("monitor_threshold")
+    def validates_monitor_threshold(self, key, monitor_threshold):
+        if monitor_threshold is not None:
+            assert 0 <= monitor_threshold <= 100, "Incorrect 'monitor_threshold' (0..100)"
+
+        return monitor_threshold
 
 
 class Alert(BaseModel):
@@ -623,6 +640,9 @@ class Zone(BaseModel):
             data,
         )
 
+    def can_be_deleted(self):
+        return len(self.sensors) == 0
+
     @property
     def serialized(self):
         return convert2camel(
@@ -654,7 +674,7 @@ class Zone(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect 'name' field length ({len(name)})"
         return name
 
 
@@ -678,6 +698,9 @@ class Area(BaseModel):
     def __init__(self, name="area"):
         self.name = name
         self.arm_state = ArmStates.DISARM
+
+    def can_be_deleted(self):
+        return len(self.sensors) == 0 and not self.output
 
     @property
     def serialized(self):
@@ -705,6 +728,7 @@ class User(BaseModel):
     card_registration_expiry = Column(DateTime(timezone=True))
     access_code = Column(String(64), unique=False, nullable=False)
     fourkey_code = Column(String(64), nullable=False)
+    mcp_key = Column(String(64), nullable=True)
     cards = relationship("Card")
     comment = Column(String, nullable=True)
 
@@ -825,12 +849,12 @@ class User(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect user name field length ({len(name)})"
+        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect 'user name' field length ({len(name)})"
         return name
 
     @validates("email")
     def validates_email(self, key, email):
-        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect email field length ({len(email)})"
+        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect 'email' field length ({len(email)})"
         if len(email):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
@@ -926,7 +950,7 @@ class Option(BaseModel):
 
     @validates("name", "section")
     def validates_name(self, key, value):
-        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(value)})"
+        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect '{key}' field length ({len(value)})"
         if key == "name":
             assert value in (
                 "notifications",
@@ -1010,10 +1034,11 @@ class Output(BaseModel):
 
     __tablename__ = "output"
 
+    NAME_LENGTH = 16
     ENDLESS_DURATION = 0
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(16), nullable=True)
+    name = Column(String(NAME_LENGTH), nullable=True)
     description = Column(String, nullable=True)
     channel = Column(Integer, default=None, nullable=True)
     state = Column(Boolean, default=False, nullable=False)
@@ -1037,15 +1062,15 @@ class Output(BaseModel):
 
     def __init__(
         self,
-        name,
-        description,
-        channel,
-        trigger_type,
-        area_id,
-        delay,
-        duration,
-        default_state,
-        enabled,
+        name: str,
+        description: str,
+        channel: int,
+        trigger_type: str,
+        area_id: int,
+        delay: int,
+        duration: int,
+        default_state: bool,
+        enabled: bool,
     ):
         self.name = name
         self.description = description
@@ -1096,11 +1121,18 @@ class Output(BaseModel):
             )
         )
 
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= Output.NAME_LENGTH, (
+            f"Incorrect 'name' field length ({len(name)}>{Output.NAME_LENGTH})"
+        )
+        return name
+
     @validates("channel")
     def validates_channel(self, key, channel):
         if channel is not None:
-            assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]), (
-                f"Incorrect channel (0..{os.environ['OUTPUT_NUMBER']})"
+            assert 0 <= channel <= int(os.environ["OUTPUT_NUMBER"]) - 1, (
+                f"Incorrect 'channel' (0..{int(os.environ['OUTPUT_NUMBER']) - 1})"
             )
         return channel
 

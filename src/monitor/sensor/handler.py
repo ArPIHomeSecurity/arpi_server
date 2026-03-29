@@ -10,6 +10,7 @@ from time import sleep
 from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
+from monitor.config.models import AlertSensitivityConfig
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -30,9 +31,8 @@ from utils.constants import (
 from utils.models import AlertSensor, Arm, Sensor
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
-from monitor.config_helper import AlertSensitivityConfig, load_alert_sensitivity_config
 from monitor.database import get_database_session
-from monitor.sensor.detector import detect_alert, detect_error, wiring_config
+from monitor.sensor.detector import detect_alert, detect_error
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_error, send_sensors_state
 from monitor.storage import State, States
@@ -123,15 +123,12 @@ class SensorHandler:
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
-        alert_sensitivity = load_alert_sensitivity_config(session=self._db_session)
-        if alert_sensitivity is None:
-            self._logger.info("Alert sensitivity config not found!")
-            alert_sensitivity = AlertSensitivityConfig(None, None)
+        alert_sensitivity = AlertSensitivityConfig.load_config(session=self._db_session)
 
         # initialize the sensors history
         sample_rate = int(environ["SAMPLE_RATE"])
         if alert_sensitivity.monitor_period is None:
-            # instant alerts
+            # no custom sensitivity, use instant alerts
             self._sensors_history = SensorsHistory(
                 len(self._sensors),
                 size=1,
@@ -347,7 +344,7 @@ class SensorHandler:
                 and delay is not None
             ):
                 self._logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert! %ss%s%| (%r)",
+                    "Sensor %s (CH%02d) has suppressed alert! %ss%s | (%r)",
                     sensor.name,
                     sensor.channel,
                     sensitivity.monitor_period,

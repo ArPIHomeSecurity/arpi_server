@@ -4,7 +4,7 @@ from datetime import datetime
 from threading import Thread, Event
 
 from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
-from monitor.config_helper import AlertSensitivityConfig
+from monitor.config.models import AlertSensitivityConfig
 from monitor.storage import States, State
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session

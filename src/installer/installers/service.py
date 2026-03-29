@@ -74,7 +74,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         SystemHelper.run_command("systemctl daemon-reload")
 
         # Enable services
-        services_to_enable = ["argus_server", "argus_monitor", "nginx"]
+        services_to_enable = ["argus_server", "argus_mcp", "argus_monitor", "nginx"]
         for service in services_to_enable:
             ServiceHelper.enable_service(service)
             click.echo(f"   ✓ Enabled {service} service")
@@ -213,6 +213,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
             ),
             "Database schema updated": self.check_database_schema_updated(),
             "Argus server enabled": ServiceHelper.is_service_enabled("argus_server"),
+            "Argus MCP exists": ServiceHelper.is_service_enabled("argus_mcp") is not None,
             "Argus monitor enabled": ServiceHelper.is_service_enabled("argus_monitor"),
             "Nginx enabled": ServiceHelper.is_service_enabled("nginx"),
             "Tmpfiles configured": self.check_tmpfiles_configured(),

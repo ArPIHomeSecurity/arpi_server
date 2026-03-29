@@ -1,4 +1,3 @@
-
 import os
 
 from flask.blueprints import Blueprint

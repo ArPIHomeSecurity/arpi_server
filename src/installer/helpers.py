@@ -134,7 +134,7 @@ class SystemHelper:
             with open(file_path, "r") as f:
                 content = f.read()
                 if regex:
-                    return bool(re.search(text, content))
+                    return bool(re.search(text, content, re.MULTILINE))
                 return text in content
         except FileNotFoundError:
             return False
@@ -450,7 +450,7 @@ class ServiceHelper:
             return False
 
     @staticmethod
-    def is_service_enabled(service: str) -> bool:
+    def is_service_enabled(service: str) -> bool | None:
         """Check if systemd service is enabled"""
         try:
             result = SystemHelper.run_command(
@@ -458,4 +458,4 @@ class ServiceHelper:
             )
             return result.returncode == 0
         except Exception:
-            return False
+            return None

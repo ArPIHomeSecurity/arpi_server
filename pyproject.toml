@@ -30,7 +30,8 @@ dependencies = [
     "flask-cors~=6.0",
     "flask-migrate~=4.1",
     "flask-sqlalchemy~=3.1",
-    "gunicorn~=23.0",
+    "fastmcp~=3.0",
+    "gunicorn~=25.1",
     "noipy~=1.5.3",
     "paho-mqtt~=2.1",
     "psycopg2-binary~=2.9",
@@ -39,6 +40,7 @@ dependencies = [
     "python-jose~=3.5",
     "python-socketio~=5.14",
     "stringcase~=1.2.0",
+    "uvicorn~=0.42",
 ]
 
 [project.optional-dependencies]
@@ -72,7 +74,7 @@ argus-simulator = "bin.simulator:main"
 argus-ssh-keymanager = "bin.ssh_keymanager:cli_main"
 argus-ssh-service = "bin.ssh_service:cli_main"
 argus-tester = "bin.tester:cli_main"
-argus-update-user = "bin.update_user:cli_main"
+argus-user = "bin.user:cli_main"
 argus-upgrade = "bin.upgrade:cli_main"
 argus-status = "installer.cli:status_standalone"
 
@@ -84,6 +86,7 @@ packages = {find = {where = ["src"]}}
 
 [tool.setuptools.package-data]
 server = ["version.json"]
+mcp_server = ["prompts/*.txt"]
 
 [tool.setuptools.data-files]
 "etc/arpi-server/" = ["config.env"]

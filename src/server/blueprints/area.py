@@ -1,13 +1,15 @@
-from flask.blueprints import Blueprint
 from flask import jsonify, request
-from flask.helpers import make_response
-from utils.models import Area
-from utils.constants import ROLE_USER
+from flask.blueprints import Blueprint
 
 from server.database import db
-from server.decorators import authenticated, restrict_host, registered
+from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
+from server.services.area import AreaService
+from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
+                                  ObjectNotFound)
 from server.tools import process_ipc_response
+from utils.constants import ROLE_USER
+from utils.models import Area
 
 area_blueprint = Blueprint("area", __name__)
 
@@ -16,80 +18,88 @@ area_blueprint = Blueprint("area", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_areas():
+    """
+    Retrieve all existing areas.
+    """
+    area_service = AreaService(db.session)
     return jsonify(
-        [
-            i.serialized
-            for i in db.session.query(Area)
-            .filter_by(deleted=False)
-            .order_by(Area.id.asc())
-            .all()
-        ]
+        [area.serialized for area in area_service.get_areas()]
     )
-
 
 @area_blueprint.route("/api/areas/", methods=["POST"])
 @authenticated()
 @restrict_host
 def create_area():
-    area = Area()
-    area.update(request.json)
-    db.session.add(area)
-    db.session.commit()
-    IPCClient().update_configuration()
-    return jsonify(area.serialized)
+    """
+    Create a new area.
+    """
+    try:
+        area_service = AreaService(db.session)
+        area = area_service.create_area(request.json.get("name"))
+        return jsonify(area.serialized), 201
+    except ConfigChangesNotAllowed:
+        return jsonify({"error": "Configuration changes are not allowed in the current state"}), 409
 
 
 @area_blueprint.route("/api/area/<int:area_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
 @restrict_host
-def area(area_id):
-    if request.method == "GET":
-        area = db.session.query(Area).get(area_id)
-        if area:
+def manage_area(area_id):
+    """
+    Manage areas.
+    """
+    try:
+        area_service = AreaService(db.session)
+        if request.method == "GET":
+            area = area_service.get_area(area_id)
             return jsonify(area.serialized)
+        elif request.method == "PUT":
+            area = area_service.update_area(area_id, request.json.get("name"))
+            return jsonify(area.serialized)
+        elif request.method == "DELETE":
+            area_service.delete_area(area_id)
+            return "Deleted", 204
 
-        return make_response(jsonify({"error": "Area not found"}), 404)
-    elif request.method == "DELETE":
-        area = db.session.query(Area).get(area_id)
-        if area:
-            area.deleted = True
-            db.session.commit()
-            return process_ipc_response(IPCClient().update_configuration())
-
-        return make_response(jsonify({"error": "Area not found"}), 404)
-    elif request.method == "PUT":
-        area = db.session.query(Area).get(area_id)
-        if not area:
-            return make_response(jsonify({"error": "Area not found"}), 404)
-
-        if not area.update(request.json):
-            return make_response("", 204)
-
-        db.session.commit()
-        return process_ipc_response(IPCClient().update_configuration())
-    return make_response(jsonify({"error": "Unknown action"}), 400)
+        return jsonify({"error": "Unknown action"}), 405
+    except ConfigChangesNotAllowed:
+        return jsonify({"error": "Configuration changes are not allowed in the current state"}), 409
+    except ObjectNotFound:
+        return jsonify({"error": "Area not found"}), 404
+    except ObjectNotChanged:
+        return jsonify({"info": "No changes made"}), 204
 
 
 @area_blueprint.route("/api/area/arm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_arm():
-    return process_ipc_response(
-        IPCClient().arm(
-            arm_type=request.args.get("type"),
-            user_id=request.environ["requester_id"],
-            area_id=request.args["area_id"],
+    try:
+        area_service = AreaService(db.session)
+        return process_ipc_response(
+            area_service.arm(
+                area_id=request.args["area_id"],
+                arm_type=request.args.get("type"),
+                user_id=request.environ["requester_id"],
+            )
         )
-    )
+    except ObjectNotFound:
+        return jsonify({"error": "Area not found"}), 404
 
 
 @area_blueprint.route("/api/area/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def put_disarm():
-    return process_ipc_response(
-        IPCClient().disarm(request.environ["requester_id"], request.args["area_id"])
-    )
+    try:
+        area_service = AreaService(db.session)
+        return process_ipc_response(
+            area_service.disarm(
+                area_id=request.args["area_id"],
+                user_id=request.environ["requester_id"],
+            )
+        )
+    except ObjectNotFound:
+        return jsonify({"error": "Area not found"}), 404
 
 
 @area_blueprint.route("/api/areas/reorder", methods=["PUT"])
@@ -106,4 +116,4 @@ def reorder_areas():
 
     db.session.commit()
 
-    return make_response("", 200)
+    return ""

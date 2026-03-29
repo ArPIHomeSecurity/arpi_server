@@ -1,16 +1,11 @@
-import logging
 
-from datetime import datetime, timedelta
-
+from flask import jsonify
 from flask.blueprints import Blueprint
-from flask import jsonify, request, current_app
-from sqlalchemy import or_
-from sqlalchemy.dialects import postgresql
 
-from utils.constants import ROLE_USER, ARM_DISARM
-from utils.models import Alert, Arm, Disarm, ArmSensor
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
+from utils.constants import ROLE_USER
+from utils.models import Alert
 
 alert_blueprint = Blueprint("alert", __name__)
 

@@ -3,7 +3,7 @@ import os
 from typing import List
 
 from utils.constants import LOG_MONITOR
-from monitor.config_helper import AlertSensitivityConfig
+from monitor.config.models import AlertSensitivityConfig
 
 
 class SensorHistory:
@@ -116,6 +116,7 @@ class SensorsHistory:
         """
         if idx >= len(self._sensors):
             raise ValueError(f"Invalid sensor index {idx}")
+
         self._sensors[idx].set_sensitivity(size, threshold)
 
     def add_state(self, idx: int, state: bool):

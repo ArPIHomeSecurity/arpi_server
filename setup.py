@@ -15,9 +15,9 @@ class PreBuild(build):
     
     def run(self):
         """Create config.env from .env.prod before building."""
-        print("Running pre-build transformations...")
-        
         source = Path(f".env.{os.getenv('ENVIRONMENT', 'prod')}")
+        print(f"Running pre-build transformations for {source}...")
+        
         target = Path("config.env")
         
         if source.exists():
@@ -35,9 +35,9 @@ class PreSDist(sdist):
     
     def run(self):
         """Create config.env from .env.prod before creating source distribution."""
-        print("Running pre-sdist transformations...")
-        
         source = Path(".env.prod")
+        print(f"Running pre-sdist transformations for {source}...")
+        
         target = Path("config.env")
         
         if source.exists():
