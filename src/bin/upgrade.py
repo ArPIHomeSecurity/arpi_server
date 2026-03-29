@@ -122,15 +122,15 @@ def get_server_version() -> VersionInfo | None:
             commit_id=p["commit"] or "",
         )
     except ImportError:
-        print("⚠️  Warning: Could not find server.version module, trying fallback method")
+        pass
 
     # fallback for old-style (non-package) installations
     try:
-        with open("/home/argus/server/src/assets/version.json", "r", encoding="utf-8") as f:
+        with open("/home/argus/server/src/server/version.json", "r", encoding="utf-8") as f:
             version_info = json.load(f)
             return VersionInfo(**version_info)
     except FileNotFoundError:
-        print("⚠️  Warning: Server version file not found")
+        pass
 
 
 def get_webapplication_version() -> VersionInfo | None:
@@ -267,7 +267,7 @@ def check_and_upgrade(
     actual_version = get_version_func()
 
     print(f"    - Latest release: {latest_release['tag_name']}")
-    print(f"    - Current version: {actual_version.version}")
+    print(f"    - Current version: {actual_version.version if actual_version else 'unknown'}")
     # if we cannot determine the actual version, assume upgrade/reinstall is needed
     result = compare_versions(latest_release["tag_name"], actual_version) if actual_version else 1
     if result < 1:
