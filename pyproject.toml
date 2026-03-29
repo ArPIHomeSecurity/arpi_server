@@ -74,7 +74,7 @@ argus-simulator = "bin.simulator:main"
 argus-ssh-keymanager = "bin.ssh_keymanager:cli_main"
 argus-ssh-service = "bin.ssh_service:cli_main"
 argus-tester = "bin.tester:cli_main"
-argus-update-user = "bin.update_user:cli_main"
+argus-user = "bin.user:cli_main"
 argus-upgrade = "bin.upgrade:cli_main"
 argus-status = "installer.cli:status_standalone"
 
