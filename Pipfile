@@ -21,7 +21,7 @@ python_version = "3.11"
 
 [packages]
 bcrypt = "~=5.0"
-fastmcp = "~=3.0"
+fastmcp = "~=3.2"
 flask = "~=3.1"
 flask-cors = "~=6.0"
 flask-migrate = "~=4.1"
