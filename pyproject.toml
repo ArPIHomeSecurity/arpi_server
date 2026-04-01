@@ -50,7 +50,7 @@ dev = [
     "rope~=1.13",
 ]
 simulator = [
-    "textual~=5.3",
+    "textual~=8.2",
     "textual-dev",
 ]
 device = [
