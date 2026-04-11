@@ -62,18 +62,27 @@ tasks:
   start-server:
     desc: Start the server
     cmds:
-      - .venv/bin/flask --debug --app server run --host=0.0.0.0 --port=8080
+      - uv run flask --debug --app server run --host=0.0.0.0 --port=8080
 
   start-mcp:
     desc: Start the MCP server
     cmds:
-      - .venv/bin/fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
-
+      - uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
 
   start-monitor:
     desc: Start the monitor
     cmds:
-      - .venv/bin/flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
+      - uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
+
+  start-simulator:
+    desc: Start the simulator
+    cmds:
+      - uv run textual run --dev ./src/bin/simulator.py
+
+  start-simulator-web:
+    desc: Start the simulator web interface
+    cmds:
+      - uv run textual serve --dev -p 8888 ./src/bin/simulator.py
 
   start-mcpinspector:
     desc: Start the MCP Inspector
