@@ -83,7 +83,7 @@ class GSM:
 
                 # fix for call status parsing of SIM900
                 self._modem._pollCallStatusRegex = \
-                    re.compile('^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)')
+                    re.compile(r'^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)')
 
                 self._logger.info("GSM modem connected")
                 return True
