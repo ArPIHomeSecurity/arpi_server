@@ -12,14 +12,26 @@ tasks:
       - uv sync --extra=dev --extra=simulator
 
   format:
-    desc: Format python code using black
+    desc: Format python code using ruff
     cmds:
-      - .venv/bin/black .
+      - uvx ruff format
   
   format-check:
-    desc: Check if python code is formatted using black
+    desc: Check if python code is formatted using ruff
     cmds:
-      - .venv/bin/black --check .
+      - uvx ruff format --check
+
+  lint:
+    desc: Lint python code using ruff
+    cmds:
+      - cmd: uvx ruff check .
+        ignore_error: true
+      - uvx ruff check . --statistics
+
+  lint-fix:
+    desc: Fix linting issues using ruff
+    cmds:
+      - uvx ruff check --fix
 
   start-database:
     desc: Start the database
