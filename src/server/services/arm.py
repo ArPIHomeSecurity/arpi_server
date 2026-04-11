@@ -106,20 +106,20 @@ class ArmService(BaseService):
         filters = []
 
         if has_alert is True:
-            filters.append(Disarm.alert != None)
+            filters.append(Disarm.alert is not None)
         elif has_alert is False:
-            filters.append(Disarm.alert == None)
+            filters.append(Disarm.alert is None)
 
         if user_id is not None:
             filters.append(or_(Disarm.user_id == user_id, Arm.user_id == user_id))
 
         if keypad_id is not None:
             # TODO: identify keypads
-            filters.append(or_(Disarm.keypad_id != None, Arm.keypad_id != None))
+            filters.append(or_(Disarm.keypad_id is not None, Arm.keypad_id is not None))
 
         if arm_type is not None:
             if arm_type == ARM_DISARM:
-                filters.append(Arm.id == None)
+                filters.append(Arm.id is None)
             else:
                 filters.append(Arm.type == arm_type)
 

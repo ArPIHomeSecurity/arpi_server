@@ -3,7 +3,6 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.ipc import IPCClient
 from server.services.area import AreaService
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.tools import process_ipc_response

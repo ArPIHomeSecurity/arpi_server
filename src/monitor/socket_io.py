@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import socketio
@@ -10,7 +9,6 @@ from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
 from utils.constants import LOG_SOCKETIO
-from utils.models import Option
 from monitor.database import get_database_session
 
 

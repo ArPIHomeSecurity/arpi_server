@@ -6,7 +6,7 @@ import logging
 from os import environ
 
 from utils.models import ChannelTypes, Sensor, SensorEOLCount
-from monitor.sensor.wirings import PullUpConfig, PullUpDownConfig
+from monitor.sensor.wirings import PullUpDownConfig
 from utils.constants import LOG_SENSORS
 
 TOLERANCE_V2 = 0.01

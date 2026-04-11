@@ -4,7 +4,6 @@ Managing outputs
 
 import contextlib
 import logging
-import os
 
 from queue import Empty, Queue
 from threading import Event, Thread

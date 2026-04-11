@@ -10,7 +10,8 @@ from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler
 from monitor.monitor import Monitor
 from monitor.notifications.notifier import Notifier
-from monitor.logging import print_logging
+
+# from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
 
 

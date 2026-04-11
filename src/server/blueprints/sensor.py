@@ -3,12 +3,11 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.ipc import IPCClient
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.sensor import ChannelConflictError, SensorService
 from server.tools import process_ipc_response
 from utils.constants import ROLE_USER
-from utils.models import Sensor, SensorType
+from utils.models import Sensor
 
 sensor_blueprint = Blueprint("sensor", __name__)
 

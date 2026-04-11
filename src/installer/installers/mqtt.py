@@ -1,5 +1,4 @@
 import os
-import tempfile
 import click
 
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
