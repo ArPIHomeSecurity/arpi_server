@@ -1,5 +1,6 @@
 BCM = "bcm"
-OUT="out"
+OUT = "out"
+
 
 def setmode(mode):
     pass
@@ -18,7 +19,6 @@ def output(pin, value):
 
 
 class LED:
-
     def __init__(self, pin):
         self.pin = pin
         self.state = False

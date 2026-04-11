@@ -8,6 +8,7 @@ from monitor.adapters.keypads.delay import DelayPhase, Handler
 
 class Action(Enum):
     """Actions of the keypad"""
+
     KEY = 0
     FUNCTION = 1
     CARD = 2
@@ -15,6 +16,7 @@ class Action(Enum):
 
 class Function(Enum):
     """Functions keys"""
+
     AWAY = 1
     STAY = 2
 

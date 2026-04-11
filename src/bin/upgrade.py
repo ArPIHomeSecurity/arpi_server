@@ -107,6 +107,7 @@ def get_server_version() -> VersionInfo | None:
     """
     try:
         import server.version as server_version
+
         m = VERSION_PARSER.match(server_version.__version__)
         if not m:
             raise ValueError(f"Invalid version string: {server_version.__version__}")

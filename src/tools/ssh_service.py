@@ -70,8 +70,7 @@ class SSHService:
         """
         self._logger.info("Updating password authentication")
         self.enable_password_authentication(
-            self._ssh_config.password_authentication_enabled,
-            self._ssh_config.service_enabled
+            self._ssh_config.password_authentication_enabled, self._ssh_config.service_enabled
         )
 
     def enable_password_authentication(self, enable: bool, restart=True):

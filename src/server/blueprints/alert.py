@@ -1,4 +1,3 @@
-
 from flask import jsonify
 from flask.blueprints import Blueprint
 
@@ -14,7 +13,9 @@ alert_blueprint = Blueprint("alert", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_alerts():
-    return jsonify([i.serialized for i in db.session.query(Alert).order_by(Alert.start_time.desc())])
+    return jsonify(
+        [i.serialized for i in db.session.query(Alert).order_by(Alert.start_time.desc())]
+    )
 
 
 @alert_blueprint.route("/api/alert", methods=["GET"])

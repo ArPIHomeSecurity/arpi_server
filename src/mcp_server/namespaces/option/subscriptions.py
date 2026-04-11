@@ -12,8 +12,6 @@ from server.tools import evaluate_ipc_response
 subscriptions_option_mcp = FastMCP("ArPI - notification subscriptions configuration service")
 
 
-
-
 @subscriptions_option_mcp.tool(
     name="get_config",
     description="Get the current notification subscriptions configuration",

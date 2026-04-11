@@ -40,8 +40,8 @@ def hash_code_2(plain_text: str) -> str:
     """
     Use hashing with builtin salt.
     """
-    return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
-    
+    return bcrypt.hashpw(plain_text.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
 
 def convert2camel(data):
     """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
@@ -141,6 +141,7 @@ class SensorEOLCount(str, enum.Enum):
     SINGLE = "single"
     DOUBLE = "double"
 
+
 class SensorContactTypes(str, enum.Enum):
     """Sensor contact type"""
 
@@ -229,9 +230,9 @@ class Sensor(BaseModel):
         self,
         channel: int,
         sensor_type: SensorType,
-        area: 'Area',
+        area: "Area",
         name: str,
-        zone: 'Zone' = None,
+        zone: "Zone" = None,
         description: str = None,
         enabled: bool = True,
         silent_alert: bool = False,
@@ -777,7 +778,9 @@ class User(BaseModel):
             access_code = str(access_code)
 
         matching_user = False
-        if self.access_code.startswith("$2") and bcrypt.checkpw(access_code.encode('utf-8'), self.access_code.encode('utf-8')):
+        if self.access_code.startswith("$2") and bcrypt.checkpw(
+            access_code.encode("utf-8"), self.access_code.encode("utf-8")
+        ):
             matching_user = True
 
         if self.access_code == hash_code(access_code):
@@ -790,10 +793,13 @@ class User(BaseModel):
     def check_registration_code(self, registration_code):
         registration_code = User.sanitize_registration_code(registration_code)
         matching_user = False
-        
+
         if (
-            self.registration_code and self.registration_code.startswith("$2") and
-            bcrypt.checkpw(registration_code.encode('utf-8'), self.registration_code.encode('utf-8'))
+            self.registration_code
+            and self.registration_code.startswith("$2")
+            and bcrypt.checkpw(
+                registration_code.encode("utf-8"), self.registration_code.encode("utf-8")
+            )
         ):
             matching_user = True
 
@@ -824,7 +830,9 @@ class User(BaseModel):
         if self.update_record(
             ("registration_code", "registration_expiry"),
             {
-                "registration_code": hash_code_2(User.sanitize_registration_code(registration_code)),
+                "registration_code": hash_code_2(
+                    User.sanitize_registration_code(registration_code)
+                ),
                 "registration_expiry": registration_expiry,
             },
         ):
@@ -832,29 +840,35 @@ class User(BaseModel):
 
     @property
     def serialized(self):
-        return convert2camel({
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "has_registration_code": bool(self.registration_code),
-            "has_card": bool(self.cards),
-            "registration_expiry": (
-                self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
-                if self.registration_expiry
-                else None
-            ),
-            "role": self.role,
-            "comment": self.comment,
-        })
+        return convert2camel(
+            {
+                "id": self.id,
+                "name": self.name,
+                "email": self.email,
+                "has_registration_code": bool(self.registration_code),
+                "has_card": bool(self.cards),
+                "registration_expiry": (
+                    self.registration_expiry.astimezone(tzlocal()).strftime("%Y-%m-%d %H:%M:%S")
+                    if self.registration_expiry
+                    else None
+                ),
+                "role": self.role,
+                "comment": self.comment,
+            }
+        )
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect 'user name' field length ({len(name)})"
+        assert 0 < len(name) <= User.NAME_LENGTH, (
+            f"Incorrect 'user name' field length ({len(name)})"
+        )
         return name
 
     @validates("email")
     def validates_email(self, key, email):
-        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect 'email' field length ({len(email)})"
+        assert 0 <= len(email) <= User.EMAIL_LENGTH, (
+            f"Incorrect 'email' field length ({len(email)})"
+        )
         if len(email):
             email_format = r"^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
@@ -863,6 +877,7 @@ class User(BaseModel):
 
 class Card(BaseModel):
     """Model for card table"""
+
     __tablename__ = "card"
 
     id = Column(Integer, primary_key=True)
@@ -880,12 +895,12 @@ class Card(BaseModel):
 
     def check_card(self, card_number):
         matching_card = False
-        if bcrypt.checkpw(card_number.encode('utf-8'), self.code.encode('utf-8')):
+        if bcrypt.checkpw(card_number.encode("utf-8"), self.code.encode("utf-8")):
             matching_card = True
 
         if self.code == hash_code(card_number):
             matching_card = True
-            self.code = hash_code_2(card_number.encode('utf-8')).decode('utf-8')
+            self.code = hash_code_2(card_number.encode("utf-8")).decode("utf-8")
 
         return matching_card
 
@@ -950,7 +965,9 @@ class Option(BaseModel):
 
     @validates("name", "section")
     def validates_name(self, key, value):
-        assert 0 < len(value) <= Option.OPTION_LENGTH, f"Incorrect '{key}' field length ({len(value)})"
+        assert 0 < len(value) <= Option.OPTION_LENGTH, (
+            f"Incorrect '{key}' field length ({len(value)})"
+        )
         if key == "name":
             assert value in (
                 "notifications",

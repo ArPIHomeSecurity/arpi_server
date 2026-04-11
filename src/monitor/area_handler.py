@@ -48,9 +48,9 @@ class AreaHandler:
         # restore the arm state of the areas if the monitoring state is disarmed
         monitoring_state = States.get(State.MONITORING)
         self._db_session.expire_all()
-        for area in self._db_session.execute(
-            select(Area).filter(Area.deleted == False)
-        ).scalars().all():
+        for area in (
+            self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
+        ):
             if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
                 area.arm_state = ARM_DISARM
                 self._logger.info("Area '%s' restored to disarmed state", area.name)
@@ -93,7 +93,9 @@ class AreaHandler:
             self._logger.info("Area id=%s already in state %s", area_id, arm_type)
             return False
 
-        self._logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
+        self._logger.info(
+            "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
+        )
 
         # update output channel
         if arm_type in (ARM_AWAY, ARM_STAY):
@@ -126,7 +128,9 @@ class AreaHandler:
                 self._logger.info("Area id=%s already in state %s", area.id, arm_type)
                 continue
 
-            self._logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
+            self._logger.info(
+                "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
+            )
             area.arm_state = arm_type
             arm_changed = True
 

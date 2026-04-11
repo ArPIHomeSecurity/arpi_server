@@ -14,16 +14,16 @@ Usage:
 Examples:
     # Install all components
     ./bin/install.py install
-    
+
     # Install specific components
     ./bin/install.py install system hardware database
-    
+
     # Check status of all components
     ./bin/install.py status
-    
+
     # Deploy server code with backup
     ./bin/install.py deploy_code --backup --restart
-    
+
     # Verbose mode with board version
     ./bin/install.py -v --board-version 3 install services
 """

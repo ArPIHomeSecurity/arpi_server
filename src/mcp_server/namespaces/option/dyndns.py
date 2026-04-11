@@ -12,8 +12,6 @@ from server.tools import evaluate_ipc_response
 dyndns_option_mcp = FastMCP("ArPI - dynamic DNS configuration service")
 
 
-
-
 @dyndns_option_mcp.tool(
     name="get_config",
     description="Get the current dynamic DNS configuration",
@@ -42,7 +40,7 @@ def set_config(config: DyndnsConfig) -> str:
         if response is not None:
             _, success = evaluate_ipc_response(response)
             return "Success" if success else "Failed"
-        
+
         return "Success"
     except ConfigChangesNotAllowed:
         raise ToolChangesNotAllowed()

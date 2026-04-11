@@ -8,7 +8,6 @@ from utils.constants import LOG_ADKEYPAD
 
 
 class MockKeypad(KeypadBase):
-
     # ACTIONS = "1234    1111      9876   65       C0C1"
     # ACTIONS = "                                    C1"
     # ACTIONS = "                                                            1234"
@@ -59,20 +58,20 @@ class MockKeypad(KeypadBase):
         self.manage_delay()
 
         if self._index is not None:
-            if self.ACTIONS[self._index] == 'C':
-                self._card = self.CARDS[int(self.ACTIONS[self._index+1])]
+            if self.ACTIONS[self._index] == "C":
+                self._card = self.CARDS[int(self.ACTIONS[self._index + 1])]
                 self._index += 1
-            elif self.ACTIONS[self._index] == 'A':
+            elif self.ACTIONS[self._index] == "A":
                 self._logger.debug("Function: %s", self.ACTIONS[self._index])
                 self._function = Function.AWAY
                 self.ACTIONS = " "
                 # avoid repeating the test action
-            elif self.ACTIONS[self._index] == 'S':
+            elif self.ACTIONS[self._index] == "S":
                 self._logger.debug("Function: %s", self.ACTIONS[self._index])
                 self._function = Function.STAY
                 self.ACTIONS = " "
                 # avoid repeating the test action
-            elif self.ACTIONS[self._index] != ' ':
+            elif self.ACTIONS[self._index] != " ":
                 self._logger.debug("Pressed: %s", self.ACTIONS[self._index])
                 self._keys.append(self.ACTIONS[self._index])
 

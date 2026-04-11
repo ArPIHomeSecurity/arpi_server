@@ -3,8 +3,7 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
-                                  ObjectNotFound)
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.zone import ZoneService
 from utils.constants import ROLE_USER
 from utils.models import Zone
@@ -16,9 +15,7 @@ zone_blueprint = Blueprint("zone", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_zones():
-    return jsonify(
-        [i.serialized for i in db.session.query(Zone).filter_by(deleted=False).all()]
-    )
+    return jsonify([i.serialized for i in db.session.query(Zone).filter_by(deleted=False).all()])
 
 
 @zone_blueprint.route("/api/zones/", methods=["POST"])
@@ -80,9 +77,7 @@ def reorder_zones():
     Change only the ui_order of the zones
     """
     for zone_data in request.json:
-        db.session.query(Zone).get(zone_data["id"]).update_record(
-            ["ui_order"], zone_data
-        )
+        db.session.query(Zone).get(zone_data["id"]).update_record(["ui_order"], zone_data)
 
     db.session.commit()
 

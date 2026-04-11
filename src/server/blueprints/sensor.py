@@ -90,7 +90,7 @@ def manage_sensor(sensor_id):
 def sensors_reset_references(sensor_id=None):
     """
     Reset the reference value of a specific sensor or all sensors.
-    
+
     - If sensor_id is provided, reset the reference value of that specific sensor.
     - If sensor_id is not provided, reset the reference values of all sensors.
     """
@@ -103,6 +103,7 @@ def sensors_reset_references(sensor_id=None):
         return jsonify({"error": "Sensor not found"}), 404
     except ObjectNotChanged:
         return jsonify({"info": "No changes made"}), 204
+
 
 @sensor_blueprint.route("/api/sensortypes")
 @authenticated(role=ROLE_USER)
@@ -135,6 +136,7 @@ def get_sensor_error():
     """
     sensor_service = SensorService(db.session)
     return jsonify(sensor_service.get_sensor_error(sensor_id=request.args.get("sensorId")))
+
 
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered

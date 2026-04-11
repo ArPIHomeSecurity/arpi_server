@@ -16,9 +16,7 @@ card_blueprint = Blueprint("card", __name__)
 def get_cards():
     card_service = CardService(db.session)
 
-    return jsonify(
-        [card.serialized for card in card_service.get_cards(request.args.get("userId"))]
-    )
+    return jsonify([card.serialized for card in card_service.get_cards(request.args.get("userId"))])
 
 
 @card_blueprint.route("/api/card/<int:card_id>", methods=["GET", "PUT", "DELETE"])

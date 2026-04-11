@@ -30,8 +30,6 @@ from server.version import __version__
 monitoring_mcp = FastMCP("ArPI - monitoring service")
 
 
-
-
 @monitoring_mcp.resource(
     uri="objects://list",
     name="all_objects",
@@ -47,12 +45,14 @@ def get_all_objects() -> str:
     zones = [zone.serialized for zone in ZoneService(db_session).get_zones()]
     sensors = [sensor.serialized for sensor in SensorService(db_session).get_sensors()]
     outputs = [output.serialized for output in OutputService(db_session).get_outputs()]
-    return json.dumps({
-        "areas": areas,
-        "zones": zones,
-        "sensors": sensors,
-        "outputs": outputs,
-    })
+    return json.dumps(
+        {
+            "areas": areas,
+            "zones": zones,
+            "sensors": sensors,
+            "outputs": outputs,
+        }
+    )
 
 
 @monitoring_mcp.resource(
@@ -77,23 +77,25 @@ def get_all_options() -> str:
     syren_config = SyrenService(db_session).get_syren_config()
     clock_info = ClockService().get_clock_info()
     keypads = [keypad.serialized for keypad in KeypadService(db_session).get_keypads()]
-    return json.dumps({
-        "options": {
-            "alert_sensitivity": asdict(alert_sensitivity),
-            "dyndns": asdict(dyndns_config),
-            "gsm": asdict(gsm_config),
-            "mqtt_external_publish": asdict(mqtt_external_publish),
-            "mqtt_internal_read": asdict(mqtt_internal_read),
-            "smtp": asdict(smtp_config),
-            "ssh": asdict(ssh_config),
-            "subscriptions": asdict(subscriptions),
-            "syren": asdict(syren_config),
-        },
-        "clock": clock_info,
-        "keypads": keypads,
-        "version": __version__,
-        "board_version": os.environ["BOARD_VERSION"],
-    })
+    return json.dumps(
+        {
+            "options": {
+                "alert_sensitivity": asdict(alert_sensitivity),
+                "dyndns": asdict(dyndns_config),
+                "gsm": asdict(gsm_config),
+                "mqtt_external_publish": asdict(mqtt_external_publish),
+                "mqtt_internal_read": asdict(mqtt_internal_read),
+                "smtp": asdict(smtp_config),
+                "ssh": asdict(ssh_config),
+                "subscriptions": asdict(subscriptions),
+                "syren": asdict(syren_config),
+            },
+            "clock": clock_info,
+            "keypads": keypads,
+            "version": __version__,
+            "board_version": os.environ["BOARD_VERSION"],
+        }
+    )
 
 
 @monitoring_mcp.tool(

@@ -84,10 +84,7 @@ class OutputSign(Thread):
                 self._logger.debug("No duration, break loop after delay")
                 break
 
-            if (
-                duration > Output.ENDLESS_DURATION
-                and start_time + delay + duration <= now
-            ):
+            if duration > Output.ENDLESS_DURATION and start_time + delay + duration <= now:
                 self._logger.debug("Duration expired, break loop")
                 break
 
@@ -108,12 +105,10 @@ class OutputSign(Thread):
         sleep(delay)
         output_state = default_state
         self._output_adapter.control_channel(channel, output_state)
-        self._logger.debug(
-            "Output sign on channel '%s' turned off", OUTPUT_NAMES[channel]
-        )
+        self._logger.debug("Output sign on channel '%s' turned off", OUTPUT_NAMES[channel])
         self._logger.debug("Output sign exited on channel '%s'", OUTPUT_NAMES[channel])
 
         # update state in database
         session.query(Output).filter_by(id=self._output.id).update({"state": False})
-        session.commit()        
+        session.commit()
         send_output_state(self._output.id, False)

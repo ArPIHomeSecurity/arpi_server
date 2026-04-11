@@ -27,6 +27,7 @@ from monitor.adapters.mock.utils import (
     set_keypad_state,
 )
 from monitor.output import OUTPUT_NAMES
+
 # use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
 
@@ -40,10 +41,7 @@ WIRING_STRATEGIES = [
 ]
 
 # Contact types for control
-CONTACT_TYPES = [
-    ("NC", ContactTypes.NC.value),
-    ("NO", ContactTypes.NO.value)
-]
+CONTACT_TYPES = [("NC", ContactTypes.NC.value), ("NO", ContactTypes.NO.value)]
 
 SENSOR_CONTACT_TYPE_MAP = {
     SensorContactTypes.NC: ContactTypes.NC.value,
@@ -146,7 +144,9 @@ class Channels(Widget):
     }
     """
 
-    def __init__(self, default_states, channel_configs, is_advanced_mode=False, show_voltage=False, **kwargs):
+    def __init__(
+        self, default_states, channel_configs, is_advanced_mode=False, show_voltage=False, **kwargs
+    ):
         super().__init__(**kwargs)
         self._default_states = default_states
         self._channel_configs = channel_configs
@@ -394,14 +394,20 @@ class SimulatorApp(App):
 
         # Update configs from DB
         for sensor in sensors:
-            channel_name = f"CH{sensor.channel+1:02d}"
+            channel_name = f"CH{sensor.channel + 1:02d}"
             # Map DB fields to simulator config
             wiring_strategy = WiringStrategies.CUT.value
             if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
                 wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
-            elif sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL:
+            elif (
+                sensor.channel_type == ChannelTypes.BASIC
+                or sensor.channel_type == ChannelTypes.NORMAL
+            ):
                 wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
-            elif sensor.channel_type == ChannelTypes.CHANNEL_A or sensor.channel_type == ChannelTypes.CHANNEL_B:
+            elif (
+                sensor.channel_type == ChannelTypes.CHANNEL_A
+                or sensor.channel_type == ChannelTypes.CHANNEL_B
+            ):
                 wiring_strategy = WiringStrategies.DUAL.value
 
             contact_type = SENSOR_CONTACT_TYPE_MAP[sensor.sensor_contact_type]
@@ -418,7 +424,6 @@ class SimulatorApp(App):
         new_advanced_mode = self.has_v3_features() and self.is_v3_board
         if new_advanced_mode:
             self.is_advanced_mode = new_advanced_mode
-
 
     def initialize_channels(self, input_number: int) -> None:
         """
@@ -455,7 +460,7 @@ class SimulatorApp(App):
             WiringStrategies.DUAL.value,
             WiringStrategies.SINGLE_WITH_2EOL.value,
         ]
-        return  any(
+        return any(
             self.channel_configs[ch]["wiring_strategy"] in v3_features
             for ch in self.channel_configs
         )
@@ -475,7 +480,9 @@ class SimulatorApp(App):
                     id="voltage-toggle",
                     value=self.show_voltage,
                 )
-                yield Button("Update channels from DB", id="refresh-channels", classes="refresh-button")
+                yield Button(
+                    "Update channels from DB", id="refresh-channels", classes="refresh-button"
+                )
             yield Channels(
                 id="channels-pane",
                 default_states=list(self.channel_values.values()),

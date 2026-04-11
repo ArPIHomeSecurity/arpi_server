@@ -82,13 +82,15 @@ def option_get(option_name, section) -> Response:
         value = asdict(MQTTService(db.session).get_internal_read_config())
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         value = asdict(DyndnsService(db.session).get_dyndns_config())
-    
+
     if value is not None:
-        return jsonify({
-            "name": option_name,
-            "section": section,
-            "value": value,
-        })
+        return jsonify(
+            {
+                "name": option_name,
+                "section": section,
+                "value": value,
+            }
+        )
 
     db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
     return jsonify(db_option.serialized) if db_option else jsonify(None), 404

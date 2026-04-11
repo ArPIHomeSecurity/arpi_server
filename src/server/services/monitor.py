@@ -20,7 +20,7 @@ class MonitoringService(BaseService):
             str: The current monitoring state (e.g., "armed", "disarmed", etc.)
         """
         return IPCClient().get_state()
-    
+
     def get_arm_state(self) -> str:
         """
         Get the current arm state.

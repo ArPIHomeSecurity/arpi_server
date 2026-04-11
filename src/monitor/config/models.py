@@ -142,6 +142,7 @@ class MQTTConfigInternalRead(BaseConfig):
     """
     Access configuration to the internal MQTT broker for reading by other services.
     """
+
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_read"
 
@@ -158,6 +159,7 @@ class MQTTConfigInternalPublish(BaseConfig):
     """
     Access configuration to the internal MQTT broker for publishing by the monitor.
     """
+
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_publish"
 
@@ -174,6 +176,7 @@ class MQTTConfigExternalPublish(BaseConfig):
     """
     Access configuration to the external MQTT broker for publishing.
     """
+
     OPTION_NAME = "mqtt"
     SECTION_NAME = "external_publish"
 

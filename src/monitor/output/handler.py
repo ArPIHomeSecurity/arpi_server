@@ -34,9 +34,7 @@ class OutputHandler(Thread):
         Send signal when area armed
         """
         cls._notifications.put(
-            Notification(
-                type=TriggerSource.AREA, state=EventType.START, area_id=area.id
-            )
+            Notification(type=TriggerSource.AREA, state=EventType.START, area_id=area.id)
         )
 
     @classmethod
@@ -53,18 +51,14 @@ class OutputHandler(Thread):
         """
         Send signal when system armed
         """
-        cls._notifications.put(
-            Notification(type=TriggerSource.SYSTEM, state=EventType.START)
-        )
+        cls._notifications.put(Notification(type=TriggerSource.SYSTEM, state=EventType.START))
 
     @classmethod
     def send_system_disarmed(cls):
         """
         Send signal when system disarmed
         """
-        cls._notifications.put(
-            Notification(type=TriggerSource.SYSTEM, state=EventType.STOP)
-        )
+        cls._notifications.put(Notification(type=TriggerSource.SYSTEM, state=EventType.STOP))
 
     @classmethod
     def send_button_pressed(cls, output_id: int):
@@ -72,9 +66,7 @@ class OutputHandler(Thread):
         Send signal when manual impulse
         """
         cls._notifications.put(
-            Notification(
-                type=TriggerSource.BUTTON, state=EventType.START, output_id=output_id
-            )
+            Notification(type=TriggerSource.BUTTON, state=EventType.START, output_id=output_id)
         )
 
     @classmethod
@@ -83,9 +75,7 @@ class OutputHandler(Thread):
         Send signal when manual impulse released
         """
         cls._notifications.put(
-            Notification(
-                type=TriggerSource.BUTTON, state=EventType.STOP, output_id=output_id
-            )
+            Notification(type=TriggerSource.BUTTON, state=EventType.STOP, output_id=output_id)
         )
 
     def __init__(self, broadcaster: Broadcaster):
@@ -160,9 +150,7 @@ class OutputHandler(Thread):
 
             output = self.get_output(**output_args.get(notification.type, {}))
             if output is None:
-                self._logger.debug(
-                    "Cannot find output for notification: %s", notification
-                )
+                self._logger.debug("Cannot find output for notification: %s", notification)
                 continue
 
             stop_event = self._signs.pop(output.channel, None)
@@ -212,8 +200,6 @@ class OutputHandler(Thread):
                     return output
         else:
             # invalid notification
-            self._logger.error(
-                "Invalid notification! Both area_id and button_id are set"
-            )
+            self._logger.error("Invalid notification! Both area_id and button_id are set")
 
         return None

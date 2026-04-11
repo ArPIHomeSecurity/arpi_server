@@ -8,14 +8,11 @@ from pydantic import Field
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from mcp_server.models.zone import ArmType
 from monitor.database import get_database_session
-from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
-                                  ObjectNotFound)
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.zone import ZoneService
 from utils.models import Zone
 
 zone_mcp = FastMCP("ArPI - zone service")
-
-
 
 
 @zone_mcp.resource(
@@ -92,8 +89,12 @@ def create_zone(
         str | None, Field(description="The new description of the zone, can be a long text")
     ] = None,
     disarmed_delay: Annotated[int | None, Field(description="The new disarmed delay", ge=0)] = None,
-    away_alert_delay: Annotated[int | None, Field(description="The new away alert delay", ge=0)] = None,
-    stay_alert_delay: Annotated[int | None, Field(description="The new stay alert delay", ge=0)] = None,
+    away_alert_delay: Annotated[
+        int | None, Field(description="The new away alert delay", ge=0)
+    ] = None,
+    stay_alert_delay: Annotated[
+        int | None, Field(description="The new stay alert delay", ge=0)
+    ] = None,
     away_arm_delay: Annotated[int | None, Field(description="The new away arm delay", ge=0)] = None,
     stay_arm_delay: Annotated[int | None, Field(description="The new stay arm delay", ge=0)] = None,
 ):
@@ -140,8 +141,12 @@ def update_zone(
         str | None, Field(description="The new description of the zone, can be a long text")
     ] = None,
     disarmed_delay: Annotated[int | None, Field(description="The new disarmed delay", ge=0)] = None,
-    away_alert_delay: Annotated[int | None, Field(description="The new away alert delay", ge=0)] = None,
-    stay_alert_delay: Annotated[int | None, Field(description="The new stay alert delay", ge=0)] = None,
+    away_alert_delay: Annotated[
+        int | None, Field(description="The new away alert delay", ge=0)
+    ] = None,
+    stay_alert_delay: Annotated[
+        int | None, Field(description="The new stay alert delay", ge=0)
+    ] = None,
     away_arm_delay: Annotated[int | None, Field(description="The new away arm delay", ge=0)] = None,
     stay_arm_delay: Annotated[int | None, Field(description="The new stay arm delay", ge=0)] = None,
 ):

@@ -150,7 +150,7 @@ class SystemHelper:
         """Remove lines containing specific text from file"""
         if not os.path.exists(file_path):
             return
-        
+
         if isinstance(text, str):
             text = [text]
 

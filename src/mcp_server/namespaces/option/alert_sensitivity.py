@@ -16,7 +16,6 @@ OPTION_NAME = "alert"
 OPTION_SECTION = "sensitivity"
 
 
-
 @alert_sensitivity_option_mcp.tool(
     name="get_custom_sensitivity",
     description="Get the current alert sensitivity configuration",

@@ -1,6 +1,7 @@
 """
 SecureConnection
 """
+
 import logging
 from threading import Event, Thread
 
@@ -16,6 +17,7 @@ class SecureConnection(Thread):
     SecureConnection class for updating to remote/secure secure connection
     with dynamic dns and certificate.
     """
+
     lock = Event()
 
     def __init__(self):

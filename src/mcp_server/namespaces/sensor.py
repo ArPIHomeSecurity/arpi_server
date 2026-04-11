@@ -17,8 +17,6 @@ from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCoun
 sensor_mcp = FastMCP("ArPI - sensor service")
 
 
-
-
 @sensor_mcp.resource(
     uri="sensors://list/{alerting_only}",
     name="all",

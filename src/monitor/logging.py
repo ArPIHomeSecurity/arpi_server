@@ -33,7 +33,6 @@ def initialize_logging():
         file_handler = logging.FileHandler(os.environ["OUTPUT_PATH"])
         file_handler.setFormatter(formatter)
 
-
     for name, level in LOGGING_MODULES:
         logger = logging.getLogger(name)
         logger.__class__ = ArgusLogger

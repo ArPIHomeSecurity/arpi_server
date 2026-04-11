@@ -1,4 +1,3 @@
-
 class Broadcaster(object):
     """Send message to registered queues."""
 

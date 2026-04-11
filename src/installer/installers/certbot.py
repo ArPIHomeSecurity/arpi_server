@@ -7,11 +7,7 @@ from installer.installers.base import BaseInstaller, InstallerConfig
 class CertbotInstaller(BaseInstaller):
     """Installer for SSL certificate management"""
 
-    FOLDERS = [
-        "/var/lib/letsencrypt",
-        "/var/log/letsencrypt",
-        "/etc/letsencrypt"
-    ]
+    FOLDERS = ["/var/lib/letsencrypt", "/var/log/letsencrypt", "/etc/letsencrypt"]
 
     def __init__(self, config: InstallerConfig):
         super().__init__(config)
@@ -20,7 +16,7 @@ class CertbotInstaller(BaseInstaller):
     def should_use_snap_certbot(self) -> bool:
         """Determine if snap should be used for certbot installation"""
         return SystemHelper.get_architecture() == "x86_64"
-    
+
     def create_folders(self):
         """
         Create necessary folders for Certbot
@@ -34,8 +30,11 @@ class CertbotInstaller(BaseInstaller):
 
     def check_folders_exist(self) -> bool:
         """Check if necessary Certbot folders exist"""
-        return all(SystemHelper.run_command(f"test -d {folder}", check=False).returncode == 0 for folder in self.FOLDERS)
-    
+        return all(
+            SystemHelper.run_command(f"test -d {folder}", check=False).returncode == 0
+            for folder in self.FOLDERS
+        )
+
     def install_certbot(self):
         """Install Certbot for SSL certificate management"""
 
@@ -75,5 +74,5 @@ class CertbotInstaller(BaseInstaller):
         """Get Certbot status"""
         return {
             "Certbot installed": self.is_installed(),
-            "Certbot folders exist": self.check_folders_exist()
+            "Certbot folders exist": self.check_folders_exist(),
         }

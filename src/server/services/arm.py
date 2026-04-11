@@ -89,12 +89,7 @@ class ArmService(BaseService):
         """
         filters = self._build_filters(has_alert, user_id, keypad_id, arm_type, start, end)
 
-        return (
-            self._db_session.query(Disarm)
-            .outerjoin(Arm, full=True)
-            .filter(*filters)
-            .count()
-        )
+        return self._db_session.query(Disarm).outerjoin(Arm, full=True).filter(*filters).count()
 
     def _build_filters(
         self,
@@ -130,14 +125,10 @@ class ArmService(BaseService):
 
         if start is not None:
             start_dt = datetime.strptime(start, "%Y-%m-%d")
-            filters.append(
-                or_(Arm.time >= start_dt, Disarm.time >= start_dt)
-            )
+            filters.append(or_(Arm.time >= start_dt, Disarm.time >= start_dt))
 
         if end is not None:
             end_dt = datetime.strptime(end, "%Y-%m-%d") + timedelta(days=1)
-            filters.append(
-                or_(Arm.time <= end_dt, Disarm.time <= end_dt)
-            )
+            filters.append(or_(Arm.time <= end_dt, Disarm.time <= end_dt))
 
         return filters

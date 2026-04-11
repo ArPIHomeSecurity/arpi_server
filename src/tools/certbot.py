@@ -157,7 +157,7 @@ class Certbot:
         if not dyndns_config:
             self._logger.info("Missing dynamic dns configuration")
             return
-        
+
         self._logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
         remote_conf = os.path.expanduser("~/.local/etc/arpi-server/remote.conf")
         if os.path.isfile(remote_conf):
@@ -165,7 +165,9 @@ class Certbot:
                 lines = file.readlines()
                 for i, line in enumerate(lines):
                     if "server_name" in line and "# managed by Certbot" in line:
-                        lines[i] = f"    server_name {dyndns_config.hostname}; # managed by Certbot\n"
+                        lines[i] = (
+                            f"    server_name {dyndns_config.hostname}; # managed by Certbot\n"
+                        )
                         break
 
             with open(remote_conf, "w", encoding="utf-8") as file:

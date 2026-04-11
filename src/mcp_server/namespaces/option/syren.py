@@ -87,4 +87,3 @@ def test_syren(duration: int = 5) -> str:
         return "Success"
     except TestingNotAllowed:
         raise ToolError("Testing is not allowed currently.")
-

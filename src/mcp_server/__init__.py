@@ -76,7 +76,9 @@ def generate_system_prompt():
 
     Add dynamic data from the database and source code.
     """
-    system_prompt = files('mcp_server').joinpath('prompts/general_system.txt').read_text(encoding='utf-8')
+    system_prompt = (
+        files("mcp_server").joinpath("prompts/general_system.txt").read_text(encoding="utf-8")
+    )
 
     # get sensor types from the database
     db_session = get_database_session()

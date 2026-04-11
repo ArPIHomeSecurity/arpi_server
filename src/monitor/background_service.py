@@ -23,6 +23,7 @@ class BackgroundService(Thread):
     The main background service of the application which monitors the health of the threads
     and restarts them if necessary.
     """
+
     def __init__(self, stop_event: Event):
         super().__init__(name="HealthCheck")
         self._threads: list = None

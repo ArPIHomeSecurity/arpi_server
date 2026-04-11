@@ -12,8 +12,6 @@ from server.tools import evaluate_ipc_response
 area_mcp = FastMCP("ArPI - area service")
 
 
-
-
 @area_mcp.resource(
     uri="areas://list",
     name="all",

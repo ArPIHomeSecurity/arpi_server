@@ -52,11 +52,13 @@ def get_arms_count():
     elif request.args.get("has_alert") == "false":
         has_alert = False
 
-    return jsonify(arm_service.get_arms_count(
-        has_alert=has_alert,
-        user_id=request.args.get("user_id", type=int),
-        keypad_id=request.args.get("keypad_id", type=int),
-        arm_type=request.args.get("arm_type"),
-        start=request.args.get("start"),
-        end=request.args.get("end"),
-    ))
+    return jsonify(
+        arm_service.get_arms_count(
+            has_alert=has_alert,
+            user_id=request.args.get("user_id", type=int),
+            keypad_id=request.args.get("keypad_id", type=int),
+            arm_type=request.args.get("arm_type"),
+            start=request.args.get("start"),
+            end=request.args.get("end"),
+        )
+    )

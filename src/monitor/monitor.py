@@ -251,7 +251,9 @@ class Monitor(Thread):
         """
         Arm the monitoring system to the given state (away, stay).
         """
-        self._logger.info("Arming to %s %s", arm_type, "with delay" if use_delay else "without delay")
+        self._logger.info(
+            "Arming to %s %s", arm_type, "with delay" if use_delay else "without delay"
+        )
 
         arm_changed = False
         if area_id is None:
@@ -396,17 +398,11 @@ class Monitor(Thread):
             States.set(State.POWER, POWER_SOURCE_NETWORK)
             self._logger.trace("System works from network")
 
-        if (
-            new_power_source == SOURCE_BATTERY
-            and self._power_source == SOURCE_NETWORK
-        ):
+        if new_power_source == SOURCE_BATTERY and self._power_source == SOURCE_NETWORK:
             send_power_state(POWER_SOURCE_BATTERY)
             Notifier.notify_power_outage_started(dt.now())
             self._logger.info("Power outage started!")
-        elif (
-            new_power_source == SOURCE_NETWORK
-            and self._power_source == SOURCE_BATTERY
-        ):
+        elif new_power_source == SOURCE_NETWORK and self._power_source == SOURCE_BATTERY:
             send_power_state(POWER_SOURCE_NETWORK)
             Notifier.notify_power_outage_stopped(dt.now())
             self._logger.info("Power outage ended!")
@@ -418,10 +414,7 @@ class Monitor(Thread):
         Cleanup invalid values in the database.
         """
         # close the alert if the system is not alerting
-        alert_states = [
-            MONITORING_ALERT,
-            MONITORING_ALERT_DELAY
-        ]
+        alert_states = [MONITORING_ALERT, MONITORING_ALERT_DELAY]
         alert = self._db_session.query(Alert).filter_by(end_time=None).first()
         if alert and States.get(State.MONITORING) not in alert_states:
             alert.end_time = dt.now()

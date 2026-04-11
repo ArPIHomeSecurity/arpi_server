@@ -1,4 +1,3 @@
-
 import logging
 
 from utils.constants import LOG_ADSENSOR

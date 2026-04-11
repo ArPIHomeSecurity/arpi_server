@@ -11,7 +11,13 @@ from time import sleep, time
 from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
 from monitor.broadcast import Broadcaster
 from monitor.config.models import GSMConfig, SMTPConfig, SubscriptionsConfig
-from utils.constants import LOG_NOTIFIER, MONITOR_DISARM, MONITOR_STOP, MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER
+from utils.constants import (
+    LOG_NOTIFIER,
+    MONITOR_DISARM,
+    MONITOR_STOP,
+    MONITOR_UPDATE_CONFIG,
+    THREAD_NOTIFIER,
+)
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
 from monitor.notifications.notification import Notification, NotificationType
@@ -43,7 +49,7 @@ class Notifier(Thread):
                 type=NotificationType.ALERT_STARTED,
                 id=alert_id,
                 sensors=sensors,
-                time=start_time.strftime(Notifier.DATETIME_FORMAT)
+                time=start_time.strftime(Notifier.DATETIME_FORMAT),
             )
         )
 
@@ -55,7 +61,7 @@ class Notifier(Thread):
                 type=NotificationType.ALERT_STOPPED,
                 id=alert_id,
                 sensors=None,
-                time=stop_time.strftime(Notifier.DATETIME_FORMAT)
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT),
             )
         )
 
@@ -67,7 +73,7 @@ class Notifier(Thread):
                 type=NotificationType.POWER_OUTAGE_STARTED,
                 id=None,
                 sensors=None,
-                time=start_time.strftime(Notifier.DATETIME_FORMAT)
+                time=start_time.strftime(Notifier.DATETIME_FORMAT),
             )
         )
 
@@ -79,8 +85,9 @@ class Notifier(Thread):
                 type=NotificationType.POWER_OUTAGE_STOPPED,
                 id=None,
                 sensors=None,
-                time=stop_time.strftime(Notifier.DATETIME_FORMAT))
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT),
             )
+        )
 
     @staticmethod
     def send_test_email():
@@ -90,7 +97,7 @@ class Notifier(Thread):
             hostname=smtp_config.smtp_hostname,
             port=smtp_config.smtp_port,
             username=smtp_config.smtp_username,
-            password=smtp_config.smtp_password
+            password=smtp_config.smtp_password,
         )
 
         messages = {}
@@ -102,14 +109,14 @@ class Notifier(Thread):
             messages["email1"] = smtp.send_email(
                 to_address=smtp_config.email_address_1,
                 subject="ArPI Test Email",
-                content="This is a test email from the ArPI Home Security system!"
+                content="This is a test email from the ArPI Home Security system!",
             )
 
         if smtp_config.email_address_2:
             messages["email2"] = smtp.send_email(
                 to_address=smtp_config.email_address_2,
                 subject="ArPI Test Email",
-                content="This is a test email from the ArPI Home Security system!"
+                content="This is a test email from the ArPI Home Security system!",
             )
 
         smtp.destroy()
@@ -122,7 +129,7 @@ class Notifier(Thread):
         gsm = GSM(
             pin_code=gsm_config.pin_code,
             port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"]
+            baud=os.environ["GSM_PORT_BAUD"],
         )
 
         messages = {}
@@ -146,7 +153,7 @@ class Notifier(Thread):
         gsm = GSM(
             pin_code=gsm_config.pin_code,
             port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"]
+            baud=os.environ["GSM_PORT_BAUD"],
         )
 
         if not gsm.setup():
@@ -154,12 +161,14 @@ class Notifier(Thread):
 
         messages = []
         for sms in gsm.get_sms_messages() or []:
-            messages.append({
-                "idx": sms.index,
-                "number": sms.number,
-                "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "text": sms.text
-            })
+            messages.append(
+                {
+                    "idx": sms.index,
+                    "number": sms.number,
+                    "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "text": sms.text,
+                }
+            )
 
         gsm.destroy()
         return True, messages
@@ -171,7 +180,7 @@ class Notifier(Thread):
         gsm = GSM(
             pin_code=gsm_config.pin_code,
             port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"]
+            baud=os.environ["GSM_PORT_BAUD"],
         )
 
         if not gsm.setup():
@@ -189,7 +198,7 @@ class Notifier(Thread):
         gsm = GSM(
             pin_code=gsm_config.pin_code,
             port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"]
+            baud=os.environ["GSM_PORT_BAUD"],
         )
 
         messages = {}
@@ -257,7 +266,7 @@ class Notifier(Thread):
             self._gsm = GSM(
                 pin_code=self._gsm_config.pin_code,
                 port=os.environ["GSM_PORT"],
-                baud=os.environ["GSM_PORT_BAUD"]
+                baud=os.environ["GSM_PORT_BAUD"],
             )
         else:
             self._logger.debug("GSM disabled")
@@ -317,10 +326,7 @@ class Notifier(Thread):
         user = get_user_with_access_code(db_session, feedback)
         if user:
             self._logger.info("Disarming based on dmtf code of user %s", user.name)
-            self._broadcaster.send_message(message={
-                "action": MONITOR_DISARM,
-                "user_id": user.id
-            })
+            self._broadcaster.send_message(message={"action": MONITOR_DISARM, "user_id": user.id})
             db_session.close()
             return True
         else:
@@ -329,10 +335,7 @@ class Notifier(Thread):
         user = get_user_with_access_code(db_session, feedback)
         if user:
             self._logger.info("Disarming based on dmtf code of user %s", user.name)
-            self._broadcaster.send_message(message={
-                "action": MONITOR_DISARM,
-                "user_id": user.id
-            })
+            self._broadcaster.send_message(message={"action": MONITOR_DISARM, "user_id": user.id})
             db_session.close()
             return True
         else:
@@ -340,7 +343,6 @@ class Notifier(Thread):
 
         db_session.close()
         return False
-
 
     def execute_notification(self, notification: Notification):
         self._logger.info("Sending message: %s", notification)
@@ -353,7 +355,7 @@ class Notifier(Thread):
             Notifier.send_SMS_1,
             Notifier.send_SMS_2,
             Notifier.call_1,
-            Notifier.call_2
+            Notifier.call_2,
         ]
         for action in alert_chain:
             try:
@@ -370,7 +372,7 @@ class Notifier(Thread):
                 notification.email1_sent = self._smtp.send_email(
                     to_address=self._smtp_config.email_address_1,
                     subject=notification.get_email_subject(),
-                    content=template.format(**asdict(notification))
+                    content=template.format(**asdict(notification)),
                 )
         else:
             notification.email1_sent = None
@@ -382,7 +384,7 @@ class Notifier(Thread):
                 notification.email2_sent = self._smtp.send_email(
                     to_address=self._smtp_config.email_address_2,
                     subject=notification.get_email_subject(),
-                    content=template.format(**asdict(notification))
+                    content=template.format(**asdict(notification)),
                 )
         else:
             notification.email2_sent = None
@@ -392,8 +394,7 @@ class Notifier(Thread):
             if notification.sms_sent1 is False:
                 template = notification.get_sms_template()
                 notification.sms_sent1 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_1,
-                    template.format(**asdict(notification))
+                    self._gsm_config.phone_number_1, template.format(**asdict(notification))
                 )
         else:
             notification.sms_sent1 = None
@@ -403,8 +404,7 @@ class Notifier(Thread):
             if notification.sms_sent2 is False:
                 template = notification.get_sms_template()
                 notification.sms_sent2 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_2,
-                    template.format(**asdict(notification))
+                    self._gsm_config.phone_number_2, template.format(**asdict(notification))
                 )
         else:
             notification.sms_sent2 = None

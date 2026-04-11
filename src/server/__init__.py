@@ -59,7 +59,7 @@ app.register_blueprint(power_blueprint)
 app.register_blueprint(sensor_blueprint)
 app.register_blueprint(user_blueprint)
 app.register_blueprint(zone_blueprint)
-    
+
 
 @app.errorhandler(AssertionError)
 def handle_validation_errors(error):
@@ -74,4 +74,4 @@ def invalid_route(e):
 @app.errorhandler(Exception)
 def all_exception_handler(error):
     app.logger.exception(error)
-    return (str(error), 500) if app.debug else ('Error: internal error', 500)
+    return (str(error), 500) if app.debug else ("Error: internal error", 500)

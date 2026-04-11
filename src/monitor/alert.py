@@ -120,12 +120,10 @@ class SensorAlert(Thread):
         # send notification only on the first sensor alert
         if new_alert:
             sensor_descriptions = [
-                f"{item.sensor.description}(id:{item.sensor.id}/CH{(item.sensor.channel+1):02d})"
+                f"{item.sensor.description}(id:{item.sensor.id}/CH{(item.sensor.channel + 1):02d})"
                 for item in alert.sensors
             ]
-            Notifier.notify_alert_started(
-                alert.id, sensor_descriptions, alert.start_time
-            )
+            Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
 
         session.close()
 
@@ -156,9 +154,7 @@ class SensorAlert(Thread):
         If the sensor is already added to the alert, it will not be added again.
         """
         sensor = session.query(Sensor).get(self._sensor_id)
-        already_added = any(
-            alert_sensor.sensor.id == sensor.id for alert_sensor in alert.sensors
-        )
+        already_added = any(alert_sensor.sensor.id == sensor.id for alert_sensor in alert.sensors)
 
         # we can't add a sensor twice to the same alert, check database AlertSensor schema
         if already_added:

@@ -124,27 +124,31 @@ class MqttInstaller(BaseInstaller):
             if argus_password:
                 click.echo("   ✓ MQTT password exists")
             else:
-                argus_password = self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
+                argus_password = self.secrets_manager.generate_secret("ARGUS_MQTT_PASSWORD")
                 click.echo("   ✓ MQTT password created")
 
             argus_reader_password = self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD")
             if argus_reader_password:
                 click.echo("   ✓ Reader MQTT password already exists")
             else:
-                argus_reader_password = self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
+                argus_reader_password = self.secrets_manager.generate_secret(
+                    "ARGUS_READER_MQTT_PASSWORD"
+                )
                 click.echo("   ✓ Reader MQTT password created")
-            
+
             # configure password for argus user
             create_flag = "-c" if not os.path.exists("/etc/mosquitto/.passwd") else ""
             SystemHelper.run_command(
-                f"mosquitto_passwd -b {create_flag} /etc/mosquitto/.passwd argus \"{argus_password}\""
+                f'mosquitto_passwd -b {create_flag} /etc/mosquitto/.passwd argus "{argus_password}"'
             )
             # configure password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader \"{argus_reader_password}\""
+                f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader "{argus_reader_password}"'
             )
             SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
-            click.echo(f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}")
+            click.echo(
+                f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}"
+            )
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
             self.warnings.append(f"MQTT authentication setup failed: {e}")

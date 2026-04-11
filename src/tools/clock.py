@@ -97,8 +97,18 @@ class Clock:
                 "/usr/share/zoneinfo/" + settings["timezone"]
             ):
                 run(["sudo", "rm", "-f", "/etc/localtime"])
-                run(["sudo", "ln", "-s", "/usr/share/zoneinfo/" + settings["timezone"], "/etc/localtime"])
-                run(["sudo", "bash", "-c", "echo '{}' > /etc/timezone".format(settings["timezone"])])
+                run(
+                    [
+                        "sudo",
+                        "ln",
+                        "-s",
+                        "/usr/share/zoneinfo/" + settings["timezone"],
+                        "/etc/localtime",
+                    ]
+                )
+                run(
+                    ["sudo", "bash", "-c", "echo '{}' > /etc/timezone".format(settings["timezone"])]
+                )
             if "datetime" in settings and settings["datetime"]:
                 run(["sudo", "date", "--set={}".format(settings["datetime"])])
         except (PermissionError, CalledProcessError) as e:

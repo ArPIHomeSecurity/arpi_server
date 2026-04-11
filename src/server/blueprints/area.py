@@ -5,8 +5,7 @@ from server.database import db
 from server.decorators import authenticated, registered, restrict_host
 from server.ipc import IPCClient
 from server.services.area import AreaService
-from server.services.base import (ConfigChangesNotAllowed, ObjectNotChanged,
-                                  ObjectNotFound)
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.tools import process_ipc_response
 from utils.constants import ROLE_USER
 from utils.models import Area
@@ -22,9 +21,8 @@ def get_areas():
     Retrieve all existing areas.
     """
     area_service = AreaService(db.session)
-    return jsonify(
-        [area.serialized for area in area_service.get_areas()]
-    )
+    return jsonify([area.serialized for area in area_service.get_areas()])
+
 
 @area_blueprint.route("/api/areas/", methods=["POST"])
 @authenticated()
@@ -110,9 +108,7 @@ def reorder_areas():
     Change only the ui_order of the areas
     """
     for area_data in request.json:
-        db.session.query(Area).get(area_data["id"]).update_record(
-            ["ui_order"], area_data
-        )
+        db.session.query(Area).get(area_data["id"]).update_record(["ui_order"], area_data)
 
     db.session.commit()
 

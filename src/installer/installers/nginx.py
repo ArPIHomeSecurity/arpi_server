@@ -115,27 +115,21 @@ class NginxInstaller(BaseInstaller):
         if os.path.exists("/usr/local/nginx/conf/sites-enabled/remote.conf"):
             is_remote_enabled = True
             # remove symlink if exists
-            SystemHelper.run_command(
-                "rm -fr /usr/local/nginx/conf/sites-enabled/remote.conf"
-            )
+            SystemHelper.run_command("rm -fr /usr/local/nginx/conf/sites-enabled/remote.conf")
             click.echo("   ✓ Removed existing remote.conf from NGINX sites-enabled")
 
-        if (
-            not os.path.exists(f"{self.config_directory}/remote.conf") and
-            os.path.exists("/usr/local/nginx/conf/sites-available/remote.conf")
+        if not os.path.exists(f"{self.config_directory}/remote.conf") and os.path.exists(
+            "/usr/local/nginx/conf/sites-available/remote.conf"
         ):
             # setup dynamic remote config
             SystemHelper.run_command(
                 f"mv /usr/local/nginx/conf/sites-available/remote.conf {self.config_directory}/remote.conf"
             )
             click.echo("   ✓ Moved remote.conf to configuration directory")
-        
-        if os.path.exists("/usr/local/nginx/conf/sites-available/remote.conf"):
-            SystemHelper.run_command(
-                "rm -fr /usr/local/nginx/conf/sites-available/remote.conf"
-            )
-            click.echo("   ✓ Removed existing remote.conf from NGINX sites-available")
 
+        if os.path.exists("/usr/local/nginx/conf/sites-available/remote.conf"):
+            SystemHelper.run_command("rm -fr /usr/local/nginx/conf/sites-available/remote.conf")
+            click.echo("   ✓ Removed existing remote.conf from NGINX sites-available")
 
         SystemHelper.run_command(
             f"ln -s {self.config_directory}/remote.conf /usr/local/nginx/conf/sites-available/remote.conf"
