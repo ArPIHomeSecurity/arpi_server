@@ -1,8 +1,7 @@
-# Release Production Workflow
 # This workflow automates the release process for the production build which is
 # used in the live environment on the raspberry pi.
 # The workflow will bump the version, and create a new release with the build artifacts.
-name: Release Production
+name: Release Version
 
 on:
   push:
@@ -32,7 +31,7 @@ on:
 
 jobs:
   release:
-    name: Release Production
+    name: Release Version
     runs-on: ubuntu-latest
     permissions:
       contents: write
