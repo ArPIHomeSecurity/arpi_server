@@ -49,7 +49,7 @@ class AreaHandler:
         monitoring_state = States.get(State.MONITORING)
         self._db_session.expire_all()
         for area in (
-            self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
+            self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()  # noqa: E712
         ):
             if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
                 area.arm_state = ARM_DISARM
@@ -119,7 +119,10 @@ class AreaHandler:
         """
         self._logger.info("Arming areas to %s", arm_type)
         areas = (
-            self._db_session.query(Area).filter(Area.deleted == False).filter(Area.sensors.any())
+            self._db_session.query(Area)
+            .filter(Area.deleted == False)  # noqa: E712
+            .filter(Area.sensors.any())
+            .all()
         )
 
         arm_changed = False

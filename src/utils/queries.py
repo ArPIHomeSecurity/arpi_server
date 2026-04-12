@@ -69,7 +69,7 @@ def get_arm_state(session) -> str:
         select(func.count(distinct(Area.arm_state)))
         .select_from(Area)
         .where(Area.arm_state != ARM_DISARM)
-        .where(Area.deleted == False)
+        .where(Area.deleted == False)  # noqa: E712
     ).scalar_one()
     logger.debug("Are areas mixed state %s", count)
 
@@ -79,7 +79,7 @@ def get_arm_state(session) -> str:
 
     state = (
         session.execute(
-            select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)
+            select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)  # noqa: E712
         )
         .first()
         .arm_state

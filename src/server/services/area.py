@@ -26,7 +26,7 @@ class AreaService(BaseService):
         """
         query = self._db_session.query(Area)
 
-        return query.order_by(Area.name.asc()).filter(Area.deleted == False).all()
+        return query.order_by(Area.name.asc()).filter(Area.deleted == False).all()  # noqa: E712
 
     def get_area(self, area_id: int) -> Area:
         """
@@ -39,7 +39,7 @@ class AreaService(BaseService):
             Area object or None if not found
         """
         area = (
-            self._db_session.query(Area).filter(Area.id == area_id, Area.deleted == False).first()
+            self._db_session.query(Area).filter(Area.id == area_id, Area.deleted == False).first()  # noqa: E712
         )
         if not area:
             raise ObjectNotFound("Area not found")
