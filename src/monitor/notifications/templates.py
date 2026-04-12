@@ -2,6 +2,10 @@
 Templates for email and SMS messages
 """
 
+TEST_EMAIL = """This is a test email from the ArPI Home Security system!"""
+TEST_SMS = "ArPI Test Message"
+
+
 ALERT_STARTED_SMS = "Alert({id}) started at {time}!"
 ALERT_STARTED_EMAIL = """
 Hi,

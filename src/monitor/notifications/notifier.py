@@ -20,7 +20,13 @@ from utils.constants import (
 )
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
-from monitor.notifications.notification import Notification, NotificationType
+from monitor.notifications.notification import (
+    Notification,
+    NotificationType,
+    get_email_subject,
+    get_email_template,
+    get_sms_template,
+)
 from utils.queries import get_user_with_access_code
 
 
@@ -108,15 +114,15 @@ class Notifier(Thread):
         if smtp_config.email_address_1:
             messages["email1"] = smtp.send_email(
                 to_address=smtp_config.email_address_1,
-                subject="ArPI Test Email",
-                content="This is a test email from the ArPI Home Security system!",
+                subject=get_email_subject(NotificationType.TEST_NOTIFICATION),
+                content=get_email_template(NotificationType.TEST_NOTIFICATION),
             )
 
         if smtp_config.email_address_2:
             messages["email2"] = smtp.send_email(
                 to_address=smtp_config.email_address_2,
-                subject="ArPI Test Email",
-                content="This is a test email from the ArPI Home Security system!",
+                subject=get_email_subject(NotificationType.TEST_NOTIFICATION),
+                content=get_email_template(NotificationType.TEST_NOTIFICATION),
             )
 
         smtp.destroy()
@@ -138,10 +144,14 @@ class Notifier(Thread):
             return False, messages
 
         if gsm_config.phone_number_1:
-            messages["phone1"] = gsm.send_SMS(gsm_config.phone_number_1, "ArPI Test Message")
+            messages["phone1"] = gsm.send_SMS(
+                gsm_config.phone_number_1, get_sms_template(NotificationType.TEST_NOTIFICATION)
+            )
 
         if gsm_config.phone_number_2:
-            messages["phone2"] = gsm.send_SMS(gsm_config.phone_number_2, "ArPI Test Message")
+            messages["phone2"] = gsm.send_SMS(
+                gsm_config.phone_number_2, get_sms_template(NotificationType.TEST_NOTIFICATION)
+            )
 
         gsm.destroy()
         return True, messages
