@@ -77,9 +77,15 @@ jobs:
 
       - name: Install dependencies 📦
         run: |
-          sudo apt update && sudo apt install -y jq
-          pip install pipenv
-          pipenv install --categories=dev-packages,simulator
+          curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash
+          sudo apt update && sudo apt install -y jq task
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          task create-environment
+
+      - name: Lint code 🧹
+        run: |
+          task format-check
+          task lint
 
       - name: Bump version 🏷️
         run: |
