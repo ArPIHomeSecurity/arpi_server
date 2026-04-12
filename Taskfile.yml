@@ -9,7 +9,7 @@ tasks:
   create-environment:
     desc: Create a python virtual environment with uv
     cmds:
-      - uv sync --extra=dev --extra=simulator
+      - uv sync --group=dev --extra=simulator
 
   format:
     desc: Format python code using ruff

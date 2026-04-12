@@ -345,7 +345,7 @@ def main():
     print("🔧 Starting ArPI upgrade process...")
 
     # ensure required packages are installed
-    install_packages(["pipenv", "python3-click"])
+    install_packages(["python3-click"])
 
     server_upgraded = check_and_upgrade(
         GITHUB_API_SERVER,

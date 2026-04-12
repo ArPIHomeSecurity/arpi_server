@@ -116,11 +116,6 @@ jobs:
         run: |
             git tag "$(echo '${{ steps.get_version.outputs.simple_version }}')" -m "Release version $(echo '${{ steps.get_version.outputs.version }}')"
 
-      # no testing for now
-      # - name: Run tests 🧪
-      #   run: |
-      #     # pipenv run pytest
-      
       - name: Build and package server 🏗️
         run: |
           scripts/create_bootstrap_package.sh

@@ -144,7 +144,6 @@ export PATH="$HOME/.local/bin:$PATH"
             "gir1.2-gtk-3.0",
             "fail2ban",
             "python3-pip",
-            "pipenv",
         ]
 
         if PackageHelper.install_packages(tools_packages, "common development tools"):
