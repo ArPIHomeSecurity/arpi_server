@@ -1,6 +1,7 @@
 from .alert_sensitivity import AlertSensitivityService
 from .dyndns import DyndnsService
 from .gsm import GSMService
+from .location import LocationConfigService
 from .mqtt import MQTTService
 from .smtp import SMTPService
 from .ssh import SSHService
@@ -15,5 +16,6 @@ __all__ = [
     "SMTPService",
     "SSHService",
     "SubscriptionsService",
+    "LocationConfigService",
     "SyrenService",
 ]

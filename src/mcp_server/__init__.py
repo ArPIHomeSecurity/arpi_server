@@ -13,6 +13,7 @@ from mcp_server.namespaces.option import (
     alert_sensitivity_option_mcp,
     dyndns_option_mcp,
     gsm_option_mcp,
+    location_option_mcp,
     mqtt_option_mcp,
     smtp_option_mcp,
     ssh_option_mcp,
@@ -68,6 +69,7 @@ def mount_servers():
     main_mcp.mount(subscriptions_option_mcp, namespace="option_subscriptions")
     main_mcp.mount(ssh_option_mcp, namespace="option_ssh")
     main_mcp.mount(dyndns_option_mcp, namespace="option_dyndns")
+    main_mcp.mount(location_option_mcp, namespace="option_location")
 
 
 def generate_system_prompt():

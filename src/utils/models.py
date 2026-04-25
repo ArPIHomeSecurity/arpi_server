@@ -19,6 +19,7 @@ from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey
 from stringcase import camelcase, snakecase
 
+from monitor.config.registry import get_registered_config_names, get_registered_config_sections
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -969,28 +970,9 @@ class Option(BaseModel):
             f"Incorrect '{key}' field length ({len(value)})"
         )
         if key == "name":
-            assert value in (
-                "notifications",
-                "network",
-                "mqtt",
-                "syren",
-                "alert",
-            ), f"Unknown option ({value})"
+            assert value in get_registered_config_names(), f"Unknown option ({value})"
         elif key == "section":
-            assert value in (
-                "smtp",
-                "gsm",
-                "subscriptions",
-                "dyndns",
-                "access",
-                "timing",
-                "sensitivity",
-                # MQTT
-                "connection",
-                "internal_publish",
-                "internal_read",
-                "external_publish",
-            ), f"Unknown section ({value})"
+            assert value in get_registered_config_sections(), f"Unknown section ({value})"
         return value
 
 

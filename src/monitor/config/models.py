@@ -62,6 +62,29 @@ class SubscriptionsConfig(BaseConfig):
 
 
 @dataclass
+class LocationConfig(BaseConfig):
+    """
+    Configuration for the location information, the source of the notifications.
+    """
+
+    OPTION_NAME = "system"
+    SECTION_NAME = "location"
+
+    name: str = None
+    latitude: float = None
+    longitude: float = None
+    country: str = None
+    city: str = None
+    state: str = None
+    zip_code: str = None
+    address: str = None
+    description: str = None
+    contact_name: str = None
+    contact_phone: str = None
+    contact_email: str = None
+
+
+@dataclass
 class SMTPConfig(BaseConfig):
     OPTION_NAME = "notifications"
     SECTION_NAME = "smtp"

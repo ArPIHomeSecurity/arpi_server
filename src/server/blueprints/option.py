@@ -16,6 +16,7 @@ from monitor.config.models import (
     MQTTConnection,
     SMTPConfig,
     SSHConfig,
+    LocationConfig,
     SubscriptionsConfig,
     SyrenConfig,
 )
@@ -30,6 +31,7 @@ from server.services.option import (
     MQTTService,
     SMTPService,
     SSHService,
+    LocationConfigService,
     SubscriptionsService,
     SyrenService,
 )
@@ -82,6 +84,8 @@ def option_get(option_name, section) -> Response:
         value = asdict(MQTTService(db.session).get_internal_read_config())
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         value = asdict(DyndnsService(db.session).get_dyndns_config())
+    elif option_name == LocationConfig.OPTION_NAME and section == LocationConfig.SECTION_NAME:
+        value = asdict(LocationConfigService(db.session).get_location_config())
 
     if value is not None:
         return jsonify(
@@ -148,6 +152,10 @@ def option_put(option_name, section) -> Response:
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         dyndns_service = DyndnsService(db.session)
         dyndns_service.set_dyndns_config(DyndnsConfig(**request.json))
+        return ""
+    elif option_name == LocationConfig.OPTION_NAME and section == LocationConfig.SECTION_NAME:
+        location_service = LocationConfigService(db.session)
+        location_service.set_location_config(LocationConfig(**request.json))
         return ""
 
     # handle other options
@@ -279,3 +287,13 @@ def get_installation_id():
     """
     secret = os.environ["SECRET"]
     return hashlib.sha256(f"{secret}".encode()).hexdigest()
+
+
+@config_blueprint.route("/api/config/location_name", methods=["GET"])
+def get_location_name():
+    """
+    Public endpoint to get the location name.
+    This is used by the locations to display the location name in the UI.
+    """
+    location_config = LocationConfigService(db.session).get_location_config()
+    return jsonify(location_config.name if location_config else "")

@@ -5,6 +5,7 @@ This module defines the base class for all configuration dataclasses used in the
 from dataclasses import asdict
 
 from monitor.config.helper import load_config, save_config
+from monitor.config.registry import register_config_option
 
 
 class BaseConfig:
@@ -15,6 +16,9 @@ class BaseConfig:
 
     OPTION_NAME = None
     SECTION_NAME = None
+
+    def __post_init__(self):
+        register_config_option(self.__class__)
 
     @classmethod
     def load_config(cls, cleanup=False, session=None):
