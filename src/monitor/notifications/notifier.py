@@ -2,7 +2,6 @@ import contextlib
 import logging
 import os
 
-from dataclasses import asdict
 from datetime import datetime
 from queue import Empty, Queue
 from threading import Thread

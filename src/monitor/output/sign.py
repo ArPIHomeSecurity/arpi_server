@@ -3,7 +3,6 @@ Output sign
 """
 
 import logging
-from queue import Queue
 from threading import Thread
 from time import sleep, time
 
@@ -25,7 +24,6 @@ class OutputSign(Thread):
         self._stop_event = stop_event
         self._output = output
         self._output_adapter = get_output_adapter()
-        self._actions = Queue()
         self._logger = logging.getLogger(LOG_OUTPUT)
 
         # set as daemon to avoid blocking the application
