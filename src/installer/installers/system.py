@@ -45,6 +45,7 @@ class SystemInstaller(BaseInstaller):
             "net-tools",
             "telnet",
             "dnsutils",
+            "libffi-dev",
         ]
 
         PackageHelper.install_packages(essential_packages, "essential packages")
