@@ -71,6 +71,7 @@ class LocationConfig(BaseConfig):
     SECTION_NAME = "location"
 
     name: str = None
+    description: str = None
     latitude: float = None
     longitude: float = None
     country: str = None
@@ -78,7 +79,6 @@ class LocationConfig(BaseConfig):
     state: str = None
     zip_code: str = None
     address: str = None
-    description: str = None
     contact_name: str = None
     contact_phone: str = None
     contact_email: str = None

@@ -10,7 +10,7 @@ from time import sleep, time
 
 from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
 from monitor.broadcast import Broadcaster
-from monitor.config.models import GSMConfig, SMTPConfig, SubscriptionsConfig
+from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
 from utils.constants import (
     LOG_NOTIFIER,
     MONITOR_DISARM,
@@ -20,13 +20,7 @@ from utils.constants import (
 )
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
-from monitor.notifications.notification import (
-    Notification,
-    NotificationType,
-    get_email_subject,
-    get_email_template,
-    get_sms_template,
-)
+from monitor.notifications.notification import Notification, NotificationType
 from utils.queries import get_user_with_access_code
 
 
@@ -111,18 +105,25 @@ class Notifier(Thread):
             messages["connection"] = False
             return False, messages
 
+        location = LocationConfig.load_config().name
+        notification = Notification(
+            type=NotificationType.TEST_NOTIFICATION,
+            id=None,
+            location=location,
+            time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
+        )
         if smtp_config.email_address_1:
             messages["email1"] = smtp.send_email(
                 to_address=smtp_config.email_address_1,
-                subject=get_email_subject(NotificationType.TEST_NOTIFICATION),
-                content=get_email_template(NotificationType.TEST_NOTIFICATION),
+                subject=notification.get_email_subject(),
+                content=notification.get_email_content(),
             )
 
         if smtp_config.email_address_2:
             messages["email2"] = smtp.send_email(
                 to_address=smtp_config.email_address_2,
-                subject=get_email_subject(NotificationType.TEST_NOTIFICATION),
-                content=get_email_template(NotificationType.TEST_NOTIFICATION),
+                subject=notification.get_email_subject(),
+                content=notification.get_email_content(),
             )
 
         smtp.destroy()
@@ -143,14 +144,20 @@ class Notifier(Thread):
             messages["connection"] = False
             return False, messages
 
+        notification = Notification(
+            type=NotificationType.TEST_NOTIFICATION,
+            id=None,
+            sensors=None,
+            time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
+        )
         if gsm_config.phone_number_1:
             messages["phone1"] = gsm.send_SMS(
-                gsm_config.phone_number_1, get_sms_template(NotificationType.TEST_NOTIFICATION)
+                gsm_config.phone_number_1, notification.get_sms_content()
             )
 
         if gsm_config.phone_number_2:
             messages["phone2"] = gsm.send_SMS(
-                gsm_config.phone_number_2, get_sms_template(NotificationType.TEST_NOTIFICATION)
+                gsm_config.phone_number_2, notification.get_sms_content()
             )
 
         gsm.destroy()
@@ -378,11 +385,10 @@ class Notifier(Thread):
     def send_email_1(self, notification: Notification):
         if self._smtp and getattr(self._subscriptions.email1, notification.type, False):
             if notification.email1_sent is False:
-                template = notification.get_email_template()
                 notification.email1_sent = self._smtp.send_email(
                     to_address=self._smtp_config.email_address_1,
                     subject=notification.get_email_subject(),
-                    content=template.format(**asdict(notification)),
+                    content=notification.get_email_content(),
                 )
         else:
             notification.email1_sent = None
@@ -390,11 +396,10 @@ class Notifier(Thread):
     def send_email_2(self, notification: Notification):
         if self._smtp and getattr(self._subscriptions.email2, notification.type, False):
             if notification.email2_sent is False:
-                template = notification.get_email_template()
                 notification.email2_sent = self._smtp.send_email(
                     to_address=self._smtp_config.email_address_2,
                     subject=notification.get_email_subject(),
-                    content=template.format(**asdict(notification)),
+                    content=notification.get_email_content(),
                 )
         else:
             notification.email2_sent = None
@@ -402,9 +407,8 @@ class Notifier(Thread):
     def send_SMS_1(self, notification: Notification):
         if self._gsm and getattr(self._subscriptions.sms1, notification.type, False):
             if notification.sms_sent1 is False:
-                template = notification.get_sms_template()
                 notification.sms_sent1 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_1, template.format(**asdict(notification))
+                    self._gsm_config.phone_number_1, notification.get_sms_content()
                 )
         else:
             notification.sms_sent1 = None
@@ -412,9 +416,8 @@ class Notifier(Thread):
     def send_SMS_2(self, notification: Notification):
         if self._gsm and getattr(self._subscriptions.sms2, notification.type, False):
             if notification.sms_sent2 is False:
-                template = notification.get_sms_template()
                 notification.sms_sent2 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_2, template.format(**asdict(notification))
+                    self._gsm_config.phone_number_2, notification.get_sms_content()
                 )
         else:
             notification.sms_sent2 = None
