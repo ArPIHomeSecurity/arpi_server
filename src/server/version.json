@@ -1,9 +1,9 @@
 {
-  "version": "v2.3.0_RC02:8cbce59",
+  "version": "v2.3.0_RC03:3941ada",
   "major": 2,
   "minor": 3,
   "patch": 0,
   "prerelease": "RC",
-  "prerelease_num": "02",
-  "commit_id": "8cbce59"
+  "prerelease_num": "03",
+  "commit_id": "3941ada"
 }
