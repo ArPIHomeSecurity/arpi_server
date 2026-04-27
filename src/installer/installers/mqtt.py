@@ -62,7 +62,7 @@ class MqttInstaller(BaseInstaller):
 
     def configure_mqtt_ssl_certificates(self):
         """Configure SSL certificates for MQTT"""
-        click.echo("   🔐 Configuring MQTT SSL certificates...")
+        click.echo("   🔐 Install MQTT SSL self-signed certificates...")
 
         # Create certs directory and copy certificates
         SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
@@ -86,7 +86,7 @@ class MqttInstaller(BaseInstaller):
             "/etc/mosquitto/certs", "mosquitto:mosquitto", "700", recursive=True
         )
 
-        click.echo("   ✓ MQTT SSL certificates configured")
+        click.echo("   ✓ MQTT SSL self-signed certificates installed")
 
     def configure_mqtt(self):
         """Configure MQTT configuration files"""
@@ -102,10 +102,14 @@ class MqttInstaller(BaseInstaller):
             f"cp {ETC_DIR}/mosquitto/ssl*.conf /etc/mosquitto/configs-available/"
         )
 
-        # Create symlink for SSL configuration
-        SystemHelper.run_command(
-            "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
-        )
+        if os.path.exists("/etc/mosquitto/conf.d/ssl.conf"):
+            click.echo("   ✓ MQTT SSL configuration already exists")
+        else:
+            # Create symlink for SSL configuration
+            SystemHelper.run_command(
+                "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
+            )
+            click.echo("   ✓ MQTT SSL configuration enabled")
 
         SecurityHelper.set_permissions(
             "/etc/mosquitto/conf.d/", f"mosquitto:{self.user}", "774", recursive=True
