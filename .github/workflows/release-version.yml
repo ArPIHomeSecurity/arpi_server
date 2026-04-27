@@ -24,10 +24,6 @@ on:
         description: 'Pre-release identifier (optional, e.g., "beta", "rc1")'
         required: false
         type: string
-      release_notes:
-        description: "Release notes / What's Changed (optional)"
-        required: false
-        type: string
 
 jobs:
   release:
@@ -44,11 +40,9 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "version_type=pre-release" >> $GITHUB_OUTPUT
             echo "pre_release=RC" >> $GITHUB_OUTPUT
-            echo "release_notes=Development build" >> $GITHUB_OUTPUT
           else
             echo "version_type=${{ inputs.version_type }}" >> $GITHUB_OUTPUT
             echo "pre_release=${{ inputs.pre_release }}" >> $GITHUB_OUTPUT
-            echo "release_notes=${{ inputs.release_notes }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout repository 🛎️
@@ -126,6 +120,44 @@ jobs:
           git push origin
           git push origin --tags
 
+      - name: Setup Node.js for Copilot CLI 🤖
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Copilot CLI 🛠️
+        run: npm install -g @github/copilot
+
+      - name: Generate AI release summary ✍️
+        id: copilot_summary
+        continue-on-error: true
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="$PREV_TAG..HEAD"
+          else
+            RANGE="$(git rev-list --max-count=20 HEAD | tail -n 1)..HEAD"
+          fi
+
+          copilot -p "Summarize the key changes in git range ${RANGE}. Output markdown only with:
+          1) a short overview paragraph (max 80 words),
+          2) a bullet list of the most important changes,
+          3) a short note about version/release impact if visible.
+          Write the result to summary.md" \
+            --allow-tool='shell(git:*)' \
+            --allow-tool=write \
+            --no-ask-user
+
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "summary<<EOF"
+            cat summary.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release 📦
         uses: softprops/action-gh-release@v1
         with:
@@ -140,7 +172,7 @@ jobs:
           body: |
             ## What's Changed
 
-            ${{ steps.set_inputs.outputs.release_notes || format('This release includes the latest changes from the {0} branch.', github.ref_name) }}
+            ${{ steps.copilot_summary.outputs.summary && steps.copilot_summary.outputs.summary || format('This release includes the latest changes from the {0} branch.', github.ref_name) }}
 
             ### Build Information
             - **Version**: ${{ steps.get_version.outputs.version }}
