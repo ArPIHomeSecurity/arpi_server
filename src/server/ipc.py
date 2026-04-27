@@ -43,11 +43,15 @@ class IPCClient(object):
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
-                self._logger.info("Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"])
+                self._logger.info(
+                    "Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"]
+                )
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
                 self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):
-                self._logger.error("Failed to connect to monitor socket! %s", environ["MONITOR_INPUT_SOCKET"])
+                self._logger.error(
+                    "Failed to connect to monitor socket! %s", environ["MONITOR_INPUT_SOCKET"]
+                )
                 self._socket = None
 
     @property
@@ -56,28 +60,30 @@ class IPCClient(object):
 
     def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:
-            return self._send_message({
-                "action": MONITOR_ARM_AWAY,
-                "user_id": user_id,
-                "area_id": area_id,
-                "use_delay": False
-            })
+            return self._send_message(
+                {
+                    "action": MONITOR_ARM_AWAY,
+                    "user_id": user_id,
+                    "area_id": area_id,
+                    "use_delay": False,
+                }
+            )
         elif arm_type == ARM_STAY:
-            return self._send_message({
-                "action": MONITOR_ARM_STAY,
-                "user_id": user_id,
-                "area_id": area_id,
-                "use_delay": False
-            })
+            return self._send_message(
+                {
+                    "action": MONITOR_ARM_STAY,
+                    "user_id": user_id,
+                    "area_id": area_id,
+                    "use_delay": False,
+                }
+            )
         else:
             print(f"Unknown arm type: {arm_type}")
 
     def disarm(self, user_id, area_id=None):
-        return self._send_message({
-            "action": MONITOR_DISARM,
-            "user_id": user_id,
-            "area_id": area_id
-        })
+        return self._send_message(
+            {"action": MONITOR_DISARM, "user_id": user_id, "area_id": area_id}
+        )
 
     def get_state(self):
         return self._send_message({"action": MONITOR_GET_STATE})
@@ -105,10 +111,10 @@ class IPCClient(object):
 
     def send_test_sms(self):
         return self._send_message({"action": SEND_TEST_SMS})
-    
+
     def get_sms_messages(self):
         return self._send_message({"action": GET_SMS_MESSAGES})
-    
+
     def delete_sms_message(self, message_id):
         return self._send_message({"action": DELETE_SMS_MESSAGE, "message_id": message_id})
 
@@ -128,7 +134,7 @@ class IPCClient(object):
 
     def activate_output(self, output_id):
         return self._send_message({"action": MONITOR_ACTIVATE_OUTPUT, "output_id": output_id})
-    
+
     def deactivate_output(self, output_id):
         return self._send_message({"action": MONITOR_DEACTIVATE_OUTPUT, "output_id": output_id})
 
@@ -144,11 +150,13 @@ class IPCClient(object):
                         return json.loads(data.decode())
                     except json.JSONDecodeError:
                         if data == b"":
-                            self._logger.error("Received empty response from monitor socket! Message: %s", message)
+                            self._logger.error(
+                                "Received empty response from monitor socket! Message: %s", message
+                            )
                             return
                         self._logger.warning(
                             "Received invalid JSON (may be we need another part)! Response: %s",
-                            data
+                            data,
                         )
             except ConnectionResetError as error:
                 self._logger.error("Sending message to monitor socket failed! %s", error)

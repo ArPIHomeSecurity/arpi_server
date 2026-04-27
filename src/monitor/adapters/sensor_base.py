@@ -1,8 +1,8 @@
-
 class SensorAdapterBase:
     """
     Base class for sensor adapters.
     """
+
     def get_value(self, channel):
         """
         Get the value from the specified channel.

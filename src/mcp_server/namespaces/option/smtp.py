@@ -13,8 +13,6 @@ from server.tools import evaluate_ipc_response
 smtp_option_mcp = FastMCP("ArPI - SMTP configuration service")
 
 
-
-
 @smtp_option_mcp.tool(
     name="get_config",
     description="Get the current SMTP configuration",

@@ -38,7 +38,9 @@ class OutputAdapter:
     Class for controlling outputs with DRV8860
     """
 
-    def __init__(self, latch_pin=None, enable_pin=None, clock_pin=None, data_in_pin=None, data_out_pin=None):
+    def __init__(
+        self, latch_pin=None, enable_pin=None, clock_pin=None, data_in_pin=None, data_out_pin=None
+    ):
         self._logger = logging.getLogger(LOG_ADOUTPUT)
         self._states = [0] * int(OUTPUT_NUMBER)
 
@@ -123,13 +125,9 @@ class OutputAdapter:
         """
         Control output by channel number
         """
-        self._logger.debug(
-            "Control channel %d for %s to %r", channel, OUTPUT_NAMES[channel], state
-        )
+        self._logger.debug("Control channel %d for %s to %r", channel, OUTPUT_NAMES[channel], state)
         if channel < 0 or channel > OUTPUT_NUMBER - 1:
-            raise ValueError(
-                f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!"
-            )
+            raise ValueError(f"Channel number must be between 0 and {OUTPUT_NUMBER - 1}!")
 
         # set the state by channel
         with state_lock:

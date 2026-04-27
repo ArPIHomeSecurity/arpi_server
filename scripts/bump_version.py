@@ -63,7 +63,9 @@ def get_git_commit() -> str:
     return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode()
 
 
-def bump_version(version: dict, version_type: str, pre_release: str = None, release: bool = False) -> tuple:
+def bump_version(
+    version: dict, version_type: str, pre_release: str = None, release: bool = False
+) -> tuple:
     """Bump the version based on the given version type"""
     major = int(version["major"])
     minor = int(version["minor"])
@@ -130,7 +132,12 @@ def main():
     if sum([args.type is not None, args.pre_release is not None, args.release]) > 1:
         parser.error("Only one of --type, --pre-release, or --release can be specified")
 
-    info("Bumping version with type: %s, pre-release: %s, release: %s", args.type, args.pre_release, args.release)
+    info(
+        "Bumping version with type: %s, pre-release: %s, release: %s",
+        args.type,
+        args.pre_release,
+        args.release,
+    )
 
     raw_version = load_version()
     major, minor, patch, pre_release, commit = bump_version(

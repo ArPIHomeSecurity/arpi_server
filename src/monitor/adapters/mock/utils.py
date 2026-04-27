@@ -22,16 +22,19 @@ class WiringStrategies(str, Enum):
     """
     Wiring strategies of the input channels
     """
+
     SINGLE_WITH_EOL = "single_with_eol"
     SINGLE_WITH_2EOL = "single_with_2eol"
     DUAL = "dual"
     CUT = "cut"
     SHORTAGE = "shortage"
 
+
 class ContactTypes(str, Enum):
     """
     Contact types of the sensors
     """
+
     NC = "nc"
     NO = "no"
 
@@ -85,6 +88,7 @@ def protected_transfer(filename, default_data):
 
     return default_data
 
+
 def protected_update(filename, data, default_data, merge_function):
     """
     Update the data in a JSON file with file locking to avoid conflicts.
@@ -92,7 +96,7 @@ def protected_update(filename, data, default_data, merge_function):
     # create the file if it does not exist
     if not os.path.exists(filename):
         protected_write(filename, default_data)
-        
+
     with contextlib.suppress(FileNotFoundError, OSError):
         with open(filename, "r+", encoding="utf-8") as file_handle:
             fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -115,7 +119,10 @@ def get_input_state(input_name):
     """
     Get the state of a specific input channel.
     """
-    default_data = {f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"} for i in range(int(os.environ.get("INPUT_NUMBER", 0)))}
+    default_data = {
+        f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"}
+        for i in range(int(os.environ.get("INPUT_NUMBER", 0)))
+    }
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
     if input_name == "POWER":
@@ -138,7 +145,7 @@ def set_input_states(channel_values, channel_configs):
                 "wiring_strategy": config.get("wiring_strategy", "cut"),
                 "contact_type": config.get("contact_type", "nc"),
                 "sensor_a_active": config.get("sensor_a_active", False),
-                "sensor_b_active": config.get("sensor_b_active", False)
+                "sensor_b_active": config.get("sensor_b_active", False),
             }
         else:
             # Handle legacy format where config is just a string type
@@ -147,7 +154,7 @@ def set_input_states(channel_values, channel_configs):
                 "wiring_strategy": "cut" if config in ["cut", "shortage"] else "single_with_eol",
                 "contact_type": "nc",
                 "sensor_a_active": False,
-                "sensor_b_active": False
+                "sensor_b_active": False,
             }
     data["POWER"] = channel_values[-1]
     protected_write(INPUT_FILE, data)
@@ -167,27 +174,31 @@ def get_channel_configs():
             "wiring_strategy": WiringStrategies.SINGLE_WITH_EOL.value,
             "contact_type": ContactTypes.NC.value,
             "sensor_a_active": False,
-            "sensor_b_active": False
-        } for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
+            "sensor_b_active": False,
+        }
+        for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
     }
     default_data["POWER"] = 0
     data = protected_read(INPUT_FILE, default_data)
     configs = {}
     keys = [f"CH{str(i).zfill(2)}" for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)]
     for ch_key in keys:
-        channel_data = data.get(ch_key, {
-            "value": 0,
-            "wiring_strategy": "cut",
-            "contact_type": "nc",
-            "sensor_a_active": False,
-            "sensor_b_active": False
-        })
+        channel_data = data.get(
+            ch_key,
+            {
+                "value": 0,
+                "wiring_strategy": "cut",
+                "contact_type": "nc",
+                "sensor_a_active": False,
+                "sensor_b_active": False,
+            },
+        )
         if isinstance(channel_data, dict):
             configs[ch_key] = {
                 "wiring_strategy": channel_data.get("wiring_strategy", "cut"),
                 "contact_type": channel_data.get("contact_type", "nc"),
                 "sensor_a_active": channel_data.get("sensor_a_active", False),
-                "sensor_b_active": channel_data.get("sensor_b_active", False)
+                "sensor_b_active": channel_data.get("sensor_b_active", False),
             }
         else:
             # Handle old format - default to "cut"
@@ -195,7 +206,7 @@ def get_channel_configs():
                 "wiring_strategy": "cut",
                 "contact_type": "nc",
                 "sensor_a_active": False,
-                "sensor_b_active": False
+                "sensor_b_active": False,
             }
     return configs
 
@@ -212,9 +223,7 @@ def set_output_states(states):
     """
     Set the state of all output channels.
     """
-    data = {
-        name: state for name, state in zip(OUTPUT_NAMES.values(), states)
-    }
+    data = {name: state for name, state in zip(OUTPUT_NAMES.values(), states)}
     protected_write(OUTPUT_FILE, data)
 
 
@@ -230,15 +239,13 @@ def set_keypad_state(pending_bits, data):
     """
     Set the state of the keypad.
     """
+
     def merge_keypad_data(base, new):
         return {
             "pending_bits": base.get("pending_bits", 0) + new.get("pending_bits", 0),
-            "data": base.get("data", []) + new.get("data", [])
+            "data": base.get("data", []) + new.get("data", []),
         }
 
-    new_data = {
-        "pending_bits": pending_bits,
-        "data": data
-    }
+    new_data = {"pending_bits": pending_bits, "data": data}
 
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)

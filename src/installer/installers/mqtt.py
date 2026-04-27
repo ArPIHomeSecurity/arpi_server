@@ -1,5 +1,4 @@
 import os
-import tempfile
 import click
 
 from installer.helpers import SystemHelper, PackageHelper, ServiceHelper, SecurityHelper
@@ -63,7 +62,7 @@ class MqttInstaller(BaseInstaller):
 
     def configure_mqtt_ssl_certificates(self):
         """Configure SSL certificates for MQTT"""
-        click.echo("   🔐 Configuring MQTT SSL certificates...")
+        click.echo("   🔐 Install MQTT SSL self-signed certificates...")
 
         # Create certs directory and copy certificates
         SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
@@ -87,7 +86,7 @@ class MqttInstaller(BaseInstaller):
             "/etc/mosquitto/certs", "mosquitto:mosquitto", "700", recursive=True
         )
 
-        click.echo("   ✓ MQTT SSL certificates configured")
+        click.echo("   ✓ MQTT SSL self-signed certificates installed")
 
     def configure_mqtt(self):
         """Configure MQTT configuration files"""
@@ -103,10 +102,14 @@ class MqttInstaller(BaseInstaller):
             f"cp {ETC_DIR}/mosquitto/ssl*.conf /etc/mosquitto/configs-available/"
         )
 
-        # Create symlink for SSL configuration
-        SystemHelper.run_command(
-            "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
-        )
+        if os.path.exists("/etc/mosquitto/conf.d/ssl.conf"):
+            click.echo("   ✓ MQTT SSL configuration already exists")
+        else:
+            # Create symlink for SSL configuration
+            SystemHelper.run_command(
+                "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
+            )
+            click.echo("   ✓ MQTT SSL configuration enabled")
 
         SecurityHelper.set_permissions(
             "/etc/mosquitto/conf.d/", f"mosquitto:{self.user}", "774", recursive=True
@@ -124,27 +127,31 @@ class MqttInstaller(BaseInstaller):
             if argus_password:
                 click.echo("   ✓ MQTT password exists")
             else:
-                argus_password = self.secrets_manager.generate_secret('ARGUS_MQTT_PASSWORD')
+                argus_password = self.secrets_manager.generate_secret("ARGUS_MQTT_PASSWORD")
                 click.echo("   ✓ MQTT password created")
 
             argus_reader_password = self.secrets_manager.get_secret("ARGUS_READER_MQTT_PASSWORD")
             if argus_reader_password:
                 click.echo("   ✓ Reader MQTT password already exists")
             else:
-                argus_reader_password = self.secrets_manager.generate_secret('ARGUS_READER_MQTT_PASSWORD')
+                argus_reader_password = self.secrets_manager.generate_secret(
+                    "ARGUS_READER_MQTT_PASSWORD"
+                )
                 click.echo("   ✓ Reader MQTT password created")
-            
+
             # configure password for argus user
             create_flag = "-c" if not os.path.exists("/etc/mosquitto/.passwd") else ""
             SystemHelper.run_command(
-                f"mosquitto_passwd -b {create_flag} /etc/mosquitto/.passwd argus \"{argus_password}\""
+                f'mosquitto_passwd -b {create_flag} /etc/mosquitto/.passwd argus "{argus_password}"'
             )
             # configure password for argus_reader user
             SystemHelper.run_command(
-                f"mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader \"{argus_reader_password}\""
+                f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader "{argus_reader_password}"'
             )
             SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
-            click.echo(f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}")
+            click.echo(
+                f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}"
+            )
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
             self.warnings.append(f"MQTT authentication setup failed: {e}")

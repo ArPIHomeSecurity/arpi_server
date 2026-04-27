@@ -31,12 +31,7 @@ class AlertSensitivityService(BaseService):
         if db_config and db_config == config:
             return
 
-        save_config(
-            OPTION_NAME,
-            OPTION_SECTION,
-            asdict(config),
-            session=self._db_session
-        )
+        save_config(OPTION_NAME, OPTION_SECTION, asdict(config), session=self._db_session)
 
         IPCClient().update_configuration()
 

@@ -65,7 +65,6 @@ class SensorHandler:
         self._sensors = None
         self._mqtt_client = None
 
-
     def initialize(self):
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_sensors")
@@ -90,7 +89,9 @@ class SensorHandler:
             self._logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
             self.save_sensor_references(new_references)
         else:
-            self._logger.error("Error measure values! %s", [float(f"{x:.3f}") for x in new_references])
+            self._logger.error(
+                "Error measure values! %s", [float(f"{x:.3f}") for x in new_references]
+            )
 
     def has_uncalibrated_sensor(self):
         """
@@ -98,9 +99,7 @@ class SensorHandler:
         """
         for sensor in self._sensors:
             if sensor.reference_value is None and sensor.channel != -1:
-                self._logger.info(
-                    "Found uncalibrated sensor: %s => %s", sensor.id, sensor.name
-                )
+                self._logger.info("Found uncalibrated sensor: %s => %s", sensor.id, sensor.name)
                 return True
 
         self._logger.info("No uncalibrated sensors found")
@@ -147,9 +146,7 @@ class SensorHandler:
             if sensor.monitor_threshold is not None:
                 if sensor.monitor_period is None:
                     # instant alert
-                    self._sensors_history.set_sensitivity(
-                        idx, 1, 100
-                    )
+                    self._sensors_history.set_sensitivity(idx, 1, 100)
                 else:
                     self._sensors_history.set_sensitivity(
                         idx,
@@ -189,9 +186,7 @@ class SensorHandler:
         sensors = self._db_session.execute(select(Sensor)).scalars().all()
         for sensor in sensors:
             if not sensor.deleted:
-                self._mqtt_client.publish_sensor_config(
-                    sensor.id, sensor.type.name, sensor.name
-                )
+                self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
                 self._mqtt_client.publish_sensor_state(sensor.name, False)
             else:
                 self._mqtt_client.delete_sensor(sensor.name)
@@ -227,9 +222,7 @@ class SensorHandler:
 
         references = {}
         for channel in range(self._sensor_adapter.channel_count):
-            value_sum = sum(
-                measurements[cycle][channel] for cycle in range(MEASUREMENT_CYCLES)
-            )
+            value_sum = sum(measurements[cycle][channel] for cycle in range(MEASUREMENT_CYCLES))
             references[channel] = value_sum / MEASUREMENT_CYCLES
 
         return list(references.values())
@@ -300,7 +293,6 @@ class SensorHandler:
             send_sensors_state(found_alert)
             send_sensors_error(found_error)
 
-
     def handle_alerts(self):
         """
         Checking for alerting sensors if armed
@@ -359,15 +351,13 @@ class SensorHandler:
                 and sensor.id not in self._alerting_sensors
                 and sensor.enabled
             ):
-
                 # do not start alert if in delay
                 if (
                     current_monitoring != MONITORING_ALERT_DELAY
                     and delay is not None
                     and (
                         arm is not None
-                        and arm.time.replace(tzinfo=None) + timedelta(seconds=delay)
-                        > now
+                        and arm.time.replace(tzinfo=None) + timedelta(seconds=delay) > now
                     )
                 ):
                     self._logger.debug(
@@ -400,7 +390,9 @@ class SensorHandler:
                     )
 
                 if alert_type is None:
-                    self._logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
+                    self._logger.debug(
+                        "Do not start alert on sensor: %s (no alert type)", sensor.id
+                    )
                 if delay is None:
                     self._logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
 
@@ -457,28 +449,16 @@ class SensorHandler:
         elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT, MONITORING_SABOTAGE):
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
-            elif (
-                sensor.area.arm_state == ARM_AWAY
-                and sensor.zone.away_alert_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_AWAY and sensor.zone.away_alert_delay is not None:
                 return ALERT_AWAY
-            elif (
-                sensor.area.arm_state == ARM_STAY
-                and sensor.zone.stay_alert_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_alert_delay is not None:
                 return ALERT_STAY
         elif monitoring_state in (MONITORING_ARM_DELAY, MONITORING_ALERT_DELAY):
             if sensor.zone.disarmed_delay is not None:
                 return ALERT_SABOTAGE
-            elif (
-                sensor.area.arm_state == ARM_AWAY
-                and sensor.zone.away_arm_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_AWAY and sensor.zone.away_arm_delay is not None:
                 return ALERT_AWAY
-            elif (
-                sensor.area.arm_state == ARM_STAY
-                and sensor.zone.stay_arm_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_arm_delay is not None:
                 return ALERT_STAY
         else:
             logging.getLogger(LOG_SENSORS).error("Unknown monitoring state")
@@ -497,28 +477,16 @@ class SensorHandler:
         elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT):
             if sensor.zone.disarmed_delay is not None:
                 delay = sensor.zone.disarmed_delay
-            elif (
-                sensor.area.arm_state == ARM_AWAY
-                and sensor.zone.away_alert_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_AWAY and sensor.zone.away_alert_delay is not None:
                 delay = sensor.zone.away_alert_delay
-            elif (
-                sensor.area.arm_state == ARM_STAY
-                and sensor.zone.stay_alert_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_alert_delay is not None:
                 delay = sensor.zone.stay_alert_delay
         elif monitoring_state in (MONITORING_ARM_DELAY, MONITORING_ALERT_DELAY):
             if sensor.zone.disarmed_delay is not None:
                 delay = sensor.zone.disarmed_delay
-            elif (
-                sensor.area.arm_state == ARM_AWAY
-                and sensor.zone.away_arm_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_AWAY and sensor.zone.away_arm_delay is not None:
                 delay = sensor.zone.away_arm_delay
-            elif (
-                sensor.area.arm_state == ARM_STAY
-                and sensor.zone.stay_arm_delay is not None
-            ):
+            elif sensor.area.arm_state == ARM_STAY and sensor.zone.stay_arm_delay is not None:
                 delay = sensor.zone.stay_arm_delay
         else:
             logger.error("Unknown monitoring state: %s", monitoring_state)

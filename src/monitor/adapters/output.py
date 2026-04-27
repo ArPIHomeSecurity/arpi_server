@@ -22,6 +22,7 @@ def get_output_adapter(board_version: int = 0) -> OutputAdapterBase:
     """
     if USE_SIMULATOR:
         from monitor.adapters.mock.output import OutputAdapter as MockOutputAdapter
+
         return MockOutputAdapter()
     else:
         from monitor.adapters.output_v2 import OutputAdapter as OutputAdapterV2

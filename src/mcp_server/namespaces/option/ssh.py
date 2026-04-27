@@ -11,8 +11,6 @@ from server.tools import evaluate_ipc_response
 ssh_option_mcp = FastMCP("ArPI - SSH configuration service")
 
 
-
-
 @ssh_option_mcp.tool(
     name="get_config",
     description="Get the current SSH configuration",

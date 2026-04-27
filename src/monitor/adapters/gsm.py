@@ -15,7 +15,7 @@ from gsmmodem.exceptions import (
     CmsError,
     CommandError,
     InvalidStateException,
-    InterruptedException
+    InterruptedException,
 )
 from utils.constants import LOG_ADGSM
 
@@ -38,7 +38,6 @@ CALL_ACKNOWLEDGED = "1"
 
 
 class GSM:
-
     CONNECTS = 0
     RETRY_GAP_SECONDS = 5
     MAX_RETRY = 5
@@ -61,8 +60,7 @@ class GSM:
         if not self._pin_code:
             self._logger.warning("Pin code not defined")
 
-        if not self._port or \
-                not self._baud:
+        if not self._port or not self._baud:
             self._logger.error("Invalid GSM options: %s %s", self._port, self._baud)
             return False
 
@@ -82,8 +80,9 @@ class GSM:
                 self._modem.connect(self._pin_code)
 
                 # fix for call status parsing of SIM900
-                self._modem._pollCallStatusRegex = \
-                    re.compile('^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)')
+                self._modem._pollCallStatusRegex = re.compile(
+                    r'^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)'
+                )
 
                 self._logger.info("GSM modem connected")
                 return True
@@ -275,16 +274,16 @@ class GSM:
         self._logger.trace(
             "Call finished with result: %s, received dtmf: %s",
             call_result.name,
-            self._modem.dtmfpool
+            self._modem.dtmfpool,
         )
         if self._modem.dtmfpool == [CALL_ACKNOWLEDGED]:
             self._logger.debug("Call was acknowledged")
             call_result = CallResult.ACKNOWLEDGED
 
         return (
-            call_result == CallResult.ANSWERED or
-            call_result == CallResult.ACKNOWLEDGED or
-            call_result == CallResult.CANCELLED
+            call_result == CallResult.ANSWERED
+            or call_result == CallResult.ACKNOWLEDGED
+            or call_result == CallResult.CANCELLED
         )
 
     @property
@@ -296,7 +295,9 @@ class GSM:
         logger = logging.getLogger(LOG_ADGSM)
         logger.debug(
             "Manage call with DTMF tones: answered=%s, active=%s, state=%s",
-            call.answered, call.active, GSM.call_result
+            call.answered,
+            call.active,
+            GSM.call_result,
         )
 
         if call.answered:

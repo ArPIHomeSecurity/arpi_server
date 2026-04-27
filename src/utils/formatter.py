@@ -15,5 +15,5 @@ class NotTooLongStringFormatter(logging.Formatter):
         for field in self._fields:
             value = getattr(record, field)
             if len(value) > self._max_length:
-                setattr(record, field, value[:self._max_length])
+                setattr(record, field, value[: self._max_length])
             return super().format(record)

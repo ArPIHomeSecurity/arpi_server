@@ -6,6 +6,7 @@ import click
 
 from installer.helpers import SecretsManager
 
+
 @dataclass
 class InstallerConfig:
     postgresql_version: str
@@ -61,12 +62,12 @@ class BaseInstaller(ABC):
                 "/usr/local/share/arpi-server",
                 "/usr/share/arpi-server",
             ]
-        
+
         for path in possible_paths:
             if os.path.exists(path):
                 click.echo(f"✓ Found shared directory at: {path}")
                 return path
-        
+
         click.echo("⚠️ Shared directory not found.")
         return None
 
@@ -80,11 +81,11 @@ class BaseInstaller(ABC):
                 os.path.expanduser(f"~{username}/.local/etc/arpi-server"),
                 "/etc/arpi-server",
             ]
-        
+
         for path in possible_paths:
             if os.path.exists(path):
                 click.echo(f"✓ Found config directory at: {path}")
                 return path
 
-        click.echo("⚠️ Config directory not found.")        
+        click.echo("⚠️ Config directory not found.")
         return None

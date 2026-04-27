@@ -271,12 +271,16 @@ class DSCKeypad(KeypadBase):
     def send_partition_status(self):
         self._logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
-        self._line.send_and_receive([self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED])
+        self._line.send_and_receive(
+            [self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED]
+        )
 
     def send_zone_status(self):
         self._logger.debug("ZONE STATUS 0x%0X" % self.ZONE_STATUS)
         led_status = self._lights.get_lights()
-        self._line.send_and_receive(self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0xC7, 0x02]))
+        self._line.send_and_receive(
+            self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0xC7, 0x02])
+        )
 
     def send_datetime(self):
         timestamp = datetime.now()
@@ -289,12 +293,16 @@ class DSCKeypad(KeypadBase):
         b3 = (timestamp.day & 0b00000111) << 5
         b3 |= timestamp.hour & 0x1F
         b4 = timestamp.minute << 2
-        self._line.send_and_receive(self.add_CRC([self.DATETIME_STATUS, b1, b2, b3, b4, NULL, NULL]))
+        self._line.send_and_receive(
+            self.add_CRC([self.DATETIME_STATUS, b1, b2, b3, b4, NULL, NULL])
+        )
 
     def send_zone_lights(self):
         self._logger.debug("ZONE LIGHTS 0x%0X" % self.ZONE_LIGHTS)
         led_status = self._lights.get_lights()
-        self._line.send_and_receive(self.add_CRC([self.ZONE_LIGHTS, led_status, 0x01, 0x65, NULL, NULL, NULL, NULL]))
+        self._line.send_and_receive(
+            self.add_CRC([self.ZONE_LIGHTS, led_status, 0x01, 0x65, NULL, NULL, NULL, NULL])
+        )
 
     def add_CRC(self, messages):
         total = 0

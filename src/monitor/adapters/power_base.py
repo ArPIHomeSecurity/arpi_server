@@ -6,6 +6,7 @@ class PowerAdapterBase:
     """
     Determine the source of the power (network or battery)
     """
+
     @property
     def source_type(self):
         """

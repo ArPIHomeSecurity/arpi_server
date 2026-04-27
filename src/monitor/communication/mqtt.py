@@ -8,7 +8,11 @@ from enum import Enum
 
 import paho.mqtt.client as mqtt
 
-from monitor.config.models import MQTTConfigExternalPublish, MQTTConfigInternalPublish, MQTTConnection
+from monitor.config.models import (
+    MQTTConfigExternalPublish,
+    MQTTConfigInternalPublish,
+    MQTTConnection,
+)
 from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
 
 
@@ -65,7 +69,6 @@ class MQTTClient:
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
-
         mqtt_config = None
         if mqtt_connection.external:
             mqtt_config = MQTTConfigExternalPublish.load_config()
@@ -77,9 +80,11 @@ class MQTTClient:
         username = mqtt_config.username
         password = mqtt_config.password
         if username:
-            self._logger.debug("Using password authentication user: %s password length = %s",
-                               username,
-                               len(password))
+            self._logger.debug(
+                "Using password authentication user: %s password length = %s",
+                username,
+                len(password),
+            )
             try:
                 # FIXME:theoretically self._client should never be None here
                 # but we see errors in logs, so need to add a check
@@ -96,9 +101,13 @@ class MQTTClient:
 
         host = mqtt_config.hostname
         port = mqtt_config.port
-        self._logger.info("Connecting to MQTT broker at %s:%s TLS: %s insecure:%s", host, port,
-                          mqtt_config.tls_enabled,
-                          mqtt_config.tls_insecure)
+        self._logger.info(
+            "Connecting to MQTT broker at %s:%s TLS: %s insecure:%s",
+            host,
+            port,
+            mqtt_config.tls_enabled,
+            mqtt_config.tls_insecure,
+        )
         try:
             self._client.connect(host, port, keepalive=60)
             self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
@@ -137,7 +146,9 @@ class MQTTClient:
         Callback when disconnected from MQTT broker.
         """
         if rc != 0:
-            self._logger.warn("Disconnected from MQTT broker with result code: %s, will auto-reconnect", rc)
+            self._logger.warn(
+                "Disconnected from MQTT broker with result code: %s, will auto-reconnect", rc
+            )
             return
 
         self._logger.info("Disconnected from MQTT broker")
@@ -172,7 +183,7 @@ class MQTTClient:
                 "name": f"ArPI {name}",
                 "supported_features": ["arm_home", "arm_away"],
                 "state_topic": f"{topic_prefix}/state",
-                "command_topic": f"{topic_prefix}/state/set"
+                "command_topic": f"{topic_prefix}/state/set",
             }
         )
 

@@ -18,16 +18,14 @@ class SMTPSender:
         self._server = None
 
     def setup(self):
-        if not self._hostname or \
-                not self._port or \
-                not self._username or \
-                not self._password:
-            self._logger.error("Invalid SMTP options: %s:%s / %s=>%s",
-                               self._hostname,
-                               self._port,
-                               self._username,
-                               self._password
-                               )
+        if not self._hostname or not self._port or not self._username or not self._password:
+            self._logger.error(
+                "Invalid SMTP options: %s:%s / %s=>%s",
+                self._hostname,
+                self._port,
+                self._username,
+                self._password,
+            )
             return False
 
         try:
@@ -76,9 +74,7 @@ class SMTPSender:
             self._logger.info("Sending email to '%s' ...", to_address)
             message = f"Subject: {subject}\n\n{content}".encode(encoding="utf_8", errors="strict")
             self._server.sendmail(
-                from_addr="alert@arpi-security.info",
-                to_addrs=to_address,
-                msg=message
+                from_addr="alert@arpi-security.info", to_addrs=to_address, msg=message
             )
             self._logger.info("Sent email")
         except SMTPServerDisconnected as error:

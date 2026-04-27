@@ -10,7 +10,8 @@ from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler
 from monitor.monitor import Monitor
 from monitor.notifications.notifier import Notifier
-from monitor.logging import print_logging
+
+# from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
 
 
@@ -23,6 +24,7 @@ class BackgroundService(Thread):
     The main background service of the application which monitors the health of the threads
     and restarts them if necessary.
     """
+
     def __init__(self, stop_event: Event):
         super().__init__(name="HealthCheck")
         self._threads: list = None

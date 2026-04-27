@@ -14,8 +14,6 @@ from server.tools import evaluate_ipc_response
 gsm_option_mcp = FastMCP("ArPI - GSM configuration service")
 
 
-
-
 @gsm_option_mcp.tool(
     name="get_config",
     description="Get the current GSM configuration",

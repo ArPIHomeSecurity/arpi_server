@@ -19,21 +19,21 @@ class SensorAdapter(SensorAdapterBase):
         # NOTE: We have two MCP3008 chips on CE0 (GPIO8) and CE1 (GPIO7)
         self._channel_map = [
             # (AD chip, AD channel)
-            (1, 7), # CH01 
-            (1, 6), # CH02
-            (1, 5), # CH03
-            (1, 4), # CH04
-            (1, 3), # CH05
-            (1, 2), # CH06
-            (1, 1), # CH07
-            (1, 0), # CH08
-            (2, 7), # CH09
-            (2, 6), # CH10
-            (2, 5), # CH11
-            (2, 4), # CH12
-            (2, 3), # CH13
-            (2, 2), # CH14
-            (2, 1), # CH15
+            (1, 7),  # CH01
+            (1, 6),  # CH02
+            (1, 5),  # CH03
+            (1, 4),  # CH04
+            (1, 3),  # CH05
+            (1, 2),  # CH06
+            (1, 1),  # CH07
+            (1, 0),  # CH08
+            (2, 7),  # CH09
+            (2, 6),  # CH10
+            (2, 5),  # CH11
+            (2, 4),  # CH12
+            (2, 3),  # CH13
+            (2, 2),  # CH14
+            (2, 1),  # CH15
         ]
 
         self._channels = {}
@@ -46,10 +46,12 @@ class SensorAdapter(SensorAdapterBase):
                     mosi_pin=V3BoardPin.SENSOR_MOSI_PIN,
                     miso_pin=V3BoardPin.SENSOR_MISO_PIN,
                     select_pin=select_pin,
-                    channel=ad_channel
+                    channel=ad_channel,
                 )
             except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-                self._logger.error("Failed to init MCP3008 output=%s: %s", ad_chip, self._channels[idx], e)
+                self._logger.error(
+                    "Failed to init MCP3008 output=%s: %s", ad_chip, self._channels[idx], e
+                )
 
     def is_initialized(self) -> bool:
         """
@@ -68,7 +70,12 @@ class SensorAdapter(SensorAdapterBase):
         try:
             value = self._channels.get(channel).value
         except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-            self._logger.error("Read error MCP3008 chip=%s ch=%s: %s", self._channel_map[channel][0], self._channel_map[channel][1], e)
+            self._logger.error(
+                "Read error MCP3008 chip=%s ch=%s: %s",
+                self._channel_map[channel][0],
+                self._channel_map[channel][1],
+                e,
+            )
             return 0.0
         else:
             # use trace (custom low level) to avoid flooding normal logs

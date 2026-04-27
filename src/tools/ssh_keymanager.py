@@ -33,7 +33,7 @@ class SSHKeyManager:
             key_type: The type of the key (rsa, ecdsa, ed25519)
             key_name: The name of the key
             passphrase: The passphrase for the key
-        
+
         Returns:
             A tuple containing the private key and public key as strings
         """

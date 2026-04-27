@@ -7,11 +7,21 @@ from time import sleep, time
 
 from sqlalchemy import inspect
 
-from utils.constants import (ARM_AWAY, ARM_STAY, LOG_ADKEYPAD,
-                       MONITOR_ARM_AWAY, MONITOR_ARM_STAY, MONITOR_DISARM,
-                       MONITOR_REGISTER_CARD, MONITOR_STOP,
-                       MONITOR_UPDATE_KEYPAD, MONITORING_ALERT,
-                       MONITORING_ALERT_DELAY, MONITORING_READY, THREAD_KEYPAD)
+from utils.constants import (
+    ARM_AWAY,
+    ARM_STAY,
+    LOG_ADKEYPAD,
+    MONITOR_ARM_AWAY,
+    MONITOR_ARM_STAY,
+    MONITOR_DISARM,
+    MONITOR_REGISTER_CARD,
+    MONITOR_STOP,
+    MONITOR_UPDATE_KEYPAD,
+    MONITORING_ALERT,
+    MONITORING_ALERT_DELAY,
+    MONITORING_READY,
+    THREAD_KEYPAD,
+)
 from utils.models import Arm, Card, Keypad, User
 from monitor.adapters import V2BoardPin
 from monitor.adapters.keypads import get_wiegand_keypad
@@ -21,8 +31,7 @@ from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
-from utils.queries import (get_alert_delay, get_arm_delay, get_arm_state,
-                           get_user_with_access_code)
+from utils.queries import get_alert_delay, get_arm_delay, get_arm_state, get_user_with_access_code
 
 COMMUNICATION_PERIOD = 0.2  # sec
 CARD_REGISTRATION_EXPIRY = 120  # sec
@@ -186,11 +195,9 @@ class KeypadHandler(Thread):
         if user:
             self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
-            self._broadcaster.send_message(message={
-                "action": MONITOR_DISARM,
-                "user_id": user.id,
-                "keypad_id": self._keypad.id
-            })
+            self._broadcaster.send_message(
+                message={"action": MONITOR_DISARM, "user_id": user.id, "keypad_id": self._keypad.id}
+            )
         else:
             self._logger.debug("Invalid code")
             self._keypad.set_error(True)
@@ -203,11 +210,13 @@ class KeypadHandler(Thread):
         db_card = self.get_card_by_number(card)
         if db_card and db_card.enabled:
             self._logger.info("Accepted card => disarming")
-            self._broadcaster.send_message(message={
-                "action": MONITOR_DISARM,
-                "user_id": db_card.user_id,
-                "keypad_id": self._keypad.id
-            })
+            self._broadcaster.send_message(
+                message={
+                    "action": MONITOR_DISARM,
+                    "user_id": db_card.user_id,
+                    "keypad_id": self._keypad.id,
+                }
+            )
         else:
             self._logger.info("Unknown card")
             self._keypad.set_error(True)
@@ -215,17 +224,21 @@ class KeypadHandler(Thread):
     def handle_function(self, function: Function):
         self._logger.debug("Handling function: %s", function)
         if Function.AWAY == function:
-            self._broadcaster.send_message({
-                "action": MONITOR_ARM_AWAY,
-                "keypad_id": self._keypad.id,
-                "use_delay": True,
-            })
+            self._broadcaster.send_message(
+                {
+                    "action": MONITOR_ARM_AWAY,
+                    "keypad_id": self._keypad.id,
+                    "use_delay": True,
+                }
+            )
         elif Function.STAY == function:
-            self._broadcaster.send_message({
-                "action": MONITOR_ARM_STAY,
-                "keypad_id": self._keypad.id,
-                "use_delay": True,
-            })
+            self._broadcaster.send_message(
+                {
+                    "action": MONITOR_ARM_STAY,
+                    "keypad_id": self._keypad.id,
+                    "use_delay": True,
+                }
+            )
         else:
             self._logger.error("Unknown function: %s", function)
 
@@ -254,7 +267,7 @@ class KeypadHandler(Thread):
         card_number : str - card number to register
         """
         with get_database_session() as db_session:
-            users = db_session.query(User).filter(User.card_registration_expiry >= 'NOW()').all()
+            users = db_session.query(User).filter(User.card_registration_expiry >= "NOW()").all()
             if users:
                 cards = db_session.query(Card).all()
                 for tmp_card in cards:

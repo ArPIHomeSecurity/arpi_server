@@ -216,15 +216,14 @@ def register_device():
         else:
             sleep(5)
             return jsonify({"error": "Failed to register device", "reason": "User not found"}), 400
-            
 
     sleep(5)
     return jsonify(
-            {
-                "error": "Failed to register device",
-                "reason": "Missing registration code",
-            }
-        ), 400
+        {
+            "error": "Failed to register device",
+            "reason": "Missing registration code",
+        }
+    ), 400
 
 
 @user_blueprint.route("/api/user/authenticate", methods=["POST"])
@@ -310,9 +309,7 @@ def has_mcp_token(user_id: int):
         if not db_user:
             return jsonify({"error": "User not found"}), 404
 
-        return jsonify({
-            "has_mcp_token": db_user.mcp_key is not None
-        })
+        return jsonify({"has_mcp_token": db_user.mcp_key is not None})
     else:
         return jsonify({"error": "operation not permitted"}), 403
 

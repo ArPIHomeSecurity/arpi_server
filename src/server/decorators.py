@@ -31,6 +31,7 @@ def restrict_host(request_handler):
     example.com <==> localhost
     Configurable option in the networking section.
     """
+
     @functools.wraps(request_handler)
     def _restrict_host(*args, **kws):
         noip_config = db.session.query(Option).filter_by(name="network", section="dyndns").first()
@@ -53,10 +54,12 @@ def restrict_host(request_handler):
 
             logger.debug("Origin -> Referer: '%s' -> '%s'", origin, referer.geturl())
             if origin != referer.netloc:
-                return jsonify({
-                    "error": "invalid origin",
-                    "reason": f"{baseurl(origin)} <> {baseurl(referer)}"
-                }), 401
+                return jsonify(
+                    {
+                        "error": "invalid origin",
+                        "reason": f"{baseurl(origin)} <> {baseurl(referer)}",
+                    }
+                ), 401
 
         return request_handler(*args, **kws)
 
@@ -64,7 +67,8 @@ def restrict_host(request_handler):
 
 
 def registered(request_handler):
-    """ Allow access only for registered devices """
+    """Allow access only for registered devices"""
+
     @functools.wraps(request_handler)
     def _registered(*args, **kws):
         auth_header = request.headers.get("Authorization")
@@ -100,7 +104,7 @@ def generate_user_token(user_id: int, name: str, role: str, origin: str, ttl: in
         "name": name,
         "role": role,
         "origin": origin,
-        "timestamp": int(dt.now(tz=UTC).timestamp())
+        "timestamp": int(dt.now(tz=UTC).timestamp()),
     }
 
     if ttl is not None:
@@ -138,7 +142,8 @@ def _generate_token(payload: dict, secret: str) -> str:
 
 
 def authenticated(role=ROLE_ADMIN):
-    """ Allow access only for users with given role """
+    """Allow access only for users with given role"""
+
     def _authenticated(request_handler):
         @functools.wraps(request_handler)
         def check_access(*args, **kws):
@@ -152,24 +157,25 @@ def authenticated(role=ROLE_ADMIN):
                 try:
                     user_token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
                     logger.debug("Token: %s", user_token)
-                    if int(user_token.get("timestamp", 0)) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
+                    if (
+                        int(user_token.get("timestamp", 0))
+                        < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY
+                    ):
                         return jsonify({"error": "token expired"}), 401
 
                     if (
-                        (role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN))
-                        or
-                        (role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,))
-                    ):
+                        role == ROLE_USER and user_token["role"] not in (ROLE_USER, ROLE_ADMIN)
+                    ) or (role == ROLE_ADMIN and user_token["role"] not in (ROLE_ADMIN,)):
                         logger.info(
                             "Operation %s not permitted for user='%s/%s' on origin=%s from %s",
                             request.path,
                             user_token["name"],
                             user_token["role"],
                             user_token["origin"],
-                            remote_address
+                            remote_address,
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
-                    
+
                     flask.request.environ["requester_id"] = user_token["id"]
                     flask.request.environ["requester_role"] = user_token["role"]
 
@@ -185,12 +191,19 @@ def authenticated(role=ROLE_ADMIN):
                     # generate new user token to extend the user session
                     referer = urlparse(request.environ.get("HTTP_REFERER", ""))
                     try:
-
                         response.headers["User-Token"] = generate_user_token(
-                            user_token["id"], user_token["name"], user_token["role"], f"{referer.scheme}://{referer.netloc}"
+                            user_token["id"],
+                            user_token["name"],
+                            user_token["role"],
+                            f"{referer.scheme}://{referer.netloc}",
                         )
                     except Exception as e:
-                        logger.error("Failed to generate user token: %s, request_handler=%s, response=%s", e, request_handler, response)
+                        logger.error(
+                            "Failed to generate user token: %s, request_handler=%s, response=%s",
+                            e,
+                            request_handler,
+                            response,
+                        )
                         raise e
                     return response
                 except jose.exceptions.JWTError:

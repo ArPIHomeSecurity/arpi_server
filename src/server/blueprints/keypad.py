@@ -36,10 +36,12 @@ def manage_keypad(keypad_id):
             try:
                 return process_ipc_response(keypad_service.update_keypad(keypad_id, **request.json))
             except ObjectNotFound:
-                return process_ipc_response(keypad_service.create_keypad(
-                    type_id=request.json["typeId"],
-                    enabled=request.json.get("enabled", True),
-                ))
+                return process_ipc_response(
+                    keypad_service.create_keypad(
+                        type_id=request.json["typeId"],
+                        enabled=request.json.get("enabled", True),
+                    )
+                )
         return jsonify({"error": "Unknown action"}), 405
     except ObjectNotFound:
         return jsonify({"error": "Keypad not found"}), 404

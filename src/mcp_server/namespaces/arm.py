@@ -9,8 +9,6 @@ from server.services.arm import ArmService
 arm_mcp = FastMCP("ArPI - arm service")
 
 
-
-
 @arm_mcp.resource(
     uri="arms://list",
     name="all",

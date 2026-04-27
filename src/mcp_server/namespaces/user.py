@@ -10,8 +10,6 @@ from server.services.user import UserService
 user_mcp = FastMCP("ArPI - user service")
 
 
-
-
 @user_mcp.resource(
     uri="users://all",
     name="all",
@@ -96,9 +94,7 @@ def create_user(name: str, role: str, access_code: str, comment: str = None) -> 
 
 
 @user_mcp.tool
-def update_user(
-    user_id: int, name: str = None, role: str = None, comment: str = None
-):
+def update_user(user_id: int, name: str = None, role: str = None, comment: str = None):
     """
     Update an existing user in the database.
 

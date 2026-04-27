@@ -1,4 +1,3 @@
-
 import logging
 from os import environ
 
@@ -10,7 +9,8 @@ logger = logging.getLogger(LOG_ADKEYPAD)
 
 USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() == "true"
 
-def get_wiegand_keypad(board_version = 0):
+
+def get_wiegand_keypad(board_version=0):
     if board_version == 0:
         board_version = int(environ.get("BOARD_VERSION", 0))
 

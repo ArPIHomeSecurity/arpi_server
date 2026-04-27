@@ -25,10 +25,12 @@ CHANNEL_GPIO_PINS = [
     V2BoardPin.CH15_PIN,
 ]
 
+
 class SensorAdapter(SensorAdapterBase):
     """
     GPIO-based sensor adapter (board version 2)
     """
+
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._channels = []
@@ -38,7 +40,6 @@ class SensorAdapter(SensorAdapterBase):
                 self._channels.append(DigitalInputDevice(pin, pull_up=False))
             except lgpio.error as e:
                 self._logger.error("Failed to init DigitalInputDevice on pin %s: %s", pin, e)
-
 
     def is_initialized(self) -> bool:
         """
@@ -54,7 +55,7 @@ class SensorAdapter(SensorAdapterBase):
             self._logger.error("Invalid channel number: %s", channel)
             return 0
         value = int(self._channels[channel].value)
-        self._logger.trace("Value[CH%02d]: %s", channel+1, value)
+        self._logger.trace("Value[CH%02d]: %s", channel + 1, value)
         return value
 
     def get_values(self):

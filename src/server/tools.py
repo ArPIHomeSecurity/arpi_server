@@ -6,6 +6,7 @@ from utils.constants import LOG_IPC
 
 logger = logging.getLogger(LOG_IPC)
 
+
 def evaluate_ipc_response(ipc_response) -> tuple[dict, bool]:
     """
     Process IPC response and return a tuple of response dict and success boolean.

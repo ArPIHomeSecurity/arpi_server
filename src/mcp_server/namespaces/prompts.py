@@ -91,7 +91,11 @@ def first_setup_sensors() -> list[Message]:
     Returns:
         A confirmation message indicating successful deployment.
     """
-    system_prompt = files('mcp_server').joinpath('prompts/setup_wizard_sensors_system.txt').read_text(encoding='utf-8')
+    system_prompt = (
+        files("mcp_server")
+        .joinpath("prompts/setup_wizard_sensors_system.txt")
+        .read_text(encoding="utf-8")
+    )
 
     return [
         Message(role="assistant", content=system_prompt),
@@ -100,9 +104,10 @@ def first_setup_sensors() -> list[Message]:
             content=(
                 "Configure a fresh installation of the ArPI home security system "
                 "with sensors to the specified environment."
-            )
+            ),
         ),
     ]
+
 
 @prompts_mcp.prompt(
     name="add_output",

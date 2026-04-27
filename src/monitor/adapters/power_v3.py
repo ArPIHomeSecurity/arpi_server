@@ -1,4 +1,3 @@
-
 import logging
 
 import lgpio
@@ -25,7 +24,7 @@ class PowerAdapter:
                 mosi_pin=V3BoardPin.SENSOR_MOSI_PIN,
                 miso_pin=V3BoardPin.SENSOR_MISO_PIN,
                 select_pin=V3BoardPin.SENSOR_LATCH_PIN_AD2,
-                channel=0
+                channel=0,
             )
         except (OSError, ValueError, RuntimeError, lgpio.error) as e:
             self._logger.error("Failed to init MCP3008 for power sense: %s", e)

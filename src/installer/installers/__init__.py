@@ -1,4 +1,3 @@
-
 from installer.installers.base import BaseInstaller, InstallerConfig
 from installer.installers.certbot import CertbotInstaller
 from installer.installers.database import DatabaseInstaller

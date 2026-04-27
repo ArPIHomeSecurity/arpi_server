@@ -89,12 +89,7 @@ class ArmService(BaseService):
         """
         filters = self._build_filters(has_alert, user_id, keypad_id, arm_type, start, end)
 
-        return (
-            self._db_session.query(Disarm)
-            .outerjoin(Arm, full=True)
-            .filter(*filters)
-            .count()
-        )
+        return self._db_session.query(Disarm).outerjoin(Arm, full=True).filter(*filters).count()
 
     def _build_filters(
         self,
@@ -111,33 +106,29 @@ class ArmService(BaseService):
         filters = []
 
         if has_alert is True:
-            filters.append(Disarm.alert != None)
+            filters.append(Disarm.alert is not None)
         elif has_alert is False:
-            filters.append(Disarm.alert == None)
+            filters.append(Disarm.alert is None)
 
         if user_id is not None:
             filters.append(or_(Disarm.user_id == user_id, Arm.user_id == user_id))
 
         if keypad_id is not None:
             # TODO: identify keypads
-            filters.append(or_(Disarm.keypad_id != None, Arm.keypad_id != None))
+            filters.append(or_(Disarm.keypad_id is not None, Arm.keypad_id is not None))
 
         if arm_type is not None:
             if arm_type == ARM_DISARM:
-                filters.append(Arm.id == None)
+                filters.append(Arm.id is None)
             else:
                 filters.append(Arm.type == arm_type)
 
         if start is not None:
             start_dt = datetime.strptime(start, "%Y-%m-%d")
-            filters.append(
-                or_(Arm.time >= start_dt, Disarm.time >= start_dt)
-            )
+            filters.append(or_(Arm.time >= start_dt, Disarm.time >= start_dt))
 
         if end is not None:
             end_dt = datetime.strptime(end, "%Y-%m-%d") + timedelta(days=1)
-            filters.append(
-                or_(Arm.time <= end_dt, Disarm.time <= end_dt)
-            )
+            filters.append(or_(Arm.time <= end_dt, Disarm.time <= end_dt))
 
         return filters

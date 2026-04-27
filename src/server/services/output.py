@@ -118,12 +118,12 @@ class OutputService(BaseService):
         output_changed = output.update(kwargs)
         if not output_changed:
             raise ObjectNotChanged("Output not changed")
-        
+
         try:
             self.validate_configuration(output)
         except ValueError as e:
             raise InvalidConfiguration(str(e))
-        
+
         if not self.validate_channel(output):
             raise ChannelConflictError("Channel conflict with existing outputs.")
 
@@ -165,7 +165,7 @@ class OutputService(BaseService):
         output = self._db_session.query(Output).get(output_id)
         if not output:
             raise ObjectNotFound("Output not found")
-        
+
         if output.trigger_type != OutputTriggerType.BUTTON:
             raise ObjectNotChanged("Only buttons can be activated manually")
 
@@ -184,7 +184,7 @@ class OutputService(BaseService):
         output = self._db_session.query(Output).get(output_id)
         if not output:
             raise ObjectNotFound("Output not found")
-        
+
         if output.trigger_type != OutputTriggerType.BUTTON:
             raise ObjectNotChanged("Only buttons can be deactivated manually")
 

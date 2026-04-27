@@ -25,7 +25,7 @@ from monitor.output import OUTPUT_NAMES
 
 def print_channels(correct_channels, values):
     for idx, value in enumerate(values):
-        print(f"\033[2K", end="")  # Clear line
+        print("\033[2K", end="")  # Clear line
         print(f"CH{idx + 1:02d}: {value:.2f}", end="")
         if correct_channels[idx]:
             print(" ✅", end="")

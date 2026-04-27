@@ -16,13 +16,19 @@ class Sms:
 
 
 MESSAGES = [
-    Sms(idx=1, number="06201234567", text="Test message 1111", time=datetime(2024, 7, 22, 12, 0, 0)),
-    Sms(idx=2, number="0036309876543", text="Test message 2222", time=datetime(2024, 6, 21, 11, 0, 0)),
+    Sms(
+        idx=1, number="06201234567", text="Test message 1111", time=datetime(2024, 7, 22, 12, 0, 0)
+    ),
+    Sms(
+        idx=2,
+        number="0036309876543",
+        text="Test message 2222",
+        time=datetime(2024, 6, 21, 11, 0, 0),
+    ),
 ]
 
 
 class GSM:
-
     CONNECTS = 0
 
     def __init__(self, pin_code, port, baud):

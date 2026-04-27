@@ -6,7 +6,6 @@ from server.services.card import CardService
 card_mcp = FastMCP("ArPI - card service")
 
 
-
 @card_mcp.resource(
     uri="cards://user/{user_id}",
     name="user_cards",

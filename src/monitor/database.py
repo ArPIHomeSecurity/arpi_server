@@ -5,7 +5,6 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import create_engine
 
 
-
 # database connection common to all threads
 db_user = environ.get("DB_USER")
 if db_user:

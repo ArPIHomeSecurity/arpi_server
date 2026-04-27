@@ -44,11 +44,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "black~=23.12",
-    "cryptography~=46.0",
-    "rope~=1.13",
-]
 simulator = [
     "textual~=5.3",
     "textual-dev",
@@ -103,27 +98,18 @@ mcp_server = ["prompts/*.txt"]
 [tool.setuptools.dynamic]
 version = {attr = "server.version.__package_version__"}
 
-[tool.black]
-line-length = 120
-target-version = ['py311']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-  | migrations
-)/
-'''
+[tool.ruff]
+line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[dependency-groups]
+dev = [
+    "build~=1.4",
+    "cryptography~=46.0",
+    "rope~=1.14",
+]

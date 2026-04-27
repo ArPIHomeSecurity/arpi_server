@@ -12,8 +12,6 @@ from server.tools import evaluate_ipc_response
 mqtt_option_mcp = FastMCP("ArPI - MQTT configuration service")
 
 
-
-
 @mqtt_option_mcp.tool(
     name="get_connection_config",
     description="Get the current MQTT connection configuration (enabled/disabled, internal vs external broker)",

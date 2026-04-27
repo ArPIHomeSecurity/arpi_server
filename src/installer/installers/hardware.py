@@ -88,7 +88,7 @@ class HardwareInstaller(BaseInstaller):
         """Enable SPI interface"""
         click.echo(f"   🔧 Setup SPI interface for board version {self._board_version}...")
 
-        if os.path.exists(self._config_txt): 
+        if os.path.exists(self._config_txt):
             if self._board_version == 3:
                 # enable SPI for board version 3
                 if not SystemHelper.file_contains_text(

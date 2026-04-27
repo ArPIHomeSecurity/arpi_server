@@ -107,6 +107,7 @@ def get_server_version() -> VersionInfo | None:
     """
     try:
         import server.version as server_version
+
         m = VERSION_PARSER.match(server_version.__version__)
         if not m:
             raise ValueError(f"Invalid version string: {server_version.__version__}")
@@ -344,7 +345,7 @@ def main():
     print("🔧 Starting ArPI upgrade process...")
 
     # ensure required packages are installed
-    install_packages(["pipenv", "python3-click"])
+    install_packages(["python3-click"])
 
     server_upgraded = check_and_upgrade(
         GITHUB_API_SERVER,

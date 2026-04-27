@@ -79,11 +79,7 @@ def env_prod():
     logger.info(" - Created area")
 
     ssh_access = SSHConfig()
-    ssh_option = Option(
-        name="network",
-        section="access",
-        value=json.dumps(asdict(ssh_access))
-    )
+    ssh_option = Option(name="network", section="access", value=json.dumps(asdict(ssh_access)))
     session.add(ssh_option)
     logger.info(" - Created access options")
 

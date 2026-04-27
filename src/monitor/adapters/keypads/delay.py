@@ -12,8 +12,7 @@ class DelayPhase(Enum):
     LAST_5_SECS = 3
 
 
-class Handler():
-
+class Handler:
     def __init__(self, start, delay) -> None:
         self._start = start
         self._delay = delay

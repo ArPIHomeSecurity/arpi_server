@@ -7,6 +7,7 @@ from installer.installers.base import BaseInstaller, InstallerConfig
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
+
 class ServiceInstaller(BaseInstaller):
     """Installer for ArPI services and configurations"""
 
@@ -87,8 +88,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         click.echo("   🗑️ Removing existing Python virtual environment if it exists...")
         try:
             SystemHelper.run_command(
-                f"sudo -u {self.user} -E -H zsh --login -c '"
-                "pipenv --rm || true'",
+                f"sudo -u {self.user} -E -H zsh --login -c 'pipenv --rm || true'",
                 suppress_output=True,
                 cwd=f"/home/{self.user}/server",
             )
@@ -114,9 +114,7 @@ d /run/{self.user} 0755 {self.user} {self.user}
         """Setup permissions for user"""
         click.echo("   🔐 Setting up permissions...")
 
-        SecurityHelper.set_permissions(
-            "/etc/localtime", f"{self.user}:{self.user}", "644"
-        )
+        SecurityHelper.set_permissions("/etc/localtime", f"{self.user}:{self.user}", "644")
 
         sudoers_config = """# Allow argus to set system time without password
 argus ALL=(ALL) NOPASSWD: /usr/bin/date --set=*
@@ -140,7 +138,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
 
         SystemHelper.run_command(
             f"sudo -u {self.user} -E -H zsh --login -c '"
-            f"flask --app server:app db upgrade --directory {self.shared_directory}/migrations'",   
+            f"flask --app server:app db upgrade --directory {self.shared_directory}/migrations'",
         )
         click.echo("   ✓ Database schema updated")
 
@@ -150,8 +148,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
 
         if self.data_set_name:
             SystemHelper.run_command(
-                f"sudo -u {self.user} -E -H zsh --login -c '"
-                f"argus-data -d -c {self.data_set_name}'",
+                f"sudo -u {self.user} -E -H zsh --login -c 'argus-data -d -c {self.data_set_name}'",
             )
             click.echo(f"   ✓ Database contents updated with data set '{self.data_set_name}'")
         else:
@@ -171,7 +168,7 @@ argus ALL=(ALL) NOPASSWD: /bin/bash -c echo * > /etc/timezone
             current_revision = SystemHelper.run_command(
                 f"sudo -u {self.user} -H zsh --login -c '"
                 f"flask --app server:app db current --directory {self.shared_directory}/migrations'",
-                capture=True
+                capture=True,
             ).stdout.strip()
             head_revision = SystemHelper.run_command(
                 f"sudo -u {self.user} -H zsh --login -c '"

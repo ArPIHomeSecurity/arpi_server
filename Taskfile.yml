@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  GREETING: Hello, world!
+
+tasks:
+  create-environment:
+    desc: Create a python virtual environment with uv
+    cmds:
+      - uv sync --group=dev --extra=simulator
+
+  format:
+    desc: Format python code using ruff
+    cmds:
+      - uvx ruff format
+  
+  format-check:
+    desc: Check if python code is formatted using ruff
+    cmds:
+      - uvx ruff format --check
+
+  lint:
+    desc: Lint python code using ruff
+    cmds:
+      - cmd: uvx ruff check .
+        ignore_error: true
+      - uvx ruff check . --statistics
+
+  lint-fix:
+    desc: Fix linting issues using ruff
+    cmds:
+      - uvx ruff check --fix
+
+  start-database:
+    desc: Start the database
+    cmds:
+      - docker volume create argus-database
+      - docker start argus-database || docker run -d -it \
+          --name argus-database \
+          -p 127.0.0.1:5432:5432 \
+          -v /var/run/postgresql:/var/run/postgresql \
+          -v argus-database:/var/lib/postgresql/data \
+          -e POSTGRES_USER=argus \
+          -e POSTGRES_PASSWORD=argus1 \
+          -e POSTGRES_DB=argus \
+          postgres:15
+
+  start-mqtt:
+    desc: Start the MQTT broker
+    cmds:
+      - docker volume create argus-mqtt
+      - docker start argus-mqtt || docker run -d -it \
+          --name argus-mqtt \
+          -p 127.0.0.1:1883:1883 \
+          -p 127.0.0.1:9001:9001 \
+          -v {{.TASKFILE_DIR}}/mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro \
+          -v arpi-mosquitto:/mosquitto/data/ \
+          eclipse-mosquitto
+
+  start-server:
+    desc: Start the server
+    cmds:
+      - uv run flask --debug --app server run --host=0.0.0.0 --port=8080
+
+  start-mcp:
+    desc: Start the MCP server
+    cmds:
+      - uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
+
+  start-monitor:
+    desc: Start the monitor
+    cmds:
+      - uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
+
+  start-simulator:
+    desc: Start the simulator
+    cmds:
+      - uv run textual run --dev ./src/bin/simulator.py
+
+  start-simulator-web:
+    desc: Start the simulator web interface
+    cmds:
+      - uv run textual serve --dev -p 8888 ./src/bin/simulator.py
+
+  start-mcpinspector:
+    desc: Start the MCP Inspector
+    cmds:
+      - docker start arpi_mcp_inspector || docker run --rm \
+          --network=host \
+          -it \
+          -p 127.0.0.1:6274:6274 \
+          -p 127.0.0.1:6277:6277 \
+          -e HOST=0.0.0.0 \
+          -e MCP_AUTO_OPEN_ENABLED=false \
+          --name arpi_mcp_inspector \
+          ghcr.io/modelcontextprotocol/inspector:latest
+
+  create-ssl-certificate:
+    desc: Create self-signed SSL certificate for development
+    status:
+      - test -f {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key
+      - test -f {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt
+    cmds:
+      - openssl req -new -newkey rsa:4096 -nodes -x509
+          -subj "/C=HU/ST=Fejér/L=Baracska/O=ArPI/CN=arpi.local"
+          -days 730
+          -keyout {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key
+          -out {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt
+          -addext "subjectAltName=DNS:arpi.local,DNS:*.arpi.local"
+
+  create-dhparams:
+    desc: Create DH parameters file for nginx
+    status:
+      - test -f {{.TASKFILE_DIR}}/scripts/nginx/arpi_dhparams.pem
+    cmds:
+      - openssl dhparam -out {{.TASKFILE_DIR}}/scripts/nginx/arpi_dhparams.pem 1024
+
+  start-nginx:
+    desc: Start the nginx reverse proxy
+    deps: [create-ssl-certificate, create-dhparams]
+    vars:
+      HOST_IP:
+        sh: hostname -I | awk '{print $1}'
+    cmds:
+      - docker rm -fv arpi-server
+      - docker run -d --name arpi-server
+          -p 8000:8000
+          -e HOST_IP={{.HOST_IP}}
+          -v {{.TASKFILE_DIR}}/scripts/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+          -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dhparams.pem:/etc/nginx/arpi_dhparams.pem:ro
+          -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt:/etc/nginx/arpi_dev.crt:ro
+          -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key:/etc/nginx/arpi_dev.key:ro
+          nginx

@@ -3,12 +3,11 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.ipc import IPCClient
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.sensor import ChannelConflictError, SensorService
 from server.tools import process_ipc_response
 from utils.constants import ROLE_USER
-from utils.models import Sensor, SensorType
+from utils.models import Sensor
 
 sensor_blueprint = Blueprint("sensor", __name__)
 
@@ -90,7 +89,7 @@ def manage_sensor(sensor_id):
 def sensors_reset_references(sensor_id=None):
     """
     Reset the reference value of a specific sensor or all sensors.
-    
+
     - If sensor_id is provided, reset the reference value of that specific sensor.
     - If sensor_id is not provided, reset the reference values of all sensors.
     """
@@ -103,6 +102,7 @@ def sensors_reset_references(sensor_id=None):
         return jsonify({"error": "Sensor not found"}), 404
     except ObjectNotChanged:
         return jsonify({"info": "No changes made"}), 204
+
 
 @sensor_blueprint.route("/api/sensortypes")
 @authenticated(role=ROLE_USER)
@@ -135,6 +135,7 @@ def get_sensor_error():
     """
     sensor_service = SensorService(db.session)
     return jsonify(sensor_service.get_sensor_error(sensor_id=request.args.get("sensorId")))
+
 
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered
