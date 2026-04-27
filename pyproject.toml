@@ -45,7 +45,7 @@ dependencies = [
 
 [project.optional-dependencies]
 simulator = [
-    "textual~=5.3",
+    "textual~=8.2",
     "textual-dev",
 ]
 device = [
