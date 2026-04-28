@@ -133,3 +133,6 @@ tasks:
           -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt:/etc/nginx/arpi_dev.crt:ro
           -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key:/etc/nginx/arpi_dev.key:ro
           nginx
+
+  test:
+    - uv run pytest -v

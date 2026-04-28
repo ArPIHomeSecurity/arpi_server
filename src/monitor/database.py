@@ -5,12 +5,14 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import create_engine
 
 
+DB_HOST = environ.get("DB_HOST", "/var/run/postgresql")
+
 # database connection common to all threads
 db_user = environ.get("DB_USER")
 if db_user:
-    url = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}"
+    url = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
 else:
-    url = f"postgresql:///{environ['DB_SCHEMA']}"
+    url = f"postgresql:///{environ['DB_SCHEMA']}?host={DB_HOST}"
 
 common_engine = create_engine(url)
 

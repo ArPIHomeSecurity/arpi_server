@@ -41,6 +41,7 @@ dependencies = [
     "python-socketio~=5.14",
     "stringcase~=1.2.0",
     "uvicorn~=0.42",
+    "dotenv>=0.9.9",
 ]
 
 [project.optional-dependencies]
@@ -106,10 +107,14 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+log_level = "DEBUG"
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 
 [dependency-groups]
 dev = [
     "build~=1.4",
     "cryptography~=46.0",
+    "pytest~=9.0",
     "rope~=1.14",
 ]
