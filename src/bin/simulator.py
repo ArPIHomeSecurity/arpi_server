@@ -5,9 +5,7 @@ from contextlib import suppress
 from copy import deepcopy
 from os import environ
 
-# Database and models for direct DB access
-from monitor.database import get_database_session
-from utils.models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
+from utils.models import SensorContactTypes
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -19,9 +17,9 @@ from textual.widgets import Button, Checkbox, Select, Static
 
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
-    ContactTypes,
     WiringStrategies,
-    get_channel_configs,
+    ChannelConfig,
+    load_channel_configs,
     get_output_states,
     set_input_states,
     set_keypad_state,
@@ -41,12 +39,10 @@ WIRING_STRATEGIES = [
 ]
 
 # Contact types for control
-CONTACT_TYPES = [("NC", ContactTypes.NC.value), ("NO", ContactTypes.NO.value)]
-
-SENSOR_CONTACT_TYPE_MAP = {
-    SensorContactTypes.NC: ContactTypes.NC.value,
-    SensorContactTypes.NO: ContactTypes.NO.value,
-}
+CONTACT_TYPES = [
+    ("NC", SensorContactTypes.NC.value),
+    ("NO", SensorContactTypes.NO.value),
+]
 
 # channel error states
 CHANNEL_CUT = wiring_config.open_circuit
@@ -163,11 +159,16 @@ class Channels(Widget):
                 with Vertical(classes="channel-column"):
                     for i in col:
                         ch_key = f"CH{i:02d}"
-                        config = self._channel_configs.get(ch_key, {})
-                        wiring_strategy = config.get("wiring_strategy", "cut")
-                        contact_type = config.get("contact_type", "nc")
-                        sensor_a_active = config.get("sensor_a_active", False)
-                        sensor_b_active = config.get("sensor_b_active", False)
+                        config = self._channel_configs.get(ch_key)
+                        if config is None:
+                            config = ChannelConfig(
+                                wiring_strategy=WiringStrategies.CUT.value,
+                                contact_type=SensorContactTypes.NC,
+                            )
+                        wiring_strategy = config.wiring_strategy
+                        contact_type = config.contact_type.value
+                        sensor_a_active = config.sensor_a_active
+                        sensor_b_active = config.sensor_b_active
 
                         with Horizontal(classes="channel-row"):
                             channel_class = self.get_channel_class(
@@ -370,54 +371,14 @@ class SimulatorApp(App):
         self.show_voltage = False
         self.is_v3_board = environ.get("BOARD_VERSION") == "3"
 
-    def load_configuration_from_db(self, input_number: int) -> None:
+    def load_configuration(self, input_number: int) -> None:
         """
-        Refresh channel configurations from the database.
+        Refresh channel configurations from the database and recalculate channel values.
         """
-        session = get_database_session()
-        sensors = (
-            session.query(Sensor)
-            .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
-            .order_by(Sensor.channel)
-            .all()
-        )
+        self.channel_configs = load_channel_configs(input_number)
 
-        self.channel_configs = {
-            f"CH{i:02d}": {
-                "wiring_strategy": WiringStrategies.CUT.value,
-                "contact_type": ContactTypes.NC.value,
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            }
-            for i in range(1, input_number + 1)
-        }
-
-        # Update configs from DB
-        for sensor in sensors:
-            channel_name = f"CH{sensor.channel + 1:02d}"
-            # Map DB fields to simulator config
-            wiring_strategy = WiringStrategies.CUT.value
-            if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
-                wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
-            elif (
-                sensor.channel_type == ChannelTypes.BASIC
-                or sensor.channel_type == ChannelTypes.NORMAL
-            ):
-                wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
-            elif (
-                sensor.channel_type == ChannelTypes.CHANNEL_A
-                or sensor.channel_type == ChannelTypes.CHANNEL_B
-            ):
-                wiring_strategy = WiringStrategies.DUAL.value
-
-            contact_type = SENSOR_CONTACT_TYPE_MAP[sensor.sensor_contact_type]
-
-            self.channel_configs[channel_name] = {
-                "wiring_strategy": wiring_strategy,
-                "contact_type": contact_type,
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            }
+        for i in range(1, input_number + 1):
+            channel_name = f"CH{i:02d}"
             self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
 
         # turn on advanced mode if v3 features are present
@@ -427,33 +388,12 @@ class SimulatorApp(App):
 
     def initialize_channels(self, input_number: int) -> None:
         """
-        Initialize channel states and values from saved data or defaults.
+        Initialize channel states and load channel configuration from the database.
         """
-        # Load channel configurations from buffer file
-        saved_configs = get_channel_configs()
-
-        # Initialize channel dictionaries
         self.channel_values = {f"CH{i:02d}": CHANNEL_CUT for i in range(1, input_number + 1)}
         self.channel_values["POWER"] = POWER_HIGH
 
-        self.channel_configs = {
-            f"CH{i:02d}": {
-                "wiring_strategy": WiringStrategies.CUT.value,
-                "contact_type": ContactTypes.NC.value,
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            }
-            for i in range(1, input_number + 1)
-        }
-
-        # Apply saved configurations and calculate values
-        for channel_name, config in saved_configs.items():
-            if channel_name in self.channel_configs:
-                self.channel_configs[channel_name] = config
-                # Calculate initial values based on configuration
-                self.channel_values[channel_name] = self.calculate_channel_value(channel_name)
-
-        self.is_advanced_mode = self.has_v3_features() and self.is_v3_board
+        self.load_configuration(input_number)
 
     def has_v3_features(self):
         v3_features = [
@@ -461,8 +401,7 @@ class SimulatorApp(App):
             WiringStrategies.SINGLE_WITH_2EOL.value,
         ]
         return any(
-            self.channel_configs[ch]["wiring_strategy"] in v3_features
-            for ch in self.channel_configs
+            self.channel_configs[ch].wiring_strategy in v3_features for ch in self.channel_configs
         )
 
     def compose(self) -> ComposeResult:
@@ -502,13 +441,7 @@ class SimulatorApp(App):
                 checkbox.value = outputs[idx]
 
     def save_input_states(self):
-        set_input_states(
-            list(self.channel_values.values()),
-            [
-                self.channel_configs[f"CH{i:02d}"]
-                for i in range(1, int(environ.get("INPUT_NUMBER", 15)) + 1)
-            ],
-        )
+        set_input_states(list(self.channel_values.values()))
 
     def save_keypad_states(self):
         set_keypad_state(self.keypad["pending_bits"], self.keypad["data"])
@@ -524,10 +457,10 @@ class SimulatorApp(App):
         Calculate the channel value based on wiring strategy and sensor states
         """
         config = self.channel_configs[channel]
-        wiring_strategy = config["wiring_strategy"]
-        contact_type = config["contact_type"]
-        sensor_a_active = config["sensor_a_active"]
-        sensor_b_active = config["sensor_b_active"]
+        wiring_strategy = config.wiring_strategy
+        contact_type = config.contact_type
+        sensor_a_active = config.sensor_a_active
+        sensor_b_active = config.sensor_b_active
 
         logging.debug(
             "Calculating value channel: %s, strategy: %s, contact: %s, A active: %s, B active: %s",
@@ -543,17 +476,14 @@ class SimulatorApp(App):
         elif wiring_strategy == WiringStrategies.SHORTAGE.value:
             return CHANNEL_SHORTAGE
 
-        # Convert contact type to SensorContactTypes enum
-        contact_enum = SensorContactTypes.NC if contact_type == "nc" else SensorContactTypes.NO
-
         if wiring_strategy == WiringStrategies.SINGLE_WITH_EOL.value:
-            strategy = wiring_config.select_strategy(contact_enum, dual=False, two_eol=False)
+            strategy = wiring_config.select_strategy(contact_type, dual=False, two_eol=False)
             return strategy.active if sensor_a_active else strategy.default
         elif wiring_strategy == WiringStrategies.SINGLE_WITH_2EOL.value:
-            strategy = wiring_config.select_strategy(contact_enum, dual=False, two_eol=True)
+            strategy = wiring_config.select_strategy(contact_type, dual=False, two_eol=True)
             return strategy.active if sensor_a_active else strategy.default
         elif wiring_strategy == WiringStrategies.DUAL.value:
-            strategy = wiring_config.select_strategy(contact_enum, dual=True, two_eol=False)
+            strategy = wiring_config.select_strategy(contact_type, dual=True, two_eol=False)
             if sensor_a_active and sensor_b_active:
                 return strategy.both_active
             elif sensor_a_active:
@@ -575,9 +505,9 @@ class SimulatorApp(App):
         config = self.channel_configs[channel_name]
         # Toggle sensor state
         if sensor == "a":
-            config["sensor_a_active"] = not config["sensor_a_active"]
+            config.sensor_a_active = not config.sensor_a_active
         elif sensor == "b":
-            config["sensor_b_active"] = not config["sensor_b_active"]
+            config.sensor_b_active = not config.sensor_b_active
 
         # Update button appearance
         event.button.toggle_class("sensor-active")
@@ -603,9 +533,9 @@ class SimulatorApp(App):
 
         # Update configuration
         config = self.channel_configs[channel_name]
-        config["wiring_strategy"] = wiring_strategy
-        config["sensor_a_active"] = False  # Reset sensor states
-        config["sensor_b_active"] = False
+        config.wiring_strategy = wiring_strategy
+        config.sensor_a_active = False  # Reset sensor states
+        config.sensor_b_active = False
 
         # Update contact type select enable/disable
         contact_disabled = wiring_strategy in ["cut", "shortage"]
@@ -615,7 +545,7 @@ class SimulatorApp(App):
         # Update sensor button enable/disable
         sensor_a_button = self.query_one(f"#sensor-{channel_num}-a")
         sensor_b_button = self.query_one(f"#sensor-{channel_num}-b")
-        sensor_a_button.disabled = config["wiring_strategy"] in [
+        sensor_a_button.disabled = config.wiring_strategy in [
             WiringStrategies.CUT.value,
             WiringStrategies.SHORTAGE.value,
         ]
@@ -646,7 +576,10 @@ class SimulatorApp(App):
 
         # Update configuration
         config = self.channel_configs[channel_name]
-        config["contact_type"] = event.value
+        # Convert string value back to enum
+        config.contact_type = (
+            SensorContactTypes.NC if event.value == "NC" else SensorContactTypes.NO
+        )
 
         # Update channel value and label
         self.update_channel_label(channel_num, channel_name, config)
@@ -662,9 +595,9 @@ class SimulatorApp(App):
             [
                 "channel-label",
                 Channels.get_channel_class(
-                    config["wiring_strategy"], config["sensor_a_active"], config["sensor_b_active"]
+                    config.wiring_strategy, config.sensor_a_active, config.sensor_b_active
                 )
-                or config["wiring_strategy"],
+                or config.wiring_strategy,
             ]
         )
 
@@ -694,7 +627,7 @@ class SimulatorApp(App):
     async def refresh_channels_pressed(self, event: Button.Pressed) -> None:
         """Reload channel settings from the database and update the UI."""
         input_number = int(environ.get("INPUT_NUMBER", 15))
-        self.load_configuration_from_db(input_number)
+        self.load_configuration(input_number)
         self.save_input_states()
         await self.recompose()
 
