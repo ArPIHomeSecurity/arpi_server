@@ -78,8 +78,12 @@ class IPCServer(Thread):
             remove(MONITOR_INPUT_SOCKET)
 
         self.create_socket_file()
-        _socket.bind(MONITOR_INPUT_SOCKET)
-        _socket.listen(2)
+        try:
+            _socket.bind(MONITOR_INPUT_SOCKET)
+            _socket.listen(2)
+        except OSError as error:
+            self._logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
+            raise
 
         try:
             chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
@@ -91,7 +95,7 @@ class IPCServer(Thread):
             self._logger.info("Socket permissions fixed")
         except KeyError as error:
             self._logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
-            self._logger.debug("Error: %s", error)
+            self._logger.error("Error: %s", error)
 
         self._sockets = [_socket]
 

@@ -102,19 +102,21 @@ version = {attr = "server.version.__package_version__"}
 [tool.ruff]
 line-length = 100
 
-[tool.pytest.ini_options]
+[tool.pytest]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 log_level = "DEBUG"
-log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_format = "%(asctime)s-[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s"
 
 
 [dependency-groups]
 dev = [
     "build~=1.4",
     "cryptography~=46.0",
+    "deepdiff>=9.0.0",
     "pytest~=9.0",
+    "python-socketio[client]>=5.16.1",
     "rope~=1.14",
 ]

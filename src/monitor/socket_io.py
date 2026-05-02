@@ -23,6 +23,7 @@ socketio_app.wsgi_app = socketio.WSGIApp(sio, socketio_app.wsgi_app)
 
 @sio.on("connect")
 def connect(sid, environ):
+    #raise Exception("Connection attempt without authentication")  # should never happen, but just in case
     logger.debug('Client info "%s": %s', sid, environ)
     query_string = parse_qs(environ["QUERY_STRING"])
     remote_address = environ.get("HTTP_X_REAL_IP", environ.get("REMOTE_ADDR", ""))

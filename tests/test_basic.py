@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import signal
@@ -5,30 +6,37 @@ import subprocess
 
 from time import sleep
 
-from monitor.adapters.mock.utils import set_input_states
 import pytest
 import requests
+import socketio
 
+from dotenv import load_dotenv
+
+from monitor.adapters.mock.utils import set_input_state
 from monitor.sensor.detector import wiring_config
+from utils.models import SensorContactTypes
+from helpers import (
+    MonitorEvent,
+    call_api,
+    check_api_response,
+    MonitorEventsClient,
+    wait_for_monitoring_ready,
+)
 
+
+load_dotenv(".env.pytest")
 
 logger = logging.getLogger(__name__)
 
-CHANNEL_CUT = wiring_config.open_circuit
-CHANNEL_SHORTCUT = wiring_config.shortcut
 
-POWER_LOW = 0
-POWER_HIGH = 1
-
-# def set_channel_state(channel, state):
-#     channel_values = {f"CH{i:02d}": CHANNEL_CUT for i in range(1, os.environ["INPUT_NUMBER"] + 1)}
-#     channel_values["POWER"] = POWER_HIGH
-
-#     set_input_states(channel_values,)
+@pytest.fixture(scope="session")
+def monitoring_state():
+    with open("status.json", "w") as f:
+        json.dump({"State.MONITORING": "monitoring_stopped", "State.POWER": "network"}, f)
 
 
 @pytest.fixture(scope="session")
-def monitor():
+def monitor(monitoring_state):
     host = os.environ["MONITOR_HOST"]
     port = os.environ["MONITOR_PORT"]
     proc = subprocess.Popen(
@@ -46,12 +54,31 @@ def monitor():
         start_new_session=True,
     )
 
-    sleep(5)  # wait for the monitor to start
+    logger.debug("Monitor process started with PID %s", proc.pid)
+
+    # wait for the monitor to start
+    for _ in range(30):
+        try:
+            sio = socketio.SimpleClient()
+            sio.connect(f"http://{host}:{port}?token=invalid_token")
+            break
+        except socketio.exceptions.ConnectionError:
+            logger.debug("Monitor is ready")
+            break
+        except Exception as e:
+            logger.exception("Failed to connect to monitor Socket.IO: %s", e)
+        finally:
+            sio.disconnect()
+
+        logger.debug("Waiting for monitor to be ready...")
+        sleep(0.5)
+    else:
+        raise RuntimeError("Monitor did not become ready in time")
+
     yield
 
     # kill the monitor process twice, at least in terminal it needs two signals to stop
-    os.killpg(proc.pid, signal.SIGTERM)
-    os.killpg(proc.pid, signal.SIGTERM)
+    os.killpg(proc.pid, signal.SIGKILL)
     proc.wait()
 
 
@@ -130,51 +157,98 @@ def authenticate(device_token):
     yield response.json()["user_token"]
 
 
-def test_arm_away(monitor, server, user_token):
-    # call rest api to arm away
-    host = os.environ["SERVER_HOST"]
-    port = os.environ["SERVER_PORT"]
-    response = requests.put(
-        f"http://{host}:{port}/api/monitoring/arm?type=arm_away",
-        headers={
-            "Authorization": f"Bearer {user_token}",
-            "Origin": "http://localhost:8100",
-        },
-    )
-    assert response.status_code == 200
+def test_arm_away(monitor, server, device_token, user_token):
+    # connect to monitor websocket first to catch events
+    monitor_events = MonitorEventsClient(device_token)
+    try:
+        wait_for_monitoring_ready(device_token)
 
-    # get monitoring arm status
-    response = requests.get(
-        f"http://{host}:{port}/api/monitoring/arm",
-        headers={
-            "Authorization": f"Bearer {user_token}",
-            "Origin": "http://localhost:8100",
-        },
-    )
-    assert response.status_code == 200
+        response = call_api("PUT", "/api/monitoring/arm?type=arm_away", {}, user_token)
+        check_api_response(response)
 
-    # disarm the system
-    response = requests.put(
-        f"http://{host}:{port}/api/monitoring/arm?type=disarm",
-        headers={
-            "Authorization": f"Bearer {user_token}",
-            "Origin": "http://localhost:8100",
-        },
-    )
-    assert response.status_code == 200
+        # wait for area changed to armed away
+        monitor_events.wait_for_event(
+            MonitorEvent(
+                name="area_state_change",
+                payload={"id": 1, "name": "House", "armState": "arm_away", "uiOrder": None},
+            ),
+            timeout=1,
+        )
+
+        # get monitoring arm status
+        response = call_api("GET", "/api/monitoring/arm", {}, user_token)
+        check_api_response(response)
+
+        # disarm the system
+        response = call_api("PUT", "/api/monitoring/disarm", {}, user_token)
+        check_api_response(response)
+
+        # wait for area changed to disarmed
+        monitor_events.wait_for_event(
+            MonitorEvent(
+                name="area_state_change",
+                payload={"id": 1, "name": "House", "armState": "disarm", "uiOrder": None},
+            ),
+            timeout=2,
+        )
+
+        # get monitoring arm status
+        response = call_api("GET", "/api/monitoring/arm", {}, user_token)
+        check_api_response(response)
+
+        assert response.status_code == 200
+
+    finally:
+        monitor_events.disconnect()
 
 
-def test_alert(monitor, server, user_token):
-    # call rest api to arm away
-    host = os.environ["SERVER_HOST"]
-    port = os.environ["SERVER_PORT"]
-    response = requests.put(
-        f"http://{host}:{port}/api/monitoring/arm?type=arm_away",
-        headers={
-            "Authorization": f"Bearer {user_token}",
-            "Origin": "http://localhost:8100",
-        },
-    )
-    assert response.status_code == 200
+def test_alert(monitor, server, device_token, user_token):
+    monitor_events = MonitorEventsClient(device_token)
 
-    # set channel to activate
+    try:
+        # wait for monitoring to be ready
+        wait_for_monitoring_ready(device_token)
+
+        # call rest api to arm away
+        response = call_api("PUT", "/api/monitoring/arm?type=arm_away", {}, user_token)
+        check_api_response(response)
+
+        # set channel to activate
+        set_input_state("CH01", wiring_config.select_strategy(SensorContactTypes.NC).active)
+
+        # wait for alert event (alert delay is 3 seconds in test config, so wait for 4 seconds)
+        monitor_events.wait_for_event(
+            MonitorEvent(
+                name="alert_state_change",
+                payload={
+                    "id": 1,
+                    "alertType": "alert_away",
+                    "startTime": "2026-05-02 19:09:40",
+                    "endTime": None,
+                    "silent": True,
+                    "sensors": [
+                        {
+                            "sensorId": 1,
+                            "channel": 0,
+                            "typeId": 1,
+                            "name": "Test room",
+                            "description": "Test room movement sensor",
+                            "startTime": "2026-05-02 21:09:30",
+                            "endTime": None,
+                            "delay": 3,
+                            "silent": True,
+                            "monitorPeriod": None,
+                            "monitorThreshold": 100,
+                        }
+                    ],
+                },
+                diffOptions={
+                    "ignore_order": True,
+                    "exclude_paths": ["root['startTime']", "root['sensors'][0]['startTime']"],
+                },
+            ),
+            timeout=4,
+        )
+
+    finally:
+        monitor_events.disconnect()

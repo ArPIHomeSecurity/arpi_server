@@ -20,6 +20,11 @@ KEYPAD_FILE = "simulator_keypad.json"
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
 
+DEFAULT_INPUT_DATA = {
+    f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
+}
+DEFAULT_INPUT_DATA["POWER"] = 0
+
 
 class WiringStrategies(str, Enum):
     """
@@ -36,6 +41,7 @@ class WiringStrategies(str, Enum):
 @dataclass
 class ChannelConfig:
     """Configuration for a single channel."""
+
     wiring_strategy: str
     contact_type: SensorContactTypes
     sensor_a_active: bool = False
@@ -122,21 +128,26 @@ def get_input_state(input_name):
     """
     Get the numeric state of a specific input channel.
     """
-    default_data = {
-        f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
-    }
-    default_data["POWER"] = 0
+    default_data = DEFAULT_INPUT_DATA.copy()
     data = protected_read(INPUT_FILE, default_data)
     return data.get(input_name, 0)
+
+
+def set_input_state(input_name, state):
+    """
+    Set the numeric state of a specific input channel.
+    """
+    default_data = DEFAULT_INPUT_DATA.copy()
+    data = protected_read(INPUT_FILE, default_data)
+    data[input_name] = state
+    protected_write(INPUT_FILE, data)
 
 
 def set_input_states(channel_values):
     """
     Set the numeric state of all input channels.
     """
-    data = {
-        f"CH{str(i).zfill(2)}": value for i, value in enumerate(channel_values[:-1], start=1)
-    }
+    data = {f"CH{str(i).zfill(2)}": value for i, value in enumerate(channel_values[:-1], start=1)}
     data["POWER"] = channel_values[-1]
     protected_write(INPUT_FILE, data)
 

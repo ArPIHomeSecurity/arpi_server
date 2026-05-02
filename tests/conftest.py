@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import subprocess
 
 from os import environ
@@ -8,7 +9,9 @@ import pytest
 
 from dotenv import load_dotenv
 
-load_dotenv(".env.test")
+from data import create_test_with_v2
+
+load_dotenv(".env.pytest", override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +69,56 @@ def database_host():
 
 @pytest.fixture(scope="session", autouse=True)
 def database_data(database_host):
+    logger.debug("Running database initialization and data population")
     subprocess.run(["uv", "run", "flask", "--app", "server:app", "db", "upgrade"], check=True)
 
+    # result = subprocess.run(
+    #     ["uv", "run", "python", "src/bin/data.py", "-c", "test_with_v2"],
+    #     check=False,
+    #     capture_output=True,
+    #     text=True,
+    # )
+
+    # if result.returncode != 0:
+    #     logger.error("Data population output: %s", result.stderr)
+    #     raise RuntimeError("Data population failed")
+
+    create_test_with_v2()
+
+    yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mqtt():
+    path = Path(__file__).parent.parent
+    config_path = path / "scripts" / "mosquitto" / "mosquitto.dev.conf"
+    subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=False)
+    subprocess.run(["docker", "volume", "create", "argus-mqtt-test"], check=True)
     result = subprocess.run(
-        ["uv", "run", "python", "src/bin/data.py", "-c", "test_with_v2"],
-        check=False,
+        [
+            "docker",
+            "run",
+            "-d",
+            "-it",
+            "--name",
+            "argus-mqtt-test",
+            "-p",
+            "127.0.0.1:1883:1883",
+            "-p",
+            "127.0.0.1:9001:9001",
+            "-v",
+            f"{config_path}:/mosquitto/config/mosquitto.conf:ro",
+            "eclipse-mosquitto",
+        ],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     if result.returncode != 0:
-        logger.error("Data population output: %s", result.stderr)
-        raise RuntimeError("Data population failed")
+        logger.error("Failed to start MQTT broker: %s", result.stderr)
+        raise RuntimeError("Failed to start MQTT broker")
 
     yield
+
+    subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=True)
