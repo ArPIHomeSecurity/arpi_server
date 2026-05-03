@@ -59,47 +59,63 @@ class MonitorEventsClient:
     def clear_events(self):
         self._received.clear()
 
-    def wait_for_event(self, event: MonitorEvent, timeout=10):
+    def _find_event(self, event: MonitorEvent) -> bool:
+        """
+        Check if a specific Socket.IO event has been received.
+        If payload is provided, also check that the event payload matches.
+        """
+        for received_event in self._received:
+            if received_event.name == event.name:
+                if (
+                    event.payload is None
+                    and received_event.payload is None
+                    or DeepDiff(event.payload, received_event.payload, **(event.diffOptions or {}))
+                    == {}
+                ):
+                    logger.debug(
+                        "Socket.IO event '%s' received with payload: %s at %s",
+                        event.name,
+                        received_event.payload,
+                        datetime.now().strftime("%H:%M:%S"),
+                    )
+                    return True
+                else:
+                    logger.debug(
+                        "Socket.IO event '%s' received but payload does not match. Received: %s, Expected: %s at %s",
+                        event.name,
+                        received_event.payload,
+                        event.payload,
+                        datetime.now().strftime("%H:%M:%S"),
+                    )
+
+        return False
+
+    def wait_for_event(self, event: MonitorEvent, delay=0, timeout=10):
         """
         Wait for a specific Socket.IO event to arrive within timeout.
         If payload is provided, also check that the event payload matches.
         """
-        start = datetime.now()
         logger.debug(
             "Waiting for Socket.IO event: %s from %s",
             event.name,
-            start.strftime("%H:%M:%S"),
+            datetime.now().strftime("%H:%M:%S"),
         )
+
+        start = datetime.now()
+        while (datetime.now() - start).total_seconds() < delay:
+            assert not self._find_event(event), (
+                f"Socket.IO event '{event.name}' received before delay period at {datetime.now().strftime('%H:%M:%S')}"
+            )
+            sleep(0.1)
+
+        start = datetime.now()
         while (datetime.now() - start).total_seconds() < timeout:
-            for received_event in self._received:
-                if received_event.name == event.name:
-                    if (
-                        event.payload is None
-                        and received_event.payload is None
-                        or DeepDiff(
-                            event.payload, received_event.payload, **(event.diffOptions or {})
-                        )
-                        == {}
-                    ):
-                        logger.debug(
-                            "Socket.IO event '%s' received with payload: %s at %s",
-                            event.name,
-                            received_event.payload,
-                            datetime.now().strftime("%H:%M:%S"),
-                        )
-                        return
-                    else:
-                        logger.debug(
-                            "Socket.IO event '%s' received but payload does not match. Received: %s, Expected: %s at %s",
-                            event.name,
-                            received_event.payload,
-                            event.payload,
-                            datetime.now().strftime("%H:%M:%S"),
-                        )
+            if self._find_event(event):
+                return
 
             sleep(0.1)
 
-        raise AssertionError(
+        assert False, (
             f"Socket.IO event '{event.name}' not received within {timeout} seconds at {datetime.now().strftime('%H:%M:%S')}"
         )
 

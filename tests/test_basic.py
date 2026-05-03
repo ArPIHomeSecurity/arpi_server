@@ -247,7 +247,8 @@ def test_alert(monitor, server, device_token, user_token):
                     "exclude_paths": ["root['startTime']", "root['sensors'][0]['startTime']"],
                 },
             ),
-            timeout=4,
+            delay=3,
+            timeout=0.5,
         )
 
     finally:
