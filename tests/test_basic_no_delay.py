@@ -1,5 +1,6 @@
 import logging
 
+from deepdiff import DeepDiff
 from dotenv import load_dotenv
 import pytest
 
@@ -159,6 +160,7 @@ def test_alert(device_token, user_token):
                     "exclude_paths": [
                         "root['id']",
                         "root['startTime']",
+                        "root['sensors'][0]['sensorId']",
                         "root['sensors'][0]['startTime']",
                     ],
                 },
@@ -170,6 +172,111 @@ def test_alert(device_token, user_token):
         # disarm the system
         response = call_api("PUT", "/api/monitoring/disarm", {}, user_token)
         check_api_response(response)
+
+        # check for alert in the event log
+        response = call_api("GET", "/api/arms/count", {}, user_token)
+        check_api_response(response)
+
+        assert response.status_code == 200
+        assert response.json() == 1
+
+        response = call_api("GET", "/api/arms/count?has_alert=true", {}, user_token)
+        check_api_response(response)
+
+        assert response.status_code == 200
+        assert response.json() == 1
+
+        # get arm events
+        response = call_api("GET", "/api/arms", {}, user_token)
+        check_api_response(response)
+        logger.debug(f"API response: {response.json()}")
+
+        assert response.status_code == 200
+        difference = DeepDiff(
+            response.json(),
+            [
+                {
+                    "alert": {
+                        "alertType": "alert_away",
+                        "endTime": None,
+                        "id": 1,
+                        "sensors": [
+                            {
+                                "channel": 0,
+                                "delay": 0,
+                                "description": "Test room movement sensor",
+                                "endTime": None,
+                                "monitorPeriod": None,
+                                "monitorThreshold": 100,
+                                "name": "Test room",
+                                "sensorId": 1,
+                                "silent": True,
+                                "startTime": "2026-05-08 21:26:23",
+                                "typeId": 1,
+                            }
+                        ],
+                        "silent": False,
+                        "startTime": "2026-05-08 19:26:23",
+                    },
+                    "arm": {
+                        "keypadId": None,
+                        "time": "2026-05-08 21:26:23",
+                        "type": "arm_away",
+                        "userId": 1,
+                    },
+                    "disarm": {"keypadId": None, "time": "2026-05-08 21:26:23", "userId": 1},
+                    "sensorChanges": [
+                        {
+                            "sensors": [
+                                {
+                                    "channel": 0,
+                                    "delay": 0,
+                                    "description": "Test room movement sensor",
+                                    "enabled": True,
+                                    "name": "Test room",
+                                    "sensorId": 1,
+                                    "timestamp": "2026-05-08 21:26:23",
+                                    "typeId": 1,
+                                },
+                                {
+                                    "channel": 1,
+                                    "delay": 0,
+                                    "description": "Test room 0 door sensor",
+                                    "enabled": True,
+                                    "name": "Test room 0",
+                                    "sensorId": 2,
+                                    "timestamp": "2026-05-08 21:26:23",
+                                    "typeId": 3,
+                                },
+                                {
+                                    "channel": 2,
+                                    "delay": 0,
+                                    "description": "Sabotage wire",
+                                    "enabled": True,
+                                    "name": "Tamper",
+                                    "sensorId": 3,
+                                    "timestamp": "2026-05-08 21:26:23",
+                                    "typeId": 2,
+                                },
+                            ],
+                            "timestamp": "2026-05-08 21:26:23",
+                        }
+                    ],
+                }
+            ],
+            ignore_order=True,
+            exclude_paths=[
+                "root[0]['arm']['time']",
+                "root[0]['disarm']['time']",
+                "root[0]['alert']['startTime']",
+                "root[0]['alert']['sensors'][0]['startTime']",
+                "root[0]['sensorChanges'][0]['timestamp']",
+                "root[0]['sensorChanges'][0]['sensors'][0]['timestamp']",
+                "root[0]['sensorChanges'][0]['sensors'][1]['timestamp']",
+                "root[0]['sensorChanges'][0]['sensors'][2]['timestamp']",
+            ],
+        )
+        assert difference == {}, f"Arm events do not match expected. Difference: {difference}"
 
     finally:
         monitor_events.disconnect()

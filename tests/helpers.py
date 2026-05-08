@@ -66,11 +66,15 @@ class MonitorEventsClient:
         """
         for received_event in self._received:
             if received_event.name == event.name:
+                difference = DeepDiff(
+                    event.payload,
+                    received_event.payload,
+                    **(event.diffOptions or {}),
+                )
                 if (
                     event.payload is None
                     and received_event.payload is None
-                    or DeepDiff(event.payload, received_event.payload, **(event.diffOptions or {}))
-                    == {}
+                    or difference == {}
                 ):
                     logger.debug(
                         "Socket.IO event '%s' received with payload: %s at %s",
@@ -81,11 +85,12 @@ class MonitorEventsClient:
                     return True
                 else:
                     logger.debug(
-                        "Socket.IO event '%s' received but payload does not match. Received: %s, Expected: %s at %s",
+                        "Socket.IO event '%s' received but payload does not match. Received: %s, Expected: %s at %s. Difference: %s",
                         event.name,
                         received_event.payload,
                         event.payload,
                         datetime.now().strftime("%H:%M:%S"),
+                        difference,
                     )
 
         return False
