@@ -8,8 +8,13 @@ from monitor.config.models import MQTTConfigInternalPublish
 from monitor.database import get_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
+    Alert,
+    AlertSensor,
     Area,
+    Arm,
+    ArmSensor,
     ChannelTypes,
+    Disarm,
     Option,
     Sensor,
     SensorContactTypes,
@@ -21,6 +26,18 @@ from utils.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def clear_events():
+    session = get_database_session()
+    logger.info("Clearing events...")
+    session.execute(ArmSensor.__table__.delete())
+    session.execute(AlertSensor.__table__.delete())
+    session.execute(Disarm.__table__.delete())
+    session.execute(Arm.__table__.delete())
+    session.execute(Alert.__table__.delete())
+    session.commit()
+    logger.info("Events cleared")
 
 
 def _create_sensor_types(session):

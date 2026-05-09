@@ -14,9 +14,9 @@ from monitor.output import OUTPUT_NAMES
 from utils.models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
 
 # buffer files between the simulator and the mock adapters
-INPUT_FILE = "simulator_input.json"
-OUTPUT_FILE = "simulator_output.json"
-KEYPAD_FILE = "simulator_keypad.json"
+INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
+OUTPUT_FILE = os.environ.get("MOCK_OUTPUT_FILE", "simulator_output.json")
+KEYPAD_FILE = os.environ.get("MOCK_KEYPAD_FILE", "simulator_keypad.json")
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
 

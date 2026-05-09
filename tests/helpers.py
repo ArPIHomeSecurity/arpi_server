@@ -11,6 +11,8 @@ import socketio
 
 logger = logging.getLogger(__name__)
 
+def _get_time_string():
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 @dataclass
 class MonitorEvent:
@@ -20,6 +22,7 @@ class MonitorEvent:
 
 
 class MonitorEventsClient:
+
     def __init__(self, device_token: str):
         self.sio = socketio.Client()
         self._received = []
@@ -80,7 +83,7 @@ class MonitorEventsClient:
                         "Socket.IO event '%s' received with payload: %s at %s",
                         event.name,
                         received_event.payload,
-                        datetime.now().strftime("%H:%M:%S"),
+                        _get_time_string(),
                     )
                     return True
                 else:
@@ -89,7 +92,7 @@ class MonitorEventsClient:
                         event.name,
                         received_event.payload,
                         event.payload,
-                        datetime.now().strftime("%H:%M:%S"),
+                        _get_time_string(),
                         difference,
                     )
 
@@ -103,13 +106,13 @@ class MonitorEventsClient:
         logger.debug(
             "Waiting for Socket.IO event: %s from %s",
             event.name,
-            datetime.now().strftime("%H:%M:%S"),
+            _get_time_string(),
         )
 
         start = datetime.now()
         while (datetime.now() - start).total_seconds() < delay:
             assert not self._find_event(event), (
-                f"Socket.IO event '{event.name}' received before delay period at {datetime.now().strftime('%H:%M:%S')}"
+                f"Socket.IO event '{event.name}' received before delay period at {_get_time_string()}"
             )
             sleep(0.1)
 
@@ -121,45 +124,50 @@ class MonitorEventsClient:
             sleep(0.1)
 
         assert False, (
-            f"Socket.IO event '{event.name}' not received within {timeout} seconds at {datetime.now().strftime('%H:%M:%S')}"
+            f"Socket.IO event '{event.name}' not received within {timeout} seconds at {_get_time_string()}"
         )
 
-    def wait_for_events(self, events: list[MonitorEvent], timeout=10):
+    def wait_for_events(self, events: list[MonitorEvent], delay=0, timeout=10):
         """
         Wait for all specified Socket.IO events to arrive within timeout.
         If payload is provided for an event, also check that the event payload matches.
         """
-        start = datetime.now()
         logger.debug(
             "Waiting for Socket.IO events: %s from %s",
             [event.name for event in events],
-            start.strftime("%H:%M:%S"),
+            _get_time_string(),
         )
-        while (datetime.now() - start).total_seconds() < timeout:
-            matched_events = []
+
+        start = datetime.now()
+        while (datetime.now() - start).total_seconds() < delay:
             for event in events:
-                for received_event in self._received:
-                    if received_event.name == event.name:
-                        if (
-                            event.payload is None
-                            and received_event.payload is None
-                            or received_event.payload == event.payload
-                        ):
-                            matched_events.append(received_event)
-                            break
+                assert not self._find_event(event), (
+                    f"Socket.IO event '{event.name}' received before delay period ({delay} seconds) at {_get_time_string()}"
+                )
+            sleep(0.1)
+
+        start = datetime.now()
+        matched_events = []
+        while (datetime.now() - start).total_seconds() < timeout:
+            for event in events:
+                if event not in matched_events and self._find_event(event):
+                    matched_events.append(event)
+                    break
 
             if len(matched_events) == len(events):
                 logger.debug(
                     "All Socket.IO events received: %s at %s",
                     [event.name for event in events],
-                    datetime.now().strftime("%H:%M:%S"),
+                    _get_time_string(),
                 )
                 return
 
             sleep(0.1)
 
+        missing_events = [event.name for event in events if event not in matched_events]
+
         raise AssertionError(
-            f"Socket.IO events not received within {timeout} seconds at {datetime.now().strftime('%H:%M:%S')}"
+            f"Socket.IO events not received within {timeout} seconds at {_get_time_string()}: {missing_events}"
         )
 
 
