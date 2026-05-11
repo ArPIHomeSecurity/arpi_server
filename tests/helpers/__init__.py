@@ -9,6 +9,8 @@ from deepdiff import DeepDiff
 import requests
 import socketio
 
+from utils.constants import MONITORING_READY
+
 logger = logging.getLogger(__name__)
 
 
@@ -192,20 +194,25 @@ def check_api_response(response, expected_status=200):
 
 
 def wait_for_monitoring_ready(device_token: str, timeout=15):
+    wait_for_monitoring_state(MONITORING_READY, device_token, timeout)
+
+def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
     start_time = time()
     while time() - start_time < timeout:
         response = call_api("GET", "/api/monitoring/state", {}, device_token)
         check_api_response(response)
-        if response.json()["state"] == "monitoring_ready":
+        if response.json()["state"] == state:
             logger.debug(
-                "Monitoring is ready at %s",
+                "Monitoring is in state '%s' at %s",
+                state,
                 datetime.now().strftime("%H:%M:%S"),
             )
             break
         else:
             logger.debug(
-                "Monitoring state is '%s', waiting for 'monitoring_ready' at %s",
-                response.json(),
+                "Monitoring state is '%s', waiting for '%s' at %s",
+                response.json()["state"],
+                state,
                 datetime.now().strftime("%H:%M:%S"),
             )
 

@@ -26,6 +26,7 @@ from utils.constants import (
     MONITORING_ARM_DELAY,
     MONITORING_ARMED,
     MONITORING_ERROR,
+    MONITORING_INVALID_CONFIG,
     MONITORING_READY,
     MONITORING_SABOTAGE,
     MONITORING_STARTUP,
@@ -122,7 +123,7 @@ class Monitor(Thread):
         States.open()
         if States.get(State.MONITORING) is None:
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) == MONITORING_ERROR:
+        elif States.get(State.MONITORING) in (MONITORING_ERROR, MONITORING_INVALID_CONFIG):
             self._logger.warning("Monitor restarted after error")
             States.set(State.MONITORING, MONITORING_STARTUP)
         elif States.get(State.MONITORING) == MONITORING_STOPPED:
