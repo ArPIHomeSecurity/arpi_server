@@ -312,9 +312,7 @@ class Sensor(BaseModel):
 
     @validates("name")
     def validates_name(self, key, name):
-        assert 0 <= len(name) <= Sensor.NAME_LENGTH, (
-            f"Incorrect 'name' field length ({len(name)})"
-        )
+        assert 0 <= len(name) <= Sensor.NAME_LENGTH, f"Incorrect 'name' field length ({len(name)})"
         return name
 
     @validates("channel")

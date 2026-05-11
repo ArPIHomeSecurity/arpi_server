@@ -14,7 +14,7 @@ class SSHService:
     def __init__(self):
         super(SSHService, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
-        self._ssh_config = SSHConfig.load_config(get_database_session(new_connection=True))
+        self._ssh_config = SSHConfig.load_config(get_database_session())
 
     def update_service_state(self):
         self._logger.debug("Updating SSH service state...")

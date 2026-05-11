@@ -9,10 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
 from utils.constants import LOG_SOCKETIO
-from monitor.database import get_database_session
 
-
-session = get_database_session()
 logger = logging.getLogger(LOG_SOCKETIO)
 
 sio = socketio.Server(async_mode="threading", cors_allowed_origins="*")
@@ -23,7 +20,6 @@ socketio_app.wsgi_app = socketio.WSGIApp(sio, socketio_app.wsgi_app)
 
 @sio.on("connect")
 def connect(sid, environ):
-    #raise Exception("Connection attempt without authentication")  # should never happen, but just in case
     logger.debug('Client info "%s": %s', sid, environ)
     query_string = parse_qs(environ["QUERY_STRING"])
     remote_address = environ.get("HTTP_X_REAL_IP", environ.get("REMOTE_ADDR", ""))

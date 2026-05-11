@@ -37,6 +37,9 @@ def clear_events():
     session.execute(Arm.__table__.delete())
     session.execute(Alert.__table__.delete())
     session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
     logger.info("Events cleared")
 
 
@@ -94,6 +97,9 @@ def clear_database():
         except ProgrammingError:
             logger.warning("   Table %s does not exist, skipping", table)
             session.rollback()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
     logger.info("Database is empty")
 
 
@@ -160,6 +166,9 @@ def create_test_no_delay_v2():
     logger.info(" - Created sensors")
 
     session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
     logger.info("Database setup is complete")
 
 
@@ -257,4 +266,7 @@ def create_test_with_delay_v2():
     logger.info(" - Created sensors")
 
     session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
     logger.info("Database setup is complete")

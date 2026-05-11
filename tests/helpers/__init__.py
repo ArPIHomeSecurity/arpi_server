@@ -11,8 +11,10 @@ import socketio
 
 logger = logging.getLogger(__name__)
 
+
 def _get_time_string():
     return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
 
 @dataclass
 class MonitorEvent:
@@ -22,7 +24,6 @@ class MonitorEvent:
 
 
 class MonitorEventsClient:
-
     def __init__(self, device_token: str):
         self.sio = socketio.Client()
         self._received = []
@@ -74,11 +75,7 @@ class MonitorEventsClient:
                     received_event.payload,
                     **(event.diffOptions or {}),
                 )
-                if (
-                    event.payload is None
-                    and received_event.payload is None
-                    or difference == {}
-                ):
+                if event.payload is None and received_event.payload is None or difference == {}:
                     logger.debug(
                         "Socket.IO event '%s' received with payload: %s at %s",
                         event.name,
@@ -212,6 +209,6 @@ def wait_for_monitoring_ready(device_token: str, timeout=15):
                 datetime.now().strftime("%H:%M:%S"),
             )
 
-        sleep(0.1)
+        sleep(0.5)
     else:
         raise RuntimeError("Monitoring did not become ready in time")

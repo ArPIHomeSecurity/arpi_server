@@ -1,7 +1,9 @@
-import json
+from dotenv import load_dotenv
+
+load_dotenv(".env.pytest", override=True)
+
 import logging
 import os
-import signal
 from pathlib import Path
 import subprocess
 
@@ -10,13 +12,11 @@ from time import sleep
 
 import pytest
 
-from dotenv import load_dotenv
 import requests
-import socketio
 
 from data import clear_database
+from helpers.services import server_service
 
-load_dotenv(".env.pytest", override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -123,96 +123,12 @@ def mqtt():
     subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=True)
 
 
-@pytest.fixture(scope="module")
-def monitoring_state():
-    with open("status.json", "w") as f:
-        json.dump({"State.MONITORING": "monitoring_stopped", "State.POWER": "network"}, f)
-
-
-@pytest.fixture(scope="module", autouse=True)
-def monitor(monitoring_state, mqtt, database_data):
-    host = os.environ["MONITOR_HOST"]
-    port = os.environ["MONITOR_PORT"]
-    proc = subprocess.Popen(
-        [
-            "uv",
-            "run",
-            "flask",
-            "--app",
-            "monitor.service:create_app",
-            "run",
-            "--no-reload",
-            f"--host={host}",
-            f"--port={port}",
-        ],
-        start_new_session=True,
-    )
-
-    logger.debug("Monitor process started with PID %s", proc.pid)
-
-    # wait for the monitor to start
-    for _ in range(30):
-        try:
-            sio = socketio.SimpleClient()
-            sio.connect(f"http://{host}:{port}?token=invalid_token")
-            break
-        except socketio.exceptions.ConnectionError:
-            logger.debug("Monitor is ready")
-            break
-        except Exception as e:
-            logger.exception("Failed to connect to monitor Socket.IO: %s", e)
-        finally:
-            sio.disconnect()
-
-        logger.debug("Waiting for monitor to be ready...")
-        sleep(0.5)
-    else:
-        raise RuntimeError("Monitor did not become ready in time")
-
-    yield
-
-    # kill the monitor process twice, at least in terminal it needs two signals to stop
-    os.killpg(proc.pid, signal.SIGKILL)
-    proc.wait()
-
-
 @pytest.fixture(scope="module", autouse=True)
 def server(database_data):
     host = os.environ["SERVER_HOST"]
     port = os.environ["SERVER_PORT"]
-
-    proc = subprocess.Popen(
-        [
-            "uv",
-            "run",
-            "flask",
-            "--app",
-            "server",
-            "run",
-            f"--host={host}",
-            f"--port={port}",
-        ],
-        start_new_session=True,
-    )
-
-    # wait for the server to start
-    for _ in range(30):
-        try:
-            response = requests.get(f"http://{host}:{port}/api/version")
-            if response.status_code == 200:
-                logger.debug("Server is ready")
-                break
-        except requests.ConnectionError:
-            pass
-        logger.debug("Waiting for server to be ready...")
-        sleep(0.5)
-    else:
-        raise RuntimeError("Server did not become ready in time")
-
-    yield
-
-    os.killpg(proc.pid, signal.SIGTERM)
-    proc.wait()
+    with server_service(host, port):
+        yield
 
 
 @pytest.fixture(scope="module", name="device_token")

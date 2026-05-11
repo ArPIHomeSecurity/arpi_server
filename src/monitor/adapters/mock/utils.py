@@ -221,8 +221,7 @@ def load_channel_configs(input_number: int) -> dict:
         if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
             wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
         elif (
-            sensor.channel_type == ChannelTypes.BASIC
-            or sensor.channel_type == ChannelTypes.NORMAL
+            sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL
         ):
             wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
         elif (

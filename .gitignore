@@ -22,3 +22,8 @@ status.json
 
 arpi_dhparam.pem
 config.env
+.coverage
+
+*_input.json
+*_output.json
+*_keypad.json

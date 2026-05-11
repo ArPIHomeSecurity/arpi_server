@@ -6,7 +6,7 @@ import pytest
 
 from monitor.adapters.mock.utils import set_input_state
 from monitor.sensor.detector import wiring_config
-from tests.data import create_test_with_delay_v2
+from data import create_test_with_delay_v2
 from utils.models import SensorContactTypes
 from helpers import (
     MonitorEvent,
