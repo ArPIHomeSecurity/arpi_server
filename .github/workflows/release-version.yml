@@ -81,6 +81,9 @@ jobs:
           task format-check
           task lint
 
+      - name: Run tests 🔍
+        run: task test
+
       - name: Bump version 🏷️
         run: |
           if [ "${{ steps.set_inputs.outputs.version_type }}" = "release" ]; then
