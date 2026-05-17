@@ -139,7 +139,7 @@ class Monitor(Thread):
             )
             States.set(State.MONITORING, MONITORING_STARTUP)
         elif state in (MONITORING_ARM_DELAY, MONITORING_ARMED):
-            arm = self._db_session.scalar(select(Arm).where(Arm.disarm == None))
+            arm = self._db_session.scalar(select(Arm).where(Arm.disarm == None))  # noqa: E711
             arm_state = get_arm_state(self._db_session)
 
             if arm_state == ARM_DISARM:
