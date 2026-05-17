@@ -9,10 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
 from utils.constants import LOG_SOCKETIO
-from monitor.database import get_database_session
 
-
-session = get_database_session()
 logger = logging.getLogger(LOG_SOCKETIO)
 
 sio = socketio.Server(async_mode="threading", cors_allowed_origins="*")
@@ -53,8 +50,8 @@ def disconnect(sid):
     logging.getLogger(LOG_SOCKETIO).info('Disconnected "%s"', sid)
 
 
-def send_alert_state(arm_state):
-    send_message("alert_state_change", arm_state)
+def send_alert_state(alert_state):
+    send_message("alert_state_change", alert_state)
 
 
 def send_arm_state(arm_state):

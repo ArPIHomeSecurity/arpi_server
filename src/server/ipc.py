@@ -78,7 +78,8 @@ class IPCClient(object):
                 }
             )
         else:
-            print(f"Unknown arm type: {arm_type}")
+            self._logger.error("Unknown arm type: %s", arm_type)
+            return {"message": "Unknown arm type"}
 
     def disarm(self, user_id, area_id=None):
         return self._send_message(

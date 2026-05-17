@@ -6,16 +6,24 @@ import contextlib
 import fcntl
 import json
 import os
+from dataclasses import dataclass
 from enum import Enum
 
+from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
+from utils.models import Sensor, SensorContactTypes, ChannelTypes, SensorEOLCount
 
 # buffer files between the simulator and the mock adapters
-INPUT_FILE = "simulator_input.json"
-OUTPUT_FILE = "simulator_output.json"
-KEYPAD_FILE = "simulator_keypad.json"
+INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
+OUTPUT_FILE = os.environ.get("MOCK_OUTPUT_FILE", "simulator_output.json")
+KEYPAD_FILE = os.environ.get("MOCK_KEYPAD_FILE", "simulator_keypad.json")
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
+
+DEFAULT_INPUT_DATA = {
+    f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
+}
+DEFAULT_INPUT_DATA["POWER"] = 0
 
 
 class WiringStrategies(str, Enum):
@@ -30,13 +38,14 @@ class WiringStrategies(str, Enum):
     SHORTAGE = "shortage"
 
 
-class ContactTypes(str, Enum):
-    """
-    Contact types of the sensors
-    """
+@dataclass
+class ChannelConfig:
+    """Configuration for a single channel."""
 
-    NC = "nc"
-    NO = "no"
+    wiring_strategy: str
+    contact_type: SensorContactTypes
+    sensor_a_active: bool = False
+    sensor_b_active: bool = False
 
 
 def protected_read(filename, default_data):
@@ -117,98 +126,30 @@ def protected_update(filename, data, default_data, merge_function):
 
 def get_input_state(input_name):
     """
-    Get the state of a specific input channel.
+    Get the numeric state of a specific input channel.
     """
-    default_data = {
-        f"CH{str(i).zfill(2)}": {"value": 0, "type": "cut"}
-        for i in range(int(os.environ.get("INPUT_NUMBER", 0)))
-    }
-    default_data["POWER"] = 0
+    default_data = DEFAULT_INPUT_DATA.copy()
     data = protected_read(INPUT_FILE, default_data)
-    if input_name == "POWER":
-        return data.get(input_name)
-    else:
-        channel_data = data.get(input_name, {"value": 0, "type": "cut"})
-        return channel_data.get("value", 0) if isinstance(channel_data, dict) else channel_data
+    return data.get(input_name, 0)
 
 
-def set_input_states(channel_values, channel_configs):
+def set_input_state(input_name, state):
     """
-    Set the state of all input channels with their complete configurations.
+    Set the numeric state of a specific input channel.
     """
-    data = {}
-    for i, (value, config) in enumerate(zip(channel_values[:-1], channel_configs), start=1):
-        ch_key = f"CH{str(i).zfill(2)}"
-        if isinstance(config, dict):
-            data[ch_key] = {
-                "value": value,
-                "wiring_strategy": config.get("wiring_strategy", "cut"),
-                "contact_type": config.get("contact_type", "nc"),
-                "sensor_a_active": config.get("sensor_a_active", False),
-                "sensor_b_active": config.get("sensor_b_active", False),
-            }
-        else:
-            # Handle legacy format where config is just a string type
-            data[ch_key] = {
-                "value": value,
-                "wiring_strategy": "cut" if config in ["cut", "shortage"] else "single_with_eol",
-                "contact_type": "nc",
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            }
-    data["POWER"] = channel_values[-1]
+    default_data = DEFAULT_INPUT_DATA.copy()
+    data = protected_read(INPUT_FILE, default_data)
+    data[input_name] = state
     protected_write(INPUT_FILE, data)
 
 
-def get_channel_configs():
+def set_input_states(channel_values):
     """
-    Get the complete configuration of all channels.
-
-    If the configuration is in an old format (just a string), it defaults to "cut".
-    In case of missing fields, default values are used.
+    Set the numeric state of all input channels.
     """
-
-    default_data = {
-        f"CH{str(i).zfill(2)}": {
-            "value": 0,
-            "wiring_strategy": WiringStrategies.SINGLE_WITH_EOL.value,
-            "contact_type": ContactTypes.NC.value,
-            "sensor_a_active": False,
-            "sensor_b_active": False,
-        }
-        for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
-    }
-    default_data["POWER"] = 0
-    data = protected_read(INPUT_FILE, default_data)
-    configs = {}
-    keys = [f"CH{str(i).zfill(2)}" for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)]
-    for ch_key in keys:
-        channel_data = data.get(
-            ch_key,
-            {
-                "value": 0,
-                "wiring_strategy": "cut",
-                "contact_type": "nc",
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            },
-        )
-        if isinstance(channel_data, dict):
-            configs[ch_key] = {
-                "wiring_strategy": channel_data.get("wiring_strategy", "cut"),
-                "contact_type": channel_data.get("contact_type", "nc"),
-                "sensor_a_active": channel_data.get("sensor_a_active", False),
-                "sensor_b_active": channel_data.get("sensor_b_active", False),
-            }
-        else:
-            # Handle old format - default to "cut"
-            configs[ch_key] = {
-                "wiring_strategy": "cut",
-                "contact_type": "nc",
-                "sensor_a_active": False,
-                "sensor_b_active": False,
-            }
-    return configs
+    data = {f"CH{str(i).zfill(2)}": value for i, value in enumerate(channel_values[:-1], start=1)}
+    data["POWER"] = channel_values[-1]
+    protected_write(INPUT_FILE, data)
 
 
 def get_output_states() -> list[bool]:
@@ -249,3 +190,49 @@ def set_keypad_state(pending_bits, data):
     new_data = {"pending_bits": pending_bits, "data": data}
 
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
+
+
+def load_channel_configs(input_number: int) -> dict:
+    """
+    Load channel configurations from the database.
+    Returns a dict mapping channel names (CH01, CH02, ...) to ChannelConfig instances.
+    """
+    session = get_database_session()
+    sensors = (
+        session.query(Sensor)
+        .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
+        .order_by(Sensor.channel)
+        .all()
+    )
+
+    channel_configs = {
+        f"CH{i:02d}": ChannelConfig(
+            wiring_strategy=WiringStrategies.CUT.value,
+            contact_type=SensorContactTypes.NC,
+        )
+        for i in range(1, input_number + 1)
+    }
+
+    # Update configs from DB
+    for sensor in sensors:
+        channel_name = f"CH{sensor.channel + 1:02d}"
+        # Map DB fields to simulator config
+        wiring_strategy = WiringStrategies.CUT.value
+        if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
+            wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
+        elif (
+            sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL
+        ):
+            wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
+        elif (
+            sensor.channel_type == ChannelTypes.CHANNEL_A
+            or sensor.channel_type == ChannelTypes.CHANNEL_B
+        ):
+            wiring_strategy = WiringStrategies.DUAL.value
+
+        channel_configs[channel_name] = ChannelConfig(
+            wiring_strategy=wiring_strategy,
+            contact_type=SensorContactTypes(sensor.sensor_contact_type),
+        )
+
+    return channel_configs

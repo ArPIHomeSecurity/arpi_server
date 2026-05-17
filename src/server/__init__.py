@@ -33,11 +33,15 @@ if __name__ != "server":
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+DB_HOST = environ.get("DB_HOST", "/var/run/postgresql")
+
 db_user = environ.get("DB_USER")
 if db_user:
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = (
+        f"postgresql://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
+    )
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql:///{environ['DB_SCHEMA']}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"postgresql:///{environ['DB_SCHEMA']}?host={DB_HOST}"
 
 app.logger.debug("App config: %s", app.config)
 

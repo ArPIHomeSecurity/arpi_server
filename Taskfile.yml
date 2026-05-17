@@ -3,7 +3,6 @@
 version: '3'
 
 vars:
-  GREETING: Hello, world!
 
 tasks:
   create-environment:
@@ -133,3 +132,9 @@ tasks:
           -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt:/etc/nginx/arpi_dev.crt:ro
           -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key:/etc/nginx/arpi_dev.key:ro
           nginx
+
+  test:
+    - uv run pytest -v {{.CLI_ARGS}}
+
+  test-debug:
+    - uv run pytest -vv -s --setup-show {{.CLI_ARGS}}

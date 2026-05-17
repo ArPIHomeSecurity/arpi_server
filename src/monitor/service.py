@@ -15,7 +15,7 @@ from tools.ssh_service import SSHService
 stop_event = Event()
 logger = logging.getLogger(LOG_SERVICE)
 
-background_service = BackgroundService(stop_event)
+background_service = None
 
 
 def signal_term_handler(signal_number, frame):
@@ -24,27 +24,33 @@ def signal_term_handler(signal_number, frame):
 
 
 def start_background_service():
+    global background_service
     logger.debug("Starting background service")
     signal(SIGTERM, signal_term_handler)
 
-    # thread safe lock for starting the application only once
-    if os.environ.get("MONITOR_RUNNING", "false").lower() == "true":
+    if background_service is not None:
+        logger.error("Background service is already running")
         return
+
+    background_service = BackgroundService(stop_event)
 
     if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":
         SSHService().update_service_state()
 
     background_service.start()
-    os.environ["MONITOR_RUNNING"] = "true"
 
 
 def stop_background_service():
+    global background_service
     logger.debug("Stopping background service")
     stop_event.set()
 
     # check if the background service is running
     if background_service and background_service.is_alive():
         background_service.join()
+        logger.debug("Background service stopped")
+        background_service = None
+        stop_event.clear()
 
 
 def create_app():

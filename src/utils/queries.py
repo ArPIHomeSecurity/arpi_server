@@ -77,13 +77,14 @@ def get_arm_state(session) -> str:
         logger.debug("Areas state %s", ARM_MIXED)
         return ARM_MIXED
 
-    state = (
-        session.execute(
-            select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)  # noqa: E712
-        )
-        .first()
-        .arm_state
-    )
+    result = session.execute(
+        select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)  # noqa: E712
+    ).first()
+
+    if result is None:
+        state = ARM_DISARM
+    else:
+        state = result.arm_state
 
     logger.debug("Areas state %s", state)
     return state
