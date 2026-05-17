@@ -118,7 +118,7 @@ omit = [
 
 [dependency-groups]
 dev = [
-    "build~=1.4",
+    "build~=1.5",
     "cryptography~=46.0",
     "deepdiff>=9.0.0",
     "pytest~=9.0",
