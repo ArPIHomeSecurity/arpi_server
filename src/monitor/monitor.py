@@ -11,6 +11,8 @@ from queue import Empty, Queue
 from threading import Thread, Timer
 from time import sleep
 
+from sqlalchemy import select
+
 from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
@@ -37,7 +39,7 @@ from utils.constants import (
     THREAD_MONITOR,
     UPDATE_SECURE_CONNECTION,
 )
-from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates
+from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates, User
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
@@ -121,32 +123,42 @@ class Monitor(Thread):
 
         # setup the states
         States.open()
-        if States.get(State.MONITORING) is None:
+        state = States.get(State.MONITORING)
+        if state is None:
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) in (MONITORING_ERROR, MONITORING_INVALID_CONFIG):
-            self._logger.warning("Monitor restarted after error")
+        elif state in (MONITORING_ERROR, MONITORING_INVALID_CONFIG):
+            self._logger.warning("Monitor restarted after error: %s", state)
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) == MONITORING_STOPPED:
+        elif state == MONITORING_STOPPED:
             # normal restart
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) == MONITORING_UPDATING_CONFIG:
+        elif state == MONITORING_UPDATING_CONFIG:
             self._logger.warning(
                 "Monitor restarted during configuration update, restoring state: %s",
                 MONITORING_STARTUP,
             )
             States.set(State.MONITORING, MONITORING_STARTUP)
-        elif States.get(State.MONITORING) in (MONITORING_ARM_DELAY, MONITORING_ARMED):
-            if get_arm_state(self._db_session) == ARM_DISARM:
+        elif state in (MONITORING_ARM_DELAY, MONITORING_ARMED):
+            arm = self._db_session.scalar(select(Arm).where(Arm.disarm == None))
+            arm_state = get_arm_state(self._db_session)
+
+            if arm_state == ARM_DISARM:
                 self._logger.warning(
                     "Monitor restarted during '%s', but no areas are armed, restoring state: %s",
-                    States.get(State.MONITORING),
+                    state,
+                    MONITORING_READY,
+                )
+                States.set(State.MONITORING, MONITORING_READY)
+            elif arm_state in (ARM_AWAY, ARM_STAY) and arm is None:
+                self._logger.warning(
+                    "Monitor restarted during '%s', but no arm found in database, restoring : %s",
+                    state,
                     MONITORING_READY,
                 )
                 States.set(State.MONITORING, MONITORING_READY)
         else:
             self._logger.error(
-                "Monitor restarted without proper shutdown, restoring state: %s",
-                States.get(State.MONITORING),
+                "Monitor restarted without proper shutdown, restoring state: %s", state
             )
 
         # cleanup the database
@@ -372,7 +384,8 @@ class Monitor(Thread):
         now = dt.now()
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         if arm is None:
-            arm = Arm(arm_type=arm_type, time=now, user_id=user_id, keypad_id=keypad_id)
+            user = self._db_session.get(User, user_id) if user_id else None
+            arm = Arm(arm_type=arm_type, time=now, user=user, keypad_id=keypad_id)
             self._db_session.add(arm)
         else:
             self._logger.info("Arm state to database: %s", arm.type)

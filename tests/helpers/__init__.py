@@ -196,6 +196,7 @@ def check_api_response(response, expected_status=200):
 def wait_for_monitoring_ready(device_token: str, timeout=15):
     wait_for_monitoring_state(MONITORING_READY, device_token, timeout)
 
+
 def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
     start_time = time()
     while time() - start_time < timeout:
@@ -218,4 +219,6 @@ def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
 
         sleep(0.5)
     else:
-        raise RuntimeError("Monitoring did not become ready in time")
+        raise RuntimeError(
+            "Monitoring did not reach state '%s' within %s seconds" % (state, timeout)
+        )

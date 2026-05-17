@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from datetime import datetime
 import json
 import logging
 
@@ -13,6 +14,7 @@ from utils.models import (
     Area,
     Arm,
     ArmSensor,
+    ArmStates,
     ChannelTypes,
     Disarm,
     Option,
@@ -77,13 +79,68 @@ def _create_options(session):
     logger.info(" - Created MQTT config option")
 
 
-def _create_users(session):
+def _create_users(session) -> dict:
     admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
-    session.add_all(
-        [admin_user, User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")]
-    )
+
+    user = User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")
+    session.add_all([admin_user, user])
     logger.info(" - Created users")
+    return {"admin": admin_user, "user": user}
+
+
+def create_zones(session, delay: int = 3) -> dict:
+    tamper = Zone(
+        name="Tamper",
+        disarmed_delay=0,
+        away_alert_delay=0,
+        stay_alert_delay=0,
+        description="Sabotage alert",
+    )
+    no_delay = Zone(
+        name="Away/stay",
+        away_arm_delay=0,
+        stay_arm_delay=0,
+        away_alert_delay=0,
+        stay_alert_delay=0,
+        description="Alert when armed AWAY or STAY",
+    )
+    delayed = Zone(
+        name="Away/stay delayed",
+        away_arm_delay=delay,
+        stay_arm_delay=delay,
+        away_alert_delay=delay,
+        stay_alert_delay=delay,
+        description="Alert delayed when armed AWAY or STAY",
+    )
+    away_delayed = Zone(
+        name="Away delayed",
+        away_arm_delay=delay,
+        away_alert_delay=delay,
+        description="Alert delayed when armed AWAY",
+    )
+    stay_delayed = Zone(
+        name="Stay delayed",
+        stay_arm_delay=delay,
+        stay_alert_delay=delay,
+        description="Alert delayed when armed STAY",
+    )
+    stay = Zone(
+        name="Stay",
+        stay_arm_delay=None,
+        stay_alert_delay=None,
+        description="No alert when armed STAY",
+    )
+    session.add_all([tamper, no_delay, no_delay, delayed, away_delayed, stay_delayed, stay])
+    logger.info(" - Created zones")
+    return {
+        "tamper": tamper,
+        "no_delay": no_delay,
+        "delayed": delayed,
+        "away_delayed": away_delayed,
+        "stay_delayed": stay_delayed,
+        "stay": stay,
+    }
 
 
 def clear_database():
@@ -113,16 +170,7 @@ def create_test_no_delay_v2():
     _create_options(session)
     sensor_types = _create_sensor_types(session)
 
-    z1 = Zone(name="No delay", description="Alert with no delay")
-    z2 = Zone(
-        name="Tamper",
-        disarmed_delay=0,
-        away_alert_delay=0,
-        stay_alert_delay=0,
-        description="Sabotage alert",
-    )
-    session.add_all([z1, z2])
-    logger.info(" - Created zones")
+    zones = create_zones(session)
 
     area = Area(name="House")
     session.add(area)
@@ -135,9 +183,9 @@ def create_test_no_delay_v2():
         sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=sensor_types["Motion"],
         area=area,
-        zone=z1,
-        name="Test room",
-        description="Test room movement sensor",
+        zone=zones["no_delay"],
+        name="Room 1",
+        description="Test room 1 movement sensor",
         silent_alert=True,
     )
     s2 = Sensor(
@@ -147,9 +195,9 @@ def create_test_no_delay_v2():
         sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=sensor_types["Open"],
         area=area,
-        zone=z1,
-        name="Test room 0",
-        description="Test room 0 door sensor",
+        zone=zones["no_delay"],
+        name="Room 2",
+        description="Test room 2 door sensor",
     )
     s3 = Sensor(
         channel=2,
@@ -158,12 +206,76 @@ def create_test_no_delay_v2():
         sensor_contact_type=SensorContactTypes.NC,
         sensor_eol_count=SensorEOLCount.SINGLE,
         area=area,
-        zone=z2,
+        zone=zones["tamper"],
         name="Tamper",
         description="Sabotage wire",
     )
     session.add_all([s1, s2, s3])
     logger.info(" - Created sensors")
+
+    session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
+    logger.info("Database setup is complete")
+
+
+def create_test_no_delay_v2_armed():
+    """
+    This configuration is for basic testing with board v2 without any delays.
+    But the area is armed, so we can test starting in armed state.
+    """
+    session = get_database_session()
+
+    users = _create_users(session)
+    _create_options(session)
+    sensor_types = _create_sensor_types(session)
+
+    zones = create_zones(session)
+
+    area = Area(name="House", arm_state=ArmStates.AWAY)
+    session.add(area)
+    logger.info(" - Created area")
+
+    s1 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Motion"],
+        area=area,
+        zone=zones["no_delay"],
+        name="Room 1",
+        description="Test room 1 movement sensor",
+        silent_alert=True,
+    )
+    s2 = Sensor(
+        channel=1,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Open"],
+        area=area,
+        zone=zones["no_delay"],
+        name="Room 2",
+        description="Test room 2 door sensor",
+    )
+    s3 = Sensor(
+        channel=2,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=sensor_types["Tamper"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["tamper"],
+        name="Tamper",
+        description="Sabotage wire",
+    )
+    session.add_all([s1, s2, s3])
+    logger.info(" - Created sensors")
+
+    arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now(), user=users["admin"])
+    session.add(arm)
 
     session.commit()
     engine = session.get_bind()
@@ -182,36 +294,7 @@ def create_test_with_delay_v2():
     _create_options(session)
     sensor_types = _create_sensor_types(session)
 
-    z1 = Zone(name="No delay", description="Alert with no delay")
-    z2 = Zone(
-        name="Tamper",
-        disarmed_delay=0,
-        away_alert_delay=0,
-        stay_alert_delay=0,
-        description="Sabotage alert",
-    )
-    z3 = Zone(
-        name="Away/stay delayed",
-        away_arm_delay=3,
-        stay_arm_delay=3,
-        away_alert_delay=3,
-        stay_alert_delay=3,
-        description="Alert delayed when armed AWAY or STAY",
-    )
-    z4 = Zone(
-        name="Stay delayed",
-        stay_arm_delay=3,
-        stay_alert_delay=3,
-        description="Alert delayed when armed STAY",
-    )
-    z5 = Zone(
-        name="Stay",
-        stay_arm_delay=None,
-        stay_alert_delay=None,
-        description="No alert when armed STAY",
-    )
-    session.add_all([z1, z2, z3, z4, z5])
-    logger.info(" - Created zones")
+    zones = create_zones(session)
 
     area = Area(name="House")
     session.add(area)
@@ -224,7 +307,7 @@ def create_test_with_delay_v2():
         sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=sensor_types["Motion"],
         area=area,
-        zone=z3,
+        zone=zones["delayed"],
         name="Room 0",
         description="Test room 0 delayed movement sensor",
         silent_alert=True,
@@ -236,7 +319,7 @@ def create_test_with_delay_v2():
         sensor_eol_count=SensorEOLCount.SINGLE,
         sensor_type=sensor_types["Open"],
         area=area,
-        zone=z4,
+        zone=zones["stay_delayed"],
         name="Room 1",
         description="Test room 1 stay delayed door sensor",
     )
@@ -247,7 +330,7 @@ def create_test_with_delay_v2():
         sensor_contact_type=SensorContactTypes.NC,
         sensor_eol_count=SensorEOLCount.SINGLE,
         area=area,
-        zone=z5,
+        zone=zones["stay_delayed"],
         name="Room 2",
         description="Test room 2 stay delayed movement sensor",
     )
@@ -258,7 +341,7 @@ def create_test_with_delay_v2():
         sensor_contact_type=SensorContactTypes.NC,
         sensor_eol_count=SensorEOLCount.SINGLE,
         area=area,
-        zone=z2,
+        zone=zones["tamper"],
         name="Tamper",
         description="Sabotage wire",
     )

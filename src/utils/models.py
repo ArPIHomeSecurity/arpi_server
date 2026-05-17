@@ -469,14 +469,15 @@ class Arm(BaseModel):
     alert_id = Column(Integer, ForeignKey("alert.id"), nullable=True)
     alert: Mapped["Alert"] = relationship(back_populates="arm")
     sensors: Mapped[List["ArmSensor"]] = relationship(back_populates="arm")
+    user = relationship("User")
 
     disarm: Mapped["Disarm"] = relationship(back_populates="arm")
 
-    def __init__(self, arm_type, time, user_id=None, keypad_id=None):
+    def __init__(self, arm_type, time, user=None, keypad_id=None):
         self.type = arm_type
         self.time = time
         self.keypad_id = keypad_id
-        self.user_id = user_id
+        self.user = user
 
     @property
     def serialized(self):
@@ -695,9 +696,9 @@ class Area(BaseModel):
     output = relationship("Output", back_populates="area")
     sensors = relationship("Sensor", back_populates="area")
 
-    def __init__(self, name="area"):
+    def __init__(self, name: str = "area", arm_state: ArmStates = ArmStates.DISARM):
         self.name = name
-        self.arm_state = ArmStates.DISARM
+        self.arm_state = arm_state
 
     def can_be_deleted(self):
         return len(self.sensors) == 0 and not self.output

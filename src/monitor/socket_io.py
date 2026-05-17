@@ -50,8 +50,8 @@ def disconnect(sid):
     logging.getLogger(LOG_SOCKETIO).info('Disconnected "%s"', sid)
 
 
-def send_alert_state(arm_state):
-    send_message("alert_state_change", arm_state)
+def send_alert_state(alert_state):
+    send_message("alert_state_change", alert_state)
 
 
 def send_arm_state(arm_state):
