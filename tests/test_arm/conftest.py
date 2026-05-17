@@ -9,7 +9,6 @@ from helpers.services import monitor_service
 logger = logging.getLogger(__name__)
 
 
-
 @pytest.fixture(scope="module")
 def monitoring_state():
     with open("status.json", "w") as f:

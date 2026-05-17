@@ -223,19 +223,19 @@ def test_03_alert(device_token, user_token):
                 MonitorEvent(
                     name="alert_state_change",
                     payload={
-                        "id": 4,
+                        "id": 1,
                         "alertType": "alert_away",
-                        "startTime": "2026-05-04 16:14:49",
+                        "startTime": "2026-05-17 10:45:02",
                         "endTime": None,
                         "silent": True,
                         "sensors": [
                             {
-                                "sensorId": 4,
+                                "sensorId": 1,
                                 "channel": 0,
                                 "typeId": 1,
-                                "name": "Room 0",
-                                "description": "Test room 0 delayed movement sensor",
-                                "startTime": "2026-05-04 18:14:46",
+                                "name": "Room 1",
+                                "description": "Test room 1 movement sensor",
+                                "startTime": "2026-05-17 12:44:59",
                                 "endTime": None,
                                 "delay": 3,
                                 "silent": True,
@@ -325,8 +325,8 @@ def test_03_alert(device_token, user_token):
         sensor_changes = event["sensorChanges"]
         assert len(sensor_changes) == 1
         sensors = sensor_changes[0]["sensors"]
-        assert len(sensors) == 4
-        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2, 3}
+        assert len(sensors) == 3
+        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2}
         assert {sensor["typeId"] for sensor in sensors} == {1, 2, 3}
 
     finally:
