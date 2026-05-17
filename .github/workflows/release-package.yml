@@ -9,6 +9,8 @@ on:
       - CI
     types:
       - completed
+    branches:
+      - 'dev_*'
   workflow_dispatch:
     inputs:
       version_type:
