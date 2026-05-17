@@ -49,4 +49,9 @@ jobs:
           task lint
 
       - name: Run tests 🔍
-        run: task test
+        run: |
+          if [ "$RUNNER_DEBUG" = "1" ]; then
+            task test-debug
+          else
+            task test
+          fi

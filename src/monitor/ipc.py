@@ -74,10 +74,8 @@ class IPCServer(Thread):
         _socket.settimeout(60)
         _socket.setblocking(False)
 
-        with contextlib.suppress(OSError):
-            remove(MONITOR_INPUT_SOCKET)
+        self.prepare_socket()
 
-        self.create_socket_file()
         try:
             _socket.bind(MONITOR_INPUT_SOCKET)
             _socket.listen(2)
@@ -99,16 +97,18 @@ class IPCServer(Thread):
 
         self._sockets = [_socket]
 
-    def create_socket_file(self):
+    def prepare_socket(self):
         """
-        Create the socket file for the IPC server to listen to.
+        Prepare the socket folder for the socket file.
         """
-        filename = MONITOR_INPUT_SOCKET
-        if not path.exists(path.dirname(filename)):
-            self._logger.info("Create socket file: %s", MONITOR_INPUT_SOCKET)
-            makedirs(path.dirname(filename))
-            with open(MONITOR_INPUT_SOCKET, "w", encoding="utf-8"):
-                pass
+        # remove the socket file if it already exists
+        with contextlib.suppress(OSError):
+            remove(MONITOR_INPUT_SOCKET)
+
+        folder = path.dirname(MONITOR_INPUT_SOCKET)
+        if not path.exists(folder):
+            self._logger.info("Create folder for socket file: %s", MONITOR_INPUT_SOCKET)
+            makedirs(folder)
 
     def run(self):
         self._logger.info("IPC server started")

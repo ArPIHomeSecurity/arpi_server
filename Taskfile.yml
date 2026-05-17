@@ -3,7 +3,6 @@
 version: '3'
 
 vars:
-  GREETING: Hello, world!
 
 tasks:
   create-environment:
@@ -135,4 +134,7 @@ tasks:
           nginx
 
   test:
-    - uv run pytest -v
+    - uv run pytest -v {{.CLI_ARGS}}
+
+  test-debug:
+    - uv run pytest -vv -s --setup-show {{.CLI_ARGS}}
