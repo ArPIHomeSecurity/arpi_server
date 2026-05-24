@@ -11,14 +11,6 @@ from utils.constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_ADKEYPAD,
-    MONITOR_ARM_AWAY,
-    MONITOR_ARM_STAY,
-    MONITOR_DISARM,
-    MONITOR_REGISTER_CARD,
-    MONITOR_STOP,
-    MONITOR_UPDATE_KEYPAD,
-    MONITORING_ALERT,
-    MONITORING_ALERT_DELAY,
     MONITORING_READY,
     THREAD_KEYPAD,
 )
@@ -31,6 +23,16 @@ from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
+from monitor.actions import (
+    MonitorArmAwayCommand,
+    MonitorArmStayCommand,
+    MonitorDisarmCommand,
+    MonitorRegisterCardCommand,
+    MonitorStopCommand,
+    MonitorUpdateKeypadCommand,
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+)
 from utils.queries import get_alert_delay, get_arm_delay, get_arm_state, get_user_with_access_code
 
 COMMUNICATION_PERIOD = 0.2  # sec
@@ -94,35 +96,34 @@ class KeypadHandler(Thread):
                 self._logger.trace("Wait for command...")
                 message = self._actions.get(timeout=COMMUNICATION_PERIOD)
                 self._logger.debug("Command: %s", message)
-
-                if message["action"] == MONITOR_UPDATE_KEYPAD:
-                    self._logger.info("Updating keypad")
-                    self.configure()
-                    last_press = int(time())
-                elif message["action"] == MONITOR_REGISTER_CARD:
-                    register_card_start = time()
-                elif message["action"] == MONITOR_ARM_AWAY and self._keypad:
-                    self.arm_keypad(ARM_AWAY, message.get("use_delay", True))
-                elif message["action"] == MONITOR_ARM_STAY and self._keypad:
-                    self.arm_keypad(ARM_STAY, message.get("use_delay", True))
-                elif message["action"] == MONITORING_ALERT and self._keypad:
-                    self._keypad.stop_delay()
-                elif message["action"] == MONITORING_ALERT_DELAY and self._keypad:
-                    self.alert_delay()
-                elif message["action"] == MONITOR_DISARM and self._keypad:
-                    # TODO: if area_id is provided check if the keypad is assigned to that area
-                    # currently keypads are not assigned to areas
-
-                    # temporary hack to delay processing the disarm
-                    # the monitor thread needs time to update the database
-                    sleep(0.5)
-                    if States.get(State.MONITORING) == MONITORING_READY:
-                        self._logger.info("Keypad disarmed: monitoring disarmed")
-                        self._keypad.set_armed(False)
+                match message:
+                    case MonitorUpdateKeypadCommand():
+                        self._logger.info("Updating keypad")
+                        self.configure()
+                        last_press = int(time())
+                    case MonitorRegisterCardCommand():
+                        register_card_start = time()
+                    case MonitorArmAwayCommand(use_delay=use_delay) if self._keypad:
+                        self.arm_keypad(ARM_AWAY, use_delay)
+                    case MonitorArmStayCommand(use_delay=use_delay) if self._keypad:
+                        self.arm_keypad(ARM_STAY, use_delay)
+                    case MonitoringAlertCommand() if self._keypad:
                         self._keypad.stop_delay()
+                    case MonitoringAlertDelayCommand() if self._keypad:
+                        self.alert_delay()
+                    case MonitorDisarmCommand() if self._keypad:
+                        # TODO: if area_id is provided check if the keypad is assigned to that area
+                        # currently keypads are not assigned to areas
 
-                elif message["action"] == MONITOR_STOP:
-                    break
+                        # temporary hack to delay processing the disarm
+                        # the monitor thread needs time to update the database
+                        sleep(0.5)
+                        if States.get(State.MONITORING) == MONITORING_READY:
+                            self._logger.info("Keypad disarmed: monitoring disarmed")
+                            self._keypad.set_armed(False)
+                            self._keypad.stop_delay()
+                    case MonitorStopCommand():
+                        break
 
             if register_card_start and time() - register_card_start > CARD_REGISTRATION_EXPIRY:
                 register_card_start = None
@@ -196,7 +197,7 @@ class KeypadHandler(Thread):
             self._logger.debug("Code accepted: %s", presses)
             self._logger.info("Accepted code => disarming")
             self._broadcaster.send_message(
-                message={"action": MONITOR_DISARM, "user_id": user.id, "keypad_id": self._keypad.id}
+                message=MonitorDisarmCommand(user_id=user.id, keypad_id=self._keypad.id)
             )
         else:
             self._logger.debug("Invalid code")
@@ -211,11 +212,7 @@ class KeypadHandler(Thread):
         if db_card and db_card.enabled:
             self._logger.info("Accepted card => disarming")
             self._broadcaster.send_message(
-                message={
-                    "action": MONITOR_DISARM,
-                    "user_id": db_card.user_id,
-                    "keypad_id": self._keypad.id,
-                }
+                message=MonitorDisarmCommand(user_id=db_card.user_id, keypad_id=self._keypad.id)
             )
         else:
             self._logger.info("Unknown card")
@@ -225,19 +222,11 @@ class KeypadHandler(Thread):
         self._logger.debug("Handling function: %s", function)
         if Function.AWAY == function:
             self._broadcaster.send_message(
-                {
-                    "action": MONITOR_ARM_AWAY,
-                    "keypad_id": self._keypad.id,
-                    "use_delay": True,
-                }
+                MonitorArmAwayCommand(keypad_id=self._keypad.id, use_delay=True)
             )
         elif Function.STAY == function:
             self._broadcaster.send_message(
-                {
-                    "action": MONITOR_ARM_STAY,
-                    "keypad_id": self._keypad.id,
-                    "use_delay": True,
-                }
+                MonitorArmStayCommand(keypad_id=self._keypad.id, use_delay=True)
             )
         else:
             self._logger.error("Unknown function: %s", function)

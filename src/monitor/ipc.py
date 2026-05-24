@@ -39,6 +39,7 @@ from monitor.notifications.notifier import Notifier
 from monitor.output.handler import OutputHandler
 from tools.clock import Clock
 from tools.ssh_service import SSHService
+from monitor.actions import ParseCommandError, from_dict
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -161,16 +162,20 @@ class IPCServer(Thread):
             return
 
         self._logger.debug("Received action: '%s'", data)
-
-        response = self.handle_actions(json.loads(data.decode()))
-
+        try:
+            message = json.loads(data.decode())
+        except json.JSONDecodeError as error:
+            self._logger.error("Invalid JSON payload: %s", error)
+            response = {"result": False, "message": "Invalid JSON payload"}
+        else:
+            response = self.handle_actions(message)
         try:
             connection.send(json.dumps(response).encode())
         except BrokenPipeError:
             self._sockets.remove(connection)
             connection.close()
 
-    def handle_actions(self, message):
+    def handle_actions(self, message: dict) -> dict:
         """
         Return value:
         {
@@ -180,10 +185,15 @@ class IPCServer(Thread):
         }
         """
         return_value = {"result": True}
+
         if message["action"] in self.BROADCASTED_ACTIONS:
-            # broadcast message
             self._logger.info("IPC action received: %s", message["action"])
-            self._broadcaster.send_message(message=message)
+            try:
+                command = from_dict(message)
+            except ParseCommandError as error:
+                return {"result": False, "message": f"Invalid command payload: {error}"}
+
+            self._broadcaster.send_message(message=command)
         elif message["action"] == MONITOR_GET_STATE:
             return_value["value"] = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:
@@ -195,10 +205,10 @@ class IPCServer(Thread):
             ssh.update_access_local_network()
             ssh.update_password_authentication()
         elif message["action"] == SEND_TEST_SMS:
-            result, message = Notifier.send_test_sms()
+            result, details = Notifier.send_test_sms()
             return_value["result"] = result
             return_value["message"] = "Error in SMS sending!" if not result else ""
-            return_value["other"] = message
+            return_value["other"] = details
         elif message["action"] == GET_SMS_MESSAGES:
             result, messages = Notifier.get_sms_messages()
             return_value["result"] = result
@@ -207,15 +217,15 @@ class IPCServer(Thread):
             result = Notifier.delete_sms_message(message["message_id"])
             return_value["result"] = result
         elif message["action"] == SEND_TEST_EMAIL:
-            result, message = Notifier.send_test_email()
+            result, details = Notifier.send_test_email()
             return_value["result"] = result
             return_value["message"] = "Error in email sending!" if not result else ""
-            return_value["other"] = message
+            return_value["other"] = details
         elif message["action"] == MAKE_TEST_CALL:
-            result, message = Notifier.make_test_call()
+            result, details = Notifier.make_test_call()
             return_value["result"] = result
             return_value["message"] = "Error in call sending!" if not result else ""
-            return_value["other"] = message
+            return_value["other"] = details
         elif message["action"] == SEND_TEST_SYREN:
             self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:

@@ -18,11 +18,6 @@ from utils.constants import (
     ARM_DISARM,
     ARM_STAY,
     LOG_MONITOR,
-    MONITOR_ARM_AWAY,
-    MONITOR_ARM_STAY,
-    MONITOR_DISARM,
-    MONITOR_STOP,
-    MONITOR_UPDATE_CONFIG,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_ARM_DELAY,
@@ -37,7 +32,6 @@ from utils.constants import (
     POWER_SOURCE_BATTERY,
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
-    UPDATE_SECURE_CONNECTION,
 )
 from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates, User
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
@@ -54,6 +48,16 @@ from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
 from monitor.connection import SecureConnection
+from monitor.actions import (
+    MonitorArmAwayCommand,
+    MonitorArmStayCommand,
+    MonitorDisarmCommand,
+    MonitorStopCommand,
+    MonitorUpdateConfigCommand,
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+    UpdateSecureConnectionCommand,
+)
 from utils.queries import get_arm_state, get_arm_delay
 
 
@@ -205,49 +209,48 @@ class Monitor(Thread):
             with contextlib.suppress(Empty):
                 message = self._actions.get(True, message_wait_time)
                 self._logger.debug("Action: %s", message)
-                if message["action"] == MONITOR_STOP:
-                    if get_arm_state(self._db_session) != ARM_DISARM:
-                        self.disarm_monitoring(None, None, None)
-                    break
-                elif message["action"] == MONITOR_ARM_AWAY:
-                    self.arm_monitoring(
-                        ARM_AWAY,
-                        message.get("user_id", None),
-                        message.get("keypad_id", None),
-                        message["use_delay"],
-                        message.get("area_id", None),
-                    )
-                elif message["action"] == MONITOR_ARM_STAY:
-                    self.arm_monitoring(
-                        ARM_STAY,
-                        message.get("user_id", None),
-                        message.get("keypad_id", None),
-                        message["use_delay"],
-                        message.get("area_id", None),
-                    )
-                elif message["action"] in (MONITORING_ALERT, MONITORING_ALERT_DELAY):
-                    if self._delay_timer:
-                        self._delay_timer.cancel()
-                        self._delay_timer = None
-                elif message["action"] == MONITOR_DISARM:
-                    self.disarm_monitoring(
-                        message.get("user_id", None),
-                        message.get("keypad_id", None),
-                        message.get("area_id", None),
-                    )
-                    continue
-                elif message["action"] == MONITOR_UPDATE_CONFIG:
-                    self._area_handler.load_areas()
-                    self._area_handler.publish_areas()
-                    self._sensor_handler.update_mqtt_config()
-                    self._sensor_handler.load_sensors()
-                    self._sensor_handler.publish_sensors()
-                elif message["action"] == UPDATE_SECURE_CONNECTION:
-                    self._logger.info("Update secure connection...")
-                    if secure_connection is None:
-                        States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
-                        secure_connection = SecureConnection()
-                        secure_connection.start()
+                match message:
+                    case MonitorStopCommand():
+                        if get_arm_state(self._db_session) != ARM_DISARM:
+                            self.disarm_monitoring(None, None, None)
+                        break
+                    case MonitorArmAwayCommand(
+                        user_id=user_id,
+                        keypad_id=keypad_id,
+                        use_delay=use_delay,
+                        area_id=area_id,
+                    ):
+                        self.arm_monitoring(ARM_AWAY, user_id, keypad_id, use_delay, area_id)
+                    case MonitorArmStayCommand(
+                        user_id=user_id,
+                        keypad_id=keypad_id,
+                        use_delay=use_delay,
+                        area_id=area_id,
+                    ):
+                        self.arm_monitoring(ARM_STAY, user_id, keypad_id, use_delay, area_id)
+                    case MonitoringAlertCommand() | MonitoringAlertDelayCommand():
+                        if self._delay_timer:
+                            self._delay_timer.cancel()
+                            self._delay_timer = None
+                    case MonitorDisarmCommand(
+                        user_id=user_id,
+                        keypad_id=keypad_id,
+                        area_id=area_id,
+                    ):
+                        self.disarm_monitoring(user_id, keypad_id, area_id)
+                        continue
+                    case MonitorUpdateConfigCommand():
+                        self._area_handler.load_areas()
+                        self._area_handler.publish_areas()
+                        self._sensor_handler.update_mqtt_config()
+                        self._sensor_handler.load_sensors()
+                        self._sensor_handler.publish_sensors()
+                    case UpdateSecureConnectionCommand():
+                        self._logger.info("Update secure connection...")
+                        if secure_connection is None:
+                            States.set(State.MONITORING, MONITORING_UPDATING_CONFIG)
+                            secure_connection = SecureConnection()
+                            secure_connection.start()
 
             if secure_connection is not None and not secure_connection.is_alive():
                 secure_connection = None

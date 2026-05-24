@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import json
 import logging
 import socket
@@ -6,27 +7,30 @@ from os import environ
 from utils.constants import (
     ARM_AWAY,
     ARM_STAY,
-    DELETE_SMS_MESSAGE,
-    GET_SMS_MESSAGES,
     LOG_IPC,
-    MAKE_TEST_CALL,
-    MONITOR_ACTIVATE_OUTPUT,
-    MONITOR_ARM_AWAY,
-    MONITOR_ARM_STAY,
-    MONITOR_DEACTIVATE_OUTPUT,
-    MONITOR_DISARM,
-    MONITOR_GET_STATE,
-    MONITOR_REGISTER_CARD,
-    MONITOR_SET_CLOCK,
-    MONITOR_SYNC_CLOCK,
-    MONITOR_UPDATE_CONFIG,
-    MONITOR_UPDATE_KEYPAD,
-    POWER_GET_STATE,
-    SEND_TEST_EMAIL,
-    SEND_TEST_SMS,
-    SEND_TEST_SYREN,
-    UPDATE_SECURE_CONNECTION,
-    UPDATE_SSH,
+)
+from monitor.actions import (
+    DeleteSMSMessageCommand,
+    GetSMSMessagesCommand,
+    MakeTestCallCommand,
+    MonitorActivateOutputCommand,
+    MonitorArmAwayCommand,
+    MonitorArmStayCommand,
+    MonitorCommand,
+    MonitorDeactivateOutputCommand,
+    MonitorDisarmCommand,
+    MonitorGetStateCommand,
+    MonitorRegisterCardCommand,
+    MonitorSetClockCommand,
+    MonitorSyncClockCommand,
+    MonitorUpdateConfigCommand,
+    MonitorUpdateKeypadCommand,
+    PowerGetStateCommand,
+    SendTestEmailCommand,
+    SendTestSMSCommand,
+    SendTestSyrenCommand,
+    UpdateSSHCommand,
+    UpdateSecureConnectionCommand,
 )
 
 
@@ -61,88 +65,81 @@ class IPCClient(object):
     def arm(self, arm_type, user_id, area_id=None):
         if arm_type == ARM_AWAY:
             return self._send_message(
-                {
-                    "action": MONITOR_ARM_AWAY,
-                    "user_id": user_id,
-                    "area_id": area_id,
-                    "use_delay": False,
-                }
+                MonitorArmAwayCommand(user_id=user_id, area_id=area_id, use_delay=False)
             )
         elif arm_type == ARM_STAY:
             return self._send_message(
-                {
-                    "action": MONITOR_ARM_STAY,
-                    "user_id": user_id,
-                    "area_id": area_id,
-                    "use_delay": False,
-                }
+                MonitorArmStayCommand(user_id=user_id, area_id=area_id, use_delay=False)
             )
         else:
             self._logger.error("Unknown arm type: %s", arm_type)
             return {"message": "Unknown arm type"}
 
     def disarm(self, user_id, area_id=None):
-        return self._send_message(
-            {"action": MONITOR_DISARM, "user_id": user_id, "area_id": area_id}
-        )
+        return self._send_message(MonitorDisarmCommand(user_id=user_id, area_id=area_id))
 
     def get_state(self):
-        return self._send_message({"action": MONITOR_GET_STATE})
+        return self._send_message(MonitorGetStateCommand())
 
     def get_power_state(self):
-        return self._send_message({"action": POWER_GET_STATE})
+        return self._send_message(PowerGetStateCommand())
 
     def update_configuration(self):
-        return self._send_message({"action": MONITOR_UPDATE_CONFIG})
+        return self._send_message(MonitorUpdateConfigCommand())
 
     def update_keypad(self):
-        return self._send_message({"action": MONITOR_UPDATE_KEYPAD})
+        return self._send_message(MonitorUpdateKeypadCommand())
 
     def register_card(self):
-        return self._send_message({"action": MONITOR_REGISTER_CARD})
+        return self._send_message(MonitorRegisterCardCommand())
 
     def update_dyndns(self):
-        return self._send_message({"action": UPDATE_SECURE_CONNECTION})
+        return self._send_message(UpdateSecureConnectionCommand())
 
     def update_ssh(self):
-        return self._send_message({"action": UPDATE_SSH})
+        return self._send_message(UpdateSSHCommand())
 
     def send_test_email(self):
-        return self._send_message({"action": SEND_TEST_EMAIL})
+        return self._send_message(SendTestEmailCommand())
 
     def send_test_sms(self):
-        return self._send_message({"action": SEND_TEST_SMS})
+        return self._send_message(SendTestSMSCommand())
 
     def get_sms_messages(self):
-        return self._send_message({"action": GET_SMS_MESSAGES})
+        return self._send_message(GetSMSMessagesCommand())
 
     def delete_sms_message(self, message_id):
-        return self._send_message({"action": DELETE_SMS_MESSAGE, "message_id": message_id})
+        return self._send_message(DeleteSMSMessageCommand(message_id=message_id))
 
     def make_test_call(self):
-        return self._send_message({"action": MAKE_TEST_CALL})
+        return self._send_message(MakeTestCallCommand())
 
     def send_test_syren(self, duration):
-        return self._send_message({"action": SEND_TEST_SYREN, "duration": duration})
+        return self._send_message(SendTestSyrenCommand(duration=duration))
 
     def sync_clock(self):
-        return self._send_message({"action": MONITOR_SYNC_CLOCK})
+        return self._send_message(MonitorSyncClockCommand())
 
     def set_clock(self, settings):
-        message = {"action": MONITOR_SET_CLOCK}
-        message = {**message, **settings}
-        return self._send_message(message)
+        return self._send_message(
+            MonitorSetClockCommand(
+                timezone=settings.get("timezone"),
+                datetime=settings.get("datetime"),
+            )
+        )
 
     def activate_output(self, output_id):
-        return self._send_message({"action": MONITOR_ACTIVATE_OUTPUT, "output_id": output_id})
+        return self._send_message(MonitorActivateOutputCommand(output_id=output_id))
 
     def deactivate_output(self, output_id):
-        return self._send_message({"action": MONITOR_DEACTIVATE_OUTPUT, "output_id": output_id})
+        return self._send_message(MonitorDeactivateOutputCommand(output_id=output_id))
 
-    def _send_message(self, message) -> dict:
+    def _send_message(self, message: MonitorCommand) -> dict:
+        payload = asdict(message)
+
         if self._socket:
             try:
-                self._socket.send(json.dumps(message).encode())
+                self._socket.send(json.dumps(payload).encode())
                 retries = 0
                 data = b""
                 while retries < IPCClient.MAX_RETRIES:
@@ -152,7 +149,7 @@ class IPCClient(object):
                     except json.JSONDecodeError:
                         if data == b"":
                             self._logger.error(
-                                "Received empty response from monitor socket! Message: %s", message
+                                "Received empty response from monitor socket! Message: %s", payload
                             )
                             return
                         self._logger.warning(

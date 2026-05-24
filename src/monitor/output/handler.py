@@ -8,7 +8,7 @@ import logging
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from utils.constants import LOG_OUTPUT, MONITOR_STOP, MONITOR_UPDATE_CONFIG
+from utils.constants import LOG_OUTPUT
 from utils.models import Area, Output, OutputTriggerType
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
@@ -16,6 +16,7 @@ from monitor.output import OUTPUT_NAMES
 from monitor.output.notification import Notification, EventType, TriggerSource
 from monitor.output.sign import OutputSign
 from monitor.socket_io import send_output_state
+from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
 
 from monitor.adapters.output import get_output_adapter
 
@@ -118,10 +119,11 @@ class OutputHandler(Thread):
 
             if message is not None:
                 # handle monitoring and notification actions
-                if message["action"] == MONITOR_STOP:
-                    break
-                elif message["action"] == MONITOR_UPDATE_CONFIG:
-                    self.load_outputs()
+                match message:
+                    case MonitorStopCommand():
+                        break
+                    case MonitorUpdateConfigCommand():
+                        self.load_outputs()
 
             if not self._notifications.empty():
                 self.process_notifications()

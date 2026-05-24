@@ -4,12 +4,13 @@ import logging
 from threading import Thread, Event
 from time import sleep, time
 
-from utils.constants import LOG_SERVICE, MONITOR_STOP
+from utils.constants import LOG_SERVICE
 from monitor.broadcast import Broadcaster
 from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler
 from monitor.monitor import Monitor
 from monitor.notifications.notifier import Notifier
+from monitor.actions import MonitorStopCommand
 
 # from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
@@ -95,7 +96,7 @@ class BackgroundService(Thread):
 
     def _stop_threads(self):
         self._logger.info("Stopping threads...")
-        self._broadcaster.send_message(message={"action": MONITOR_STOP})
+        self._broadcaster.send_message(message=MonitorStopCommand())
         self._stop_event.set()
 
         # wait for all threads to stop

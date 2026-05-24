@@ -11,6 +11,11 @@ from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
 from monitor.socket_io import send_syren_state, send_alert_state
 from monitor.syren import Syren
+from monitor.actions import (
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+    MonitoringSabotageCommand,
+)
 from utils.constants import (
     ALERT_SABOTAGE,
     MONITORING_ALERT,
@@ -90,7 +95,7 @@ class SensorAlert(Thread):
 
         if self._delay > 0:
             States.set(State.MONITORING, MONITORING_ALERT_DELAY)
-            self._broadcaster.send_message({"action": MONITORING_ALERT_DELAY})
+            self._broadcaster.send_message(MonitoringAlertDelayCommand())
 
         if self._stop_event.wait(self._delay):
             self._logger.info(
@@ -130,10 +135,10 @@ class SensorAlert(Thread):
         Syren.start_syren()
         if self._alert_type == ALERT_SABOTAGE:
             States.set(State.MONITORING, MONITORING_SABOTAGE)
-            self._broadcaster.send_message({"action": MONITORING_SABOTAGE})
+            self._broadcaster.send_message(MonitoringSabotageCommand())
         else:
             States.set(State.MONITORING, MONITORING_ALERT)
-            self._broadcaster.send_message({"action": MONITORING_ALERT})
+            self._broadcaster.send_message(MonitoringAlertCommand())
 
     def create_alert(self, session) -> Alert:
         """

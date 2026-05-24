@@ -12,14 +12,16 @@ from monitor.broadcast import Broadcaster
 from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
 from utils.constants import (
     LOG_NOTIFIER,
-    MONITOR_DISARM,
-    MONITOR_STOP,
-    MONITOR_UPDATE_CONFIG,
     THREAD_NOTIFIER,
 )
 from monitor.adapters.smtp import SMTPSender
 from monitor.database import get_database_session
 from monitor.notifications.notification import Notification, NotificationType
+from monitor.actions import (
+    MonitorDisarmCommand,
+    MonitorStopCommand,
+    MonitorUpdateConfigCommand,
+)
 from utils.queries import get_user_with_access_code
 
 
@@ -261,10 +263,11 @@ class Notifier(Thread):
 
             if message is not None:
                 # handle monitoring and notification actions
-                if message["action"] == MONITOR_STOP:
-                    break
-                elif message["action"] == MONITOR_UPDATE_CONFIG:
-                    self.setup_connections()
+                match message:
+                    case MonitorStopCommand():
+                        break
+                    case MonitorUpdateConfigCommand():
+                        self.setup_connections()
 
             if not self._notifications.empty():
                 self.process_notifications()
@@ -342,7 +345,7 @@ class Notifier(Thread):
         user = get_user_with_access_code(db_session, feedback)
         if user:
             self._logger.info("Disarming based on dmtf code of user %s", user.name)
-            self._broadcaster.send_message(message={"action": MONITOR_DISARM, "user_id": user.id})
+            self._broadcaster.send_message(message=MonitorDisarmCommand(user_id=user.id))
             db_session.close()
             return True
         else:
@@ -351,7 +354,7 @@ class Notifier(Thread):
         user = get_user_with_access_code(db_session, feedback)
         if user:
             self._logger.info("Disarming based on dmtf code of user %s", user.name)
-            self._broadcaster.send_message(message={"action": MONITOR_DISARM, "user_id": user.id})
+            self._broadcaster.send_message(message=MonitorDisarmCommand(user_id=user.id))
             db_session.close()
             return True
         else:
