@@ -1,4 +1,5 @@
 import contextlib
+from dataclasses import asdict, dataclass
 import json
 import logging
 from select import select
@@ -45,6 +46,13 @@ from monitor.actions import ParseCommandError, from_dict
 logger = logging.getLogger(LOG_IPC)
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
+
+@dataclass()
+class IPCResponse:
+    result: bool
+    message: str = ""
+    value: dict = None
+    other: dict = None
 
 class IPCServer(Thread):
     """
@@ -171,34 +179,30 @@ class IPCServer(Thread):
         else:
             response = self.handle_actions(message)
         try:
-            connection.send(json.dumps(response).encode())
+            connection.send(json.dumps(asdict(response)).encode())
         except BrokenPipeError:
             self._sockets.remove(connection)
             connection.close()
 
-    def handle_actions(self, message: dict) -> dict:
+    def handle_actions(self, message: dict) -> IPCResponse:
         """
-        Return value:
-        {
-            "result": boolean, # True if succeeded
-            "message": string, # Error message
-            "value: dict # value to return
-        }
+        Handle the actions received from the client and execute them on monitoring.
+        Return the result of the action execution in an IPCResponse object.
         """
-        return_value = {"result": True}
+        return_value = IPCResponse(result=True)
 
         if message["action"] in self.BROADCASTED_ACTIONS:
             logger.info("IPC action received: %s", message["action"])
             try:
                 command = from_dict(message)
             except ParseCommandError as error:
-                return {"result": False, "message": f"Invalid command payload: {error}"}
+                return IPCResponse(result=False, message=f"Invalid command payload: {error}")
 
             self._broadcaster.send_message(message=command)
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": States.get(State.MONITORING)}
+            return_value.value = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": States.get(State.POWER)}
+            return_value.value = {"state": States.get(State.POWER)}
         elif message["action"] == UPDATE_SSH:
             logger.info("Update ssh connection...")
             ssh = SSHService()
@@ -207,43 +211,43 @@ class IPCServer(Thread):
             ssh.update_password_authentication()
         elif message["action"] == SEND_TEST_SMS:
             result, details = Notifier.send_test_sms()
-            return_value["result"] = result
-            return_value["message"] = "Error in SMS sending!" if not result else ""
-            return_value["other"] = details
+            return_value.result = result
+            return_value.message = "Error in SMS sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == GET_SMS_MESSAGES:
             result, messages = Notifier.get_sms_messages()
-            return_value["result"] = result
-            return_value["value"] = messages
+            return_value.result = result
+            return_value.value = messages
         elif message["action"] == DELETE_SMS_MESSAGE:
             result = Notifier.delete_sms_message(message["message_id"])
-            return_value["result"] = result
+            return_value.result = result
         elif message["action"] == SEND_TEST_EMAIL:
             result, details = Notifier.send_test_email()
-            return_value["result"] = result
-            return_value["message"] = "Error in email sending!" if not result else ""
-            return_value["other"] = details
+            return_value.result = result
+            return_value.message = "Error in email sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == MAKE_TEST_CALL:
             result, details = Notifier.make_test_call()
-            return_value["result"] = result
-            return_value["message"] = "Error in call sending!" if not result else ""
-            return_value["other"] = details
+            return_value.result = result
+            return_value.message = "Error in call sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == SEND_TEST_SYREN:
             self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
-                return_value["result"] = False
-                return_value["message"] = "Failed to sync time"
+                return_value.result = False
+                return_value.message = "Failed to sync time"
         elif message["action"] == MONITOR_SET_CLOCK:
             if not Clock().set_clock(message):
-                return_value["result"] = False
-                return_value["message"] = "Failed to update date/time and zone"
+                return_value.result = False
+                return_value.message = "Failed to update date/time and zone"
         elif message["action"] == MONITOR_ACTIVATE_OUTPUT:
             OutputHandler.send_button_pressed(message["output_id"])
         elif message["action"] == MONITOR_DEACTIVATE_OUTPUT:
             OutputHandler.send_button_released(message["output_id"])
         else:
-            return_value["result"] = False
-            return_value["message"] = f"Unknown command: {message}"
+            return_value.result = False
+            return_value.message = f"Unknown command: {message}"
 
         return return_value
 
