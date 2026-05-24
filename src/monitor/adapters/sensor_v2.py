@@ -7,6 +7,9 @@ from utils.constants import LOG_ADSENSOR
 from monitor.adapters.sensor_base import SensorAdapterBase
 from monitor.adapters import V2BoardPin
 
+logger = logging.getLogger(LOG_ADSENSOR)
+
+
 CHANNEL_GPIO_PINS = [
     V2BoardPin.CH01_PIN,
     V2BoardPin.CH02_PIN,
@@ -32,14 +35,13 @@ class SensorAdapter(SensorAdapterBase):
     """
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_ADSENSOR)
         self._channels = []
         for pin in CHANNEL_GPIO_PINS:
-            self._logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
+            logger.debug("Creating sensor adapter for GPIO pin: %s", pin)
             try:
                 self._channels.append(DigitalInputDevice(pin, pull_up=False))
             except lgpio.error as e:
-                self._logger.error("Failed to init DigitalInputDevice on pin %s: %s", pin, e)
+                logger.error("Failed to init DigitalInputDevice on pin %s: %s", pin, e)
 
     def is_initialized(self) -> bool:
         """
@@ -52,15 +54,15 @@ class SensorAdapter(SensorAdapterBase):
 
     def get_value(self, channel):
         if not (0 <= channel <= (len(CHANNEL_GPIO_PINS) - 1)):
-            self._logger.error("Invalid channel number: %s", channel)
+            logger.error("Invalid channel number: %s", channel)
             return 0
         value = int(self._channels[channel].value)
-        self._logger.trace("Value[CH%02d]: %s", channel + 1, value)
+        logger.trace("Value[CH%02d]: %s", channel + 1, value)
         return value
 
     def get_values(self):
         values = [int(channel.value) for channel in self._channels]
-        self._logger.debug("Values: %s", [f"{v}" for v in values])
+        logger.debug("Values: %s", [f"{v}" for v in values])
         return values
 
     def _cleanup(self):

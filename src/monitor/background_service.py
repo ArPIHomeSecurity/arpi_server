@@ -15,6 +15,7 @@ from monitor.actions import MonitorStopCommand
 # from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
 
+logger = logging.getLogger(LOG_SERVICE)
 
 MAX_RETRIES = 3
 CRASH_TIMEOUT = 120
@@ -31,7 +32,6 @@ class BackgroundService(Thread):
         self._threads: list = None
         self._stop_event = stop_event
         self._broadcaster: Broadcaster = None
-        self._logger = logging.getLogger(LOG_SERVICE)
 
     def run(self):
         """
@@ -48,14 +48,14 @@ class BackgroundService(Thread):
             # print the logging configuration for debugging
             # print_logging()
 
-            self._logger.trace("Health check of threads: %s", [t.name for t in self._threads])
+            logger.trace("Health check of threads: %s", [t.name for t in self._threads])
             for thread in self._threads:
                 if not thread.is_alive():
-                    self._logger.error("Thread crashed: %s", thread.name)
+                    logger.error("Thread crashed: %s", thread.name)
                     last_crash = time()
                     retries += 1
                     if retries > MAX_RETRIES:
-                        self._logger.error("Too many retries. Stopping the application.")
+                        logger.error("Too many retries. Stopping the application.")
                         return
 
                     self._stop_threads()
@@ -71,10 +71,10 @@ class BackgroundService(Thread):
         if retries < MAX_RETRIES:
             self._stop_threads()
 
-        self._logger.info("Health checker stopped")
+        logger.info("Health checker stopped")
 
     def _start_threads(self):
-        self._logger.info("Starting threads...")
+        logger.info("Starting threads...")
         self._stop_event.clear()
         self._broadcaster = Broadcaster()
         monitor = Monitor(self._broadcaster)
@@ -95,16 +95,16 @@ class BackgroundService(Thread):
         self._threads = [monitor, ipc_server, notifier, output_handler, keypad]
 
     def _stop_threads(self):
-        self._logger.info("Stopping threads...")
+        logger.info("Stopping threads...")
         self._broadcaster.send_message(message=MonitorStopCommand())
         self._stop_event.set()
 
         # wait for all threads to stop
         for thread in self._threads or []:
-            self._logger.debug("Waiting for thread to stop: %s %s", thread.name, thread.is_alive())
+            logger.debug("Waiting for thread to stop: %s %s", thread.name, thread.is_alive())
             if thread.is_alive():
                 thread.join()
-            self._logger.info("Stopped thread: %s", thread.name)
+            logger.info("Stopped thread: %s", thread.name)
             thread = None
 
         self._threads = None

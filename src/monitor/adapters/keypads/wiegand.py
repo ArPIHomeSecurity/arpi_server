@@ -15,6 +15,8 @@ from monitor.adapters.keypads.base import Function, KeypadBase
 from utils.constants import LOG_ADKEYPAD
 
 
+logger = logging.getLogger(LOG_ADKEYPAD)
+
 # Function key combinations
 ACTION_AWAY = "#1"
 ACTION_STAY = "#2"
@@ -32,9 +34,8 @@ class WiegandKeypad(KeypadBase):
 
     def __init__(self, data0, data1, beeper):
         super(WiegandKeypad, self).__init__()
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._reader = WiegandReader(data0, data1)
-        self._logger.debug(
+        logger.debug(
             "Wiegand keypad created, reader initialized: %s", self._reader.is_initialized()
         )
         self._function_mode = False
@@ -71,14 +72,14 @@ class WiegandKeypad(KeypadBase):
             return
 
         data = self._reader.read()
-        self._logger.debug("Wiegand(Data:%s Bit count:%s)", data, pending_bits)
+        logger.debug("Wiegand(Data:%s Bit count:%s)", data, pending_bits)
 
         if pending_bits in (26, 34):
             self._card = data[0]
-            self._logger.debug("Using card: %s", self._card)
+            logger.debug("Using card: %s", self._card)
         else:
             keys = data
-            self._logger.info("Pressed keys: %s", keys)
+            logger.info("Pressed keys: %s", keys)
             if self._function_mode:
                 # previous key was a #
                 # next key is the function
@@ -88,7 +89,7 @@ class WiegandKeypad(KeypadBase):
                     self._function_mode = False
             elif ["#"] == keys:
                 # only a # pressed
-                self._logger.debug("Waiting for next key to identify the function...")
+                logger.debug("Waiting for next key to identify the function...")
                 self._function_mode = True
             elif "#" in keys:
                 # multiple keys pressed
@@ -106,13 +107,13 @@ class WiegandKeypad(KeypadBase):
                 self._keys += keys
 
     def identify_function(self, action):
-        self._logger.debug("Detected action: %s", action)
+        logger.debug("Detected action: %s", action)
         if ACTION_AWAY == action:
             self._function = Function.AWAY
         elif ACTION_STAY == action:
             self._function = Function.STAY
         else:
-            self._logger.warning("Unknown function: %s", action)
+            logger.warning("Unknown function: %s", action)
 
     @staticmethod
     def decode_keys(binary, bits):

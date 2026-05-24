@@ -22,18 +22,19 @@ from monitor.socket_io import send_area_state
 from monitor.storage import State, States
 
 
+logger = logging.getLogger(LOG_MONITOR)
+
 class AreaHandler:
     """
     Class for managing areas
     """
 
     def __init__(self, session):
-        self._logger = logging.getLogger(LOG_MONITOR)
         self._db_session = session
 
         self._mqtt_client = MQTTClient()
         self._mqtt_client.connect(client_id="arpi_area")
-        self._logger.debug("AreaHandler initialized")
+        logger.debug("AreaHandler initialized")
 
     def load_areas(self):
         """
@@ -53,7 +54,7 @@ class AreaHandler:
         ):
             if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
                 area.arm_state = ARM_DISARM
-                self._logger.info("Area '%s' restored to disarmed state", area.name)
+                logger.info("Area '%s' restored to disarmed state", area.name)
 
             send_area_state(area.serialized)
 
@@ -79,21 +80,21 @@ class AreaHandler:
 
         Return True if the area was found and the arm state was changed.
         """
-        self._logger.info("Arming area id=%s to %s", area_id, arm_type)
+        logger.info("Arming area id=%s to %s", area_id, arm_type)
         area = self._db_session.query(Area).get(area_id)
         if area is None or area.deleted:
-            self._logger.error("Area not found or deleted")
+            logger.error("Area not found or deleted")
             return False
 
         if area.sensors == []:
-            self._logger.error("Area has no sensors")
+            logger.error("Area has no sensors")
             return False
 
         if area.arm_state == arm_type:
-            self._logger.info("Area id=%s already in state %s", area_id, arm_type)
+            logger.info("Area id=%s already in state %s", area_id, arm_type)
             return False
 
-        self._logger.info(
+        logger.info(
             "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
         )
 
@@ -117,7 +118,7 @@ class AreaHandler:
 
         Return True if at least one area was found and the arm state was changed.
         """
-        self._logger.info("Arming areas to %s", arm_type)
+        logger.info("Arming areas to %s", arm_type)
         areas = (
             self._db_session.query(Area)
             .filter(Area.deleted == False)  # noqa: E712
@@ -128,10 +129,10 @@ class AreaHandler:
         arm_changed = False
         for area in areas:
             if area.arm_state == arm_type:
-                self._logger.info("Area id=%s already in state %s", area.id, arm_type)
+                logger.info("Area id=%s already in state %s", area.id, arm_type)
                 continue
 
-            self._logger.info(
+            logger.info(
                 "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
             )
             area.arm_state = arm_type
@@ -153,5 +154,5 @@ class AreaHandler:
         """
         Close the area handler.
         """
-        self._logger.debug("Closing MQTT client...")
+        logger.debug("Closing MQTT client...")
         self._mqtt_client.close()

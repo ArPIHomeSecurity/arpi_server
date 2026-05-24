@@ -12,6 +12,8 @@ from tools.schedule import enable_dyndns_job
 from utils.constants import THREAD_SECCON, LOG_SECCON
 
 
+logger = logging.getLogger(LOG_SECCON)
+
 class SecureConnection(Thread):
     """
     SecureConnection class for updating to remote/secure secure connection
@@ -22,23 +24,22 @@ class SecureConnection(Thread):
 
     def __init__(self):
         super(SecureConnection, self).__init__(name=THREAD_SECCON, daemon=True)
-        self._logger = logging.getLogger(LOG_SECCON)
 
     def run(self):
         if SecureConnection.lock.is_set():
-            self._logger.info("A thread is already running...")
+            logger.info("A thread is already running...")
             return
 
         SecureConnection.lock.set()
 
         # update configuration
-        self._logger.debug("Start switching to secure connection...")
+        logger.debug("Start switching to secure connection...")
 
         # update the IP address of the dynamic DNS
         dyndns = DynDns()
         dyndns.update_ip()
         if not dyndns.wait_for_update(300):
-            self._logger.error("Failed to update IP address!")
+            logger.error("Failed to update IP address!")
             SecureConnection.lock.clear()
             return
 
@@ -50,10 +51,10 @@ class SecureConnection(Thread):
         enable_dyndns_job()
 
         if certificated_updated:
-            self._logger.debug("Certificate updated successfully")
+            logger.debug("Certificate updated successfully")
             public_access = certbot.check_certificate_exists()
             send_public_access(public_access)
         else:
-            self._logger.error("Failed to update certificate!")
+            logger.error("Failed to update certificate!")
 
         SecureConnection.lock.clear()

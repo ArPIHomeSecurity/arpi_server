@@ -9,32 +9,32 @@ from monitor.config.models import SSHConfig
 from utils.constants import LOG_SC_ACCESS
 from monitor.database import get_database_session
 
+logger = logging.getLogger(LOG_SC_ACCESS)
 
 class SSHService:
     def __init__(self):
         super(SSHService, self).__init__()
-        self._logger = logging.getLogger(LOG_SC_ACCESS)
         self._ssh_config = SSHConfig.load_config(get_database_session())
 
     def update_service_state(self):
-        self._logger.debug("Updating SSH service state...")
+        logger.debug("Updating SSH service state...")
         self.enable_service(self._ssh_config.service_enabled)
 
     def enable_service(self, enable: bool):
         try:
             if enable:
-                self._logger.info("Enabling SSH service")
+                logger.info("Enabling SSH service")
                 subprocess.run(["sudo", "systemctl", "start", "ssh.service"], check=True)
                 subprocess.run(["sudo", "systemctl", "enable", "ssh.service"], check=True)
             else:
-                self._logger.info("Disabling SSH service")
+                logger.info("Disabling SSH service")
                 subprocess.run(["sudo", "systemctl", "stop", "ssh.service"], check=True)
                 subprocess.run(["sudo", "systemctl", "disable", "ssh.service"], check=True)
         except subprocess.CalledProcessError as error:
-            self._logger.error("Failed to update SSH service state: %s", error)
+            logger.error("Failed to update SSH service state: %s", error)
 
     def update_access_local_network(self):
-        self._logger.debug("Updating SSH access...")
+        logger.debug("Updating SSH access...")
 
         cidr = os.environ.get("SSH_LOCAL_NETWORK", self._get_local_ip())
         ip_range = ip_network(cidr, False)
@@ -55,12 +55,12 @@ class SSHService:
 
     def _update_access_cidr(self, network, enable: bool):
         if enable:
-            self._logger.info("Restrict SSH access only for %s to %s", network, enable)
+            logger.info("Restrict SSH access only for %s to %s", network, enable)
             os.system("sudo sed -i '/sshd:/d' /etc/hosts.allow")
             os.system(f"echo 'sshd: {network}' | sudo tee -a /etc/hosts.allow")
             os.system("echo 'sshd: ALL' | sudo tee -a /etc/hosts.deny")
         else:
-            self._logger.info("Allow SSH access from any networks")
+            logger.info("Allow SSH access from any networks")
             os.system("sudo sed -i '/sshd:/d' /etc/hosts.allow")
             os.system("sudo sed -i '/sshd: ALL/d' /etc/hosts.deny")
 
@@ -68,7 +68,7 @@ class SSHService:
         """
         Update password authentication
         """
-        self._logger.info("Updating password authentication")
+        logger.info("Updating password authentication")
         self.enable_password_authentication(
             self._ssh_config.password_authentication_enabled, self._ssh_config.service_enabled
         )
@@ -78,19 +78,19 @@ class SSHService:
         Enable password authentication
         """
         if enable:
-            self._logger.info("Enabling password authentication")
+            logger.info("Enabling password authentication")
             os.system(
                 'sudo sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication yes/g" /etc/ssh/sshd_config'
             )
         else:
-            self._logger.info("Disabling password authentication")
+            logger.info("Disabling password authentication")
             os.system(
                 'sudo sed -i -E -e "s/.*PasswordAuthentication (yes|no)/PasswordAuthentication no/g" /etc/ssh/sshd_config'
             )
 
         if restart:
-            self._logger.info("Restarting SSH service")
+            logger.info("Restarting SSH service")
             try:
                 subprocess.run(["systemctl", "restart", "ssh.service"], check=True)
             except subprocess.CalledProcessError as error:
-                self._logger.error("Failed to restart SSH service: %s", error)
+                logger.error("Failed to restart SSH service: %s", error)

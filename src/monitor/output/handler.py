@@ -21,6 +21,8 @@ from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
 from monitor.adapters.output import get_output_adapter
 
 
+logger = logging.getLogger(LOG_OUTPUT)
+
 class OutputHandler(Thread):
     """
     Class for managing outputs
@@ -82,7 +84,6 @@ class OutputHandler(Thread):
         super().__init__(name="OutputHandler")
         self._broadcaster = broadcaster
         self._actions = Queue()
-        self._logger = logging.getLogger(LOG_OUTPUT)
         self._outputs = None
         self._buttons = None
         self._stop_event = None
@@ -94,12 +95,12 @@ class OutputHandler(Thread):
         """
         Load outputs from database
         """
-        self._logger.debug("Loading outputs from database")
+        logger.debug("Loading outputs from database")
         db_session = get_database_session()
         self._outputs = db_session.query(Output).all()
 
         # initialize output default states
-        self._logger.info("Initializing outputs from database")
+        logger.info("Initializing outputs from database")
         adapter = get_output_adapter()
         for output in self._outputs:
             if output.channel is not None:
@@ -108,7 +109,7 @@ class OutputHandler(Thread):
 
         db_session.close()
 
-        self._logger.debug("Loaded %s outputs", len(self._outputs))
+        logger.debug("Loaded %s outputs", len(self._outputs))
 
     def run(self) -> None:
         self.load_outputs()
@@ -131,7 +132,7 @@ class OutputHandler(Thread):
         for stop_event in self._signs.values():
             stop_event.set()
 
-        self._logger.info("Output Handler stopped")
+        logger.info("Output Handler stopped")
 
     def process_notifications(self) -> None:
         """
@@ -151,12 +152,12 @@ class OutputHandler(Thread):
 
             output = self.get_output(**output_args.get(notification.type, {}))
             if output is None:
-                self._logger.debug("Cannot find output for notification: %s", notification)
+                logger.debug("Cannot find output for notification: %s", notification)
                 continue
 
             stop_event = self._signs.pop(output.channel, None)
             if stop_event is not None:
-                self._logger.debug(
+                logger.debug(
                     "Stopping sign on channel %s for event %s",
                     OUTPUT_NAMES[output.channel],
                     notification,
@@ -165,7 +166,7 @@ class OutputHandler(Thread):
 
             # start new sign
             if notification.state == EventType.START and output.enabled:
-                self._logger.debug(
+                logger.debug(
                     "Starting new sign on channel %s for event %s",
                     OUTPUT_NAMES[output.channel],
                     notification,
@@ -201,6 +202,6 @@ class OutputHandler(Thread):
                     return output
         else:
             # invalid notification
-            self._logger.error("Invalid notification! Both area_id and button_id are set")
+            logger.error("Invalid notification! Both area_id and button_id are set")
 
         return None

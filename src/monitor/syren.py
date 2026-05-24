@@ -13,6 +13,8 @@ from utils.constants import LOG_ALERT, THREAD_ALERT
 from monitor.adapters.output import get_output_adapter
 
 
+logger = logging.getLogger(LOG_ALERT)
+
 class Syren(Thread):
     """
     Handling of syren alerts.
@@ -73,7 +75,6 @@ class Syren(Thread):
 
     def __init__(self, config: SyrenConfig):
         super(Syren, self).__init__(name=THREAD_ALERT)
-        self._logger = logging.getLogger(LOG_ALERT)
         self._output_adapter = get_output_adapter()
         self._alert = None
         self._config = config
@@ -99,7 +100,7 @@ class Syren(Thread):
         sensor_silent_alert = None
         # we should have an alert at this point, but it's not always there
         if alert is None:
-            self._logger.warning("No alert found, using syren configuration")
+            logger.warning("No alert found, using syren configuration")
         else:
             for sensor in alert.sensors:
                 if sensor.silent is None:
@@ -132,14 +133,14 @@ class Syren(Thread):
             alert.silent = silent_alert
             db_session.commit()
 
-        self._logger.info(
+        logger.info(
             "Silent alert = %s <= Syren silent = %s + Sensor silent = %s",
             silent_alert,
             syren_silent_alert,
             sensor_silent_alert,
         )
         if silent_alert:
-            self._logger.info("Syren is in silent mode")
+            logger.info("Syren is in silent mode")
             send_syren_state(False)
             Syren._is_running = False
             return
@@ -152,18 +153,18 @@ class Syren(Thread):
         self._output_adapter.control_channel(self.SYREN_CHANNEL, syren_is_on)
         send_syren_state(syren_is_on)
         if syren_is_on:
-            self._logger.info("Syren started")
+            logger.info("Syren started")
         while not self._stop_event.is_set():
             now = time()
             if not syren_is_on and (now - start_time > DELAY):
-                self._logger.info("Syren turned on after delay")
+                logger.info("Syren turned on after delay")
                 # turn on the syren
                 syren_is_on = True
                 self._output_adapter.control_channel(self.SYREN_CHANNEL, syren_is_on)
                 send_syren_state(syren_is_on)
-                self._logger.info("Syren started")
+                logger.info("Syren started")
             elif syren_is_on and DURATION > 0 and now - start_time > DURATION:
-                self._logger.info("Syren stopped after %d seconds", DURATION)
+                logger.info("Syren stopped after %d seconds", DURATION)
                 break
 
             if self._stop_event.wait(timeout=1):
@@ -173,7 +174,7 @@ class Syren(Thread):
         syren_is_on = None
         self._output_adapter.control_channel(self.SYREN_CHANNEL, False)
         send_syren_state(syren_is_on)
-        self._logger.info("Syren stopped")
+        logger.info("Syren stopped")
 
-        self._logger.debug("Syren exited")
+        logger.debug("Syren exited")
         db_session.close()

@@ -5,6 +5,7 @@ from typing import List
 from utils.constants import LOG_MONITOR
 from monitor.config.models import AlertSensitivityConfig
 
+logger = logging.getLogger(LOG_MONITOR)
 
 class SensorHistory:
     """
@@ -103,7 +104,6 @@ class SensorsHistory:
         self._sensors: List[SensorHistory] = [
             SensorHistory(size, threshold) for _ in range(sensor_count)
         ]
-        self._logger = logging.getLogger(LOG_MONITOR)
 
     def set_sensitivity(self, idx: int, size: int, threshold: int):
         """
@@ -166,7 +166,7 @@ class SensorsHistory:
             states (List[bool]): The states to add to the sensors.
         """
         if len(states) != len(self._sensors):
-            self._logger.error(
+            logger.error(
                 "Invalid number of states! %s != %s", len(states), len(self._sensors)
             )
             return

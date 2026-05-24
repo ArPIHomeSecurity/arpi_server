@@ -41,6 +41,8 @@ from tools.clock import Clock
 from tools.ssh_service import SSHService
 from monitor.actions import ParseCommandError, from_dict
 
+
+logger = logging.getLogger(LOG_IPC)
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
 
@@ -64,11 +66,10 @@ class IPCServer(Thread):
         Constructor
         """
         super(IPCServer, self).__init__(name=THREAD_IPC)
-        self._logger = logging.getLogger(LOG_IPC)
         self._stop_event = stop_event
         self._broadcaster = broadcaster
         self._initialize_socket()
-        self._logger.info("IPC server created")
+        logger.info("IPC server created")
 
     def _initialize_socket(self):
         _socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -81,7 +82,7 @@ class IPCServer(Thread):
             _socket.bind(MONITOR_INPUT_SOCKET)
             _socket.listen(2)
         except OSError as error:
-            self._logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
+            logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
             raise
 
         try:
@@ -91,10 +92,10 @@ class IPCServer(Thread):
                 getpwnam(environ["USERNAME"]).pw_uid,
                 getgrnam(environ["GROUPNAME"]).gr_gid,
             )
-            self._logger.info("Socket permissions fixed")
+            logger.info("Socket permissions fixed")
         except KeyError as error:
-            self._logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
-            self._logger.error("Error: %s", error)
+            logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
+            logger.error("Error: %s", error)
 
         self._sockets = [_socket]
 
@@ -108,18 +109,18 @@ class IPCServer(Thread):
 
         folder = path.dirname(MONITOR_INPUT_SOCKET)
         if not path.exists(folder):
-            self._logger.info("Create folder for socket file: %s", MONITOR_INPUT_SOCKET)
+            logger.info("Create folder for socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(folder)
 
     def run(self):
-        self._logger.info("IPC server started")
+        logger.info("IPC server started")
 
         try:
             self.communicate()
         except Exception:
-            self._logger.exception("IPC server crashed!")
+            logger.exception("IPC server crashed!")
 
-        self._logger.info("IPC server stopped")
+        logger.info("IPC server stopped")
 
     def communicate(self):
         """
@@ -127,7 +128,7 @@ class IPCServer(Thread):
         """
         # read all the messages
         while not self._stop_event.is_set():
-            self._logger.trace("Waiting for connection...")
+            logger.trace("Waiting for connection...")
             readable, _, exceptional = select(self._sockets, [], self._sockets, 1)
 
             for read_socket in readable:
@@ -138,7 +139,7 @@ class IPCServer(Thread):
                     self.process_data(read_socket)
 
             for exc_socket in exceptional:
-                self._logger.error("Exceptional socket: %s", exc_socket)
+                logger.error("Exceptional socket: %s", exc_socket)
                 self._sockets.remove(exc_socket)
                 exc_socket.close()
 
@@ -152,20 +153,20 @@ class IPCServer(Thread):
         try:
             data = connection.recv(1024)
         except ConnectionResetError as error:
-            self._logger.error("Connection reset: %s", error)
+            logger.error("Connection reset: %s", error)
             return
 
         if not data:
-            self._logger.debug("No data received")
+            logger.debug("No data received")
             self._sockets.remove(connection)
             connection.close()
             return
 
-        self._logger.debug("Received action: '%s'", data)
+        logger.debug("Received action: '%s'", data)
         try:
             message = json.loads(data.decode())
         except json.JSONDecodeError as error:
-            self._logger.error("Invalid JSON payload: %s", error)
+            logger.error("Invalid JSON payload: %s", error)
             response = {"result": False, "message": "Invalid JSON payload"}
         else:
             response = self.handle_actions(message)
@@ -187,7 +188,7 @@ class IPCServer(Thread):
         return_value = {"result": True}
 
         if message["action"] in self.BROADCASTED_ACTIONS:
-            self._logger.info("IPC action received: %s", message["action"])
+            logger.info("IPC action received: %s", message["action"])
             try:
                 command = from_dict(message)
             except ParseCommandError as error:
@@ -199,7 +200,7 @@ class IPCServer(Thread):
         elif message["action"] == POWER_GET_STATE:
             return_value["value"] = {"state": States.get(State.POWER)}
         elif message["action"] == UPDATE_SSH:
-            self._logger.info("Update ssh connection...")
+            logger.info("Update ssh connection...")
             ssh = SSHService()
             ssh.update_service_state()
             ssh.update_access_local_network()
@@ -250,7 +251,7 @@ class IPCServer(Thread):
         """
         Test syren for a given duration.
         """
-        self._logger.debug("Testing syren %ss...", duration)
+        logger.debug("Testing syren %ss...", duration)
         Syren.start_syren(silent=False, delay=0, duration=duration)
         sleep(duration)
         Syren.stop_syren()

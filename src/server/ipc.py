@@ -33,6 +33,7 @@ from monitor.actions import (
     UpdateSecureConnectionCommand,
 )
 
+logger = logging.getLogger(LOG_IPC)
 
 class IPCClient(object):
     """
@@ -43,17 +44,16 @@ class IPCClient(object):
     _socket = None
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_IPC)
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
-                self._logger.info(
+                logger.info(
                     "Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"]
                 )
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
                 self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):
-                self._logger.error(
+                logger.error(
                     "Failed to connect to monitor socket! %s", environ["MONITOR_INPUT_SOCKET"]
                 )
                 self._socket = None
@@ -72,7 +72,7 @@ class IPCClient(object):
                 MonitorArmStayCommand(user_id=user_id, area_id=area_id, use_delay=False)
             )
         else:
-            self._logger.error("Unknown arm type: %s", arm_type)
+            logger.error("Unknown arm type: %s", arm_type)
             return {"message": "Unknown arm type"}
 
     def disarm(self, user_id, area_id=None):
@@ -148,13 +148,13 @@ class IPCClient(object):
                         return json.loads(data.decode())
                     except json.JSONDecodeError:
                         if data == b"":
-                            self._logger.error(
+                            logger.error(
                                 "Received empty response from monitor socket! Message: %s", payload
                             )
                             return
-                        self._logger.warning(
+                        logger.warning(
                             "Received invalid JSON (may be we need another part)! Response: %s",
                             data,
                         )
             except ConnectionResetError as error:
-                self._logger.error("Sending message to monitor socket failed! %s", error)
+                logger.error("Sending message to monitor socket failed! %s", error)

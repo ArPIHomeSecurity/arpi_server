@@ -35,6 +35,7 @@ from monitor.actions import (
 )
 from utils.queries import get_alert_delay, get_arm_delay, get_arm_state, get_user_with_access_code
 
+logger = logging.getLogger(LOG_ADKEYPAD)
 COMMUNICATION_PERIOD = 0.2  # sec
 CARD_REGISTRATION_EXPIRY = 120  # sec
 
@@ -42,7 +43,6 @@ CARD_REGISTRATION_EXPIRY = 120  # sec
 class KeypadHandler(Thread):
     def __init__(self, broadcaster: Broadcaster):
         super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._actions = Queue()
         self._codes = []
         self._keypad: KeypadBase = None
@@ -51,13 +51,13 @@ class KeypadHandler(Thread):
         self._broadcaster.register_queue(id(self), self._actions)
 
     def configure(self):
-        self._logger.debug("Configure keypad")
+        logger.debug("Configure keypad")
         with get_database_session() as db_session:
             keypad_settings = db_session.query(Keypad).first()
 
             if keypad_settings is None or not keypad_settings.enabled:
                 self._keypad = None
-                self._logger.info("Keypad removed")
+                logger.info("Keypad removed")
                 return
 
             if keypad_settings.type.name == "DSC":
@@ -67,8 +67,8 @@ class KeypadHandler(Thread):
                 self._keypad = get_wiegand_keypad()
                 self._keypad.id = keypad_settings.id
             else:
-                self._logger.error("Unknown keypad type: %s", keypad_settings.type.name)
-            self._logger.debug("Keypad created type: %s", keypad_settings.type.name)
+                logger.error("Unknown keypad type: %s", keypad_settings.type.name)
+            logger.debug("Keypad created type: %s", keypad_settings.type.name)
 
             # save the database keypad id
             self._keypad.id = keypad_settings.id
@@ -80,12 +80,12 @@ class KeypadHandler(Thread):
 
             self.communicate()
         except Exception:
-            self._logger.exception("Keypad thread crashed!")
+            logger.exception("Keypad thread crashed!")
 
         if self._keypad:
             self._keypad.close()
 
-        self._logger.info("Keypad handler stopped")
+        logger.info("Keypad handler stopped")
 
     def communicate(self):
         last_press = int(time())
@@ -93,12 +93,12 @@ class KeypadHandler(Thread):
         register_card_start = None
         while True:
             with contextlib.suppress(Empty):
-                self._logger.trace("Wait for command...")
+                logger.trace("Wait for command...")
                 message = self._actions.get(timeout=COMMUNICATION_PERIOD)
-                self._logger.debug("Command: %s", message)
+                logger.debug("Command: %s", message)
                 match message:
                     case MonitorUpdateKeypadCommand():
-                        self._logger.info("Updating keypad")
+                        logger.info("Updating keypad")
                         self.configure()
                         last_press = int(time())
                     case MonitorRegisterCardCommand():
@@ -119,7 +119,7 @@ class KeypadHandler(Thread):
                         # the monitor thread needs time to update the database
                         sleep(0.5)
                         if States.get(State.MONITORING) == MONITORING_READY:
-                            self._logger.info("Keypad disarmed: monitoring disarmed")
+                            logger.info("Keypad disarmed: monitoring disarmed")
                             self._keypad.set_armed(False)
                             self._keypad.stop_delay()
                     case MonitorStopCommand():
@@ -135,13 +135,13 @@ class KeypadHandler(Thread):
                 # delete pressed keys after 10 secs
                 if int(time()) - last_press > 10 and presses:
                     presses = ""
-                    self._logger.info("Cleared presses after 10 secs")
+                    logger.info("Cleared presses after 10 secs")
 
                 # check the action from the keypad
                 action = self._keypad.last_action()
                 if action == Action.KEY:
                     presses += self._keypad.get_last_key()
-                    self._logger.trace("Presses: '%s'", presses)
+                    logger.trace("Presses: '%s'", presses)
                     last_press = time()
                     if len(presses) == 4:
                         self.handle_access_code(presses)
@@ -155,12 +155,12 @@ class KeypadHandler(Thread):
                 elif action == Action.FUNCTION:
                     self.handle_function(self._keypad.get_function())
                 elif action is not None:
-                    self._logger.error("Unknown keypad action: %s", action)
+                    logger.error("Unknown keypad action: %s", action)
 
     def arm_keypad(self, arm_type, use_delay):
         with get_database_session() as session:
             arm_delay = get_arm_delay(session, arm_type) if use_delay else 0
-            self._logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
+            logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
             self._keypad.set_armed(True)
 
             # wait for the arm created in the database
@@ -173,10 +173,10 @@ class KeypadHandler(Thread):
                 sleep(1)
 
             if not arm:
-                self._logger.error("Arm not created")
+                logger.error("Arm not created")
                 return
 
-            self._logger.debug("Arm: %s", arm)
+            logger.debug("Arm: %s", arm)
             if arm_delay is not None and arm_delay > 0:
                 self._keypad.start_delay(arm.time, arm_delay)
 
@@ -184,7 +184,7 @@ class KeypadHandler(Thread):
         with get_database_session() as session:
             arm_type = get_arm_state(session)
             alert_delay = get_alert_delay(session, arm_type)
-            self._logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
+            logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
 
             # TODO: for now we don't have a reference time as for delayed arm
             # we need to add the alerts to the database
@@ -194,32 +194,32 @@ class KeypadHandler(Thread):
     def handle_access_code(self, presses):
         user = get_user_with_access_code(get_database_session(), presses)
         if user:
-            self._logger.debug("Code accepted: %s", presses)
-            self._logger.info("Accepted code => disarming")
+            logger.debug("Code accepted: %s", presses)
+            logger.info("Accepted code => disarming")
             self._broadcaster.send_message(
                 message=MonitorDisarmCommand(user_id=user.id, keypad_id=self._keypad.id)
             )
         else:
-            self._logger.debug("Invalid code")
+            logger.debug("Invalid code")
             self._keypad.set_error(True)
 
     def handle_card(self, card):
-        self._logger.debug("Card: %s", card)
+        logger.debug("Card: %s", card)
         if not self._keypad.get_armed():
             return
 
         db_card = self.get_card_by_number(card)
         if db_card and db_card.enabled:
-            self._logger.info("Accepted card => disarming")
+            logger.info("Accepted card => disarming")
             self._broadcaster.send_message(
                 message=MonitorDisarmCommand(user_id=db_card.user_id, keypad_id=self._keypad.id)
             )
         else:
-            self._logger.info("Unknown card")
+            logger.info("Unknown card")
             self._keypad.set_error(True)
 
     def handle_function(self, function: Function):
-        self._logger.debug("Handling function: %s", function)
+        logger.debug("Handling function: %s", function)
         if Function.AWAY == function:
             self._broadcaster.send_message(
                 MonitorArmAwayCommand(keypad_id=self._keypad.id, use_delay=True)
@@ -229,7 +229,7 @@ class KeypadHandler(Thread):
                 MonitorArmStayCommand(keypad_id=self._keypad.id, use_delay=True)
             )
         else:
-            self._logger.error("Unknown function: %s", function)
+            logger.error("Unknown function: %s", function)
 
     def get_card_by_number(self, card_number) -> Card | None:
         """
@@ -266,12 +266,12 @@ class KeypadHandler(Thread):
                         if state.modified:
                             db_session.commit()
 
-                        self._logger.info("Card already registered")
+                        logger.info("Card already registered")
                         send_card_not_registered()
                         return
 
                 card_number = Card(card_number, users[0].id)
-                self._logger.debug("Card created: %s", card_number)
+                logger.debug("Card created: %s", card_number)
                 db_session.add(card_number)
                 users[0].card_registration_expiry = None
                 db_session.commit()

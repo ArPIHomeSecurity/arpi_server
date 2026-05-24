@@ -13,6 +13,9 @@ from gpiozero import DigitalOutputDevice, DigitalInputDevice
 
 from monitor.output import OUTPUT_NAMES
 
+
+logger = logging.getLogger(LOG_ADOUTPUT)
+
 OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
 
 
@@ -42,7 +45,6 @@ class OutputAdapter:
     def __init__(
         self, latch_pin=None, enable_pin=None, clock_pin=None, data_in_pin=None, data_out_pin=None
     ):
-        self._logger = logging.getLogger(LOG_ADOUTPUT)
         if OutputAdapter.DATA_REGISTER_SIZE != OUTPUT_NUMBER:
             raise ValueError(
                 f"Data register size {OutputAdapter.DATA_REGISTER_SIZE} does not match output number {OUTPUT_NUMBER}"
@@ -62,10 +64,10 @@ class OutputAdapter:
             self._clock = None
             self._data_in = None
             self._data_out = None
-            self._logger.error(f"Error initializing digital devices: {error}")
+            logger.error(f"Error initializing digital devices: {error}")
 
         if all([self._latch, self._enable, self._clock, self._data_in, self._data_out]):
-            self._logger.debug(
+            logger.debug(
                 "Digital devices: %s",
                 [self._latch, self._enable, self._clock, self._data_in, self._data_out],
             )
@@ -95,15 +97,15 @@ class OutputAdapter:
     def _reset_faults(self):
         faults = self._read_faults()
         if any(faults):
-            self._logger.debug("Resetting faults")
+            logger.debug("Resetting faults")
             self._write_command(*Commands.RESET_FAULT_REGISTER.value)
 
             faults = self._read_faults()
             if any(faults):
-                self._logger.error("Failed to reset faults")
+                logger.error("Failed to reset faults")
                 return
 
-        self._logger.debug("Successfully reset faults")
+        logger.debug("Successfully reset faults")
 
     def _read_faults(self) -> List[int]:
         self._latch.off()
@@ -122,11 +124,11 @@ class OutputAdapter:
         # bits are in reverse order F16 -> F1
         buffer = list(reversed(buffer))
         if any(buffer):
-            self._logger.debug(
+            logger.debug(
                 "Read faults: %s", ", ".join(f"F{idx + 1}: {bit}" for idx, bit in enumerate(buffer))
             )
-            self._logger.debug("OCP=Overcurrent Detection, OLP=Open Load Protection")
-            self._logger.warning(
+            logger.debug("OCP=Overcurrent Detection, OLP=Open Load Protection")
+            logger.warning(
                 "Read faults: %s",
                 ", ".join(
                     f"OUTP{idx + 1:02d}/{OUTPUT_NAMES[idx]}: {'OLP' if buffer[idx] else '-'}|{'OCP' if buffer[idx + 8] else '-'}"
@@ -134,7 +136,7 @@ class OutputAdapter:
                 ),
             )
         else:
-            self._logger.debug("No faults detected")
+            logger.debug("No faults detected")
 
         self._latch.on()
 
@@ -163,7 +165,7 @@ class OutputAdapter:
         """
         Control output by channel number
         """
-        self._logger.debug(
+        logger.debug(
             "Control channel %d for %s to %r",
             channel,
             OUTPUT_NAMES[channel],
@@ -209,7 +211,7 @@ class OutputAdapter:
             sleep(0.001)
 
         # bits are in reverse order OUT8 -> OUT1
-        self._logger.debug("States:  %s", list(reversed(buffer)))
+        logger.debug("States:  %s", list(reversed(buffer)))
         return buffer
 
     def _cleanup(self):
@@ -231,4 +233,4 @@ class OutputAdapter:
         if self._data_out:
             self._data_out.close()
             self._data_out = None
-        self._logger.debug("Output adapter cleanup finished")
+        logger.debug("Output adapter cleanup finished")

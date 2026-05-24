@@ -4,6 +4,7 @@ from enum import Enum
 
 from utils.constants import LOG_ADKEYPAD
 
+logger = logging.getLogger(LOG_ADKEYPAD)
 
 class DelayPhase(Enum):
     NO_DELAY = 0
@@ -17,10 +18,9 @@ class Handler:
         self._start = start
         self._delay = delay
         self._step = 0
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
 
     def do(self) -> bool:
-        self._logger.debug("Start: %s delay: %s step: %s", self._start, self._delay, self._step)
+        logger.debug("Start: %s delay: %s step: %s", self._start, self._delay, self._step)
         now = dt.now()
         if self._start.replace(tzinfo=None) + timedelta(seconds=self._delay) > now:
             if (now - self._start.replace(tzinfo=None)).total_seconds() > self._step:

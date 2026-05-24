@@ -24,6 +24,7 @@ from monitor.actions import (
 )
 from utils.queries import get_user_with_access_code
 
+logger = logging.getLogger(LOG_NOTIFIER)
 
 # check if running with simulator
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
@@ -235,7 +236,6 @@ class Notifier(Thread):
 
     def __init__(self, broadcaster: Broadcaster):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
-        self._logger = logging.getLogger(LOG_NOTIFIER)
         self._actions = Queue()
         self._gsm = None
         self._smtp = None
@@ -245,10 +245,10 @@ class Notifier(Thread):
 
         self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
-        self._logger.info("Notifier created")
+        logger.info("Notifier created")
 
     def run(self):
-        self._logger.info("Notifier started...")
+        logger.info("Notifier started...")
 
         # --------------------------------------------------------------
         # Workaround to avoid hanging of keypad process on create_engine
@@ -272,7 +272,7 @@ class Notifier(Thread):
             if not self._notifications.empty():
                 self.process_notifications()
 
-        self._logger.info("Notifier stopped")
+        logger.info("Notifier stopped")
 
     def setup_connections(self):
         self._gsm_config = GSMConfig.load_config()
@@ -281,14 +281,14 @@ class Notifier(Thread):
 
         self.destroy_gsm()
         if self._gsm_config.enabled:
-            self._logger.debug("GSM enabled")
+            logger.debug("GSM enabled")
             self._gsm = GSM(
                 pin_code=self._gsm_config.pin_code,
                 port=os.environ["GSM_PORT"],
                 baud=os.environ["GSM_PORT_BAUD"],
             )
         else:
-            self._logger.debug("GSM disabled")
+            logger.debug("GSM disabled")
             self.destroy_gsm()
 
         # we will try to connect to verify the connection
@@ -296,7 +296,7 @@ class Notifier(Thread):
         # so we need to re-connect
         self.destroy_smtp()
         if self._smtp_config.enabled:
-            self._logger.debug("SMTP enabled")
+            logger.debug("SMTP enabled")
             self._smtp = SMTPSender(
                 hostname=self._smtp_config.smtp_hostname,
                 port=self._smtp_config.smtp_port,
@@ -304,7 +304,7 @@ class Notifier(Thread):
                 password=self._smtp_config.smtp_password,
             )
         else:
-            self._logger.debug("SMTP disabled")
+            logger.debug("SMTP disabled")
             self.destroy_smtp()
 
     def destroy_gsm(self):
@@ -327,13 +327,13 @@ class Notifier(Thread):
             notification.retry += 1
 
         if notification.processed:
-            self._logger.debug("Processed notification: %s", notification)
+            logger.debug("Processed notification: %s", notification)
             return
 
         # send failed
         if notification.retry >= Notifier.MAX_RETRY:
             # stop retrying
-            self._logger.debug(
+            logger.debug(
                 "Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification
             )
         else:
@@ -344,27 +344,27 @@ class Notifier(Thread):
         db_session = get_database_session()
         user = get_user_with_access_code(db_session, feedback)
         if user:
-            self._logger.info("Disarming based on dmtf code of user %s", user.name)
+            logger.info("Disarming based on dmtf code of user %s", user.name)
             self._broadcaster.send_message(message=MonitorDisarmCommand(user_id=user.id))
             db_session.close()
             return True
         else:
-            self._logger.debug("No user found for feedback...")
+            logger.debug("No user found for feedback...")
 
         user = get_user_with_access_code(db_session, feedback)
         if user:
-            self._logger.info("Disarming based on dmtf code of user %s", user.name)
+            logger.info("Disarming based on dmtf code of user %s", user.name)
             self._broadcaster.send_message(message=MonitorDisarmCommand(user_id=user.id))
             db_session.close()
             return True
         else:
-            self._logger.debug("No user found for feedback...")
+            logger.debug("No user found for feedback...")
 
         db_session.close()
         return False
 
     def execute_notification(self, notification: Notification):
-        self._logger.info("Sending message: %s", notification)
+        logger.info("Sending message: %s", notification)
 
         # execute all actions in priority order
         # TODO: consider moving it to the database to allow dynamic configuration
@@ -380,9 +380,9 @@ class Notifier(Thread):
             try:
                 action(self, notification)
             except (KeyError, TypeError) as error:
-                self._logger.exception("Failed to send message: '%s'! (%s)", notification, error)
+                logger.exception("Failed to send message: '%s'! (%s)", notification, error)
             except Exception:
-                self._logger.exception("Sending message failed!")
+                logger.exception("Sending message failed!")
 
     def send_email_1(self, notification: Notification):
         if self._smtp and getattr(self._subscriptions.email1, notification.type, False):
@@ -434,7 +434,7 @@ class Notifier(Thread):
 
                 # if the user pressed 1 (acknowledge) then we don't need to call the second number
                 if feedback == CALL_ACKNOWLEDGED:
-                    self._logger.info("Phone 1 acknowledged the alert")
+                    logger.info("Phone 1 acknowledged the alert")
                     notification.call1_sent = True
                     notification.call2_sent = None
                 elif feedback:
@@ -453,9 +453,9 @@ class Notifier(Thread):
                 feedback = self._gsm.incoming_dtmf
 
                 # if the user pressed 1 (acknowledge) then we don't need to call the second number
-                self._logger.trace("Phone 2 feedback: %s", feedback)
+                logger.trace("Phone 2 feedback: %s", feedback)
                 if feedback == CALL_ACKNOWLEDGED:
-                    self._logger.info("Phone 2 acknowledged the alert")
+                    logger.info("Phone 2 acknowledged the alert")
                     notification.call2_sent = True
                     notification.call1_sent = None
                 elif feedback:
