@@ -1,0 +1,87 @@
+ArPI Server
+
+Purpose
+- Backend service for the ArPI security system, intended to run on Raspberry Pi and Linux environments.
+- Provides the main Flask API, a monitoring service, and an MCP server.
+- Uses PostgreSQL-backed persistence and integrates with MQTT and optional device-specific components.
+
+Primary files
+- README.md: human-oriented project overview.
+- pyproject.toml: source of truth for Python requirements, package metadata, scripts, pytest settings, and optional dependency groups.
+- Taskfile.yml: source of truth for local development, linting, testing, and service startup commands.
+- config.env: packaged runtime configuration template.
+- src/server/__init__.py: main Flask API application entrypoint.
+- src/monitor/service.py: monitor service application factory and background service startup.
+- src/mcp_server/__init__.py: FastMCP server setup and HTTP app entrypoint.
+- migrations/: Alembic migration files.
+- tests/: automated test suite.
+
+Technology
+- Python 3.11+
+- Flask
+- Flask-SQLAlchemy and Flask-Migrate
+- FastMCP
+- PostgreSQL
+- MQTT
+- Pytest
+- Ruff
+- uv and Task
+
+Safe commands
+- task create-environment
+- task format-check
+- task lint
+- task test
+- task test-debug
+- task start-server
+- task start-monitor
+- task start-mcp
+
+Important tasks
+- task create-environment: create the uv-managed development environment with dev and simulator dependencies.
+- task format: format Python code with Ruff.
+- task format-check: verify formatting.
+- task lint: run Ruff checks.
+- task lint-fix: auto-fix Ruff issues where possible.
+- task test: run the pytest suite.
+- task test-debug: run pytest with verbose debug output.
+- task start-database: start the local PostgreSQL container.
+- task start-mqtt: start the local Mosquitto container.
+- task start-server: start the Flask API on port 8080.
+- task start-monitor: start the monitor service on port 8081.
+- task start-mcp: start the MCP server on port 7000.
+- task start-simulator: start the textual simulator.
+- task start-simulator-web: serve the simulator over the web on port 8888.
+
+Python entrypoints
+- Flask API: src/server/__init__.py exports the `server` Flask app used by `flask --app server run`.
+- Monitor service: src/monitor/service.py exports `create_app` for the monitor Flask-SocketIO service.
+- MCP server: src/mcp_server/__init__.py defines `main_mcp` and `app` for FastMCP HTTP serving.
+
+Packaged console scripts
+- argus-certbot
+- argus-clock
+- argus-data
+- argus-dyndns
+- argus-hash
+- argus-secret
+- argus-simulator
+- argus-ssh-keymanager
+- argus-ssh-service
+- argus-tester
+- argus-user
+- argus-upgrade
+- argus-status
+
+Working rules for agents
+- Prefer `task` commands over ad hoc shell commands when an equivalent task exists.
+- Prefer `uv run` or `uv sync` workflows over plain `pip` unless there is a project-specific reason not to.
+- Do not invent runtime configuration values; inspect `config.env` and the relevant module.
+- Treat the API server, monitor service, and MCP server as separate entrypoints with different startup commands.
+- When modifying database models or persisted behavior, check `migrations/` and `tests/` before making assumptions.
+
+External endpoints
+- Project site: https://www.arpi-security.info/
+- Documentation: https://docs.arpi-security.info/
+- Demo: https://demo.arpi-security.info/
+- Repository: https://github.com/ArPIHomeSecurity/arpi_server
