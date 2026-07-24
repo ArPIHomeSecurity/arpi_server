@@ -17,6 +17,7 @@ from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
 
 logger = logging.getLogger(LOG_MQTT)
 
+
 def sanitize(name):
     """
     Convert name to [a-zA-Z0-9_-] for home assistant

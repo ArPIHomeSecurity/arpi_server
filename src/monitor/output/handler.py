@@ -23,6 +23,7 @@ from monitor.adapters.output import get_output_adapter
 
 logger = logging.getLogger(LOG_OUTPUT)
 
+
 class OutputHandler(Thread):
     """
     Class for managing outputs

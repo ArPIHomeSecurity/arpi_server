@@ -7,6 +7,7 @@ from utils.constants import LOG_NOTIFIER
 
 logger = logging.getLogger(LOG_NOTIFIER)
 
+
 class SMTPSender:
     """Class for sending messages in email."""
 

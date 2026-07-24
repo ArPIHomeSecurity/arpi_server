@@ -14,6 +14,7 @@ from utils.constants import THREAD_SECCON, LOG_SECCON
 
 logger = logging.getLogger(LOG_SECCON)
 
+
 class SecureConnection(Thread):
     """
     SecureConnection class for updating to remote/secure secure connection

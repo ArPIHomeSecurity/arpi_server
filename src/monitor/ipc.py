@@ -54,6 +54,7 @@ class IPCResponse:
     value: dict = None
     other: dict = None
 
+
 class IPCServer(Thread):
     """
     Class for handling the actions from the server and executing them on monitoring.

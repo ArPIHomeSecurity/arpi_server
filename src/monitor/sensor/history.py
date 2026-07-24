@@ -7,6 +7,7 @@ from monitor.config.models import AlertSensitivityConfig
 
 logger = logging.getLogger(LOG_MONITOR)
 
+
 class SensorHistory:
     """
     Keeps track of the last N states of a sensor and returns whether the sensor
@@ -166,9 +167,7 @@ class SensorsHistory:
             states (List[bool]): The states to add to the sensors.
         """
         if len(states) != len(self._sensors):
-            logger.error(
-                "Invalid number of states! %s != %s", len(states), len(self._sensors)
-            )
+            logger.error("Invalid number of states! %s != %s", len(states), len(self._sensors))
             return
 
         for idx, sensor in enumerate(self._sensors):

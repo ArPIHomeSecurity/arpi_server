@@ -11,6 +11,7 @@ from monitor.database import get_database_session
 
 logger = logging.getLogger(LOG_SC_ACCESS)
 
+
 class SSHService:
     def __init__(self):
         super(SSHService, self).__init__()

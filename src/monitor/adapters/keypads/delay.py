@@ -6,6 +6,7 @@ from utils.constants import LOG_ADKEYPAD
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 
+
 class DelayPhase(Enum):
     NO_DELAY = 0
     NO_BEEP = 1

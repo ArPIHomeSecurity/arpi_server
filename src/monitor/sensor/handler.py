@@ -90,9 +90,7 @@ class SensorHandler:
             logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
             self.save_sensor_references(new_references)
         else:
-            logger.error(
-                "Error measure values! %s", [float(f"{x:.3f}") for x in new_references]
-            )
+            logger.error("Error measure values! %s", [float(f"{x:.3f}") for x in new_references])
 
     def has_uncalibrated_sensor(self):
         """
@@ -391,9 +389,7 @@ class SensorHandler:
                     )
 
                 if alert_type is None:
-                    logger.debug(
-                        "Do not start alert on sensor: %s (no alert type)", sensor.id
-                    )
+                    logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
                 if delay is None:
                     logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
 

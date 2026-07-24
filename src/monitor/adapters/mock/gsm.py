@@ -8,6 +8,7 @@ from monitor.adapters.gsm import CallType
 
 logger = logging.getLogger(LOG_ADGSM)
 
+
 class Sms:
     def __init__(self, idx, number, text, time):
         self.index = idx

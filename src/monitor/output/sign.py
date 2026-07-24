@@ -15,6 +15,7 @@ from monitor.socket_io import send_output_state
 
 logger = logging.getLogger(LOG_OUTPUT)
 
+
 class OutputSign(Thread):
     """
     Generating output sign

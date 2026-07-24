@@ -8,6 +8,7 @@ from monitor.adapters.keypads.delay import DelayPhase, Handler
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 
+
 class Action(Enum):
     """Actions of the keypad"""
 

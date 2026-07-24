@@ -35,6 +35,7 @@ from monitor.actions import (
 
 logger = logging.getLogger(LOG_IPC)
 
+
 class IPCClient(object):
     """
     Sending IPC messages from the REST API to the monitoring service
@@ -47,9 +48,7 @@ class IPCClient(object):
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
-                logger.info(
-                    "Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"]
-                )
+                logger.info("Connecting to monitor socket: %s", environ["MONITOR_INPUT_SOCKET"])
                 self._socket.connect(environ["MONITOR_INPUT_SOCKET"])
                 self._socket.settimeout(60)
             except (ConnectionRefusedError, FileNotFoundError):

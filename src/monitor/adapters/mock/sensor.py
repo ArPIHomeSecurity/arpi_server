@@ -7,6 +7,7 @@ from monitor.adapters.mock.utils import get_input_state
 
 logger = logging.getLogger(LOG_ADSENSOR)
 
+
 class SensorAdapter(SensorAdapterBase):
     """
     Mock MCP3008 interface for simulator mode.

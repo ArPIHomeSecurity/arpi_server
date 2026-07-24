@@ -24,6 +24,7 @@ from monitor.storage import State, States
 
 logger = logging.getLogger(LOG_MONITOR)
 
+
 class AreaHandler:
     """
     Class for managing areas
@@ -94,9 +95,7 @@ class AreaHandler:
             logger.info("Area id=%s already in state %s", area_id, arm_type)
             return False
 
-        logger.info(
-            "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
-        )
+        logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
 
         # update output channel
         if arm_type in (ARM_AWAY, ARM_STAY):
@@ -132,9 +131,7 @@ class AreaHandler:
                 logger.info("Area id=%s already in state %s", area.id, arm_type)
                 continue
 
-            logger.info(
-                "Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type
-            )
+            logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
             area.arm_state = arm_type
             arm_changed = True
 

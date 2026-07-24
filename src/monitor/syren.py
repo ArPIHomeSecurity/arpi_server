@@ -15,6 +15,7 @@ from monitor.adapters.output import get_output_adapter
 
 logger = logging.getLogger(LOG_ALERT)
 
+
 class Syren(Thread):
     """
     Handling of syren alerts.

@@ -9,6 +9,7 @@ from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 
 logger = logging.getLogger(LOG_ADPOWER)
 
+
 class PowerAdapter:
     """
     Determine the source of the power (network or battery) using MCP3008 AD2 pin 0 (CE1, channel 0)

@@ -15,6 +15,7 @@ from utils.dictionary import filter_keys
 
 logger = logging.getLogger(LOG_SC_CERTBOT)
 
+
 class Certbot:
     CERT_NAME = "arpi"
 

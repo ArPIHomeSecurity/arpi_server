@@ -22,6 +22,7 @@ from utils.constants import LOG_ADGSM
 
 logger = logging.getLogger(LOG_ADGSM)
 
+
 class CallType(Enum):
     ALERT = 1
     PANIC = 2

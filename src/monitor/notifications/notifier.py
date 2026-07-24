@@ -333,9 +333,7 @@ class Notifier(Thread):
         # send failed
         if notification.retry >= Notifier.MAX_RETRY:
             # stop retrying
-            logger.debug(
-                "Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification
-            )
+            logger.debug("Deleted message after retry(%s): %s", Notifier.MAX_RETRY, notification)
         else:
             # sending message failed put back to message queue
             self._notifications.put(notification)
