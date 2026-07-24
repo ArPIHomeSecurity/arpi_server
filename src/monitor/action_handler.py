@@ -1,8 +1,8 @@
 import logging
+from collections.abc import Callable
 from dataclasses import asdict
 from enum import Enum, auto
 from functools import wraps
-from typing import Callable
 
 from monitor.actions import MonitorCommand
 
@@ -72,7 +72,7 @@ class ActionHandler:
 
             # check if the attribute is a callable and has the _monitor_action attribute
             if callable(attr) and hasattr(attr, "_monitor_actions"):
-                actions = getattr(attr, "_monitor_actions")
+                actions = attr._monitor_actions
                 for action in actions:
                     self._action_handlers[action] = attr
 

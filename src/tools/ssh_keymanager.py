@@ -21,7 +21,7 @@ class KeyTypes(str, Enum):
 
 class SSHKeyManager:
     def __init__(self) -> None:
-        super(SSHKeyManager, self).__init__()
+        super().__init__()
         self.authorized_keys_path = os.path.expanduser(AUTHORIZED_KEYS_PATH)
 
     def generate_ssh_keys(

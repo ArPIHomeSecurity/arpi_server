@@ -33,9 +33,9 @@ class SensorService(BaseService):
         query = self._db_session.query(Sensor)
 
         if alerting:
-            query = query.filter(Sensor.alert == True)  # noqa: E712
+            query = query.filter(Sensor.alert == True)
 
-        query = query.filter(Sensor.deleted == False)  # noqa: E712
+        query = query.filter(Sensor.deleted == False)
 
         return query.order_by(Sensor.channel.asc()).all()
 
@@ -45,7 +45,7 @@ class SensorService(BaseService):
         """
         sensor = (
             self._db_session.query(Sensor)
-            .filter(Sensor.id == sensor_id, Sensor.deleted == False)  # noqa: E712
+            .filter(Sensor.id == sensor_id, Sensor.deleted == False)
             .first()
         )
         if not sensor:
@@ -164,11 +164,11 @@ class SensorService(BaseService):
             .filter(
                 Sensor.id != sensor.id,
                 Sensor.channel == sensor.channel,
-                Sensor.deleted == False,  # noqa: E712
+                Sensor.deleted == False,
             )
             .all()
             if sensor
-            else (self._db_session.query(Sensor).filter(Sensor.deleted == False).all())  # noqa: E712
+            else (self._db_session.query(Sensor).filter(Sensor.deleted == False).all())
         )
 
         if sensor.channel_type in [ChannelTypes.BASIC, ChannelTypes.NORMAL]:
@@ -215,9 +215,9 @@ class SensorService(BaseService):
         or if any sensor is in alert state.
         """
         query = self._db_session.query(Sensor).filter(
-            Sensor.enabled == True,  # noqa: E712
-            Sensor.alert == True,  # noqa: E712
-            Sensor.deleted == False,  # noqa: E712
+            Sensor.enabled == True,
+            Sensor.alert == True,
+            Sensor.deleted == False,
         )
 
         if sensor_id:
@@ -231,9 +231,9 @@ class SensorService(BaseService):
         or if any sensor is in error state.
         """
         query = self._db_session.query(Sensor).filter(
-            Sensor.enabled == True,  # noqa: E712
-            Sensor.error == True,  # noqa: E712
-            Sensor.deleted == False,  # noqa: E712
+            Sensor.enabled == True,
+            Sensor.error == True,
+            Sensor.deleted == False,
         )
 
         if sensor_id:

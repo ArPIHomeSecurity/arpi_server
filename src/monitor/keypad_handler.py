@@ -7,14 +7,16 @@ from time import sleep, time
 
 from sqlalchemy import inspect
 
-from utils.constants import (
-    ARM_AWAY,
-    ARM_STAY,
-    LOG_ADKEYPAD,
-    MONITORING_READY,
-    THREAD_KEYPAD,
+from monitor.actions import (
+    MonitorArmAwayCommand,
+    MonitorArmStayCommand,
+    MonitorDisarmCommand,
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+    MonitorRegisterCardCommand,
+    MonitorStopCommand,
+    MonitorUpdateKeypadCommand,
 )
-from utils.models import Arm, Card, Keypad, User
 from monitor.adapters import V2BoardPin
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
@@ -23,16 +25,14 @@ from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
-from monitor.actions import (
-    MonitorArmAwayCommand,
-    MonitorArmStayCommand,
-    MonitorDisarmCommand,
-    MonitorRegisterCardCommand,
-    MonitorStopCommand,
-    MonitorUpdateKeypadCommand,
-    MonitoringAlertCommand,
-    MonitoringAlertDelayCommand,
+from utils.constants import (
+    ARM_AWAY,
+    ARM_STAY,
+    LOG_ADKEYPAD,
+    MONITORING_READY,
+    THREAD_KEYPAD,
 )
+from utils.models import Arm, Card, Keypad, User
 from utils.queries import get_alert_delay, get_arm_delay, get_arm_state, get_user_with_access_code
 
 logger = logging.getLogger(LOG_ADKEYPAD)
@@ -42,7 +42,7 @@ CARD_REGISTRATION_EXPIRY = 120  # sec
 
 class KeypadHandler(Thread):
     def __init__(self, broadcaster: Broadcaster):
-        super(KeypadHandler, self).__init__(name=THREAD_KEYPAD)
+        super().__init__(name=THREAD_KEYPAD)
         self._actions = Queue()
         self._codes = []
         self._keypad: KeypadBase = None

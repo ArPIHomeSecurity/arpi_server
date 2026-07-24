@@ -1,11 +1,9 @@
 import logging
 import os
-
 from time import sleep, time
 
 from monitor.adapters.keypads.base import Function, KeypadBase
 from utils.constants import LOG_ADKEYPAD
-
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 
@@ -22,7 +20,7 @@ class MockKeypad(KeypadBase):
     ]
 
     def __init__(self, clock_pin, data_pin):
-        super(MockKeypad, self).__init__()
+        super().__init__()
         self._armed = False
         self._error = False
         self._ready = False

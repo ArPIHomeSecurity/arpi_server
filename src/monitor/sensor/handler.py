@@ -3,14 +3,22 @@ Sensor monitoring and alerting.
 """
 
 import logging
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
+from datetime import timedelta
 from os import environ
 from time import sleep
 
-from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
+from monitor.adapters.sensor import get_sensor_adapter
+from monitor.alert import SensorAlert
+from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
+from monitor.database import get_database_session
+from monitor.sensor.detector import detect_alert, detect_error
+from monitor.sensor.history import SensorsHistory
+from monitor.socket_io import send_sensors_error, send_sensors_state
+from monitor.storage import State, States
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -29,13 +37,6 @@ from utils.constants import (
     MONITORING_UPDATING_CONFIG,
 )
 from utils.models import AlertSensor, Arm, Sensor
-from monitor.alert import SensorAlert
-from monitor.communication.mqtt import MQTTClient
-from monitor.database import get_database_session
-from monitor.sensor.detector import detect_alert, detect_error
-from monitor.sensor.history import SensorsHistory
-from monitor.socket_io import send_sensors_error, send_sensors_state
-from monitor.storage import State, States
 
 logger = logging.getLogger(LOG_SENSORS)
 

@@ -7,7 +7,7 @@ class NotTooLongStringFormatter(logging.Formatter):
     """
 
     def __init__(self, format_string, fields, max_length=10):
-        super(NotTooLongStringFormatter, self).__init__(format_string)
+        super().__init__(format_string)
         self._max_length = max_length
         self._fields = fields
 

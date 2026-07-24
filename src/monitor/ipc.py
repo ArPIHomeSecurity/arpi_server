@@ -1,15 +1,22 @@
 import contextlib
-from dataclasses import asdict, dataclass
 import json
 import logging
-from select import select
 import socket
+from dataclasses import asdict, dataclass
+from grp import getgrnam
 from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
-from grp import getgrnam
+from select import select
 from threading import Event, Thread
 from time import sleep
 
+from monitor.actions import ParseCommandError, from_dict
+from monitor.alert import Syren
+from monitor.notifications.notifier import Notifier
+from monitor.output.handler import OutputHandler
+from monitor.storage import State, States
+from tools.clock import Clock
+from tools.ssh_service import SSHService
 from utils.constants import (
     DELETE_SMS_MESSAGE,
     GET_SMS_MESSAGES,
@@ -34,14 +41,6 @@ from utils.constants import (
     UPDATE_SECURE_CONNECTION,
     UPDATE_SSH,
 )
-from monitor.storage import State, States
-from monitor.alert import Syren
-from monitor.notifications.notifier import Notifier
-from monitor.output.handler import OutputHandler
-from tools.clock import Clock
-from tools.ssh_service import SSHService
-from monitor.actions import ParseCommandError, from_dict
-
 
 logger = logging.getLogger(LOG_IPC)
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
@@ -74,7 +73,7 @@ class IPCServer(Thread):
         """
         Constructor
         """
-        super(IPCServer, self).__init__(name=THREAD_IPC)
+        super().__init__(name=THREAD_IPC)
         self._stop_event = stop_event
         self._broadcaster = broadcaster
         self._initialize_socket()

@@ -4,27 +4,27 @@ from utils.constants import (
     DELETE_SMS_MESSAGE,
     GET_SMS_MESSAGES,
     MAKE_TEST_CALL,
-    MONITOR_GET_STATE,
-    MONITOR_SET_CLOCK,
-    MONITOR_SYNC_CLOCK,
-    POWER_GET_STATE,
-    SEND_TEST_EMAIL,
-    SEND_TEST_SMS,
-    SEND_TEST_SYREN,
-    UPDATE_SSH,
+    MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
+    MONITOR_GET_STATE,
     MONITOR_REGISTER_CARD,
+    MONITOR_SET_CLOCK,
     MONITOR_STOP,
+    MONITOR_SYNC_CLOCK,
     MONITOR_UPDATE_CONFIG,
     MONITOR_UPDATE_KEYPAD,
-    MONITOR_ACTIVATE_OUTPUT,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_SABOTAGE,
+    POWER_GET_STATE,
+    SEND_TEST_EMAIL,
+    SEND_TEST_SMS,
+    SEND_TEST_SYREN,
     UPDATE_SECURE_CONNECTION,
+    UPDATE_SSH,
 )
 
 
@@ -237,7 +237,7 @@ def from_dict(payload: dict) -> MonitorCommand:
     field_names = {field.name for field in fields(command_class)}
 
     # check for unexpected fields in the payload
-    for payload_key in payload.keys():
+    for payload_key in payload:
         if payload_key not in field_names:
             raise ParseCommandError(f"Unexpected field '{payload_key}' for action '{action}'")
 

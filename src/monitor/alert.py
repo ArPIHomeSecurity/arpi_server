@@ -1,29 +1,28 @@
 import logging
-
 from datetime import datetime
-from threading import Thread, Event
+from threading import Event, Thread
 
-from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
-from monitor.config.models import AlertSensitivityConfig
-from monitor.storage import States, State
-from monitor.broadcast import Broadcaster
-from monitor.database import get_database_session
-from monitor.notifications.notifier import Notifier
-from monitor.socket_io import send_syren_state, send_alert_state
-from monitor.syren import Syren
 from monitor.actions import (
     MonitoringAlertCommand,
     MonitoringAlertDelayCommand,
     MonitoringSabotageCommand,
 )
+from monitor.broadcast import Broadcaster
+from monitor.config.models import AlertSensitivityConfig
+from monitor.database import get_database_session
+from monitor.notifications.notifier import Notifier
+from monitor.socket_io import send_alert_state, send_syren_state
+from monitor.storage import State, States
+from monitor.syren import Syren
 from utils.constants import (
     ALERT_SABOTAGE,
+    LOG_ALERT,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_SABOTAGE,
-    LOG_ALERT,
     THREAD_ALERT,
 )
+from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
 
 logger = logging.getLogger(LOG_ALERT)
 
@@ -77,7 +76,7 @@ class SensorAlert(Thread):
         """
         Constructor
         """
-        super(SensorAlert, self).__init__(name=THREAD_ALERT)
+        super().__init__(name=THREAD_ALERT)
         self._sensor_id = sensor_id
         self._delay = delay
         self._alert_type = alert_type

@@ -5,8 +5,6 @@ from contextlib import suppress
 from copy import deepcopy
 from os import environ
 
-from utils.models import SensorContactTypes
-
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -17,10 +15,10 @@ from textual.widgets import Button, Checkbox, Select, Static
 
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
-    WiringStrategies,
     ChannelConfig,
-    load_channel_configs,
+    WiringStrategies,
     get_output_states,
+    load_channel_configs,
     set_input_states,
     set_keypad_state,
 )
@@ -28,6 +26,7 @@ from monitor.output import OUTPUT_NAMES
 
 # use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
+from utils.models import SensorContactTypes
 
 # Wiring strategies for control
 WIRING_STRATEGIES = [

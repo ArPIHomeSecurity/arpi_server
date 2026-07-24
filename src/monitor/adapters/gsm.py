@@ -1,24 +1,23 @@
 import logging
-from multiprocessing import Event
 import re
 from enum import Enum
+from multiprocessing import Event
 from time import sleep
 
-from serial.serialutil import PortNotOpenError
-
-from gsmmodem.modem import GsmModem, Call, ReceivedSms
 from gsmmodem.exceptions import (
-    PinRequiredError,
-    IncorrectPinError,
-    TimeoutException,
     CmeError,
     CmsError,
     CommandError,
-    InvalidStateException,
+    IncorrectPinError,
     InterruptedException,
+    InvalidStateException,
+    PinRequiredError,
+    TimeoutException,
 )
-from utils.constants import LOG_ADGSM
+from gsmmodem.modem import Call, GsmModem, ReceivedSms
+from serial.serialutil import PortNotOpenError
 
+from utils.constants import LOG_ADGSM
 
 logger = logging.getLogger(LOG_ADGSM)
 

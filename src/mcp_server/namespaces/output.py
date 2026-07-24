@@ -1,8 +1,9 @@
 # pylint: disable=raise-missing-from
+from typing import Annotated
+
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import Field
-from typing_extensions import Annotated
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session

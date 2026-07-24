@@ -1,5 +1,4 @@
 import logging
-
 from smtplib import SMTP, SMTPException, SMTPRecipientsRefused, SMTPServerDisconnected
 from socket import gaierror
 

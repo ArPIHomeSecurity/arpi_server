@@ -3,9 +3,8 @@ Monitoring the sensors and manage alerting.
 """
 
 import contextlib
-from datetime import datetime as dt
 import logging
-
+from datetime import datetime as dt
 from os import environ
 from queue import Empty, Queue
 from threading import Thread, Timer
@@ -14,6 +13,30 @@ from time import sleep
 from sqlalchemy import select
 
 from monitor.action_handler import ActionHandler, MonitorActionResult, handle_action
+from monitor.actions import (
+    MonitorArmAwayCommand,
+    MonitorArmStayCommand,
+    MonitorDisarmCommand,
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+    MonitorStopCommand,
+    MonitorUpdateConfigCommand,
+    UpdateSecureConnectionCommand,
+)
+from monitor.adapters.power import get_power_adapter
+from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
+from monitor.alert import SensorAlert
+from monitor.area_handler import AreaHandler
+from monitor.broadcast import Broadcaster
+from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, SSHConfig, SyrenConfig
+from monitor.connection import SecureConnection
+from monitor.database import get_database_session
+from monitor.notifications.notifier import Notifier
+from monitor.output.handler import OutputHandler
+from monitor.sensor.handler import SensorHandler
+from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
+from monitor.storage import State, States
+from monitor.syren import Syren
 from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
@@ -34,33 +57,8 @@ from utils.constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
-from utils.models import Alert, Arm, Disarm, Sensor, ArmSensor, ArmStates, User
-from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
-from monitor.alert import SensorAlert
-from monitor.area_handler import AreaHandler
-from monitor.config.models import DyndnsConfig, SSHConfig, SyrenConfig, AlertSensitivityConfig
-from monitor.sensor.handler import SensorHandler
-from monitor.storage import States, State
-from monitor.adapters.power import get_power_adapter
-from monitor.broadcast import Broadcaster
-from monitor.notifications.notifier import Notifier
-from monitor.syren import Syren
-from monitor.database import get_database_session
-from monitor.output.handler import OutputHandler
-from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
-from monitor.connection import SecureConnection
-from monitor.actions import (
-    MonitorArmAwayCommand,
-    MonitorArmStayCommand,
-    MonitorDisarmCommand,
-    MonitorStopCommand,
-    MonitorUpdateConfigCommand,
-    MonitoringAlertCommand,
-    MonitoringAlertDelayCommand,
-    UpdateSecureConnectionCommand,
-)
-from utils.queries import get_arm_state, get_arm_delay
-
+from utils.models import Alert, Arm, ArmSensor, ArmStates, Disarm, Sensor, User
+from utils.queries import get_arm_delay, get_arm_state
 
 # 2000.01.01 00:00:00
 DEFAULT_DATETIME = 946684800
@@ -147,7 +145,7 @@ class Monitor(Thread, ActionHandler):
             )
             States.set(State.MONITORING, MONITORING_STARTUP)
         elif state in (MONITORING_ARM_DELAY, MONITORING_ARMED):
-            arm = self._db_session.scalar(select(Arm).where(Arm.disarm == None))  # noqa: E711
+            arm = self._db_session.scalar(select(Arm).where(Arm.disarm == None))
             arm_state = get_arm_state(self._db_session)
 
             if arm_state == ARM_DISARM:

@@ -19,8 +19,8 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import requests
 
@@ -76,8 +76,7 @@ def download_asset(release, extension=".tar.gz") -> str:
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
                 with open(local_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                    f.writelines(r.iter_content(chunk_size=8192))
             print(f"      ✅ Asset downloaded: {local_path}")
             return local_path
 
@@ -366,7 +365,7 @@ def main():
 
     if server_upgraded or webapplication_upgraded:
         print("  🔄 Restarting services: argus_server, argus_mcp, argus_monitor, nginx ...")
-        os.system("sudo systemctl restart argus_server argus_mcp argus_monitor nginx")  # noqa: F821
+        os.system("sudo systemctl restart argus_server argus_mcp argus_monitor nginx")
         print("  ✅ Services restarted successfully")
 
     print("🎉 Upgrade process finished.")

@@ -1,7 +1,7 @@
 from monitor.actions import MonitorCommand
 
 
-class Broadcaster(object):
+class Broadcaster:
     """Send message to registered queues."""
 
     def __init__(self):

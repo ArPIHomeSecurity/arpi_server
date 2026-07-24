@@ -1,14 +1,9 @@
-from dataclasses import asdict
 import json
 import logging
 import socket
+from dataclasses import asdict
 from os import environ
 
-from utils.constants import (
-    ARM_AWAY,
-    ARM_STAY,
-    LOG_IPC,
-)
 from monitor.actions import (
     DeleteSMSMessageCommand,
     GetSMSMessagesCommand,
@@ -29,14 +24,19 @@ from monitor.actions import (
     SendTestEmailCommand,
     SendTestSMSCommand,
     SendTestSyrenCommand,
-    UpdateSSHCommand,
     UpdateSecureConnectionCommand,
+    UpdateSSHCommand,
+)
+from utils.constants import (
+    ARM_AWAY,
+    ARM_STAY,
+    LOG_IPC,
 )
 
 logger = logging.getLogger(LOG_IPC)
 
 
-class IPCClient(object):
+class IPCClient:
     """
     Sending IPC messages from the REST API to the monitoring service
     """

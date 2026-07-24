@@ -3,9 +3,9 @@ import logging
 import lgpio
 from gpiozero import MCP3008
 
-from utils.constants import LOG_ADPOWER
 from monitor.adapters import V3BoardPin
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
+from utils.constants import LOG_ADPOWER
 
 logger = logging.getLogger(LOG_ADPOWER)
 

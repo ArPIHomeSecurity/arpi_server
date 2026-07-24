@@ -2,9 +2,8 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from utils.constants import LOG_ADKEYPAD
 from monitor.adapters.keypads.delay import DelayPhase, Handler
-
+from utils.constants import LOG_ADKEYPAD
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 

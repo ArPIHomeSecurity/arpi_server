@@ -1,7 +1,8 @@
 from flask.blueprints import Blueprint
-from server.tools import process_ipc_response
+
 from server.decorators import registered
 from server.ipc import IPCClient
+from server.tools import process_ipc_response
 
 power_blueprint = Blueprint("power", __name__)
 

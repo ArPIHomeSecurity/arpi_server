@@ -6,7 +6,6 @@ from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed, ObjectNotFound
 from server.services.user import UserService
 
-
 user_mcp = FastMCP("ArPI - user service")
 
 

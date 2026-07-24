@@ -1,7 +1,7 @@
-from dataclasses import asdict
-from datetime import datetime
 import json
 import logging
+from dataclasses import asdict
+from datetime import datetime
 
 from psycopg2 import ProgrammingError
 

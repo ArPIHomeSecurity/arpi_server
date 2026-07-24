@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
@@ -26,12 +24,12 @@ def get_arms_resource():
     name="get_all",
 )
 def get_arms_tool(
-    has_alert: Optional[bool] = None,
-    user_id: Optional[int] = None,
-    keypad_id: Optional[int] = None,
-    arm_type: Optional[str] = None,
-    start: Optional[str] = None,
-    end: Optional[str] = None,
+    has_alert: bool | None = None,
+    user_id: int | None = None,
+    keypad_id: int | None = None,
+    arm_type: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
     limit: int = 10,
     offset: int = 0,
 ):
@@ -68,12 +66,12 @@ def get_arms_tool(
     name="get_arms_count",
 )
 def get_arms_count_tool(
-    has_alert: Optional[bool] = None,
-    user_id: Optional[int] = None,
-    keypad_id: Optional[int] = None,
-    arm_type: Optional[str] = None,
-    start: Optional[str] = None,
-    end: Optional[str] = None,
+    has_alert: bool | None = None,
+    user_id: int | None = None,
+    keypad_id: int | None = None,
+    arm_type: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
 ):
     """
     Tool to get the count of arm/disarm events matching the given filters.

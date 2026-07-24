@@ -1,10 +1,7 @@
 import logging
-
 from dataclasses import dataclass, field
 from string import Template
-from typing import Optional, List
 
-from utils.constants import LOG_NOTIFIER
 from monitor.notifications.templates import (
     ALERT_STARTED_EMAIL,
     ALERT_STARTED_SMS,
@@ -17,6 +14,7 @@ from monitor.notifications.templates import (
     TEST_EMAIL,
     TEST_SMS,
 )
+from utils.constants import LOG_NOTIFIER
 
 
 class NotificationType:
@@ -38,7 +36,7 @@ SEVERITY_MAPPING = {
 }
 
 
-def _get_email_subject(notification_type: str) -> Optional[str]:
+def _get_email_subject(notification_type: str) -> str | None:
     """
     Returns the email subject based on the notification type.
 
@@ -65,7 +63,7 @@ def _get_email_subject(notification_type: str) -> Optional[str]:
     return None
 
 
-def _get_email_template(notification_type: str) -> Optional[str]:
+def _get_email_template(notification_type: str) -> str | None:
     """
     Returns the email template based on the notification type.
     """
@@ -85,7 +83,7 @@ def _get_email_template(notification_type: str) -> Optional[str]:
     return None
 
 
-def _get_sms_template(notification_type: str) -> Optional[str]:
+def _get_sms_template(notification_type: str) -> str | None:
     """
     Returns the SMS template based on the notification type.
     """
@@ -116,18 +114,18 @@ class Notification:
     time: str
     retry: int = 0
     last_try: float = 0.0
-    sensors: List[str] = field(default_factory=list)
-    location: Optional[str] = None
+    sensors: list[str] = field(default_factory=list)
+    location: str | None = None
 
     # True = sent, False = not sent, None = no need to send (not subscribed)
-    sms_sent1: Optional[bool] = False
-    sms_sent2: Optional[bool] = False
-    email1_sent: Optional[bool] = False
-    email2_sent: Optional[bool] = False
-    call1_sent: Optional[bool] = False
-    call2_sent: Optional[bool] = False
+    sms_sent1: bool | None = False
+    sms_sent2: bool | None = False
+    email1_sent: bool | None = False
+    email2_sent: bool | None = False
+    call1_sent: bool | None = False
+    call2_sent: bool | None = False
 
-    def get_sms_content(self) -> Optional[str]:
+    def get_sms_content(self) -> str | None:
         """
         Returns the SMS template based on the notification type.
         """
@@ -139,7 +137,7 @@ class Notification:
             location=self.location,
         )
 
-    def get_email_content(self) -> Optional[str]:
+    def get_email_content(self) -> str | None:
         """
         Returns the email template based on the notification type.
         """
@@ -151,7 +149,7 @@ class Notification:
             location=self.location,
         )
 
-    def get_email_subject(self) -> Optional[str]:
+    def get_email_subject(self) -> str | None:
         """
         Returns the email subject based on the notification type.
 

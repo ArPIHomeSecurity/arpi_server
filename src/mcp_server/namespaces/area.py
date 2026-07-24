@@ -1,5 +1,5 @@
 # pylint: disable=raise-missing-from
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound

@@ -1,13 +1,12 @@
-from dataclasses import dataclass
-from datetime import datetime
 import logging
 import os
+from dataclasses import dataclass
+from datetime import datetime
+from time import sleep, time
 
-from time import time, sleep
-
-from deepdiff import DeepDiff
 import requests
 import socketio
+from deepdiff import DeepDiff
 
 from utils.constants import MONITORING_READY
 

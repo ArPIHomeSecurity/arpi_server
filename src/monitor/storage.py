@@ -4,15 +4,14 @@ Storage for the state of the system.
 In memory storage with a file backup.
 """
 
-from enum import Enum
 import fcntl
 import json
 import logging
+from enum import Enum
 from threading import Lock
-from typing import Optional
 
-from utils.constants import LOG_MONITOR
 from monitor.socket_io import send_system_state
+from utils.constants import LOG_MONITOR
 
 
 class State(Enum):
@@ -32,7 +31,7 @@ class States:
     _logger = logging.getLogger(LOG_MONITOR)
 
     @classmethod
-    def get(cls, key: State) -> Optional[any]:
+    def get(cls, key: State) -> any | None:
         """
         Get the current states of the system
         """

@@ -2,8 +2,8 @@ import logging
 import os
 import sys
 
-from utils.constants import LOGGING_MODULES, TRACE
 from monitor.logger import ArgusLogger
+from utils.constants import LOGGING_MODULES, TRACE
 from utils.formatter import NotTooLongStringFormatter
 
 

@@ -8,6 +8,7 @@ from mcp_server.namespaces.arm import arm_mcp
 from mcp_server.namespaces.card import card_mcp
 from mcp_server.namespaces.clock import clock_mcp
 from mcp_server.namespaces.generic import generic_mcp
+from mcp_server.namespaces.keypad import keypad_mcp
 from mcp_server.namespaces.monitoring import monitoring_mcp
 from mcp_server.namespaces.option import (
     alert_sensitivity_option_mcp,
@@ -20,7 +21,6 @@ from mcp_server.namespaces.option import (
     subscriptions_option_mcp,
     syren_option_mcp,
 )
-from mcp_server.namespaces.keypad import keypad_mcp
 from mcp_server.namespaces.output import output_mcp
 from mcp_server.namespaces.prompts import prompts_mcp
 from mcp_server.namespaces.sensor import sensor_mcp

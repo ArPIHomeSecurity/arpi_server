@@ -1,5 +1,5 @@
-from monitor.service import start_background_service, stop_background_service
 from monitor.logging import initialize_logging
+from monitor.service import start_background_service, stop_background_service
 
 initialize_logging()
 

@@ -1,18 +1,16 @@
 """ """
 
-from enum import Enum
 import logging
 import os
+from enum import Enum
 from threading import Lock
 from time import sleep
-from typing import List
 
 import lgpio
-from utils.constants import LOG_ADOUTPUT
-from gpiozero import DigitalOutputDevice, DigitalInputDevice
+from gpiozero import DigitalInputDevice, DigitalOutputDevice
 
 from monitor.output import OUTPUT_NAMES
-
+from utils.constants import LOG_ADOUTPUT
 
 logger = logging.getLogger(LOG_ADOUTPUT)
 
@@ -107,13 +105,13 @@ class OutputAdapter:
 
         logger.debug("Successfully reset faults")
 
-    def _read_faults(self) -> List[int]:
+    def _read_faults(self) -> list[int]:
         self._latch.off()
         self._clock.off()
         sleep(0.001)  # small delay to allow data to stabilize
         self._latch.on()
 
-        buffer: List[int] = []
+        buffer: list[int] = []
         for _ in range(OutputAdapter.FAULT_REGISTER_SIZE):
             self._clock.on()
             sleep(0.001)  # small delay to allow data to stabilize
@@ -198,11 +196,11 @@ class OutputAdapter:
 
         self._latch.on()
 
-    def _read_states(self) -> List[int]:
+    def _read_states(self) -> list[int]:
         self._write_command(*Commands.READ_DATA_REGISTER.value)
 
         self._latch.on()
-        buffer: List[int] = []
+        buffer: list[int] = []
         for _ in range(OutputAdapter.DATA_REGISTER_SIZE):
             self._clock.on()
             sleep(0.001)

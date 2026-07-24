@@ -1,26 +1,25 @@
 import contextlib
 import logging
 import os
-
 from datetime import datetime
 from queue import Empty, Queue
 from threading import Thread
 from time import sleep, time
 
-from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
-from monitor.broadcast import Broadcaster
-from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
-from utils.constants import (
-    LOG_NOTIFIER,
-    THREAD_NOTIFIER,
-)
-from monitor.adapters.smtp import SMTPSender
-from monitor.database import get_database_session
-from monitor.notifications.notification import Notification, NotificationType
 from monitor.actions import (
     MonitorDisarmCommand,
     MonitorStopCommand,
     MonitorUpdateConfigCommand,
+)
+from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
+from monitor.adapters.smtp import SMTPSender
+from monitor.broadcast import Broadcaster
+from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
+from monitor.database import get_database_session
+from monitor.notifications.notification import Notification, NotificationType
+from utils.constants import (
+    LOG_NOTIFIER,
+    THREAD_NOTIFIER,
 )
 from utils.queries import get_user_with_access_code
 
@@ -235,7 +234,7 @@ class Notifier(Thread):
         return True, messages
 
     def __init__(self, broadcaster: Broadcaster):
-        super(Notifier, self).__init__(name=THREAD_NOTIFIER)
+        super().__init__(name=THREAD_NOTIFIER)
         self._actions = Queue()
         self._gsm = None
         self._smtp = None

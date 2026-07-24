@@ -1,11 +1,11 @@
-from functools import cached_property
 import os
 import tempfile
+from functools import cached_property
+
 import click
 
-from installer.helpers import ServiceHelper, SystemHelper, PackageHelper, SecurityHelper
+from installer.helpers import PackageHelper, SecurityHelper, ServiceHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
-
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 

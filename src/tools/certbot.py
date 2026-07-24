@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-import os
-
 import logging
+import os
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -9,8 +8,8 @@ from time import time
 
 from cryptography import x509
 
-from utils.constants import LOG_SC_CERTBOT
 from monitor.config.models import DyndnsConfig
+from utils.constants import LOG_SC_CERTBOT
 from utils.dictionary import filter_keys
 
 logger = logging.getLogger(LOG_SC_CERTBOT)

@@ -5,7 +5,6 @@ import logging
 import os
 import subprocess
 from time import sleep
-from typing import List
 
 try:
     import lgpio
@@ -13,7 +12,6 @@ except ImportError:
     lgpio = None
 
 
-from utils.constants import LOG_ADSENSOR
 from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action
 from monitor.adapters.output import get_output_adapter
@@ -21,6 +19,7 @@ from monitor.adapters.power import get_power_adapter
 from monitor.adapters.sensor import get_sensor_adapter
 from monitor.logger import ArgusLogger
 from monitor.output import OUTPUT_NAMES
+from utils.constants import LOG_ADSENSOR
 
 
 def print_channels(correct_channels, values):
@@ -155,7 +154,7 @@ def test_keypad_adapter(board_version) -> bool:
         sleep(1)
 
 
-def list_adapters() -> List[str]:
+def list_adapters() -> list[str]:
     """
     List all available adapter test functions.
     """

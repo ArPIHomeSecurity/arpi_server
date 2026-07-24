@@ -1,25 +1,21 @@
 # pylint: disable=wrong-import-position
-# ruff: noqa: E402
 from dotenv import load_dotenv
 
 load_dotenv(".env.pytest", override=True)
 
 import logging
 import os
-from pathlib import Path
 import subprocess
-
 from os import environ
+from pathlib import Path
 from time import sleep
 
 import pytest
-
 import requests
-
 from data import clear_database, clear_events
 from helpers.services import server_service
-from monitor.adapters.mock.utils import set_input_states
 
+from monitor.adapters.mock.utils import set_input_states
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +77,7 @@ def database_data(request, database_host):
     logger.debug("Running database initialization and data population")
     subprocess.run(["uv", "run", "flask", "--app", "server:app", "db", "upgrade"], check=True)
 
-    seed_function = getattr(request, "param")
+    seed_function = request.param
     logger.debug("Applying database seed function: %s", seed_function.__name__)
     seed_function()
 

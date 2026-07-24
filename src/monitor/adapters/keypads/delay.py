@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
+from datetime import timedelta
 from enum import Enum
 
 from utils.constants import LOG_ADKEYPAD

@@ -6,6 +6,10 @@ import logging
 
 from sqlalchemy import select
 
+from monitor.communication.mqtt import MQTTClient
+from monitor.output.handler import OutputHandler
+from monitor.socket_io import send_area_state
+from monitor.storage import State, States
 from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
@@ -16,11 +20,6 @@ from utils.constants import (
     MONITORING_UPDATING_CONFIG,
 )
 from utils.models import Area
-from monitor.communication.mqtt import MQTTClient
-from monitor.output.handler import OutputHandler
-from monitor.socket_io import send_area_state
-from monitor.storage import State, States
-
 
 logger = logging.getLogger(LOG_MONITOR)
 
@@ -51,7 +50,7 @@ class AreaHandler:
         monitoring_state = States.get(State.MONITORING)
         self._db_session.expire_all()
         for area in (
-            self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()  # noqa: E712
+            self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
         ):
             if monitoring_state in disarmed_states and area.arm_state != ARM_DISARM:
                 area.arm_state = ARM_DISARM
@@ -120,7 +119,7 @@ class AreaHandler:
         logger.info("Arming areas to %s", arm_type)
         areas = (
             self._db_session.query(Area)
-            .filter(Area.deleted == False)  # noqa: E712
+            .filter(Area.deleted == False)
             .filter(Area.sensors.any())
             .all()
         )

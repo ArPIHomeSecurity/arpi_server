@@ -6,13 +6,12 @@ import logging
 import os
 from enum import Enum
 from threading import Lock
-from typing import List
 
 import lgpio
 from gpiozero import DigitalInputDevice, DigitalOutputDevice
 
-from utils.constants import LOG_ADOUTPUT
 from monitor.output import OUTPUT_NAMES
+from utils.constants import LOG_ADOUTPUT
 
 logger = logging.getLogger(LOG_ADOUTPUT)
 
@@ -91,7 +90,7 @@ class OutputAdapter:
 
         logger.debug("Successfully reset faults")
 
-    def _read_faults(self) -> List[bool]:
+    def _read_faults(self) -> list[bool]:
         self._enable.off()
         self._latch.off()
         self._clock.off()

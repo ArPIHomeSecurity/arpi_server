@@ -2,8 +2,8 @@ import json
 import logging
 import os
 
-from dotenv import load_dotenv
 import pytest
+from dotenv import load_dotenv
 from helpers.services import monitor_service
 
 load_dotenv(".env.pytest", override=True)

@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-
 from time import sleep
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
@@ -13,7 +12,6 @@ else:
 
 from monitor.adapters.keypads.base import Function, KeypadBase
 from utils.constants import LOG_ADKEYPAD
-
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 
@@ -33,7 +31,7 @@ class WiegandKeypad(KeypadBase):
     """
 
     def __init__(self, data0, data1, beeper):
-        super(WiegandKeypad, self).__init__()
+        super().__init__()
         self._reader = WiegandReader(data0, data1)
         logger.debug(
             "Wiegand keypad created, reader initialized: %s", self._reader.is_initialized()

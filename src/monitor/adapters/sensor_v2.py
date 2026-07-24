@@ -3,9 +3,9 @@ import logging
 import lgpio
 from gpiozero import DigitalInputDevice
 
-from utils.constants import LOG_ADSENSOR
-from monitor.adapters.sensor_base import SensorAdapterBase
 from monitor.adapters import V2BoardPin
+from monitor.adapters.sensor_base import SensorAdapterBase
+from utils.constants import LOG_ADSENSOR
 
 logger = logging.getLogger(LOG_ADSENSOR)
 

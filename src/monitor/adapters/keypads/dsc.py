@@ -1,10 +1,10 @@
 import logging
-from datetime import datetime
 import os
+from datetime import datetime
 from time import sleep, time
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    import RPi.GPIO as GPIO
+    from RPi import GPIO
 else:
     import monitor.adapters.mock.gpio as GPIO
 
@@ -117,7 +117,7 @@ class Line:
     def send_receive_byte(self, byte):
         response = "0b"
         GPIO.output(self._data, 1)
-        for bit in "{0:08b}".format(byte):
+        for bit in f"{byte:08b}":
             GPIO.output(self._clock, 0)
             sleep(0.000200)
 
@@ -153,7 +153,7 @@ class DSCKeypad(KeypadBase):
     BEEP = 0x64
 
     def __init__(self, clock_pin, data_pin):
-        super(DSCKeypad, self).__init__()
+        super().__init__()
         self._lights = Lights()
         self._line = Line(clock=clock_pin, data=data_pin)
         self._start_time = None

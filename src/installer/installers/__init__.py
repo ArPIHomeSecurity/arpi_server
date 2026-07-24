@@ -7,7 +7,6 @@ from installer.installers.nginx import NginxInstaller
 from installer.installers.service import ServiceInstaller
 from installer.installers.system import SystemInstaller
 
-
 __all__ = [
     InstallerConfig,
     BaseInstaller,

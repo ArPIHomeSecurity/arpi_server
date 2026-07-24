@@ -1,13 +1,13 @@
 from flask import jsonify, request
 from flask.blueprints import Blueprint
 
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
-from server.services.output import OutputService
-from utils.constants import ROLE_USER
-from utils.models import Output
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
+from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.output import OutputService
 from server.tools import process_ipc_response
+from utils.constants import ROLE_USER
+from utils.models import Output
 
 output_blueprint = Blueprint("output", __name__)
 

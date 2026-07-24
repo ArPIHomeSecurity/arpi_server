@@ -1,10 +1,10 @@
-from flask.blueprints import Blueprint
 from flask import jsonify, request
+from flask.blueprints import Blueprint
 
-from utils.constants import ROLE_USER
 from server.database import db
 from server.decorators import authenticated, restrict_host
 from server.services.arm import ArmService
+from utils.constants import ROLE_USER
 
 arm_blueprint = Blueprint("arm", __name__)
 

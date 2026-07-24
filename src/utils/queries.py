@@ -1,13 +1,12 @@
 import logging
-from sqlalchemy import distinct, inspect
-from sqlalchemy.sql.expression import false, true
 
-from sqlalchemy.sql.functions import func
+from sqlalchemy import distinct, inspect
 from sqlalchemy.future import select
-from utils.models import Area, Sensor, User, Zone
+from sqlalchemy.sql.expression import false, true
+from sqlalchemy.sql.functions import func
 
 from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
-
+from utils.models import Area, Sensor, User, Zone
 
 logger = logging.getLogger(LOG_MONITOR)
 
@@ -69,7 +68,7 @@ def get_arm_state(session) -> str:
         select(func.count(distinct(Area.arm_state)))
         .select_from(Area)
         .where(Area.arm_state != ARM_DISARM)
-        .where(Area.deleted == False)  # noqa: E712
+        .where(Area.deleted == False)
     ).scalar_one()
     logger.debug("Are areas mixed state %s", count)
 
@@ -78,7 +77,7 @@ def get_arm_state(session) -> str:
         return ARM_MIXED
 
     result = session.execute(
-        select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)  # noqa: E712
+        select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)
     ).first()
 
     if result is None:

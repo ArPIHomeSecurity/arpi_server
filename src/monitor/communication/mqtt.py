@@ -2,9 +2,8 @@ import json
 import logging
 import socket
 import ssl
-from unicodedata import normalize
-
 from enum import Enum
+from unicodedata import normalize
 
 import paho.mqtt.client as mqtt
 

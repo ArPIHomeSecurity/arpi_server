@@ -4,8 +4,8 @@ This module provides helper functions to load configuration settings from the da
 
 import json
 
-from utils.models import Option
 from monitor.database import get_database_session
+from utils.models import Option
 
 
 def load_config(name, section, config_type, session=None):

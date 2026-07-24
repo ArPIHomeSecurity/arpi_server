@@ -4,22 +4,19 @@ Managing outputs
 
 import contextlib
 import logging
-
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from utils.constants import LOG_OUTPUT
-from utils.models import Area, Output, OutputTriggerType
+from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
+from monitor.adapters.output import get_output_adapter
 from monitor.broadcast import Broadcaster
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
-from monitor.output.notification import Notification, EventType, TriggerSource
+from monitor.output.notification import EventType, Notification, TriggerSource
 from monitor.output.sign import OutputSign
 from monitor.socket_io import send_output_state
-from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
-
-from monitor.adapters.output import get_output_adapter
-
+from utils.constants import LOG_OUTPUT
+from utils.models import Area, Output, OutputTriggerType
 
 logger = logging.getLogger(LOG_OUTPUT)
 

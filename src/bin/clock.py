@@ -6,9 +6,8 @@ ArPI Clock Management Tool
 import argparse
 import logging
 
-from utils.constants import LOG_CLOCK
 from tools.clock import Clock
-
+from utils.constants import LOG_CLOCK
 
 logger = logging.getLogger(LOG_CLOCK)
 

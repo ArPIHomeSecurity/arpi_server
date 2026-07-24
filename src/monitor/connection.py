@@ -9,8 +9,7 @@ from monitor.socket_io import send_public_access
 from tools.certbot import Certbot
 from tools.dyndns import DynDns
 from tools.schedule import enable_dyndns_job
-from utils.constants import THREAD_SECCON, LOG_SECCON
-
+from utils.constants import LOG_SECCON, THREAD_SECCON
 
 logger = logging.getLogger(LOG_SECCON)
 
@@ -24,7 +23,7 @@ class SecureConnection(Thread):
     lock = Event()
 
     def __init__(self):
-        super(SecureConnection, self).__init__(name=THREAD_SECCON, daemon=True)
+        super().__init__(name=THREAD_SECCON, daemon=True)
 
     def run(self):
         if SecureConnection.lock.is_set():

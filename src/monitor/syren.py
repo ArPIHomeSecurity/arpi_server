@@ -1,17 +1,13 @@
 import logging
+from threading import Event, Thread
+from time import sleep, time
 
-from threading import Thread, Event
-from time import time, sleep
-
-from utils.models import Alert
+from monitor.adapters.output import get_output_adapter
 from monitor.config.models import SyrenConfig
 from monitor.database import get_database_session
 from monitor.socket_io import send_syren_state
-
 from utils.constants import LOG_ALERT, THREAD_ALERT
-
-from monitor.adapters.output import get_output_adapter
-
+from utils.models import Alert
 
 logger = logging.getLogger(LOG_ALERT)
 
@@ -75,7 +71,7 @@ class Syren(Thread):
         send_syren_state(None)
 
     def __init__(self, config: SyrenConfig):
-        super(Syren, self).__init__(name=THREAD_ALERT)
+        super().__init__(name=THREAD_ALERT)
         self._output_adapter = get_output_adapter()
         self._alert = None
         self._config = config

@@ -1,10 +1,9 @@
 import logging
-
 from datetime import datetime
 from time import sleep
 
-from utils.constants import LOG_ADGSM
 from monitor.adapters.gsm import CallType
+from utils.constants import LOG_ADGSM
 
 logger = logging.getLogger(LOG_ADGSM)
 
