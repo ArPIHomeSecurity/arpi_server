@@ -32,4 +32,6 @@ uv run pytest -v
 Useful variants:
 - task test
 - task test-debug
+- task test -- -k <test-filter>
+- task test-debug -- -k <test-filter>
 

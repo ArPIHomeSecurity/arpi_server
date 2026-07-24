@@ -129,6 +129,14 @@ class MonitorEventsClient:
         """
         Wait for all specified Socket.IO events to arrive within timeout.
         If payload is provided for an event, also check that the event payload matches.
+
+        Raises:
+            AssertionError: If any of the specified events are not received within the timeout.
+
+        Args:
+            events (list[MonitorEvent]): List of MonitorEvent objects to wait for.
+            delay (float): Time in seconds to wait before checking for events.
+            timeout (float): Time in seconds to wait for all events to arrive.
         """
         logger.debug(
             "Waiting for Socket.IO events: %s from %s",
