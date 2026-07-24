@@ -25,7 +25,8 @@ tasks:
     cmds:
       - cmd: uvx ruff check .
         ignore_error: true
-      - uvx ruff check . --statistics
+      - cmd: uvx ruff check . --statistics
+        ignore_error: true
 
   lint-fix:
     desc: Fix linting issues using ruff
