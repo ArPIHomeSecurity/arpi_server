@@ -7,7 +7,7 @@ name = "arpi-server"
 dynamic = ["version"]
 description = "The backend service of the ArPI security system running on the Raspberry PI"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "~=3.11.9"
 license = {text = "MIT"}
 authors = [
     {name = "ArPI Home Security"}
