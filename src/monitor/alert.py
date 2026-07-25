@@ -8,7 +8,7 @@ from monitor.actions import (
     MonitoringSabotageCommand,
 )
 from monitor.broadcast import Broadcaster
-from monitor.config.models import AlertSensitivityConfig
+from monitor.config.models import AlertSensitivityConfig, SyrenConfig
 from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
 from monitor.socket_io import send_alert_state, send_syren_state
@@ -25,6 +25,14 @@ from utils.constants import (
 from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
 
 logger = logging.getLogger(LOG_ALERT)
+
+
+def resolve_silent(system_silent: bool | None, sensor_silent: bool | None) -> bool:
+    if system_silent is False:
+        return False
+    if system_silent is True:
+        return sensor_silent if sensor_silent is not None else True
+    return sensor_silent if sensor_silent is not None else False
 
 
 class SensorAlert(Thread):
@@ -118,8 +126,19 @@ class SensorAlert(Thread):
             alert = self.create_alert(session)
             new_alert = True
 
+        syren_config = SyrenConfig.load_config()
+        if syren_config is None:
+            logger.info("Missing syren settings, using defaults")
+            syren_config = SyrenConfig(
+                silent=Syren.SILENT, delay=Syren.DELAY, duration=Syren.DURATION
+            )
+
         self.add_sensor_to_alert(
-            session=session, alert=alert, start_time=start_time, delay=self._delay
+            session=session,
+            alert=alert,
+            start_time=start_time,
+            delay=self._delay,
+            syren_config=syren_config,
         )
 
         # send notification only on the first sensor alert
@@ -132,7 +151,11 @@ class SensorAlert(Thread):
 
         session.close()
 
-        Syren.start_syren()
+        Syren.start_syren(
+            silent=alert.silent,
+            delay=syren_config.delay,
+            duration=syren_config.duration,
+        )
         if self._alert_type == ALERT_SABOTAGE:
             States.set(State.MONITORING, MONITORING_SABOTAGE)
             self._broadcaster.send_message(MonitoringSabotageCommand())
@@ -153,7 +176,9 @@ class SensorAlert(Thread):
         session.commit()
         return alert
 
-    def add_sensor_to_alert(self, session, alert: Alert, start_time, delay):
+    def add_sensor_to_alert(
+        self, session, alert: Alert, start_time, delay, syren_config: SyrenConfig
+    ):
         """
         Adds a sensor to the given alert with the specified start time and delay.
         If the sensor is already added to the alert, it will not be added again.
@@ -173,13 +198,13 @@ class SensorAlert(Thread):
             description=sensor.description,
             start_time=start_time,
             delay=delay,
-            silent=sensor.silent_alert,
+            silent=resolve_silent(syren_config.silent, sensor.silent_alert),
             monitor_period=self._sensitivity.monitor_period,
             monitor_threshold=self._sensitivity.monitor_threshold,
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)
-        alert.silent = all([item.silent for item in alert.sensors])
+        alert.silent = all(item.silent for item in alert.sensors)
         session.commit()
         logger.debug("Added sensor by id: %s", self._sensor_id)
 

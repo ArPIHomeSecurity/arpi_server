@@ -178,7 +178,18 @@ class Monitor(Thread, ActionHandler):
         if alert:
             logger.info("Continue unresolved alert: %s", alert)
             send_alert_state(alert)
-            Syren.start_syren()
+            syren_config = SyrenConfig.load_config(cleanup=True, session=self._db_session)
+            if syren_config is None:
+                syren_config = SyrenConfig(
+                    silent=Syren.SILENT,
+                    delay=Syren.DELAY,
+                    duration=Syren.DURATION,
+                )
+            Syren.start_syren(
+                silent=alert.silent,
+                delay=syren_config.delay,
+                duration=syren_config.duration,
+            )
         else:
             send_alert_state(None)
             send_syren_state(None)

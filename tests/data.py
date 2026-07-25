@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import datetime
 
 from psycopg2 import ProgrammingError
+from sqlalchemy import Integer, text
 
 from monitor.config.models import MQTTConfigInternalPublish
 from monitor.database import get_database_session
@@ -30,7 +31,34 @@ from utils.models import (
 logger = logging.getLogger(__name__)
 
 
-def clear_events():
+def _reset_sequences(session):
+    """Reset PostgreSQL serial sequences for deterministic test IDs."""
+    logger.info("Resetting database sequences...")
+
+    for table in metadata.sorted_tables:
+        for column in table.columns:
+            if not (column.primary_key and isinstance(column.type, Integer)):
+                continue
+
+            seq_name = session.execute(
+                text("SELECT pg_get_serial_sequence(:table_name, :column_name)"),
+                {"table_name": table.name, "column_name": column.name},
+            ).scalar()
+
+            if not seq_name:
+                continue
+
+            session.execute(
+                text("SELECT setval(CAST(:seq_name AS regclass), 1, false)"),
+                {"seq_name": seq_name},
+            )
+            logger.debug(" - Reset sequence %s", seq_name)
+
+    session.commit()
+    logger.info("Sequences reset")
+
+
+def cleanup_database():
     session = get_database_session()
     logger.info("Clearing events...")
     session.execute(ArmSensor.__table__.delete())
@@ -39,6 +67,9 @@ def clear_events():
     session.execute(Arm.__table__.delete())
     session.execute(Alert.__table__.delete())
     session.commit()
+
+    _reset_sequences(session)
+
     engine = session.get_bind()
     session.close()
     engine.dispose()
@@ -193,6 +224,9 @@ def clear_database():
         except ProgrammingError:
             logger.warning("   Table %s does not exist, skipping", table)
             session.rollback()
+
+    _reset_sequences(session)
+
     engine = session.get_bind()
     session.close()
     engine.dispose()

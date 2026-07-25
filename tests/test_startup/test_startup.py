@@ -128,7 +128,7 @@ def test_monitoring_armed(device_token: str, user_token: str):
                         "alertType": "alert_away",
                         "startTime": "2026-05-02 19:09:40",
                         "endTime": None,
-                        "silent": True,
+                        "silent": False,
                         "sensors": [
                             {
                                 "sensorId": 1,
@@ -139,7 +139,7 @@ def test_monitoring_armed(device_token: str, user_token: str):
                                 "startTime": "2026-05-02 21:09:30",
                                 "endTime": None,
                                 "delay": 0,
-                                "silent": True,
+                                "silent": False,
                                 "monitorPeriod": None,
                                 "monitorThreshold": 100,
                             }

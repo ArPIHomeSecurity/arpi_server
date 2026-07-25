@@ -193,11 +193,16 @@ def call_api(method: str, path: str, payload: dict, token: str):
     return response
 
 
-def check_api_response(response, expected_status=200):
-    if response.status_code != expected_status:
+def check_api_response(response: requests.Response, expected_status: int | list[int] = 200):
+    if isinstance(expected_status, int):
+        expected_status = [expected_status]
+
+    if response.status_code not in expected_status:
         logger.error(f"API call failed: {response.status_code} {response.text}")
 
-    assert response.status_code == expected_status
+    assert response.status_code in expected_status, (
+        f"API call failed: {response.status_code} {response.text}"
+    )
 
 
 def wait_for_monitoring_ready(device_token: str, timeout=15):

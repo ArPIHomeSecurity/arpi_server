@@ -12,7 +12,7 @@ from time import sleep
 
 import pytest
 import requests
-from data import clear_database, clear_events
+from data import cleanup_database, clear_database
 from helpers.services import server_service
 
 from monitor.adapters.mock.utils import set_input_states
@@ -184,6 +184,6 @@ def reset_input_states():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def clear_arm_events():
+def cleanup_database_fixture():
     yield
-    clear_events()
+    cleanup_database()

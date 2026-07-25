@@ -74,7 +74,12 @@ TEST_CASES = [
         {
             "system": {"monitor_period": 3, "monitor_threshold": 50},
             "sensor": {"monitorPeriod": None, "monitorThreshold": None},
-            "sensor_activation_steps": [("active", 1.0), ("default", 1.0), ("active", 1.0), ("default", 0.1)],
+            "sensor_activation_steps": [
+                ("active", 1.0),
+                ("default", 1.0),
+                ("active", 1.0),
+                ("default", 0.1),
+            ],
             "expect_alert": True,
             "sensor_expected_monitor_period": 3,
             "sensor_expected_monitor_threshold": 50,
@@ -166,7 +171,7 @@ def test_01_sensitivity_cases(device_token, user_token, case):
                             "alertType": "alert_away",
                             "startTime": "2026-05-02 19:09:40",
                             "endTime": None,
-                            "silent": True,
+                            "silent": False,
                             "sensors": [
                                 {
                                     "sensorId": 1,
@@ -177,7 +182,7 @@ def test_01_sensitivity_cases(device_token, user_token, case):
                                     "startTime": "2026-05-02 21:09:30",
                                     "endTime": None,
                                     "delay": 0,
-                                    "silent": True,
+                                    "silent": False,
                                     "monitorPeriod": case["sensor_expected_monitor_period"],
                                     "monitorThreshold": case["sensor_expected_monitor_threshold"],
                                 }
@@ -205,9 +210,7 @@ def test_01_sensitivity_cases(device_token, user_token, case):
                 timeout=case["trigger_timeout"],
             )
         else:
-            assert not any(
-                event.name == "alert_state_change" for event in monitor_events._received
-            )
+            assert not any(event.name == "alert_state_change" for event in monitor_events._received)
 
             response = call_api("GET", "/api/monitoring/state", {}, user_token)
             check_api_response(response)

@@ -225,7 +225,7 @@ def test_03_alert(device_token, user_token):
                         "alertType": "alert_away",
                         "startTime": "2026-05-17 10:45:02",
                         "endTime": None,
-                        "silent": True,
+                        "silent": False,
                         "sensors": [
                             {
                                 "sensorId": 1,
@@ -236,7 +236,7 @@ def test_03_alert(device_token, user_token):
                                 "startTime": "2026-05-17 12:44:59",
                                 "endTime": None,
                                 "delay": 3,
-                                "silent": True,
+                                "silent": False,
                                 "monitorPeriod": None,
                                 "monitorThreshold": 100,
                             }
@@ -318,7 +318,7 @@ def test_03_alert(device_token, user_token):
         assert alert["sensors"][0]["channel"] == 0
         assert alert["sensors"][0]["typeId"] == 1
         assert alert["sensors"][0]["delay"] == 3
-        assert alert["sensors"][0]["silent"] is True
+        assert alert["sensors"][0]["silent"] is False
 
         sensor_changes = event["sensorChanges"]
         assert len(sensor_changes) == 1
