@@ -60,7 +60,7 @@ class MQTTClient:
             logger.info("MQTT connection is not enabled")
             return
 
-        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=client_id)
+        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
         if self._client is None:
             logger.error("Failed to create MQTT client")
             return
@@ -124,8 +124,8 @@ class MQTTClient:
             logger.error("Failed to connect to MQTT broker with TLS! %s", error)
             self._client.disconnect()
             self._client = None
-        except Exception as e:
-            logger.exception("Failed to connect to MQTT broker: %s", e)
+        except Exception:
+            logger.exception("Failed to connect to MQTT broker")
 
     def close(self):
         """
@@ -135,19 +135,20 @@ class MQTTClient:
             self._client.disconnect()
             self._client = None
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
         """
         Callback when connected to MQTT broker.
         """
-        logger.debug("Connected with result code: %s", rc)
+        logger.debug("Connected with reason code: %s", reason_code)
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
         Callback when disconnected from MQTT broker.
         """
-        if rc != 0:
+        if reason_code != 0:
             logger.warning(
-                "Disconnected from MQTT broker with result code: %s, will auto-reconnect", rc
+                "Disconnected from MQTT broker with reason code: %s, will auto-reconnect",
+                reason_code,
             )
             return
 
