@@ -144,3 +144,17 @@ tasks:
 
   test-debug:
     - uv run pytest -vv -s --setup-show {{.CLI_ARGS}}
+
+  list-outdated-dependencies:
+    desc: List outdated dependencies
+    cmds:
+      - uv pip list --outdated
+
+  upgrade-dependency:
+    desc: Upgrade specified dependency
+    requires:
+      vars:
+        - name: PACKAGE
+    cmds:
+      - uv lock --upgrade-package {{.PACKAGE}}
+      - uv sync --group=dev --extra=simulator
