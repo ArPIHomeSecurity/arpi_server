@@ -97,7 +97,7 @@ def _create_options(session):
                 asdict(
                     MQTTConfigInternalPublish(
                         hostname="localhost",
-                        port=1883,
+                        port=2883,
                         username="argus_reader",
                         password="",
                         tls_enabled=False,
