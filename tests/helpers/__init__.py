@@ -170,6 +170,12 @@ class MonitorEventsClient:
 
             sleep(0.1)
 
+        unexpected_events = [event.name for event in self._received if event not in events]
+        if unexpected_events:
+            raise AssertionError(
+                f"Unexpected Socket.IO events received within {timeout} seconds at {_get_time_string()}: {unexpected_events}"
+            )
+
         missing_events = [event.name for event in events if event not in matched_events]
 
         raise AssertionError(

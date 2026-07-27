@@ -21,8 +21,9 @@ class Syren(Thread):
 
     SYREN_CHANNEL = 0
 
-    _is_running = False
     _stop_event = Event()
+    _is_running = False
+    _is_silent = False
 
     @classmethod
     def start_syren(cls, silent=None, delay=None, duration=None):
@@ -43,17 +44,28 @@ class Syren(Thread):
             resolved_duration,
         )
 
-        if not cls._is_running:
-            cls._stop_event.clear()
-            syren = Syren(
-                silent=resolved_silent,
-                delay=resolved_delay,
-                duration=resolved_duration,
-            )
-            syren.start()
-            cls._is_running = True
-        else:
-            logger.warning("Syren is already in use!")
+        if resolved_silent:
+            logger.info("Syren is in silent mode")
+            if cls._is_silent != resolved_silent:
+                send_syren_state(False)
+
+            cls._is_silent = True
+            return
+
+        if cls._is_running and cls._is_silent == resolved_silent:
+            logger.warning("Syren is already running, ignoring start request")
+            return
+
+        logger.info("Starting syren with delay=%s and duration=%s", resolved_delay, resolved_duration)
+        cls._stop_event.clear()
+        cls._is_running = True
+        cls._is_silent = resolved_silent
+        syren = Syren(
+            silent=resolved_silent,
+            delay=resolved_delay,
+            duration=resolved_duration,
+        )
+        syren.start()
 
     @classmethod
     def stop_syren(cls):
@@ -68,17 +80,14 @@ class Syren(Thread):
     def __init__(self, silent: bool, delay: int, duration: int):
         super().__init__(name=THREAD_ALERT)
         self._output_adapter = get_output_adapter()
-        self._silent = silent
         self._delay = delay
         self._duration = duration
 
     def run(self):
-        if self._silent:
-            logger.info("Syren is in silent mode")
-            send_syren_state(False)
-            Syren._is_running = False
-            return
-
+        """
+        Updates the output for the syren based on the configured delay and duration.
+        The syren is turned on after the delay and turned off after the duration.
+        """
         delay = self._delay
         duration = self._duration
 
@@ -88,6 +97,7 @@ class Syren(Thread):
         send_syren_state(syren_is_on)
         if syren_is_on:
             logger.info("Syren started")
+
         while not self._stop_event.is_set():
             now = time()
             if not syren_is_on and (now - start_time > delay):
