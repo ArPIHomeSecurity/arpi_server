@@ -56,7 +56,9 @@ class Syren(Thread):
             logger.warning("Syren is already running, ignoring start request")
             return
 
-        logger.info("Starting syren with delay=%s and duration=%s", resolved_delay, resolved_duration)
+        logger.info(
+            "Starting syren with delay=%s and duration=%s", resolved_delay, resolved_duration
+        )
         cls._stop_event.clear()
         cls._is_running = True
         cls._is_silent = resolved_silent
