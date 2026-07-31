@@ -207,7 +207,7 @@ def check_api_response(response: requests.Response, expected_status: int | list[
         logger.error(f"API call failed: {response.status_code} {response.text}")
 
     assert response.status_code in expected_status, (
-        f"API call failed: {response.status_code} {response.text}"
+        f"API call failed! Code: {response.status_code} Response: {response.text}"
     )
 
 

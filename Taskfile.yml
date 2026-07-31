@@ -69,17 +69,22 @@ tasks:
   start-mcp:
     desc: Start the MCP server
     cmds:
+      # flask loads .env automatically
       - uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
 
   start-monitor:
     desc: Start the monitor
     cmds:
+      # flask loads .env automatically
       - uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
 
   start-simulator:
     desc: Start the simulator
     cmds:
-      - uv run textual run --dev ./src/bin/simulator.py
+      # loads .env before running the simulator
+      - |
+        export $(grep -v '^#' .env | xargs)
+        uv run textual run --dev ./src/bin/simulator.py
 
   start-simulator-web:
     desc: Start the simulator web interface

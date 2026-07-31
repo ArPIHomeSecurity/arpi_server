@@ -190,9 +190,12 @@ async def create_sensor(
     ] = True,
     silent_alert: Annotated[bool, "Whether the sensor has silent alerts enabled"] = False,
     monitor_period: Annotated[
-        int | None, Field(description="Monitoring period for the sensor", gt=0)
+        int | None, Field(description="Monitoring period for the sensor in seconds", gt=0)
     ] = None,
-    monitor_threshold: Annotated[int, "Monitoring threshold for the sensor"] = 100,
+    monitor_threshold: Annotated[
+        int | None,
+        Field(description="Monitoring threshold for the sensor in percent", gt=0, le=100),
+    ] = 100,
     channel_type: Annotated[ChannelTypes, "The channel type of the sensor"] = ChannelTypes.BASIC,
     sensor_contact_type: Annotated[
         SensorContactTypes, "The contact type of the sensor"
@@ -221,8 +224,8 @@ async def create_sensor(
         description: Optional description of the sensor
         enabled: Whether the sensor is enabled
         silent_alert: Whether the sensor has silent alerts enabled
-        monitor_period: Monitoring period for the sensor
-        monitor_threshold: Monitoring threshold for the sensor
+        monitor_period: Monitoring period for the sensor in seconds
+        monitor_threshold: Monitoring threshold for the sensor in percent
         channel_type: The channel type of the sensor
         sensor_contact_type: The contact type of the sensor
         sensor_eol_count: The end-of-line count of the sensor
@@ -314,34 +317,43 @@ async def create_sensor(
 def update_sensor(
     sensor_id,
     name: Annotated[
-        str, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
+        str | None, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
     ] = None,
-    description: Annotated[str, Field(description="The new description of the sensor")] = None,
-    channel: Annotated[int, Field(description="The new channel number for the sensor")] = None,
-    channel_type: Annotated[str, Field(description="The new channel type of the sensor")] = None,
+    description: Annotated[
+        str | None, Field(description="The new description of the sensor")
+    ] = None,
+    channel: Annotated[
+        int | None, Field(description="The new channel number for the sensor")
+    ] = None,
+    channel_type: Annotated[
+        str | None, Field(description="The new channel type of the sensor")
+    ] = None,
     sensor_contact_type: Annotated[
-        str, Field(description="The new contact type of the sensor")
+        str | None, Field(description="The new contact type of the sensor")
     ] = None,
     sensor_eol_count: Annotated[
-        int, Field(description="The new end-of-line count of the sensor")
+        int | None, Field(description="The new end-of-line count of the sensor")
     ] = None,
-    enabled: Annotated[bool, Field(description="Whether the sensor is enabled")] = None,
+    enabled: Annotated[bool | None, Field(description="Whether the sensor is enabled")] = None,
     zone_id: Annotated[
-        int, Field(description="The new zone ID where the sensor is located")
+        int | None, Field(description="The new zone ID where the sensor is located")
     ] = None,
     area_id: Annotated[
-        int, Field(description="The new area ID where the sensor is located")
+        int | None, Field(description="The new area ID where the sensor is located")
     ] = None,
-    type_id: Annotated[int, Field(description="The new type ID of the sensor")] = None,
-    ui_hidden: Annotated[bool, Field(description="Whether the sensor is hidden in the UI")] = None,
+    type_id: Annotated[int | None, Field(description="The new type ID of the sensor")] = None,
+    ui_hidden: Annotated[
+        bool | None, Field(description="Whether the sensor is hidden in the UI")
+    ] = None,
     monitor_period: Annotated[
-        int, Field(description="The new monitoring period for the sensor")
+        int | None, Field(description="The new monitoring period for the sensor in seconds", gt=0)
     ] = None,
     monitor_threshold: Annotated[
-        int, Field(description="The new monitoring threshold for the sensor")
+        int | None,
+        Field(description="The new monitoring threshold for the sensor in percent", gt=0, le=100),
     ] = None,
     silent_alert: Annotated[
-        bool, Field(description="Whether the sensor has silent alerts enabled")
+        bool | None, Field(description="Whether the sensor has silent alerts enabled")
     ] = None,
 ):
     """
@@ -361,8 +373,8 @@ def update_sensor(
         area_id: The new area ID where the sensor is located
         type_id: The new type ID of the sensor
         ui_hidden: Whether the sensor is hidden in the UI
-        monitor_period: The new monitoring period for the sensor
-        monitor_threshold: The new monitoring threshold for the sensor
+        monitor_period: The new monitoring period for the sensor in seconds
+        monitor_threshold: The new monitoring threshold for the sensor in percent
         silent_alert: Whether the sensor has silent alerts enabled
     """
     sensor_data = {}

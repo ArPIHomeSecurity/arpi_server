@@ -124,7 +124,7 @@ class SensorHandler:
 
         alert_sensitivity = AlertSensitivityConfig.load_config(session=self._db_session)
 
-        # initialize the sensors history
+        # initialize the sensors history for the alert sensitivity
         sample_rate = int(environ["SAMPLE_RATE"])
         if alert_sensitivity.monitor_period is None:
             # no custom sensitivity, use instant alerts
@@ -144,8 +144,11 @@ class SensorHandler:
         # set the sensitivity of the sensors
         for idx, sensor in enumerate(self._sensors):
             if sensor.monitor_threshold is not None:
-                if sensor.monitor_period is None:
-                    # instant alert
+                if sensor.monitor_period is None and sensor.monitor_threshold is None:
+                    # keep system defaults
+                    continue
+                elif sensor.monitor_period is None and sensor.monitor_threshold == 100:
+                    # force instant alert
                     self._sensors_history.set_sensitivity(idx, 1, 100)
                 else:
                     self._sensors_history.set_sensitivity(

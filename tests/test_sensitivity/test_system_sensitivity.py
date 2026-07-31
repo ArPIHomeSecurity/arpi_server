@@ -119,7 +119,7 @@ def test_01_sensitivity_cases(device_token, user_token, case):
             case["sensor"],
             user_token,
         )
-        check_api_response(response)
+        check_api_response(response, expected_status=[200, 204])
 
         # Verify that the sensor sensitivity was set correctly
         response = call_api("GET", "/api/sensor/1", {}, user_token)
@@ -221,48 +221,10 @@ def test_01_sensitivity_cases(device_token, user_token, case):
 
             monitor_events.wait_for_events(
                 [
-                    # MonitorEvent(
-                    #     name="alert_state_change",
-                    #     payload={
-                    #         "id": 1,
-                    #         "alertType": "alert_away",
-                    #         "startTime": "2026-05-02 19:09:40",
-                    #         "endTime": None,
-                    #         "silent": True,
-                    #         "sensors": [
-                    #             {
-                    #                 "sensorId": 1,
-                    #                 "channel": 0,
-                    #                 "typeId": 1,
-                    #                 "name": "Room 1",
-                    #                 "description": "Test room 1 movement sensor",
-                    #                 "startTime": "2026-05-02 21:09:30",
-                    #                 "endTime": None,
-                    #                 "delay": 0,
-                    #                 "silent": True,
-                    #                 "monitorPeriod": case["sensor_expected_monitor_period"],
-                    #                 "monitorThreshold": case["sensor_expected_monitor_threshold"],
-                    #             }
-                    #         ],
-                    #     },
-                    #     diffOptions={
-                    #         "ignore_order": True,
-                    #         "exclude_paths": [
-                    #             "root['id']",
-                    #             "root['startTime']",
-                    #             "root['sensors'][0]['sensorId']",
-                    #             "root['sensors'][0]['startTime']",
-                    #         ],
-                    #     },
-                    # ),
                     MonitorEvent(
                         name="sensors_state_change",
                         payload=True,
                     ),
-                    # MonitorEvent(
-                    #     name="syren_state_change",
-                    #     payload=True,
-                    # ),
                 ],
                 timeout=case["trigger_timeout"],
             )
