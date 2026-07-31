@@ -9,7 +9,7 @@ from pydantic import Field
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from server.services.area import AreaService
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import _UNSET, ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.sensor import ChannelConflictError, SensorService
 from server.services.zone import ZoneService
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
@@ -195,7 +195,7 @@ async def create_sensor(
     monitor_threshold: Annotated[
         int | None,
         Field(description="Monitoring threshold for the sensor in percent", gt=0, le=100),
-    ] = 100,
+    ] = None,
     channel_type: Annotated[ChannelTypes, "The channel type of the sensor"] = ChannelTypes.BASIC,
     sensor_contact_type: Annotated[
         SensorContactTypes, "The contact type of the sensor"
@@ -318,43 +318,43 @@ def update_sensor(
     sensor_id,
     name: Annotated[
         str | None, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
-    ] = None,
+    ] = _UNSET,
     description: Annotated[
         str | None, Field(description="The new description of the sensor")
-    ] = None,
+    ] = _UNSET,
     channel: Annotated[
         int | None, Field(description="The new channel number for the sensor")
-    ] = None,
+    ] = _UNSET,
     channel_type: Annotated[
         str | None, Field(description="The new channel type of the sensor")
-    ] = None,
+    ] = _UNSET,
     sensor_contact_type: Annotated[
         str | None, Field(description="The new contact type of the sensor")
-    ] = None,
+    ] = _UNSET,
     sensor_eol_count: Annotated[
         int | None, Field(description="The new end-of-line count of the sensor")
-    ] = None,
-    enabled: Annotated[bool | None, Field(description="Whether the sensor is enabled")] = None,
+    ] = _UNSET,
+    enabled: Annotated[bool | None, Field(description="Whether the sensor is enabled")] = _UNSET,
     zone_id: Annotated[
         int | None, Field(description="The new zone ID where the sensor is located")
-    ] = None,
+    ] = _UNSET,
     area_id: Annotated[
         int | None, Field(description="The new area ID where the sensor is located")
-    ] = None,
-    type_id: Annotated[int | None, Field(description="The new type ID of the sensor")] = None,
+    ] = _UNSET,
+    type_id: Annotated[int | None, Field(description="The new type ID of the sensor")] = _UNSET,
     ui_hidden: Annotated[
         bool | None, Field(description="Whether the sensor is hidden in the UI")
-    ] = None,
+    ] = _UNSET,
     monitor_period: Annotated[
         int | None, Field(description="The new monitoring period for the sensor in seconds", gt=0)
-    ] = None,
+    ] = _UNSET,
     monitor_threshold: Annotated[
         int | None,
         Field(description="The new monitoring threshold for the sensor in percent", gt=0, le=100),
-    ] = None,
+    ] = _UNSET,
     silent_alert: Annotated[
         bool | None, Field(description="Whether the sensor has silent alerts enabled")
-    ] = None,
+    ] = _UNSET,
 ):
     """
     Update an existing sensor in the database.
@@ -396,7 +396,7 @@ def update_sensor(
     }
 
     for key, value in params.items():
-        if value is not None:
+        if value is not _UNSET:
             sensor_data[key] = value
 
     try:

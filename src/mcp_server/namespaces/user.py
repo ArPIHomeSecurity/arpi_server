@@ -93,7 +93,9 @@ def create_user(name: str, role: str, access_code: str, comment: str = None) -> 
 
 
 @user_mcp.tool
-def update_user(user_id: int, name: str = None, role: str = None, comment: str = None):
+def update_user(
+    user_id: int, name: str | None = None, role: str | None = None, comment: str | None = None
+):
     """
     Update an existing user in the database.
 
