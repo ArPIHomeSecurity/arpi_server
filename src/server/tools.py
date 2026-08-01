@@ -25,10 +25,15 @@ def evaluate_ipc_response(ipc_response) -> tuple[dict, bool]:
         response["message"] = ipc_response["message"]
 
     try:
-        response |= ipc_response.get("value", {})
-        response |= ipc_response.get("other", {})
+        value = ipc_response.get("value", {})
+        if value:
+            response |= value
+
+        other = ipc_response.get("other", {})
+        if other:
+            response |= other
     except TypeError as error:
-        logging.error("Failed to merge response values: %s! %s - %s", error, response, ipc_response)
+        logger.error("Failed to merge response values: %s! %s - %s", error, response, ipc_response)
 
     logger.info("Success: %s", success)
     logger.info("Response: %s", response)

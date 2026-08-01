@@ -12,10 +12,10 @@ __all__ = [
     "AlertSensitivityService",
     "DyndnsService",
     "GSMService",
+    "LocationConfigService",
     "MQTTService",
     "SMTPService",
     "SSHService",
     "SubscriptionsService",
-    "LocationConfigService",
     "SyrenService",
 ]

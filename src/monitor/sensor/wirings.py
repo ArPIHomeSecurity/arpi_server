@@ -14,7 +14,6 @@ Rb = EOL resistor for channel B
 """
 
 import logging
-
 from functools import cached_property
 from typing import Protocol
 

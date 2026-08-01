@@ -1,4 +1,4 @@
-from logging import ERROR, INFO, DEBUG  # noqa: F401
+from logging import DEBUG, ERROR, INFO  # noqa: F401
 
 # custom logging level for logging sensitive information
 TRACE = 5

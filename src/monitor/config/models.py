@@ -144,11 +144,31 @@ class SSHConfig(BaseConfig):
 
 @dataclass
 class AlertSensitivityConfig(BaseConfig):
+    """
+    Configuration for the alert sensitivity settings of the monitor.
+
+    If period is set to None, the monitoring will alert immediately when the sensor is active.
+    Can be overridden by the sensor's configuration.
+
+    We measure the sensor's state for a period of time in a rolling window.
+    If the sensor's state is active for more than the threshold value in the period,
+    an alert will be triggered.
+
+    threshold = (active_time / period) * 100
+    """
+
     OPTION_NAME = "alert"
     SECTION_NAME = "sensitivity"
 
     monitor_period: int | None = None
-    monitor_threshold: int | None = None
+    """
+    The period in seconds for monitoring the sensor's state.
+    """
+    monitor_threshold: int | None = 100
+    """
+    The filling threshold for the sensor's state in percent.
+    If the sensor's state is above this threshold, an alert will be triggered.
+    """
 
 
 @dataclass

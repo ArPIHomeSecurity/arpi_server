@@ -1,7 +1,7 @@
 # pylint: disable=raise-missing-from
 from dataclasses import asdict
-from fastmcp import FastMCP
 
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from mcp_server.errors import ToolChangesNotAllowed

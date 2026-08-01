@@ -1,11 +1,10 @@
 import logging
 import os
-import socketio
+from urllib.parse import parse_qs, urlparse
 
 import jose.exceptions
-
+import socketio
 from flask import Flask
-from urllib.parse import parse_qs, urlparse
 from jose import jwt
 
 from utils.constants import LOG_SOCKETIO

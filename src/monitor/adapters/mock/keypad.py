@@ -1,10 +1,11 @@
 import logging
 import os
-
 from time import sleep, time
 
 from monitor.adapters.keypads.base import Function, KeypadBase
 from utils.constants import LOG_ADKEYPAD
+
+logger = logging.getLogger(LOG_ADKEYPAD)
 
 
 class MockKeypad(KeypadBase):
@@ -19,8 +20,7 @@ class MockKeypad(KeypadBase):
     ]
 
     def __init__(self, clock_pin, data_pin):
-        super(MockKeypad, self).__init__()
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
+        super().__init__()
         self._armed = False
         self._error = False
         self._ready = False
@@ -28,7 +28,7 @@ class MockKeypad(KeypadBase):
         self._start = time()
 
     def initialise(self):
-        self._logger.debug("Keypad initialized")
+        logger.debug("Keypad initialized")
 
     def beeps(self, count, beep, mute):
         for _ in range(count):
@@ -37,20 +37,20 @@ class MockKeypad(KeypadBase):
 
     def set_armed(self, state):
         self._armed = state
-        self._logger.debug("Armed: %s", state)
+        logger.debug("Armed: %s", state)
         self.beeps(2, 0.1, 0.1)
 
     def set_error(self, state):
         self._error = state
-        self._logger.debug("Error: %s", state)
+        logger.debug("Error: %s", state)
         self.beeps(3, 0.1, 0.1)
 
     def set_ready(self, state):
         self._ready = state
-        self._logger.debug("Ready: %s", state)
+        logger.debug("Ready: %s", state)
 
     def communicate(self):
-        self._logger.trace("Start communication MOCK...")
+        logger.trace("Start communication MOCK...")
         # start 10 seconds after the start
         if time() - self._start > 10 and self._index is None:
             self._index = 0
@@ -62,17 +62,17 @@ class MockKeypad(KeypadBase):
                 self._card = self.CARDS[int(self.ACTIONS[self._index + 1])]
                 self._index += 1
             elif self.ACTIONS[self._index] == "A":
-                self._logger.debug("Function: %s", self.ACTIONS[self._index])
+                logger.debug("Function: %s", self.ACTIONS[self._index])
                 self._function = Function.AWAY
                 self.ACTIONS = " "
                 # avoid repeating the test action
             elif self.ACTIONS[self._index] == "S":
-                self._logger.debug("Function: %s", self.ACTIONS[self._index])
+                logger.debug("Function: %s", self.ACTIONS[self._index])
                 self._function = Function.STAY
                 self.ACTIONS = " "
                 # avoid repeating the test action
             elif self.ACTIONS[self._index] != " ":
-                self._logger.debug("Pressed: %s", self.ACTIONS[self._index])
+                logger.debug("Pressed: %s", self.ACTIONS[self._index])
                 self._keys.append(self.ACTIONS[self._index])
 
             self._index += 1

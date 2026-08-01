@@ -6,6 +6,8 @@ from dataclasses import asdict
 
 from sqlalchemy.exc import ProgrammingError
 
+from monitor.config.models import SSHConfig
+from monitor.database import get_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
     Area,
@@ -19,11 +21,8 @@ from utils.models import (
     SensorType,
     User,
     Zone,
+    metadata,
 )
-from monitor.database import get_database_session
-from utils.models import metadata
-from monitor.config.models import SSHConfig
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")

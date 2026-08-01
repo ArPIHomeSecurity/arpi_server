@@ -1,13 +1,12 @@
-from dataclasses import dataclass
-from datetime import datetime
 import logging
 import os
+from dataclasses import dataclass
+from datetime import datetime
+from time import sleep, time
 
-from time import time, sleep
-
-from deepdiff import DeepDiff
 import requests
 import socketio
+from deepdiff import DeepDiff
 
 from utils.constants import MONITORING_READY
 
@@ -130,6 +129,14 @@ class MonitorEventsClient:
         """
         Wait for all specified Socket.IO events to arrive within timeout.
         If payload is provided for an event, also check that the event payload matches.
+
+        Raises:
+            AssertionError: If any of the specified events are not received within the timeout.
+
+        Args:
+            events (list[MonitorEvent]): List of MonitorEvent objects to wait for.
+            delay (float): Time in seconds to wait before checking for events.
+            timeout (float): Time in seconds to wait for all events to arrive.
         """
         logger.debug(
             "Waiting for Socket.IO events: %s from %s",
@@ -163,6 +170,12 @@ class MonitorEventsClient:
 
             sleep(0.1)
 
+        unexpected_events = [event.name for event in self._received if event not in events]
+        if unexpected_events:
+            raise AssertionError(
+                f"Unexpected Socket.IO events received within {timeout} seconds at {_get_time_string()}: {unexpected_events}"
+            )
+
         missing_events = [event.name for event in events if event not in matched_events]
 
         raise AssertionError(
@@ -186,11 +199,16 @@ def call_api(method: str, path: str, payload: dict, token: str):
     return response
 
 
-def check_api_response(response, expected_status=200):
-    if response.status_code != expected_status:
+def check_api_response(response: requests.Response, expected_status: int | list[int] = 200):
+    if isinstance(expected_status, int):
+        expected_status = [expected_status]
+
+    if response.status_code not in expected_status:
         logger.error(f"API call failed: {response.status_code} {response.text}")
 
-    assert response.status_code == expected_status
+    assert response.status_code in expected_status, (
+        f"API call failed! Code: {response.status_code} Response: {response.text}"
+    )
 
 
 def wait_for_monitoring_ready(device_token: str, timeout=15):

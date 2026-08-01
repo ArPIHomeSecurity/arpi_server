@@ -1,14 +1,13 @@
 import os
 from datetime import datetime as dt
 from time import sleep
+
 from dateutil.tz.tz import tzlocal
-
+from flask import current_app, jsonify, request
 from flask.blueprints import Blueprint
-from flask import jsonify, request, current_app
 from jose import jwt
+from sqlalchemy import inspect
 
-from utils.constants import ROLE_ADMIN, ROLE_USER
-from utils.models import User
 from server.database import db
 from server.decorators import (
     authenticated,
@@ -20,7 +19,8 @@ from server.decorators import (
 from server.ipc import IPCClient
 from server.tools import process_ipc_response
 from tools.ssh_keymanager import SSHKeyManager
-from sqlalchemy import inspect
+from utils.constants import ROLE_ADMIN, ROLE_USER
+from utils.models import User
 
 user_blueprint = Blueprint("user", __name__)
 

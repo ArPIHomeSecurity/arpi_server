@@ -2,9 +2,8 @@ import json
 import logging
 import socket
 import ssl
-from unicodedata import normalize
-
 from enum import Enum
+from unicodedata import normalize
 
 import paho.mqtt.client as mqtt
 
@@ -14,6 +13,8 @@ from monitor.config.models import (
     MQTTConnection,
 )
 from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
+
+logger = logging.getLogger(LOG_MQTT)
 
 
 def sanitize(name):
@@ -47,7 +48,6 @@ class MQTTClient:
     """
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_MQTT)
         self._client = None
 
     def connect(self, client_id=None):
@@ -57,12 +57,12 @@ class MQTTClient:
 
         mqtt_connection = MQTTConnection.load_config()
         if mqtt_connection is None or not mqtt_connection.enabled:
-            self._logger.info("MQTT connection is not enabled")
+            logger.info("MQTT connection is not enabled")
             return
 
-        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=client_id)
+        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
         if self._client is None:
-            self._logger.error("Failed to create MQTT client")
+            logger.error("Failed to create MQTT client")
             return
 
         self._client.on_connect = self._on_connect
@@ -72,15 +72,15 @@ class MQTTClient:
         mqtt_config = None
         if mqtt_connection.external:
             mqtt_config = MQTTConfigExternalPublish.load_config()
-            self._logger.info("Using external MQTT connection configuration")
+            logger.info("Using external MQTT connection configuration")
         else:
             mqtt_config = MQTTConfigInternalPublish.load_config()
-            self._logger.info("Using internal MQTT connection configuration")
+            logger.info("Using internal MQTT connection configuration")
 
         username = mqtt_config.username
         password = mqtt_config.password
         if username:
-            self._logger.debug(
+            logger.debug(
                 "Using password authentication user: %s password length = %s",
                 username,
                 len(password),
@@ -90,7 +90,7 @@ class MQTTClient:
                 # but we see errors in logs, so need to add a check
                 self._client.username_pw_set(username, password)
             except AttributeError:
-                self._logger.error("Failed to set MQTT username and password")
+                logger.error("Failed to set MQTT username and password")
                 self._client = None
                 return
 
@@ -101,7 +101,7 @@ class MQTTClient:
 
         host = mqtt_config.hostname
         port = mqtt_config.port
-        self._logger.info(
+        logger.info(
             "Connecting to MQTT broker at %s:%s TLS: %s insecure:%s",
             host,
             port,
@@ -110,22 +110,22 @@ class MQTTClient:
         )
         try:
             self._client.connect(host, port, keepalive=60)
-            self._logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
+            logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
             self._client.loop_start()
         except socket.gaierror:
-            self._logger.error("Failed to resolve MQTT broker hostname %s", host)
+            logger.error("Failed to resolve MQTT broker hostname %s", host)
             self._client.disconnect()
             self._client = None
         except ConnectionRefusedError:
-            self._logger.error("Failed to connect to MQTT broker at %s:%s", host, port)
+            logger.error("Failed to connect to MQTT broker at %s:%s", host, port)
             self._client.disconnect()
             self._client = None
         except ssl.SSLCertVerificationError as error:
-            self._logger.error("Failed to connect to MQTT broker with TLS! %s", error)
+            logger.error("Failed to connect to MQTT broker with TLS! %s", error)
             self._client.disconnect()
             self._client = None
-        except Exception as e:
-            self._logger.exception("Failed to connect to MQTT broker: %s", e)
+        except Exception:
+            logger.exception("Failed to connect to MQTT broker")
 
     def close(self):
         """
@@ -135,23 +135,24 @@ class MQTTClient:
             self._client.disconnect()
             self._client = None
 
-    def _on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
         """
         Callback when connected to MQTT broker.
         """
-        self._logger.debug("Connected with result code: %s", rc)
+        logger.debug("Connected with reason code: %s", reason_code)
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
         Callback when disconnected from MQTT broker.
         """
-        if rc != 0:
-            self._logger.warn(
-                "Disconnected from MQTT broker with result code: %s, will auto-reconnect", rc
+        if reason_code != 0:
+            logger.warning(
+                "Disconnected from MQTT broker with reason code: %s, will auto-reconnect",
+                reason_code,
             )
             return
 
-        self._logger.info("Disconnected from MQTT broker")
+        logger.info("Disconnected from MQTT broker")
         if self._client is not None:
             self._client.disconnect()
             self._client = None
@@ -160,13 +161,13 @@ class MQTTClient:
         """
         Callback when message received from MQTT broker.
         """
-        self._logger.debug("Received MQTT message on topic %s: %s", msg.topic, msg.payload)
+        logger.debug("Received MQTT message on topic %s: %s", msg.topic, msg.payload)
 
     def _delete_object(self, topic_prefix):
         """
         Delete the MQTT object (config and state) with the given prefix.
         """
-        self._logger.debug("Deleting MQTT prefix %s", topic_prefix)
+        logger.debug("Deleting MQTT prefix %s", topic_prefix)
         self._client.publish(f"{topic_prefix}/config", "", qos=1, retain=False)
         self._client.publish(f"{topic_prefix}/state", "", qos=1, retain=False)
 
@@ -188,7 +189,7 @@ class MQTTClient:
         )
 
         topic = f"{topic_prefix}/config"
-        self._logger.debug("Publishing MQTT config %s=%s", topic, config)
+        logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
 
     def delete_area(self, name):
@@ -215,10 +216,10 @@ class MQTTClient:
         elif state == ARM_DISARM:
             payload = "disarmed"
         else:
-            self._logger.error("Unknown state %s", state)
+            logger.error("Unknown state %s", state)
             return
 
-        self._logger.debug("Publishing MQTT state %s=%s", topic, payload)
+        logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)
 
     def publish_sensor_config(self, id, type, name):
@@ -240,7 +241,7 @@ class MQTTClient:
         )
 
         topic = f"{topic_prefix}/config"
-        self._logger.debug("Publishing MQTT config %s=%s", topic, config)
+        logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
 
     def delete_sensor(self, name):
@@ -261,5 +262,5 @@ class MQTTClient:
 
         topic = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}/state"
         payload = SensorState.ON.value if state else SensorState.OFF.value
-        self._logger.debug("Publishing MQTT state %s=%s", topic, payload)
+        logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)

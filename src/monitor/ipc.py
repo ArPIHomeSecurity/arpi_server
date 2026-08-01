@@ -1,14 +1,22 @@
 import contextlib
 import json
 import logging
-from select import select
 import socket
+from dataclasses import asdict, dataclass
+from grp import getgrnam
 from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
-from grp import getgrnam
+from select import select
 from threading import Event, Thread
 from time import sleep
 
+from monitor.actions import ParseCommandError, from_dict
+from monitor.alert import Syren
+from monitor.notifications.notifier import Notifier
+from monitor.output.handler import OutputHandler
+from monitor.storage import State, States
+from tools.clock import Clock
+from tools.ssh_service import SSHService
 from utils.constants import (
     DELETE_SMS_MESSAGE,
     GET_SMS_MESSAGES,
@@ -33,14 +41,17 @@ from utils.constants import (
     UPDATE_SECURE_CONNECTION,
     UPDATE_SSH,
 )
-from monitor.storage import State, States
-from monitor.alert import Syren
-from monitor.notifications.notifier import Notifier
-from monitor.output.handler import OutputHandler
-from tools.clock import Clock
-from tools.ssh_service import SSHService
 
+logger = logging.getLogger(LOG_IPC)
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
+
+
+@dataclass()
+class IPCResponse:
+    result: bool
+    message: str = ""
+    value: dict = None
+    other: dict = None
 
 
 class IPCServer(Thread):
@@ -62,12 +73,11 @@ class IPCServer(Thread):
         """
         Constructor
         """
-        super(IPCServer, self).__init__(name=THREAD_IPC)
-        self._logger = logging.getLogger(LOG_IPC)
+        super().__init__(name=THREAD_IPC)
         self._stop_event = stop_event
         self._broadcaster = broadcaster
         self._initialize_socket()
-        self._logger.info("IPC server created")
+        logger.info("IPC server created")
 
     def _initialize_socket(self):
         _socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -80,7 +90,7 @@ class IPCServer(Thread):
             _socket.bind(MONITOR_INPUT_SOCKET)
             _socket.listen(2)
         except OSError as error:
-            self._logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
+            logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
             raise
 
         try:
@@ -90,10 +100,10 @@ class IPCServer(Thread):
                 getpwnam(environ["USERNAME"]).pw_uid,
                 getgrnam(environ["GROUPNAME"]).gr_gid,
             )
-            self._logger.info("Socket permissions fixed")
+            logger.info("Socket permissions fixed")
         except KeyError as error:
-            self._logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
-            self._logger.error("Error: %s", error)
+            logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
+            logger.error("Error: %s", error)
 
         self._sockets = [_socket]
 
@@ -107,18 +117,18 @@ class IPCServer(Thread):
 
         folder = path.dirname(MONITOR_INPUT_SOCKET)
         if not path.exists(folder):
-            self._logger.info("Create folder for socket file: %s", MONITOR_INPUT_SOCKET)
+            logger.info("Create folder for socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(folder)
 
     def run(self):
-        self._logger.info("IPC server started")
+        logger.info("IPC server started")
 
         try:
             self.communicate()
         except Exception:
-            self._logger.exception("IPC server crashed!")
+            logger.exception("IPC server crashed!")
 
-        self._logger.info("IPC server stopped")
+        logger.info("IPC server stopped")
 
     def communicate(self):
         """
@@ -126,7 +136,7 @@ class IPCServer(Thread):
         """
         # read all the messages
         while not self._stop_event.is_set():
-            self._logger.trace("Waiting for connection...")
+            logger.trace("Waiting for connection...")
             readable, _, exceptional = select(self._sockets, [], self._sockets, 1)
 
             for read_socket in readable:
@@ -137,7 +147,7 @@ class IPCServer(Thread):
                     self.process_data(read_socket)
 
             for exc_socket in exceptional:
-                self._logger.error("Exceptional socket: %s", exc_socket)
+                logger.error("Exceptional socket: %s", exc_socket)
                 self._sockets.remove(exc_socket)
                 exc_socket.close()
 
@@ -151,88 +161,93 @@ class IPCServer(Thread):
         try:
             data = connection.recv(1024)
         except ConnectionResetError as error:
-            self._logger.error("Connection reset: %s", error)
+            logger.error("Connection reset: %s", error)
             return
 
         if not data:
-            self._logger.debug("No data received")
+            logger.debug("No data received")
             self._sockets.remove(connection)
             connection.close()
             return
 
-        self._logger.debug("Received action: '%s'", data)
-
-        response = self.handle_actions(json.loads(data.decode()))
-
+        logger.debug("Received action: '%s'", data)
         try:
-            connection.send(json.dumps(response).encode())
+            message = json.loads(data.decode())
+        except json.JSONDecodeError as error:
+            logger.error("Invalid JSON payload: %s", error)
+            response = {"result": False, "message": "Invalid JSON payload"}
+        else:
+            response = self.handle_actions(message)
+        try:
+            connection.send(json.dumps(asdict(response)).encode())
         except BrokenPipeError:
             self._sockets.remove(connection)
             connection.close()
 
-    def handle_actions(self, message):
+    def handle_actions(self, message: dict) -> IPCResponse:
         """
-        Return value:
-        {
-            "result": boolean, # True if succeeded
-            "message": string, # Error message
-            "value: dict # value to return
-        }
+        Handle the actions received from the client and execute them on monitoring.
+        Return the result of the action execution in an IPCResponse object.
         """
-        return_value = {"result": True}
+        return_value = IPCResponse(result=True)
+
         if message["action"] in self.BROADCASTED_ACTIONS:
-            # broadcast message
-            self._logger.info("IPC action received: %s", message["action"])
-            self._broadcaster.send_message(message=message)
+            logger.info("IPC action received: %s", message["action"])
+            try:
+                command = from_dict(message)
+            except ParseCommandError as error:
+                return IPCResponse(result=False, message=f"Invalid command payload: {error}")
+
+            self._broadcaster.send_message(message=command)
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": States.get(State.MONITORING)}
+            return_value.value = {"state": States.get(State.MONITORING)}
         elif message["action"] == POWER_GET_STATE:
-            return_value["value"] = {"state": States.get(State.POWER)}
+            return_value.value = {"state": States.get(State.POWER)}
         elif message["action"] == UPDATE_SSH:
-            self._logger.info("Update ssh connection...")
+            logger.info("Update ssh connection...")
             ssh = SSHService()
             ssh.update_service_state()
             ssh.update_access_local_network()
             ssh.update_password_authentication()
         elif message["action"] == SEND_TEST_SMS:
-            result, message = Notifier.send_test_sms()
-            return_value["result"] = result
-            return_value["message"] = "Error in SMS sending!" if not result else ""
-            return_value["other"] = message
+            result, details = Notifier.send_test_sms()
+            return_value.result = result
+            return_value.message = "Error in SMS sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == GET_SMS_MESSAGES:
             result, messages = Notifier.get_sms_messages()
-            return_value["result"] = result
-            return_value["value"] = messages
+            return_value.result = result
+            return_value.value = messages
         elif message["action"] == DELETE_SMS_MESSAGE:
             result = Notifier.delete_sms_message(message["message_id"])
-            return_value["result"] = result
+            return_value.result = result
         elif message["action"] == SEND_TEST_EMAIL:
-            result, message = Notifier.send_test_email()
-            return_value["result"] = result
-            return_value["message"] = "Error in email sending!" if not result else ""
-            return_value["other"] = message
+            result, details = Notifier.send_test_email()
+            return_value.result = result
+            return_value.message = "Error in email sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == MAKE_TEST_CALL:
-            result, message = Notifier.make_test_call()
-            return_value["result"] = result
-            return_value["message"] = "Error in call sending!" if not result else ""
-            return_value["other"] = message
+            result, details = Notifier.make_test_call()
+            return_value.result = result
+            return_value.message = "Error in call sending!" if not result else ""
+            return_value.other = details
         elif message["action"] == SEND_TEST_SYREN:
             self.test_syren(message["duration"])
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
-                return_value["result"] = False
-                return_value["message"] = "Failed to sync time"
+                return_value.result = False
+                return_value.message = "Failed to sync time"
         elif message["action"] == MONITOR_SET_CLOCK:
             if not Clock().set_clock(message):
-                return_value["result"] = False
-                return_value["message"] = "Failed to update date/time and zone"
+                return_value.result = False
+                return_value.message = "Failed to update date/time and zone"
         elif message["action"] == MONITOR_ACTIVATE_OUTPUT:
             OutputHandler.send_button_pressed(message["output_id"])
         elif message["action"] == MONITOR_DEACTIVATE_OUTPUT:
             OutputHandler.send_button_released(message["output_id"])
         else:
-            return_value["result"] = False
-            return_value["message"] = f"Unknown command: {message}"
+            return_value.result = False
+            return_value.message = f"Unknown command: {message}"
 
         return return_value
 
@@ -240,7 +255,7 @@ class IPCServer(Thread):
         """
         Test syren for a given duration.
         """
-        self._logger.debug("Testing syren %ss...", duration)
+        logger.debug("Testing syren %ss...", duration)
         Syren.start_syren(silent=False, delay=0, duration=duration)
         sleep(duration)
         Syren.stop_syren()

@@ -1,16 +1,14 @@
 import atexit
 import logging
 import os
-
+from signal import SIGTERM, Signals, signal
 from threading import Event
-from signal import SIGTERM, signal, Signals
 
-from utils.constants import LOG_SERVICE
 from monitor.background_service import BackgroundService
 from monitor.logging import initialize_logging
 from monitor.socket_io import socketio_app
 from tools.ssh_service import SSHService
-
+from utils.constants import LOG_SERVICE
 
 stop_event = Event()
 logger = logging.getLogger(LOG_SERVICE)

@@ -1,12 +1,11 @@
-from datetime import datetime
 import os
 import platform
 import re
 import secrets
+import shutil
 import string
 import subprocess
-
-import shutil
+from datetime import datetime
 from time import sleep
 
 import click
@@ -14,8 +13,6 @@ import click
 
 class AptLockError(Exception):
     """Custom exception for apt lock errors"""
-
-    pass
 
 
 class SystemHelper:
@@ -391,8 +388,7 @@ class SecretsManager:
         try:
             # the final location
             with open(secrets_file, "w") as f:
-                for key, value in self._secrets.items():
-                    f.write(f'{key}="{value}"\n')
+                f.writelines(f'{key}="{value}"\n' for key, value in self._secrets.items())
 
             SystemHelper.run_command(f"chown {self.user}:{self.user} {secrets_file}")
             SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")

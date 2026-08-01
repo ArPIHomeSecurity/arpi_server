@@ -1,6 +1,6 @@
-from dataclasses import asdict
 import json
 import os
+from dataclasses import asdict
 from typing import Annotated
 
 from fastmcp import Context, FastMCP
@@ -25,7 +25,6 @@ from server.services.output import OutputService
 from server.services.sensor import SensorService
 from server.services.zone import ZoneService
 from server.version import __version__
-
 
 monitoring_mcp = FastMCP("ArPI - monitoring service")
 

@@ -3,10 +3,11 @@ import logging
 import lgpio
 from gpiozero import MCP3008
 
-from utils.constants import LOG_ADSENSOR
 from monitor.adapters import V3BoardPin
-
 from monitor.adapters.sensor_base import SensorAdapterBase
+from utils.constants import LOG_ADSENSOR
+
+logger = logging.getLogger(LOG_ADSENSOR)
 
 
 class SensorAdapter(SensorAdapterBase):
@@ -15,7 +16,6 @@ class SensorAdapter(SensorAdapterBase):
     """
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_ADSENSOR)
         # NOTE: We have two MCP3008 chips on CE0 (GPIO8) and CE1 (GPIO7)
         self._channel_map = [
             # (AD chip, AD channel)
@@ -49,7 +49,7 @@ class SensorAdapter(SensorAdapterBase):
                     channel=ad_channel,
                 )
             except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-                self._logger.error(
+                logger.error(
                     "Failed to init MCP3008 output=%s: %s", ad_chip, self._channels[idx], e
                 )
 
@@ -64,13 +64,13 @@ class SensorAdapter(SensorAdapterBase):
 
     def get_value(self, channel) -> float:
         if not (0 <= channel < len(self._channel_map)):
-            self._logger.error("Invalid channel number: %s", channel)
+            logger.error("Invalid channel number: %s", channel)
             return 0.0
 
         try:
             value = self._channels.get(channel).value
         except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-            self._logger.error(
+            logger.error(
                 "Read error MCP3008 chip=%s ch=%s: %s",
                 self._channel_map[channel][0],
                 self._channel_map[channel][1],
@@ -79,7 +79,7 @@ class SensorAdapter(SensorAdapterBase):
             return 0.0
         else:
             # use trace (custom low level) to avoid flooding normal logs
-            self._logger.trace("ADC Value[CH%02d]: %.5f", channel + 1, value)
+            logger.trace("ADC Value[CH%02d]: %.5f", channel + 1, value)
             return value
 
     def get_values(self):
@@ -91,7 +91,7 @@ class SensorAdapter(SensorAdapterBase):
             try:
                 channel.close()
             except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-                self._logger.warning("Error closing channel %s: %s", key, e)
+                logger.warning("Error closing channel %s: %s", key, e)
 
         self._channels.clear()
 

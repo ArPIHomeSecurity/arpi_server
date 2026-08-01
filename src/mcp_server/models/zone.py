@@ -1,5 +1,6 @@
 from enum import Enum
-from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, ARM_MIXED
+
+from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY
 
 
 class ArmType(str, Enum):

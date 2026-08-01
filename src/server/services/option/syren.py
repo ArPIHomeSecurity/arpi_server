@@ -1,4 +1,5 @@
 from dataclasses import asdict
+
 from monitor.config.helper import save_config
 from monitor.config.models import SyrenConfig
 from monitor.syren import Syren

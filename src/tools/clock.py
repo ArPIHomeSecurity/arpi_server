@@ -8,7 +8,6 @@ from subprocess import CalledProcessError, check_output, run
 
 from utils.constants import LOG_CLOCK
 
-
 TIME1970 = 2208988800
 
 
@@ -82,14 +81,14 @@ class Clock:
         network = self.get_time_ntp()
 
         if network is not None:
-            logger.info("Network time: {} => writing to hw clock".format(network))
-            run(["sudo", "date", "--set={}".format(network)])
+            logger.info(f"Network time: {network} => writing to hw clock")
+            run(["sudo", "date", f"--set={network}"])
             run(["sudo", "/sbin/hwclock", "-w", "--verbose"])
         else:
             hw = self.get_time_hw()
             if hw:
-                logger.info("HW clock time: {} => wrinting to system clock".format(hw))
-                run(["sudo", "date", "--set={}".format(hw)])
+                logger.info(f"HW clock time: {hw} => wrinting to system clock")
+                run(["sudo", "date", f"--set={hw}"])
 
     def set_clock(self, settings):
         try:
@@ -109,7 +108,7 @@ class Clock:
                 run(
                     ["sudo", "bash", "-c", "echo '{}' > /etc/timezone".format(settings["timezone"])]
                 )
-            if "datetime" in settings and settings["datetime"]:
+            if settings.get("datetime"):
                 run(["sudo", "date", "--set={}".format(settings["datetime"])])
         except (PermissionError, CalledProcessError) as e:
             logger.error("Permission denied when changing date/time and zone: %s", e)

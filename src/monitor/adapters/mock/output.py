@@ -6,10 +6,11 @@ import logging
 import os
 from threading import Lock
 
-from utils.constants import LOG_ADOUTPUT
-from monitor.adapters.mock.utils import set_output_states, get_output_states
+from monitor.adapters.mock.utils import get_output_states, set_output_states
 from monitor.adapters.output_base import OutputAdapterBase
+from utils.constants import LOG_ADOUTPUT
 
+logger = logging.getLogger(LOG_ADOUTPUT)
 
 OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
 
@@ -24,7 +25,6 @@ class OutputAdapter(OutputAdapterBase):
     """
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_ADOUTPUT)
         # Initialize shared state from file if it exists
         with _state_lock:
             try:
@@ -34,7 +34,7 @@ class OutputAdapter(OutputAdapterBase):
                     for i, state in enumerate(file_states):
                         _shared_states[i] = 1 if state else 0
             except (FileNotFoundError, OSError, ValueError):
-                self._logger.debug("Could not read initial state from file, using defaults")
+                logger.debug("Could not read initial state from file, using defaults")
 
     def is_initialized(self) -> bool:
         return True
@@ -43,7 +43,7 @@ class OutputAdapter(OutputAdapterBase):
         """
         Control output by channel number
         """
-        self._logger.debug("Control channel %d to %d", channel, state)
+        logger.debug("Control channel %d to %d", channel, state)
         with _state_lock:
             _shared_states[channel] = 1 if state else 0
             set_output_states(_shared_states)

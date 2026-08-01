@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-import os
-
 import logging
+import os
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -9,16 +8,15 @@ from time import time
 
 from cryptography import x509
 
-from utils.constants import LOG_SC_CERTBOT
 from monitor.config.models import DyndnsConfig
+from utils.constants import LOG_SC_CERTBOT
 from utils.dictionary import filter_keys
+
+logger = logging.getLogger(LOG_SC_CERTBOT)
 
 
 class Certbot:
     CERT_NAME = "arpi"
-
-    def __init__(self, logger=None):
-        self._logger = logger or logging.getLogger(LOG_SC_CERTBOT)
 
     def generate_certificate(self):
         """
@@ -26,15 +24,15 @@ class Certbot:
 
         Returns: True if the certificate was generated, False otherwise
         """
-        self._logger.info("Generating certbot certificate...")
+        logger.info("Generating certbot certificate...")
         dyndns_config = DyndnsConfig.load_config()
         if not dyndns_config.provider:
-            self._logger.info("No dynamic dns provider found")
+            logger.info("No dynamic dns provider found")
             return False
 
         tmp_config = asdict(dyndns_config)
         filter_keys(tmp_config, ["password"])
-        self._logger.info("Generate certificate with options: %s", tmp_config)
+        logger.info("Generate certificate with options: %s", tmp_config)
 
         try:
             # non interactive
@@ -61,12 +59,12 @@ class Certbot:
                 check=False,
             )
             if result.returncode:
-                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
+                logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
             else:
-                self._logger.info("Certificate issued")
+                logger.info("Certificate issued")
                 return True
         except FileNotFoundError as error:
-            self._logger.error("Missing file! %s", error)
+            logger.error("Missing file! %s", error)
 
         return False
 
@@ -76,7 +74,7 @@ class Certbot:
 
         Returns: True if the certificate was renewed, False otherwise
         """
-        self._logger.info("Renew certbot certificate")
+        logger.info("Renew certbot certificate")
         try:
             # non interactive
             result = subprocess.run(
@@ -93,13 +91,13 @@ class Certbot:
                 check=False,
             )
             if result.returncode:
-                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
+                logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
             else:
-                self._logger.info("Certificate renewed")
+                logger.info("Certificate renewed")
                 return True
 
         except FileNotFoundError as error:
-            self._logger.error("Missing file! %s", error)
+            logger.error("Missing file! %s", error)
 
         return False
 
@@ -107,7 +105,7 @@ class Certbot:
         """
         Replaces the certificate with letsencrypt
         """
-        self._logger.info("Deleting the certificate")
+        logger.info("Deleting the certificate")
         try:
             result = subprocess.run(
                 [
@@ -124,12 +122,12 @@ class Certbot:
             )
 
             if result.returncode:
-                self._logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
+                logger.error("Certbot problem: %s", result.stderr.decode("utf-8"))
             else:
-                self._logger.info("Certificate deleted")
+                logger.info("Certificate deleted")
 
         except FileNotFoundError as error:
-            self._logger.error("Missing file! %s", error)
+            logger.error("Missing file! %s", error)
 
     def _update_remote_configurations(self, enable=True):
         """
@@ -155,10 +153,10 @@ class Certbot:
         """
         dyndns_config = DyndnsConfig.load_config()
         if not dyndns_config:
-            self._logger.info("Missing dynamic dns configuration")
+            logger.info("Missing dynamic dns configuration")
             return
 
-        self._logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
+        logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
         remote_conf = os.path.expanduser("~/.local/etc/arpi-server/remote.conf")
         if os.path.isfile(remote_conf):
             with open(remote_conf, "r", encoding="utf-8") as file:
@@ -174,28 +172,28 @@ class Certbot:
                 file.writelines(lines)
 
     def _enable_configuration(self, destination_config, source_config):
-        self._logger.info("Updating configuration %s with %s", destination_config, source_config)
+        logger.info("Updating configuration %s with %s", destination_config, source_config)
         if Path(destination_config).exists():
             try:
                 subprocess.run(["sudo", "rm", destination_config], check=True)
             except subprocess.CalledProcessError as error:
-                self._logger.error("Error removing file %s: %s", destination_config, error)
+                logger.error("Error removing file %s: %s", destination_config, error)
 
         os.symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
-        self._logger.info("Disabling configuration %s", destination_config)
+        logger.info("Disabling configuration %s", destination_config)
         try:
             subprocess.run(["sudo", "rm", destination_config], check=True)
         except subprocess.CalledProcessError as error:
-            self._logger.error("Error removing file %s: %s", destination_config, error)
+            logger.error("Error removing file %s: %s", destination_config, error)
 
     def _restart_systemd_service(self, service_name):
-        self._logger.info("Restarting '%s' with systemctl", service_name)
+        logger.info("Restarting '%s' with systemctl", service_name)
         try:
             subprocess.run(["sudo", "systemctl", "restart", service_name], check=True)
         except subprocess.CalledProcessError as error:
-            self._logger.error("Failed to restart %s: %s", service_name, error)
+            logger.error("Failed to restart %s: %s", service_name, error)
 
     def check_domain_changed(self):
         """
@@ -203,7 +201,7 @@ class Certbot:
 
         Returns: True if the domain changed, False otherwise
         """
-        self._logger.info("Checking domain change")
+        logger.info("Checking domain change")
 
         cert_domain = None
         cert_path = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/cert.pem")
@@ -213,14 +211,14 @@ class Certbot:
                 cert_domain = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[
                     0
                 ].value
-                self._logger.info("Domain in certificate: %s", cert_domain)
+                logger.info("Domain in certificate: %s", cert_domain)
 
         dyndns_config = DyndnsConfig.load_config()
         if dyndns_config and dyndns_config.hostname == cert_domain:
-            self._logger.info("Domain not changed")
+            logger.info("Domain not changed")
             return False
 
-        self._logger.info("Domain changed: %s => %s", cert_domain, dyndns_config.hostname)
+        logger.info("Domain changed: %s => %s", cert_domain, dyndns_config.hostname)
         return True
 
     def check_certificate_exists(self):
@@ -229,13 +227,13 @@ class Certbot:
 
         Returns: True if the certificate exists, False otherwise
         """
-        self._logger.info("Checking if certificate exists")
+        logger.info("Checking if certificate exists")
         full_certificate = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/fullchain.pem")
         if full_certificate.is_file():
-            self._logger.debug("Certificate exists")
+            logger.debug("Certificate exists")
             return True
 
-        self._logger.info("Certificate does not exist")
+        logger.info("Certificate does not exist")
         return False
 
     def get_certificate_timestamp(self):
@@ -244,7 +242,7 @@ class Certbot:
 
         Returns: The timestamp of the certificate
         """
-        self._logger.info("Getting certificate timestamp")
+        logger.info("Getting certificate timestamp")
         full_certificate = Path(f"/etc/letsencrypt/live/{Certbot.CERT_NAME}/fullchain.pem")
         if full_certificate.is_file():
             return full_certificate.stat().st_mtime
@@ -260,37 +258,37 @@ class Certbot:
         # check if certificate already exists
         if self.check_certificate_exists():
             if self.check_domain_changed():
-                self._logger.info("Certbot certificate already exists and domain changed")
+                logger.info("Certbot certificate already exists and domain changed")
                 # replace certificate
                 self.delete_certificate()
                 self.generate_certificate()
             else:
                 # if exists and domain not changed try to renew it
-                self._logger.info("Certbot certificate exists and no change of domain")
+                logger.info("Certbot certificate exists and no change of domain")
                 self.renew_certificate()
         else:
             # if certificate doesn't exist generate one
-            self._logger.info("No certbot certificate found")
+            logger.info("No certbot certificate found")
             self.generate_certificate()
 
             if self.check_certificate_exists():
                 if Path("/usr/local/nginx/conf/sites-enabled/remote.conf").exists():
-                    self._logger.info("Using certbot certificates")
+                    logger.info("Using certbot certificates")
                 else:
-                    self._logger.info("NGINX uses self-signed certificates")
+                    logger.info("NGINX uses self-signed certificates")
                     self._update_remote_configurations(enable=True)
             else:
-                self._logger.warning("No certbot certificate found")
+                logger.warning("No certbot certificate found")
 
         # check if full_certificate file changed in the past 10 mins
         if self.check_certificate_exists():
             if self.get_certificate_timestamp() > time() - 600:
-                self._logger.info("Certificate renewed")
+                logger.info("Certificate renewed")
                 self._restart_systemd_service("mosquitto.service")
                 self._restart_systemd_service("nginx.service")
                 return True
         else:
-            self._logger.error("Certificate not renewed")
+            logger.error("Certificate not renewed")
             self._update_remote_configurations(enable=False)
             self._restart_systemd_service("mosquitto.service")
             self._restart_systemd_service("nginx.service")

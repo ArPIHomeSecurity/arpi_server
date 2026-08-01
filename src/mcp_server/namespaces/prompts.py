@@ -41,7 +41,7 @@ def add_sensor(
     enabled: bool = True,
     silent_alert: bool = False,
     monitor_period: int = None,
-    monitor_threshold=None,
+    monitor_threshold: int = 100,
     channel_type: ChannelTypes = ChannelTypes.BASIC,
     sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
     sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
@@ -53,8 +53,8 @@ def add_sensor(
         description: Optional description of the sensor.
         enabled: Whether the sensor is enabled.
         silent_alert: Whether the sensor has silent alerts.
-        monitor_period: Monitoring period for the sensor.
-        monitor_threshold: Monitoring threshold for the sensor.
+        monitor_period: Monitoring period for the sensor in seconds.
+        monitor_threshold: Monitoring threshold for the sensor in percent.
         channel_type: The channel type of the sensor.
         sensor_contact_type: The contact type of the sensor.
         sensor_eol_count: The end-of-line count for the sensor.

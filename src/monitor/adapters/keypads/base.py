@@ -2,8 +2,10 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from utils.constants import LOG_ADKEYPAD
 from monitor.adapters.keypads.delay import DelayPhase, Handler
+from utils.constants import LOG_ADKEYPAD
+
+logger = logging.getLogger(LOG_ADKEYPAD)
 
 
 class Action(Enum):
@@ -31,7 +33,6 @@ class KeypadBase(ABC):
         self._card = None
         self._function: Action = None
         self._delay: Handler = None
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
 
     def close(self):
         pass
@@ -79,11 +80,11 @@ class KeypadBase(ABC):
         return self._armed
 
     def start_delay(self, start, delay):
-        self._logger.debug("Starting delay: %s s", delay)
+        logger.debug("Starting delay: %s s", delay)
         self._delay = Handler(start, delay)
 
     def stop_delay(self):
-        self._logger.debug("Stopping delay")
+        logger.debug("Stopping delay")
         self._delay = None
 
     @abstractmethod
@@ -93,7 +94,7 @@ class KeypadBase(ABC):
     def manage_delay(self):
         if self._delay:
             beep = self._delay.do()
-            self._logger.debug("Beep type: %s", beep)
+            logger.debug("Beep type: %s", beep)
             if beep == DelayPhase.NORMAL:
                 self.beeps(1, 0.1, 0.1)
             elif beep == DelayPhase.LAST_5_SECS:
@@ -104,4 +105,4 @@ class KeypadBase(ABC):
                 self._delay = None
                 self.beeps(3, 0.1, 0.1)
             else:
-                self._logger.error("Unknown beep type!")
+                logger.error("Unknown beep type!")

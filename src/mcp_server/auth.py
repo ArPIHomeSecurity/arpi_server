@@ -4,15 +4,14 @@ JWT-based token verifier for MCP server authentication.
 
 import logging
 import os
-
 from datetime import datetime as dt
-from dateutil.tz import UTC
-from jose import jwt
+
 import jose
-
+from dateutil.tz import UTC
 from fastmcp.server.auth import AccessToken, TokenVerifier
-from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from jose import jwt
 
+from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 
 logger = logging.getLogger("server")
 

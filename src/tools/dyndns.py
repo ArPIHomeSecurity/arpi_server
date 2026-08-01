@@ -7,8 +7,8 @@ from time import sleep, time
 import requests
 from noipy.main import execute_update
 
-from utils.constants import LOG_SC_DYNDNS
 from monitor.config.models import DyndnsConfig
+from utils.constants import LOG_SC_DYNDNS
 from utils.dictionary import filter_keys
 from utils.lock import file_lock
 

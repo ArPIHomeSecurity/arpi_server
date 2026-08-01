@@ -1,15 +1,17 @@
 import logging
-from datetime import datetime
 import os
+from datetime import datetime
 from time import sleep, time
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    import RPi.GPIO as GPIO
+    from RPi import GPIO
 else:
     import monitor.adapters.mock.gpio as GPIO
 
 from monitor.adapters.keypads.base import KeypadBase
 from utils.constants import LOG_ADKEYPAD
+
+logger = logging.getLogger(LOG_ADKEYPAD)
 
 # Magic numbers
 NULL = 0x00
@@ -115,7 +117,7 @@ class Line:
     def send_receive_byte(self, byte):
         response = "0b"
         GPIO.output(self._data, 1)
-        for bit in "{0:08b}".format(byte):
+        for bit in f"{byte:08b}":
             GPIO.output(self._clock, 0)
             sleep(0.000200)
 
@@ -151,8 +153,7 @@ class DSCKeypad(KeypadBase):
     BEEP = 0x64
 
     def __init__(self, clock_pin, data_pin):
-        super(DSCKeypad, self).__init__()
-        self._logger = logging.getLogger(LOG_ADKEYPAD)
+        super().__init__()
         self._lights = Lights()
         self._line = Line(clock=clock_pin, data=data_pin)
         self._start_time = None
@@ -179,7 +180,7 @@ class DSCKeypad(KeypadBase):
         self._lights.ready = state
 
     def communicate(self):
-        self._logger.trace("Start communication DSC...")
+        logger.trace("Start communication DSC...")
         # send partition status info in every roud
         self.send_command(self.send_partition_status)
 
@@ -199,12 +200,12 @@ class DSCKeypad(KeypadBase):
         sent_bytes = self.send_command(method, param)
         safe_communication_time = BIT_PERIOD * 8 * sent_bytes + 0.008
         period = time() - start_time
-        self._logger.debug("Period: %.3f > %.3f", period, safe_communication_time)
+        logger.debug("Period: %.3f > %.3f", period, safe_communication_time)
 
         while period > safe_communication_time:
             # clear pressed button
             self._keys = []
-            self._logger.debug("RETRY: %.3f > %.3f", period, safe_communication_time)
+            logger.debug("RETRY: %.3f > %.3f", period, safe_communication_time)
             start_time = time()
             sent_bytes = self.send_command(method, param)
             period = time() - start_time
@@ -235,7 +236,7 @@ class DSCKeypad(KeypadBase):
         return sent_bytes
 
     def send_beep(self, count):
-        self._logger.debug("BEEP 0x%0X x %s", self.BEEP, count)
+        logger.debug("BEEP 0x%0X x %s", self.BEEP, count)
 
         param = 0x04
         if count == 2:
@@ -250,7 +251,7 @@ class DSCKeypad(KeypadBase):
         self._line.send_and_receive(self.add_CRC([self.BEEP, param]))
 
     def send_keybus_query(self):
-        self._logger.info("KEYBUS QUERY 0x%0X" % self.KEYBUS_QUERY)
+        logger.info("KEYBUS QUERY 0x%0X" % self.KEYBUS_QUERY)
         self._line.send_and_receive(
             [
                 self.KEYBUS_QUERY,
@@ -269,14 +270,14 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_partition_status(self):
-        self._logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
+        logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             [self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED]
         )
 
     def send_zone_status(self):
-        self._logger.debug("ZONE STATUS 0x%0X" % self.ZONE_STATUS)
+        logger.debug("ZONE STATUS 0x%0X" % self.ZONE_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0xC7, 0x02])
@@ -284,7 +285,7 @@ class DSCKeypad(KeypadBase):
 
     def send_datetime(self):
         timestamp = datetime.now()
-        self._logger.debug("DATETIME 0x%0X => %s" % (self.DATETIME_STATUS, timestamp.isoformat()))
+        logger.debug("DATETIME 0x%0X => %s" % (self.DATETIME_STATUS, timestamp.isoformat()))
 
         b1 = int((timestamp.year - 2000) / 10) << 4
         b1 |= 0x0F & ((timestamp.year - 2000) % 10)
@@ -298,7 +299,7 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_zone_lights(self):
-        self._logger.debug("ZONE LIGHTS 0x%0X" % self.ZONE_LIGHTS)
+        logger.debug("ZONE LIGHTS 0x%0X" % self.ZONE_LIGHTS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             self.add_CRC([self.ZONE_LIGHTS, led_status, 0x01, 0x65, NULL, NULL, NULL, NULL])
@@ -323,11 +324,11 @@ class DSCKeypad(KeypadBase):
                 sent += " {0:08b}".format(message["sent"])
                 received += " {0:08b}".format(message["received"])
 
-        # self._logger.debug("Sent:     {}".format(sent))
-        # self._logger.debug("Received: {}".format(received))
+        # logger.debug("Sent:     {}".format(sent))
+        # logger.debug("Received: {}".format(received))
         try:
             if self._line.conversation[4]["received"] == 0xFE:
-                self._logger.warning("!!! Unknown command !!!")
+                logger.warning("!!! Unknown command !!!")
         except (KeyError, IndexError):
             pass
 

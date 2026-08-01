@@ -8,7 +8,7 @@ from pydantic import Field
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from mcp_server.models.zone import ArmType
 from monitor.database import get_database_session
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import _UNSET, ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.zone import ZoneService
 from utils.models import Zone
 
@@ -136,19 +136,25 @@ def update_zone(
     name: Annotated[
         str | None,
         Field(description="The new name of the zone", min_length=1, max_length=Zone.NAME_LENGTH),
-    ] = None,
+    ] = _UNSET,
     description: Annotated[
         str | None, Field(description="The new description of the zone, can be a long text")
-    ] = None,
-    disarmed_delay: Annotated[int | None, Field(description="The new disarmed delay", ge=0)] = None,
+    ] = _UNSET,
+    disarmed_delay: Annotated[
+        int | None, Field(description="The new disarmed delay", ge=0)
+    ] = _UNSET,
     away_alert_delay: Annotated[
         int | None, Field(description="The new away alert delay", ge=0)
-    ] = None,
+    ] = _UNSET,
     stay_alert_delay: Annotated[
         int | None, Field(description="The new stay alert delay", ge=0)
-    ] = None,
-    away_arm_delay: Annotated[int | None, Field(description="The new away arm delay", ge=0)] = None,
-    stay_arm_delay: Annotated[int | None, Field(description="The new stay arm delay", ge=0)] = None,
+    ] = _UNSET,
+    away_arm_delay: Annotated[
+        int | None, Field(description="The new away arm delay", ge=0)
+    ] = _UNSET,
+    stay_arm_delay: Annotated[
+        int | None, Field(description="The new stay arm delay", ge=0)
+    ] = _UNSET,
 ):
     """
     Update an existing zone in the database.
@@ -177,7 +183,7 @@ def update_zone(
     }
 
     for key in list(zone_data.keys()):
-        if zone_data[key] is None:
+        if zone_data[key] is _UNSET:
             del zone_data[key]
 
     try:

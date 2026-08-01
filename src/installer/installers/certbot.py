@@ -1,6 +1,6 @@
 import click
 
-from installer.helpers import SecurityHelper, SystemHelper, PackageHelper
+from installer.helpers import PackageHelper, SecurityHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
 
 

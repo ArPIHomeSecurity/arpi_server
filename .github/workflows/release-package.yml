@@ -163,7 +163,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
-          PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           if [ -n "$PREV_TAG" ]; then
             RANGE="$PREV_TAG..HEAD"
           else

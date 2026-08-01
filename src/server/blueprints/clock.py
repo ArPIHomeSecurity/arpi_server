@@ -6,7 +6,6 @@ from server.decorators import authenticated, restrict_host
 from server.services.clock import ClockService
 from server.tools import process_ipc_response
 
-
 clock_blueprint = Blueprint("clock", __name__)
 
 

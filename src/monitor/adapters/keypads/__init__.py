@@ -1,9 +1,9 @@
 import logging
 from os import environ
 
-from utils.constants import LOG_ADKEYPAD
 from monitor.adapters import V2BoardPin, V3BoardPin
 from monitor.adapters.keypads.wiegand import WiegandKeypad
+from utils.constants import LOG_ADKEYPAD
 
 logger = logging.getLogger(LOG_ADKEYPAD)
 

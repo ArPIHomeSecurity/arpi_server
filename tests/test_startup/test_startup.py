@@ -1,7 +1,5 @@
 import os
 
-from sqlalchemy import select
-
 import pytest
 from data import create_test_no_delay_v2, create_test_no_delay_v2_armed
 from helpers import (
@@ -12,12 +10,13 @@ from helpers import (
     wait_for_monitoring_ready,
     wait_for_monitoring_state,
 )
+from sqlalchemy import select
 
 from monitor.adapters.mock.utils import set_input_state, set_input_states
 from monitor.database import get_database_session
 from monitor.sensor.detector import wiring_config
 from utils.constants import MONITORING_ALERT, MONITORING_ARMED
-from utils.models import Sensor, SensorContactTypes, ChannelTypes
+from utils.models import ChannelTypes, Sensor, SensorContactTypes
 
 
 @pytest.mark.parametrize("monitoring_state", [["monitoring_stopped", "network"]], indirect=True)
@@ -129,7 +128,7 @@ def test_monitoring_armed(device_token: str, user_token: str):
                         "alertType": "alert_away",
                         "startTime": "2026-05-02 19:09:40",
                         "endTime": None,
-                        "silent": True,
+                        "silent": False,
                         "sensors": [
                             {
                                 "sensorId": 1,
@@ -140,7 +139,7 @@ def test_monitoring_armed(device_token: str, user_token: str):
                                 "startTime": "2026-05-02 21:09:30",
                                 "endTime": None,
                                 "delay": 0,
-                                "silent": True,
+                                "silent": False,
                                 "monitorPeriod": None,
                                 "monitorThreshold": 100,
                             }

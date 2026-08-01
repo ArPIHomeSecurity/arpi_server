@@ -9,7 +9,7 @@ from pydantic import Field
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from server.services.area import AreaService
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import _UNSET, ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.sensor import ChannelConflictError, SensorService
 from server.services.zone import ZoneService
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
@@ -190,9 +190,12 @@ async def create_sensor(
     ] = True,
     silent_alert: Annotated[bool, "Whether the sensor has silent alerts enabled"] = False,
     monitor_period: Annotated[
-        int | None, Field(description="Monitoring period for the sensor", gt=0)
+        int | None, Field(description="Monitoring period for the sensor in seconds", gt=0)
     ] = None,
-    monitor_threshold: Annotated[int, "Monitoring threshold for the sensor"] = 100,
+    monitor_threshold: Annotated[
+        int | None,
+        Field(description="Monitoring threshold for the sensor in percent", gt=0, le=100),
+    ] = None,
     channel_type: Annotated[ChannelTypes, "The channel type of the sensor"] = ChannelTypes.BASIC,
     sensor_contact_type: Annotated[
         SensorContactTypes, "The contact type of the sensor"
@@ -221,8 +224,8 @@ async def create_sensor(
         description: Optional description of the sensor
         enabled: Whether the sensor is enabled
         silent_alert: Whether the sensor has silent alerts enabled
-        monitor_period: Monitoring period for the sensor
-        monitor_threshold: Monitoring threshold for the sensor
+        monitor_period: Monitoring period for the sensor in seconds
+        monitor_threshold: Monitoring threshold for the sensor in percent
         channel_type: The channel type of the sensor
         sensor_contact_type: The contact type of the sensor
         sensor_eol_count: The end-of-line count of the sensor
@@ -314,35 +317,44 @@ async def create_sensor(
 def update_sensor(
     sensor_id,
     name: Annotated[
-        str, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
-    ] = None,
-    description: Annotated[str, Field(description="The new description of the sensor")] = None,
-    channel: Annotated[int, Field(description="The new channel number for the sensor")] = None,
-    channel_type: Annotated[str, Field(description="The new channel type of the sensor")] = None,
+        str | None, Field(description="The new name of the sensor", max_length=Sensor.NAME_LENGTH)
+    ] = _UNSET,
+    description: Annotated[
+        str | None, Field(description="The new description of the sensor")
+    ] = _UNSET,
+    channel: Annotated[
+        int | None, Field(description="The new channel number for the sensor")
+    ] = _UNSET,
+    channel_type: Annotated[
+        str | None, Field(description="The new channel type of the sensor")
+    ] = _UNSET,
     sensor_contact_type: Annotated[
-        str, Field(description="The new contact type of the sensor")
-    ] = None,
+        str | None, Field(description="The new contact type of the sensor")
+    ] = _UNSET,
     sensor_eol_count: Annotated[
-        int, Field(description="The new end-of-line count of the sensor")
-    ] = None,
-    enabled: Annotated[bool, Field(description="Whether the sensor is enabled")] = None,
+        int | None, Field(description="The new end-of-line count of the sensor")
+    ] = _UNSET,
+    enabled: Annotated[bool | None, Field(description="Whether the sensor is enabled")] = _UNSET,
     zone_id: Annotated[
-        int, Field(description="The new zone ID where the sensor is located")
-    ] = None,
+        int | None, Field(description="The new zone ID where the sensor is located")
+    ] = _UNSET,
     area_id: Annotated[
-        int, Field(description="The new area ID where the sensor is located")
-    ] = None,
-    type_id: Annotated[int, Field(description="The new type ID of the sensor")] = None,
-    ui_hidden: Annotated[bool, Field(description="Whether the sensor is hidden in the UI")] = None,
+        int | None, Field(description="The new area ID where the sensor is located")
+    ] = _UNSET,
+    type_id: Annotated[int | None, Field(description="The new type ID of the sensor")] = _UNSET,
+    ui_hidden: Annotated[
+        bool | None, Field(description="Whether the sensor is hidden in the UI")
+    ] = _UNSET,
     monitor_period: Annotated[
-        int, Field(description="The new monitoring period for the sensor")
-    ] = None,
+        int | None, Field(description="The new monitoring period for the sensor in seconds", gt=0)
+    ] = _UNSET,
     monitor_threshold: Annotated[
-        int, Field(description="The new monitoring threshold for the sensor")
-    ] = None,
+        int | None,
+        Field(description="The new monitoring threshold for the sensor in percent", gt=0, le=100),
+    ] = _UNSET,
     silent_alert: Annotated[
-        bool, Field(description="Whether the sensor has silent alerts enabled")
-    ] = None,
+        bool | None, Field(description="Whether the sensor has silent alerts enabled")
+    ] = _UNSET,
 ):
     """
     Update an existing sensor in the database.
@@ -361,8 +373,8 @@ def update_sensor(
         area_id: The new area ID where the sensor is located
         type_id: The new type ID of the sensor
         ui_hidden: Whether the sensor is hidden in the UI
-        monitor_period: The new monitoring period for the sensor
-        monitor_threshold: The new monitoring threshold for the sensor
+        monitor_period: The new monitoring period for the sensor in seconds
+        monitor_threshold: The new monitoring threshold for the sensor in percent
         silent_alert: Whether the sensor has silent alerts enabled
     """
     sensor_data = {}
@@ -384,7 +396,7 @@ def update_sensor(
     }
 
     for key, value in params.items():
-        if value is not None:
+        if value is not _UNSET:
             sensor_data[key] = value
 
     try:

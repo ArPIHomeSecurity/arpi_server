@@ -4,12 +4,10 @@ import json
 import locale
 import os
 import uuid
-
 from copy import deepcopy
 from datetime import datetime as dt
 from datetime import timedelta
 from re import search
-from typing import List
 
 import bcrypt
 from dateutil.tz.tz import tzlocal
@@ -34,7 +32,7 @@ from utils.dictionary import merge_dicts, replace_keys
 
 
 def hash_code(access_code):
-    return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode("utf-8")).hexdigest()
+    return hashlib.sha256((f"{access_code}:{os.environ.get('SALT')}").encode()).hexdigest()
 
 
 def hash_code_2(plain_text: str) -> str:
@@ -206,7 +204,7 @@ class Sensor(BaseModel):
 
     reference_value = Column(Float, nullable=True)
     monitor_period = Column(Integer, nullable=True, default=None)
-    monitor_threshold = Column(Integer, nullable=True, default=100)
+    monitor_threshold = Column(Integer, nullable=True, default=None)
 
     alert = Column(Boolean, nullable=False, default=False)
     silent_alert = Column(Boolean, nullable=True, default=None)
@@ -234,11 +232,11 @@ class Sensor(BaseModel):
         area: "Area",
         name: str,
         zone: "Zone" = None,
-        description: str = None,
+        description: str | None = None,
         enabled: bool = True,
         silent_alert: bool = False,
-        monitor_period: int = None,
-        monitor_threshold=None,
+        monitor_period: int | None = None,
+        monitor_threshold: int | None = None,
         channel_type: ChannelTypes = ChannelTypes.BASIC,
         sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
@@ -468,7 +466,7 @@ class Arm(BaseModel):
 
     alert_id = Column(Integer, ForeignKey("alert.id"), nullable=True)
     alert: Mapped["Alert"] = relationship(back_populates="arm")
-    sensors: Mapped[List["ArmSensor"]] = relationship(back_populates="arm")
+    sensors: Mapped[list["ArmSensor"]] = relationship(back_populates="arm")
     user = relationship("User")
 
     disarm: Mapped["Disarm"] = relationship(back_populates="arm")

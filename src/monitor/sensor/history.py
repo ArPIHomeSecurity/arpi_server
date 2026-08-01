@@ -1,9 +1,10 @@
 import logging
 import os
-from typing import List
 
-from utils.constants import LOG_MONITOR
 from monitor.config.models import AlertSensitivityConfig
+from utils.constants import LOG_MONITOR
+
+logger = logging.getLogger(LOG_MONITOR)
 
 
 class SensorHistory:
@@ -48,7 +49,7 @@ class SensorHistory:
         if len(self._states) > self._size:
             self._states.pop(0)
 
-    def get_states(self) -> List[bool]:
+    def get_states(self) -> list[bool]:
         """
         Returns the states of the sensor history.
 
@@ -100,10 +101,9 @@ class SensorsHistory:
     DEFAULT_THRESHOLD = 100
 
     def __init__(self, sensor_count, size=DEFAULT_SIZE, threshold=DEFAULT_THRESHOLD) -> None:
-        self._sensors: List[SensorHistory] = [
+        self._sensors: list[SensorHistory] = [
             SensorHistory(size, threshold) for _ in range(sensor_count)
         ]
-        self._logger = logging.getLogger(LOG_MONITOR)
 
     def set_sensitivity(self, idx: int, size: int, threshold: int):
         """
@@ -158,7 +158,7 @@ class SensorsHistory:
             raise ValueError(f"Invalid sensor index {idx}")
         return any(self._sensors[idx].get_states())
 
-    def add_states(self, states: List[bool]):
+    def add_states(self, states: list[bool]):
         """
         Adds the given states to the sensors.
 
@@ -166,15 +166,13 @@ class SensorsHistory:
             states (List[bool]): The states to add to the sensors.
         """
         if len(states) != len(self._sensors):
-            self._logger.error(
-                "Invalid number of states! %s != %s", len(states), len(self._sensors)
-            )
+            logger.error("Invalid number of states! %s != %s", len(states), len(self._sensors))
             return
 
         for idx, sensor in enumerate(self._sensors):
             sensor.add_state(states[idx])
 
-    def get_states(self, idx) -> List[bool]:
+    def get_states(self, idx) -> list[bool]:
         """
         Returns the states of the sensor at the given index.
 

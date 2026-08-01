@@ -1,6 +1,6 @@
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import os
 
 import click
 
@@ -38,12 +38,10 @@ class BaseInstaller(ABC):
     @abstractmethod
     def install(self):
         """Install the component"""
-        pass
 
     @abstractmethod
     def get_status(self) -> dict:
         """Get component status information"""
-        pass
 
     @staticmethod
     def get_shared_directory(username) -> str | None:

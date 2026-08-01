@@ -4,23 +4,21 @@ from os import environ
 from flask import Flask, jsonify
 from flask_migrate import Migrate
 
-
 from server.blueprints.alert import alert_blueprint
 from server.blueprints.area import area_blueprint
 from server.blueprints.arm import arm_blueprint
 from server.blueprints.card import card_blueprint
 from server.blueprints.clock import clock_blueprint
-from server.blueprints.option import config_blueprint
 from server.blueprints.generic import generic_blueprint
 from server.blueprints.keypad import keypad_blueprint
 from server.blueprints.monitor import monitor_blueprint
+from server.blueprints.option import config_blueprint
 from server.blueprints.output import output_blueprint
 from server.blueprints.power import power_blueprint
 from server.blueprints.sensor import sensor_blueprint
 from server.blueprints.user import user_blueprint
 from server.blueprints.zone import zone_blueprint
 from server.database import db
-
 
 app = Flask(__name__)
 

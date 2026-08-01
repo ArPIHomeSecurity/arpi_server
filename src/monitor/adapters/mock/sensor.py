@@ -1,9 +1,11 @@
 import logging
 from os import environ
 
-from utils.constants import LOG_ADSENSOR
-from monitor.adapters.sensor_base import SensorAdapterBase
 from monitor.adapters.mock.utils import get_input_state
+from monitor.adapters.sensor_base import SensorAdapterBase
+from utils.constants import LOG_ADSENSOR
+
+logger = logging.getLogger(LOG_ADSENSOR)
 
 
 class SensorAdapter(SensorAdapterBase):
@@ -14,8 +16,7 @@ class SensorAdapter(SensorAdapterBase):
     """
 
     def __init__(self):
-        self._logger = logging.getLogger(LOG_ADSENSOR)
-        self._logger.debug("Mock SensorAdapter initialized")
+        logger.debug("Mock SensorAdapter initialized")
 
     def is_initialized(self) -> bool:
         return True
@@ -32,4 +33,4 @@ class SensorAdapter(SensorAdapterBase):
         return int(environ.get("INPUT_NUMBER", 8))
 
     def close(self):
-        self._logger.debug("Mock SensorAdapter closed")
+        logger.debug("Mock SensorAdapter closed")

@@ -3,14 +3,22 @@ Sensor monitoring and alerting.
 """
 
 import logging
-from datetime import datetime as dt, timedelta
+from datetime import datetime as dt
+from datetime import timedelta
 from os import environ
 from time import sleep
 
-from monitor.adapters.sensor import get_sensor_adapter
 from sqlalchemy import select
 
+from monitor.adapters.sensor import get_sensor_adapter
+from monitor.alert import SensorAlert
+from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
+from monitor.database import get_database_session
+from monitor.sensor.detector import detect_alert, detect_error
+from monitor.sensor.history import SensorsHistory
+from monitor.socket_io import send_sensors_error, send_sensors_state
+from monitor.storage import State, States
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -29,13 +37,8 @@ from utils.constants import (
     MONITORING_UPDATING_CONFIG,
 )
 from utils.models import AlertSensor, Arm, Sensor
-from monitor.alert import SensorAlert
-from monitor.communication.mqtt import MQTTClient
-from monitor.database import get_database_session
-from monitor.sensor.detector import detect_alert, detect_error
-from monitor.sensor.history import SensorsHistory
-from monitor.socket_io import send_sensors_error, send_sensors_state
-from monitor.storage import State, States
+
+logger = logging.getLogger(LOG_SENSORS)
 
 
 MEASUREMENT_CYCLES = 2
@@ -56,7 +59,6 @@ class SensorHandler:
     """
 
     def __init__(self, broadcaster):
-        self._logger = logging.getLogger(LOG_SENSORS)
         self._db_session = None
         self._broadcaster = broadcaster
         self._sensor_adapter = None
@@ -83,15 +85,13 @@ class SensorHandler:
         """
         Calibrate the sensors: update the reference value of the sensors.
         """
-        self._logger.info("Initialize sensor references...")
+        logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
         if len(new_references) == self._sensor_adapter.channel_count:
-            self._logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
+            logger.info("New references: %s", [float(f"{x:.3f}") for x in new_references])
             self.save_sensor_references(new_references)
         else:
-            self._logger.error(
-                "Error measure values! %s", [float(f"{x:.3f}") for x in new_references]
-            )
+            logger.error("Error measure values! %s", [float(f"{x:.3f}") for x in new_references])
 
     def has_uncalibrated_sensor(self):
         """
@@ -99,10 +99,10 @@ class SensorHandler:
         """
         for sensor in self._sensors:
             if sensor.reference_value is None and sensor.channel != -1:
-                self._logger.info("Found uncalibrated sensor: %s => %s", sensor.id, sensor.name)
+                logger.info("Found uncalibrated sensor: %s => %s", sensor.id, sensor.name)
                 return True
 
-        self._logger.info("No uncalibrated sensors found")
+        logger.info("No uncalibrated sensors found")
         return False
 
     def load_sensors(self):
@@ -120,11 +120,11 @@ class SensorHandler:
         # force reload the sensors from the database
         self._db_session.expire_all()
         self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
-        self._logger.debug("Sensors reloaded!")
+        logger.debug("Sensors reloaded!")
 
         alert_sensitivity = AlertSensitivityConfig.load_config(session=self._db_session)
 
-        # initialize the sensors history
+        # initialize the sensors history for the alert sensitivity
         sample_rate = int(environ["SAMPLE_RATE"])
         if alert_sensitivity.monitor_period is None:
             # no custom sensitivity, use instant alerts
@@ -144,8 +144,11 @@ class SensorHandler:
         # set the sensitivity of the sensors
         for idx, sensor in enumerate(self._sensors):
             if sensor.monitor_threshold is not None:
-                if sensor.monitor_period is None:
-                    # instant alert
+                if sensor.monitor_period is None and sensor.monitor_threshold is None:
+                    # keep system defaults
+                    continue
+                elif sensor.monitor_period is None and sensor.monitor_threshold == 100:
+                    # force instant alert
                     self._sensors_history.set_sensitivity(idx, 1, 100)
                 else:
                     self._sensors_history.set_sensitivity(
@@ -159,7 +162,7 @@ class SensorHandler:
 
         # verify the sensor configuration
         if len(self._sensors) > self._sensor_adapter.channel_count:
-            self._logger.info(
+            logger.info(
                 "Invalid number of sensors to monitor (Found=%s > Max=%s)",
                 len(self._sensors),
                 self._sensor_adapter.channel_count,
@@ -167,11 +170,11 @@ class SensorHandler:
             self._sensors = []
             States.set(State.MONITORING, MONITORING_INVALID_CONFIG)
         elif not self.validate_sensor_config():
-            self._logger.info("Invalid channel configuration")
+            logger.info("Invalid channel configuration")
             self._sensors = []
             States.set(State.MONITORING, MONITORING_INVALID_CONFIG)
         elif self.has_uncalibrated_sensor():
-            self._logger.info("Found sensor(s) without reference value")
+            logger.info("Found sensor(s) without reference value")
             self.calibrate_sensors()
             States.set(State.MONITORING, monitoring_state)
         else:
@@ -196,17 +199,17 @@ class SensorHandler:
         Validate the sensor configuration.
         * check if there is any sensor with the same channel
         """
-        self._logger.debug("Validating sensor configuration...")
+        logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
             if sensor.channel in channels and BOARD_VERSION == 2:
-                self._logger.debug("Channel already in use: %s", sensor.channel)
+                logger.debug("Channel already in use: %s", sensor.channel)
                 return False
             else:
                 channels.add(sensor.channel)
-                self._logger.debug("Channel added: %s", sensor.channel)
+                logger.debug("Channel added: %s", sensor.channel)
 
-        self._logger.debug("Channels: %s", channels)
+        logger.debug("Channels: %s", channels)
         return True
 
     def measure_sensor_references(self):
@@ -218,7 +221,7 @@ class SensorHandler:
             measurements.append(self._sensor_adapter.get_values())
             sleep(MEASUREMENT_TIME)
 
-        self._logger.debug("Measured values: %s", measurements)
+        logger.debug("Measured values: %s", measurements)
 
         references = {}
         for channel in range(self._sensor_adapter.channel_count):
@@ -255,7 +258,7 @@ class SensorHandler:
             value = self._sensor_adapter.get_value(sensor.channel)
 
             is_alert = detect_alert(sensor, value)
-            self._logger.trace(
+            logger.trace(
                 "Sensor %s (CH%02d) value: %s => alert: %s",
                 sensor.name,
                 sensor.channel,
@@ -268,7 +271,7 @@ class SensorHandler:
                 changes = True
 
             is_error = detect_error(sensor, value)
-            self._logger.trace(
+            logger.trace(
                 "Sensor %s (CH%02d) value: %s => error: %s",
                 sensor.name,
                 sensor.channel,
@@ -302,7 +305,7 @@ class SensorHandler:
         # save current state to avoid concurrency
         current_monitoring = States.get(State.MONITORING)
         now = dt.now()
-        self._logger.trace("Checking sensors in %s", current_monitoring)
+        logger.trace("Checking sensors in %s", current_monitoring)
 
         arm: Arm = None
         if current_monitoring == MONITORING_ARM_DELAY:
@@ -318,7 +321,7 @@ class SensorHandler:
             if not arm:
                 raise RuntimeError("No arm found in the database while in ARM_DELAY state")
 
-            self._logger.debug("Arm: %s", arm)
+            logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
             alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
@@ -335,7 +338,7 @@ class SensorHandler:
                 and alert_type is not None
                 and delay is not None
             ):
-                self._logger.warning(
+                logger.warning(
                     "Sensor %s (CH%02d) has suppressed alert! %ss%s | (%r)",
                     sensor.name,
                     sensor.channel,
@@ -360,7 +363,7 @@ class SensorHandler:
                         and arm.time.replace(tzinfo=None) + timedelta(seconds=delay) > now
                     )
                 ):
-                    self._logger.debug(
+                    logger.debug(
                         "Ignore alert on sensor(%s): %s + %s < %s",
                         sensor.id,
                         arm.time.replace(tzinfo=None),
@@ -371,7 +374,7 @@ class SensorHandler:
                     continue
 
                 # start the alert
-                self._logger.debug(
+                logger.debug(
                     "Found alerting sensor id: %s, states: %s, delay: %s, alert type: %s",
                     sensor.id,
                     self._sensors_history.get_states(idx),
@@ -379,7 +382,7 @@ class SensorHandler:
                     alert_type,
                 )
                 if alert_type is not None and delay is not None:
-                    self._logger.debug(
+                    logger.debug(
                         "Start alerting on sensor with history: %s => %s",
                         sensor,
                         self._sensors_history.get_states(idx),
@@ -390,18 +393,16 @@ class SensorHandler:
                     )
 
                 if alert_type is None:
-                    self._logger.debug(
-                        "Do not start alert on sensor: %s (no alert type)", sensor.id
-                    )
+                    logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
                 if delay is None:
-                    self._logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
+                    logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
 
             # stop alert of sensor
             elif (
                 not self._sensors_history.is_sensor_alerting(idx)
                 and sensor.id in self._alerting_sensors
             ):
-                self._logger.debug("Stop alerting sensor id: %s", sensor.id)
+                logger.debug("Stop alerting sensor id: %s", sensor.id)
                 alert_sensor = (
                     self._db_session.query(AlertSensor)
                     .filter_by(sensor_id=sensor.id, end_time=None)
@@ -409,7 +410,7 @@ class SensorHandler:
                 )
                 if alert_sensor is not None:
                     alert_sensor.end_time = dt.now()
-                    self._logger.debug(
+                    logger.debug(
                         "Cleared sensor alert: alert id=%s, sensor id=%s",
                         alert_sensor.alert_id,
                         alert_sensor.sensor_id,
@@ -417,7 +418,7 @@ class SensorHandler:
                     self._db_session.commit()
                     self._alerting_sensors.remove(sensor.id)
                 else:
-                    self._logger.debug(
+                    logger.debug(
                         "Cleared sensor alert: sensor id=%s (already closed in alert)",
                         sensor.id,
                     )
@@ -433,7 +434,7 @@ class SensorHandler:
         """
         Close the sensor handler.
         """
-        self._logger.debug("Closing sensor handler...")
+        logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
         self._mqtt_client.close()
 

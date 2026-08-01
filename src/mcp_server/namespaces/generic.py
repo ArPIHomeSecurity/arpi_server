@@ -4,7 +4,6 @@ from fastmcp import FastMCP
 
 from server.version import __version__
 
-
 generic_mcp = FastMCP("ArPI - generic service")
 
 

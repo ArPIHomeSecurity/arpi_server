@@ -8,8 +8,9 @@ from time import sleep
 
 import sqlalchemy
 from dateutil.tz.tz import tzlocal
-from utils.models import User
+
 from monitor.database import get_database_session
+from utils.models import User
 
 description = """
 Update the given user with a new registration or access code.

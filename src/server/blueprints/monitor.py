@@ -2,11 +2,11 @@ from flask import request
 from flask.blueprints import Blueprint
 from flask.json import jsonify
 
-from server.services.monitor import MonitoringService
-from utils.constants import ROLE_USER
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
+from server.services.monitor import MonitoringService
 from server.tools import process_ipc_response
+from utils.constants import ROLE_USER
 
 monitor_blueprint = Blueprint("monitor", __name__)
 

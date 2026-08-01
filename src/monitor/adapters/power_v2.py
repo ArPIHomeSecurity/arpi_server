@@ -3,9 +3,11 @@ import logging
 import lgpio
 from gpiozero import DigitalInputDevice
 
-from utils.constants import LOG_ADPOWER
 from monitor.adapters import V2BoardPin
 from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
+from utils.constants import LOG_ADPOWER
+
+logger = logging.getLogger(LOG_ADPOWER)
 
 
 class PowerAdapter:
@@ -18,14 +20,12 @@ class PowerAdapter:
         Constructor
         """
         self._sense = None
-        self._logger = logging.getLogger(LOG_ADPOWER)
-
-        self._logger.debug("Power sense creating...")
+        logger.debug("Power sense creating...")
         # the sense is on the last channel
         try:
             self._sense = DigitalInputDevice(V2BoardPin.POWER_PIN)
         except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-            self._logger.error("Failed to init DigitalInputDevice for power sense: %s", e)
+            logger.error("Failed to init DigitalInputDevice for power sense: %s", e)
             self._sense = None
 
     def is_initialized(self) -> bool:

@@ -1,8 +1,9 @@
 import os
 import subprocess
+
 import click
 
-from installer.helpers import SystemHelper, ServiceHelper, SecurityHelper
+from installer.helpers import SecurityHelper, ServiceHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")

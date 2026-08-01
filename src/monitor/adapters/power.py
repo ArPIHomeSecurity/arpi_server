@@ -3,9 +3,8 @@
 import logging
 from os import environ
 
-from utils.constants import LOG_ADPOWER
 from monitor.adapters.power_base import PowerAdapterBase
-
+from utils.constants import LOG_ADPOWER
 
 USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
 logger = logging.getLogger(LOG_ADPOWER)

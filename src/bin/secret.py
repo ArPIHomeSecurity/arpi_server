@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import os
-import logging
-import fcntl
 import argparse
+import fcntl
+import logging
+import os
 
 
 def _is_secret_defined(file_path: str, key: str) -> bool:
@@ -29,7 +29,7 @@ def _is_secret_defined(file_path: str, key: str) -> bool:
                 line = line.strip()
                 if line.startswith(f"{key}="):
                     return True
-    except (IOError, OSError):
+    except OSError:
         logging.error("Error reading %s", file_path)
         return False
 

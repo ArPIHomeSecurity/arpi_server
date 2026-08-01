@@ -5,6 +5,8 @@ Base service module providing common functionality for all services.
 from utils.constants import ARM_DISARM
 from utils.queries import get_arm_state
 
+_UNSET = object()
+
 
 class ObjectNotFound(Exception):
     """Thrown when object not found in the database."""

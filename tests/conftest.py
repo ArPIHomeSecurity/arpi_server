@@ -1,25 +1,21 @@
 # pylint: disable=wrong-import-position
-# ruff: noqa: E402
 from dotenv import load_dotenv
 
 load_dotenv(".env.pytest", override=True)
 
 import logging
 import os
-from pathlib import Path
 import subprocess
-
 from os import environ
+from pathlib import Path
 from time import sleep
 
 import pytest
-
 import requests
-
-from data import clear_database, clear_events
+from data import cleanup_database, clear_database
 from helpers.services import server_service
-from monitor.adapters.mock.utils import set_input_states
 
+from monitor.adapters.mock.utils import set_input_states
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +77,7 @@ def database_data(request, database_host):
     logger.debug("Running database initialization and data population")
     subprocess.run(["uv", "run", "flask", "--app", "server:app", "db", "upgrade"], check=True)
 
-    seed_function = getattr(request, "param")
+    seed_function = request.param
     logger.debug("Applying database seed function: %s", seed_function.__name__)
     seed_function()
 
@@ -105,9 +101,9 @@ def mqtt():
             "--name",
             "argus-mqtt-test",
             "-p",
-            "127.0.0.1:1883:1883",
+            "127.0.0.1:2883:1883",
             "-p",
-            "127.0.0.1:9001:9001",
+            "127.0.0.1:2001:9001",
             "-v",
             f"{config_path}:/mosquitto/config/mosquitto.conf:ro",
             "eclipse-mosquitto",
@@ -188,6 +184,6 @@ def reset_input_states():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def clear_arm_events():
+def cleanup_database_fixture():
     yield
-    clear_events()
+    cleanup_database()

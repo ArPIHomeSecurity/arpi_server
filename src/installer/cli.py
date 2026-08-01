@@ -17,11 +17,11 @@ import click
 
 from installer.helpers import SecretsManager
 from installer.installers import (
-    InstallerConfig,
     BaseInstaller,
     CertbotInstaller,
     DatabaseInstaller,
     HardwareInstaller,
+    InstallerConfig,
     MqttInstaller,
     NginxInstaller,
     ServiceInstaller,
@@ -166,9 +166,9 @@ def bootstrap(ctx, component):
             installer.install()
             click.echo(f"✓ '{comp}' installed successfully.")
         except Exception as e:
-            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {str(e)}")
+            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {e!s}")
             click.echo(traceback.format_exc())
-            installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
+            installer.warnings.append(f"Installation failed: {type(e).__name__}: {e!s}")
 
     click.echo(f"Bootstrap completed in {datetime.now() - start_time}")
 
@@ -225,9 +225,9 @@ def post_install(ctx, component):
             else:
                 click.echo(f"'{comp}' installer does not have post-installation steps, skipping.")
         except Exception as e:
-            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {str(e)}")
+            click.echo(f"⚠️ Failed to install '{comp}': {type(e).__name__}: {e!s}")
             click.echo(traceback.format_exc())
-            installer.warnings.append(f"Installation failed: {type(e).__name__}: {str(e)}")
+            installer.warnings.append(f"Installation failed: {type(e).__name__}: {e!s}")
 
     click.echo(f"Post-installation completed in {datetime.now() - start_time}")
 

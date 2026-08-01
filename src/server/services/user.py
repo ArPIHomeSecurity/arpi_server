@@ -61,10 +61,10 @@ class UserService(BaseService):
     def update_user(
         self,
         user_id: int,
-        name: str = None,
-        email: str = None,
-        role: str = None,
-        comment: str = None,
+        name: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+        comment: str | None = None,
     ) -> User:
         """
         Update an existing user in the database.

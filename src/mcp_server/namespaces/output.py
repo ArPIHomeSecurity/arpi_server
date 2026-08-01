@@ -1,14 +1,16 @@
 # pylint: disable=raise-missing-from
+from typing import Annotated
+
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import Field
-from typing_extensions import Annotated
 
 from mcp_server.errors import ToolChangesNotAllowed, ToolObjectNotFound
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
 from server.services.area import AreaService
 from server.services.base import (
+    _UNSET,
     ChannelConflictError,
     ConfigChangesNotAllowed,
     InvalidConfiguration,
@@ -187,14 +189,16 @@ async def update_output(
     name: Annotated[
         str, Field(description="The new name of the output", max_length=Output.NAME_LENGTH)
     ] = None,
-    description: Annotated[str | None, "The new description of the output"] = None,
-    channel: Annotated[int | None, "The new channel number for the output"] = None,
-    trigger_type: Annotated[OutputTriggerType | None, "The new trigger type for the output"] = None,
-    area_id: Annotated[int | None, "The new area ID the output belongs to"] = None,
-    delay: Annotated[int | None, "The new delay before the output is activated"] = None,
-    duration: Annotated[int | None, "The new duration the output remains active"] = None,
-    default_state: Annotated[bool | None, "The new default state of the output"] = None,
-    enabled: Annotated[bool | None, "Whether the output is enabled"] = None,
+    description: Annotated[str | None, "The new description of the output"] = _UNSET,
+    channel: Annotated[int | None, "The new channel number for the output"] = _UNSET,
+    trigger_type: Annotated[
+        OutputTriggerType | None, "The new trigger type for the output"
+    ] = _UNSET,
+    area_id: Annotated[int | None, "The new area ID the output belongs to"] = _UNSET,
+    delay: Annotated[int | None, "The new delay before the output is activated"] = _UNSET,
+    duration: Annotated[int | None, "The new duration the output remains active"] = _UNSET,
+    default_state: Annotated[bool | None, "The new default state of the output"] = _UNSET,
+    enabled: Annotated[bool | None, "Whether the output is enabled"] = _UNSET,
 ):
     """
     Update an existing output in the database.
@@ -237,7 +241,7 @@ async def update_output(
     }
 
     for key, value in params.items():
-        if value is not None:
+        if value is not _UNSET:
             kwargs[key] = value
 
     try:

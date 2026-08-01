@@ -1,24 +1,38 @@
 import logging
-
 from datetime import datetime
-from threading import Thread, Event
+from threading import Event, Thread
 
-from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
-from monitor.config.models import AlertSensitivityConfig
-from monitor.storage import States, State
+from monitor.actions import (
+    MonitoringAlertCommand,
+    MonitoringAlertDelayCommand,
+    MonitoringSabotageCommand,
+)
 from monitor.broadcast import Broadcaster
+from monitor.config.models import AlertSensitivityConfig, SyrenConfig
 from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
-from monitor.socket_io import send_syren_state, send_alert_state
+from monitor.socket_io import send_alert_state, send_syren_state
+from monitor.storage import State, States
 from monitor.syren import Syren
 from utils.constants import (
     ALERT_SABOTAGE,
+    LOG_ALERT,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_SABOTAGE,
-    LOG_ALERT,
     THREAD_ALERT,
 )
+from utils.models import Alert, AlertSensor, Arm, Disarm, Sensor
+
+logger = logging.getLogger(LOG_ALERT)
+
+
+def resolve_silent(system_silent: bool | None, sensor_silent: bool | None) -> bool:
+    if system_silent is False:
+        return False
+    if system_silent is True:
+        return sensor_silent if sensor_silent is not None else True
+    return sensor_silent if sensor_silent is not None else False
 
 
 class SensorAlert(Thread):
@@ -57,7 +71,7 @@ class SensorAlert(Thread):
 
         send_alert_state(None)
         send_syren_state(None)
-        logging.getLogger(LOG_ALERT).info("Alerts stopped")
+        logger.info("Alerts stopped")
 
     def __init__(
         self,
@@ -70,8 +84,7 @@ class SensorAlert(Thread):
         """
         Constructor
         """
-        super(SensorAlert, self).__init__(name=THREAD_ALERT)
-        self._logger = logging.getLogger(LOG_ALERT)
+        super().__init__(name=THREAD_ALERT)
         self._sensor_id = sensor_id
         self._delay = delay
         self._alert_type = alert_type
@@ -81,8 +94,8 @@ class SensorAlert(Thread):
     def run(self):
 
         start_time = datetime.now()
-        self._logger.debug("Alert prepared in arm state: %s", self._alert_type)
-        self._logger.info(
+        logger.debug("Alert prepared in arm state: %s", self._alert_type)
+        logger.info(
             "Alert prepared on sensor (id:%s) with %s seconds delay",
             self._sensor_id,
             self._delay,
@@ -90,17 +103,17 @@ class SensorAlert(Thread):
 
         if self._delay > 0:
             States.set(State.MONITORING, MONITORING_ALERT_DELAY)
-            self._broadcaster.send_message({"action": MONITORING_ALERT_DELAY})
+            self._broadcaster.send_message(MonitoringAlertDelayCommand())
 
         if self._stop_event.wait(self._delay):
-            self._logger.info(
+            logger.info(
                 "Sensor (%s) alert stopped before %s seconds delay",
                 self._sensor_id,
                 self._delay,
             )
             return
 
-        self._logger.info(
+        logger.info(
             "Alert started sensor (id:%s) after %s seconds delay",
             self._sensor_id,
             self._delay,
@@ -113,8 +126,19 @@ class SensorAlert(Thread):
             alert = self.create_alert(session)
             new_alert = True
 
+        syren_config = SyrenConfig.load_config()
+        if syren_config is None:
+            logger.info("Missing syren settings, using defaults")
+            syren_config = SyrenConfig(
+                silent=Syren.SILENT, delay=Syren.DELAY, duration=Syren.DURATION
+            )
+
         self.add_sensor_to_alert(
-            session=session, alert=alert, start_time=start_time, delay=self._delay
+            session=session,
+            alert=alert,
+            start_time=start_time,
+            delay=self._delay,
+            syren_config=syren_config,
         )
 
         # send notification only on the first sensor alert
@@ -127,13 +151,17 @@ class SensorAlert(Thread):
 
         session.close()
 
-        Syren.start_syren()
+        Syren.start_syren(
+            silent=alert.silent,
+            delay=syren_config.delay,
+            duration=syren_config.duration,
+        )
         if self._alert_type == ALERT_SABOTAGE:
             States.set(State.MONITORING, MONITORING_SABOTAGE)
-            self._broadcaster.send_message({"action": MONITORING_SABOTAGE})
+            self._broadcaster.send_message(MonitoringSabotageCommand())
         else:
             States.set(State.MONITORING, MONITORING_ALERT)
-            self._broadcaster.send_message({"action": MONITORING_ALERT})
+            self._broadcaster.send_message(MonitoringAlertCommand())
 
     def create_alert(self, session) -> Alert:
         """
@@ -148,7 +176,9 @@ class SensorAlert(Thread):
         session.commit()
         return alert
 
-    def add_sensor_to_alert(self, session, alert: Alert, start_time, delay):
+    def add_sensor_to_alert(
+        self, session, alert: Alert, start_time, delay, syren_config: SyrenConfig
+    ):
         """
         Adds a sensor to the given alert with the specified start time and delay.
         If the sensor is already added to the alert, it will not be added again.
@@ -158,7 +188,7 @@ class SensorAlert(Thread):
 
         # we can't add a sensor twice to the same alert, check database AlertSensor schema
         if already_added:
-            self._logger.debug("Sensor by id: %s already added", self._sensor_id)
+            logger.debug("Sensor by id: %s already added", self._sensor_id)
             return
 
         alert_sensor = AlertSensor(
@@ -168,14 +198,14 @@ class SensorAlert(Thread):
             description=sensor.description,
             start_time=start_time,
             delay=delay,
-            silent=sensor.silent_alert,
+            silent=resolve_silent(syren_config.silent, sensor.silent_alert),
             monitor_period=self._sensitivity.monitor_period,
             monitor_threshold=self._sensitivity.monitor_threshold,
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)
-        alert.silent = all([item.silent for item in alert.sensors])
+        alert.silent = all(item.silent for item in alert.sensors)
         session.commit()
-        self._logger.debug("Added sensor by id: %s", self._sensor_id)
+        logger.debug("Added sensor by id: %s", self._sensor_id)
 
         send_alert_state(alert.serialized)

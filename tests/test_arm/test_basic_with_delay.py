@@ -1,20 +1,19 @@
 import logging
 
-from dotenv import load_dotenv
 import pytest
-
-from monitor.adapters.mock.utils import set_input_state
-from monitor.sensor.detector import wiring_config
 from data import create_test_with_delay_v2
-from utils.models import SensorContactTypes
+from dotenv import load_dotenv
 from helpers import (
     MonitorEvent,
+    MonitorEventsClient,
     call_api,
     check_api_response,
-    MonitorEventsClient,
     wait_for_monitoring_ready,
 )
 
+from monitor.adapters.mock.utils import set_input_state
+from monitor.sensor.detector import wiring_config
+from utils.models import SensorContactTypes
 
 load_dotenv(".env.pytest")
 
@@ -226,7 +225,7 @@ def test_03_alert(device_token, user_token):
                         "alertType": "alert_away",
                         "startTime": "2026-05-17 10:45:02",
                         "endTime": None,
-                        "silent": True,
+                        "silent": False,
                         "sensors": [
                             {
                                 "sensorId": 1,
@@ -237,7 +236,7 @@ def test_03_alert(device_token, user_token):
                                 "startTime": "2026-05-17 12:44:59",
                                 "endTime": None,
                                 "delay": 3,
-                                "silent": True,
+                                "silent": False,
                                 "monitorPeriod": None,
                                 "monitorThreshold": 100,
                             }
@@ -319,7 +318,7 @@ def test_03_alert(device_token, user_token):
         assert alert["sensors"][0]["channel"] == 0
         assert alert["sensors"][0]["typeId"] == 1
         assert alert["sensors"][0]["delay"] == 3
-        assert alert["sensors"][0]["silent"] is True
+        assert alert["sensors"][0]["silent"] is False
 
         sensor_changes = event["sensorChanges"]
         assert len(sensor_changes) == 1
