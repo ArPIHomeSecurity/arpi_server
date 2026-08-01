@@ -52,3 +52,13 @@ jobs:
           else
             task test
           fi
+
+      - name: Code Coverage Report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          indicators: true
+          output: both

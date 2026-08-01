@@ -145,10 +145,26 @@ tasks:
             nginx
 
   test:
-    - uv run pytest -v {{.CLI_ARGS}}
+    desc: Run tests
+    cmds:
+      - |
+        uv run pytest \
+          -v \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=term \
+          {{.CLI_ARGS}}
 
   test-debug:
-    - uv run pytest -vv -s --setup-show {{.CLI_ARGS}}
+    desc: Run tests in debug mode
+    cmds:
+      - |
+        uv run pytest \
+          -vv \
+          -s \
+          --setup-show \
+          --maxfail=1 \
+          {{.CLI_ARGS}}
 
   list-outdated-dependencies:
     desc: List outdated dependencies

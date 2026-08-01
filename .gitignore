@@ -27,3 +27,5 @@ config.env
 *_input.json
 *_output.json
 *_keypad.json
+
+coverage.xml
