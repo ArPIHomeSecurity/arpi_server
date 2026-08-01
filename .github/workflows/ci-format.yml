@@ -1,4 +1,4 @@
-name: CI
+name: CI / Format
 
 on:
   pull_request:
@@ -7,9 +7,13 @@ on:
       - 'main'
       - 'dev_*'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  Analyze:
-    name: Analyze Code
+  Format:
+    name: Check code formatting
     if: >-
       ${{
         github.event_name == 'pull_request' ||
@@ -44,15 +48,3 @@ jobs:
       - name: Check code formatting 🎨
         run: |
           task format-check
-
-      - name: Lint code 🧹
-        run: |
-          task lint
-
-      - name: Run tests 🔍
-        run: |
-          if [ "$RUNNER_DEBUG" = "1" ]; then
-            task test-debug
-          else
-            task test
-          fi

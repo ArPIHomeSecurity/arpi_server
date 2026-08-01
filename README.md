@@ -1,6 +1,8 @@
 # ArPI Server 🛡️
 
-[![CI build](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/ci.yml/badge.svg)](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/ci.yml)
+[![Format](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/format.yml/badge.svg)](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/format.yml)
+[![Lint](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/lint.yml/badge.svg)](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/lint.yml)
+[![Test](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/test.yml/badge.svg)](https://github.com/ArPIHomeSecurity/arpi_server/actions/workflows/test.yml)
 
 The backend service of the system running on the Raspberry PI.
 

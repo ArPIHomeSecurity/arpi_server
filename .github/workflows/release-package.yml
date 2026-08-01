@@ -6,7 +6,9 @@ name: Release package
 on:
   workflow_run:
     workflows:
-      - CI
+      - CI / Format
+      - CI / Lint
+      - CI / Test
     types:
       - completed
     branches:
@@ -51,6 +53,31 @@ jobs:
       packages: write
 
     steps:
+      - name: Check all CI workflows passed for this SHA 🔎
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+            const required = ['CI / Format', 'CI / Lint', 'CI / Test'];
+
+            const { data: { workflow_runs: runs } } =
+              await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+              });
+
+            for (const name of required) {
+              const passed = runs.some(r => r.name === name && r.conclusion === 'success');
+              if (!passed) {
+                core.notice(`Waiting: "${name}" has not succeeded yet for ${sha}`);
+                core.setFailed(`Not all CI workflows have passed — skipping release.`);
+                return;
+              }
+            }
+            core.notice(`All CI workflows passed for ${sha}`);
+
       - name: Ensure manual release runs only on main branch 🚦
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
