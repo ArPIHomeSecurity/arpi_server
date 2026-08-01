@@ -64,7 +64,7 @@ class SensorService(BaseService):
         enabled: bool = True,
         silent_alert: bool | None = None,
         monitor_period: int | None = None,
-        monitor_threshold: int = 100,
+        monitor_threshold: int | None = None,
         channel_type: ChannelTypes = ChannelTypes.BASIC,
         sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,

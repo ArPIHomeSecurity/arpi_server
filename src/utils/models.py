@@ -204,7 +204,7 @@ class Sensor(BaseModel):
 
     reference_value = Column(Float, nullable=True)
     monitor_period = Column(Integer, nullable=True, default=None)
-    monitor_threshold = Column(Integer, nullable=True, default=100)
+    monitor_threshold = Column(Integer, nullable=True, default=None)
 
     alert = Column(Boolean, nullable=False, default=False)
     silent_alert = Column(Boolean, nullable=True, default=None)
