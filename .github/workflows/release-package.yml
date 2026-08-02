@@ -51,6 +51,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      models: read
 
     steps:
       - name: Check all CI workflows passed for this SHA 🔎
@@ -176,41 +177,67 @@ jobs:
           git push origin HEAD:${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.event.workflow_run.head_branch }}
           git push origin --tags
 
-      - name: Setup Node.js for Copilot CLI 🤖
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Collect commits for changelog 📋
+        id: git_log
+        run: |
+          NEW_TAG="${{ steps.get_version.outputs.simple_version }}"
+          # Find the previous stable tag by excluding the current one and all RC/pre-release tags
+          PREV_TAG="$(git tag --sort=-version:refname \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -v "^${NEW_TAG}$" \
+            | head -n 1 || true)"
 
-      - name: Install Copilot CLI 🛠️
-        run: npm install -g @github/copilot
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="$(git rev-list --max-count=20 HEAD | tail -n 1)..HEAD"
+            RANGE_LABEL="initial commits"
+          else
+            RANGE="$PREV_TAG..HEAD"
+            RANGE_LABEL="$PREV_TAG → $NEW_TAG"
+          fi
 
-      - name: Generate AI release summary ✍️
+          # Filter out automated/noise commits
+          COMMITS=$(git log --oneline "$RANGE" --no-merges \
+            | grep -v -E "GitHub Actions: bump version|^[a-f0-9]+ Bump version|^[a-f0-9]+ Lint fix|^[a-f0-9]+ Code formatted|^[a-f0-9]+ Taskfile fix" \
+            || true)
+
+          echo "range_label=$RANGE_LABEL" >> "$GITHUB_OUTPUT"
+          {
+            echo "commits<<EOF"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog with Copilot ✍️
         id: copilot_summary
         continue-on-error: true
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
-          if [ -n "$PREV_TAG" ]; then
-            RANGE="$PREV_TAG..HEAD"
-          else
-            RANGE="$(git rev-list --max-count=20 HEAD | tail -n 1)..HEAD"
+          COMMITS="${{ steps.git_log.outputs.commits }}"
+          RANGE_LABEL="${{ steps.git_log.outputs.range_label }}"
+
+          PROMPT="You are writing release notes for ArPI, a home security system project (Python/Flask/MQTT/Raspberry Pi). Based on these git commit messages, write a concise GitHub release changelog in markdown. Include: 1) a short 2-3 sentence summary paragraph, 2) a categorized bullet list grouping by Features / Bug Fixes / Testing / Tooling as relevant. Skip trivial or noisy commits. Commit list:\n\n${COMMITS}"
+
+          RESPONSE=$(curl -s --fail -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://models.inference.ai.azure.com/chat/completions" \
+            -d "$(jq -n --arg p "$PROMPT" '{model:"gpt-4o-mini",messages:[{role:"user",content:$p}],temperature:0.3,max_tokens:800}')")
+
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$SUMMARY" ]; then
+            # fallback to plain git log list when API is unavailable
+            SUMMARY="## What's Changed ($RANGE_LABEL)"$'\n\n'
+            while IFS= read -r line; do
+              SUMMARY+="- ${line#* }"$'\n'
+            done <<< "$COMMITS"
           fi
 
-          copilot -p "Summarize the key changes in git range ${RANGE}. Output markdown only with:
-          1) a short overview paragraph (max 80 words),
-          2) a bullet list of the most important changes,
-          3) a short note about version/release impact if visible.
-          Write the result to summary.md" \
-            --allow-tool='shell(git:*)' \
-            --allow-tool=write \
-            --no-ask-user
-
-          cat summary.md >> "$GITHUB_STEP_SUMMARY"
-
+          echo "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           {
             echo "summary<<EOF"
-            cat summary.md
+            echo "$SUMMARY"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -228,7 +255,7 @@ jobs:
           body: |
             ## What's Changed
 
-            ${{ steps.copilot_summary.outputs.summary && steps.copilot_summary.outputs.summary || format('This release includes the latest changes from the {0} branch.', github.event_name == 'workflow_dispatch' && github.ref_name || github.event.workflow_run.head_branch) }}
+            ${{ steps.copilot_summary.outputs.summary || format('This release includes the latest changes from the {0} branch.', github.event_name == 'workflow_dispatch' && github.ref_name || github.event.workflow_run.head_branch) }}
 
             ### Build Information
             - **Version**: ${{ steps.get_version.outputs.version }}
