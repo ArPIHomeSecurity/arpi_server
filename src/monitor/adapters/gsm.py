@@ -44,14 +44,13 @@ class GSM:
     RETRY_GAP_SECONDS = 5
     MAX_RETRY = 5
 
-    call_event = Event()
-    call_result: CallResult = None
-
     def __init__(self, pin_code, port, baud):
         self._pin_code = pin_code
         self._port = port
         self._baud = baud
         self._modem = None
+        self._call_event = Event()
+        self.call_result: CallResult = None
 
     def setup(self):
         if GSM.CONNECTS > 0:
@@ -201,115 +200,119 @@ class GSM:
             return False
         except (CmsError, CmeError) as error:
             logger.error("Failed to delete message: %s", error)
+            return False
 
-    def call(self, phone_number, call_type: CallType) -> bool:
+    def call(self, phone_number, call_type: CallType) -> CallResult:
         if not phone_number:
             logger.warning("Call phone number not defined")
-            return False
+            return CallResult.FAILED
 
         if not self._modem:
             self.setup()
 
         if not self._modem:
-            return False
+            return CallResult.FAILED
 
         logger.debug("Checking for network coverage...")
         try:
             self._modem.waitForNetworkCoverage(30)
         except CommandError as error:
             logger.error("Command error: %s", error)
-            return False
+            return CallResult.FAILED
         except InvalidStateException:
             logger.error("Modem is not in a valid state!")
             self.destroy()
-            return False
+            return CallResult.FAILED
         except TimeoutException:
             logger.error(
                 "Network signal strength is not sufficient, "
                 "please adjust modem position/antenna and try again."
             )
-            return False
+            return CallResult.FAILED
         except PortNotOpenError:
             logger.error("Modem serial port not open!")
             self.destroy()
-            return False
+            return CallResult.FAILED
 
         try:
-            GSM.call_event.clear()
+            self.call_result = None
+            self._call_event.clear()
             self._modem.dtmfpool = []
             self._modem.write("AT+VTD=5")
             if call_type == CallType.ALERT:
                 logger.info("Alert call to number='%s'", phone_number)
                 self._modem.dial(
-                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=GSM.play_alert
+                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=self.play_alert
                 )
             elif call_type == CallType.PANIC:
                 logger.info("Panic call to number='%s'", phone_number)
                 self._modem.dial(
-                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=GSM.play_panic
+                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=self.play_panic
                 )
             elif call_type == CallType.TEST:
                 logger.info("Test call to number='%s'", phone_number)
                 self._modem.dial(
-                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=GSM.play_test
+                    number=phone_number, timeout=30, callStatusUpdateCallbackFunc=self.play_test
                 )
             else:
                 logger.error("Unknown call type %s", call_type)
-                return False
+                return CallResult.FAILED
 
         except TimeoutException:
             logger.error("Failed to call: the call operation timed out")
-            return False
+            return CallResult.FAILED
         except (CmsError, CmeError) as error:
             logger.error("Failed to call: %s", error)
-            return False
+            return CallResult.FAILED
 
         # wait for callEvent finished
         logger.info("Waiting for call to finish...")
-        self.call_event.wait()
+        self._call_event.wait()
 
-        call_result = GSM.call_result
-        GSM.call_result = None
+        if self.call_result is None:
+            logger.error("Call finished with unknown result")
+            return CallResult.FAILED
 
-        # call result as text
-        logger.trace(
+        incoming_dtmf = ""
+        while True:
+            tone = self._modem.GetIncomingDTMF()
+            if tone is None:
+                break
+            incoming_dtmf += tone
+
+        logger.info(
             "Call finished with result: %s, received dtmf: %s",
-            call_result.name,
-            self._modem.dtmfpool,
+            self.call_result.name,
+            incoming_dtmf,
         )
-        if self._modem.dtmfpool == [CALL_ACKNOWLEDGED]:
+        if CALL_ACKNOWLEDGED in incoming_dtmf:
             logger.debug("Call was acknowledged")
-            call_result = CallResult.ACKNOWLEDGED
+            self.call_result = CallResult.ACKNOWLEDGED
 
-        return (
-            call_result == CallResult.ANSWERED
-            or call_result == CallResult.ACKNOWLEDGED
-            or call_result == CallResult.CANCELLED
-        )
+        return self.call_result
 
-    @property
-    def incoming_dtmf(self) -> str:
-        return "".join(self._modem.dtmfpool)
-
-    @staticmethod
-    def play_dtmf(call: Call, dtmf: str):
+    def play_dtmf(self, call: Call, dtmf: str):
         logger = logging.getLogger(LOG_ADGSM)
         logger.debug(
             "Manage call with DTMF tones: answered=%s, active=%s, state=%s",
             call.answered,
             call.active,
-            GSM.call_result,
+            self.call_result,
         )
 
         if call.answered:
             if call.active:
                 try:
-                    GSM.call_result = CallResult.ANSWERED
+                    self.call_result = CallResult.ANSWERED
                     logger.debug("Playing DTMF tones: %s", dtmf)
                     call.sendDtmfTone(dtmf)
+                    if not call.dtmfSupport:
+                        logger.warning("Call does not support DTMF")
+                        # force acknowledge if the call does not support DTMF
+                        self.call_result = CallResult.ACKNOWLEDGED
                 except TimeoutException as e:
                     logger.error("DTMF playback timeout: %s", e)
-                    GSM.call_result = CallResult.CANCELLED
+                    self.call_result = CallResult.CANCELLED
                 except InterruptedException as e:
                     # Call was ended during playback
                     logger.error(
@@ -317,7 +320,7 @@ class GSM:
                     )
                 except CommandError as e:
                     logger.error("DTMF playback failed: %s", e)
-                    GSM.call_result = CallResult.FAILED
+                    self.call_result = CallResult.FAILED
 
                 # wait for incoming dtmf
                 sleep(20)
@@ -327,36 +330,27 @@ class GSM:
                     call.hangup()
                 except CommandError as e:
                     logger.error("Hangup failed: %s", e)
-                GSM.call_event.set()
+                self._call_event.set()
         else:
             # Call is no longer active (remote party ended it)
-            if GSM.call_result is None:
+            if self.call_result is None:
                 # call was not answered
-                GSM.call_result = CallResult.BUSY
+                self.call_result = CallResult.BUSY
 
             logger.info("Call has been ended by remote party")
-            GSM.call_event.set()
+            self._call_event.set()
 
-    @staticmethod
-    def play_alert(call: Call):
-        logger = logging.getLogger(LOG_ADGSM)
+    def play_alert(self, call: Call):
         logger.debug("Manage alert call")
+        self.play_dtmf(call, "111")
 
-        GSM.play_dtmf(call, "111")
-
-    @staticmethod
-    def play_panic(call):
-        logger = logging.getLogger(LOG_ADGSM)
+    def play_panic(self, call: Call):
         logger.debug("Manage panic call")
+        self.play_dtmf(call, "00000")
 
-        GSM.play_dtmf(call, "00000")
-
-    @staticmethod
-    def play_test(call):
-        logger = logging.getLogger(LOG_ADGSM)
+    def play_test(self, call: Call):
         logger.debug("Manage test call")
-
-        GSM.play_dtmf(call, "5")
+        self.play_dtmf(call, "5")
 
     def destroy(self):
         if self._modem:

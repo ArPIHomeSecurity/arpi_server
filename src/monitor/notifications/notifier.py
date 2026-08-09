@@ -11,7 +11,7 @@ from monitor.actions import (
     MonitorStopCommand,
     MonitorUpdateConfigCommand,
 )
-from monitor.adapters.gsm import CALL_ACKNOWLEDGED, CallType
+from monitor.adapters.gsm import CallResult, CallType
 from monitor.adapters.smtp import SMTPSender
 from monitor.broadcast import Broadcaster
 from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
@@ -225,10 +225,14 @@ class Notifier(Thread):
             return False, messages
 
         if gsm_config.phone_number_1:
-            messages["phone1"] = gsm.call(gsm_config.phone_number_1, CallType.TEST)
+            call_result = gsm.call(gsm_config.phone_number_1, CallType.TEST)
+            logger.info("Test call to phone 1 result: %s", call_result)
+            messages["phone1"] = call_result == CallResult.ANSWERED
 
         if gsm_config.phone_number_2:
-            messages["phone2"] = gsm.call(gsm_config.phone_number_2, CallType.TEST)
+            call_result = gsm.call(gsm_config.phone_number_2, CallType.TEST)
+            logger.info("Test call to phone 2 result: %s", call_result)
+            messages["phone2"] = call_result == CallResult.ANSWERED
 
         gsm.destroy()
         return True, messages
@@ -422,41 +426,41 @@ class Notifier(Thread):
             notification.sms_sent2 = None
 
     def call_1(self, notification: Notification):
-        if self._gsm and getattr(self._subscriptions.call1, notification.type, False):
-            if notification.call1_sent is False:
-                notification.call1_sent = self._gsm.call(
-                    self._gsm_config.phone_number_1, CallType.ALERT
-                )
-                feedback = self._gsm.incoming_dtmf
-
-                # if the user pressed 1 (acknowledge) then we don't need to call the second number
-                if feedback == CALL_ACKNOWLEDGED:
-                    logger.info("Phone 1 acknowledged the alert")
-                    notification.call1_sent = True
-                    notification.call2_sent = None
-                elif feedback:
-                    if self.handle_call_feedback(feedback):
-                        notification.call2_sent = None
-
-        else:
+        # check if the call is enabled for this notification type
+        if self._gsm and not getattr(self._subscriptions.call1, notification.type, False):
+            # we don't need to call the first number
             notification.call1_sent = None
+            return
+
+        # check if the call was already sent
+        if notification.call1_sent is False:
+            call_status, _ = self._gsm.call(self._gsm_config.phone_number_1, CallType.ALERT)
+            # if the user acknowledged the call then we don't need to call the second number
+            if call_status == CallResult.ACKNOWLEDGED:
+                logger.info("Phone 1 acknowledged the alert")
+                # call to first number was successful
+                notification.call1_sent = True
+                # we don't need to call the second number
+                notification.call2_sent = (
+                    None if notification.call2_sent is False else notification.call2_sent
+                )
 
     def call_2(self, notification: Notification):
-        if self._gsm and getattr(self._subscriptions.call2, notification.type, False):
-            if notification.call2_sent is False:
-                notification.call2_sent = self._gsm.call(
-                    self._gsm_config.phone_number_2, CallType.ALERT
-                )
-                feedback = self._gsm.incoming_dtmf
-
-                # if the user pressed 1 (acknowledge) then we don't need to call the second number
-                logger.trace("Phone 2 feedback: %s", feedback)
-                if feedback == CALL_ACKNOWLEDGED:
-                    logger.info("Phone 2 acknowledged the alert")
-                    notification.call2_sent = True
-                    notification.call1_sent = None
-                elif feedback:
-                    if self.handle_call_feedback(feedback):
-                        notification.call1_sent = None
-        else:
+        # check if the call is enabled for this notification type
+        if self._gsm and not getattr(self._subscriptions.call2, notification.type, False):
+            # we don't need to call the second number
             notification.call2_sent = None
+            return
+
+        if notification.call2_sent is False:
+            call_status, _ = self._gsm.call(self._gsm_config.phone_number_2, CallType.ALERT)
+
+            # if the user acknowledged the call then we don't need to call the first number
+            if call_status == CallResult.ACKNOWLEDGED:
+                logger.info("Phone 2 acknowledged the alert")
+                # call to second number was successful
+                notification.call2_sent = True
+                # we don't need to call the first number
+                notification.call1_sent = (
+                    None if notification.call1_sent is False else notification.call1_sent
+                )
