@@ -7,6 +7,10 @@ from installer.installers.base import BaseInstaller, InstallerConfig
 
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
+# must stay in sync with DEFAULT_MQTT_CA_CERT in monitor.config.models
+CLIENT_CA_DIR = "/etc/arpi-server/certs"
+CLIENT_CA_CERT = f"{CLIENT_CA_DIR}/arpi_ca.crt"
+
 
 class MqttInstaller(BaseInstaller):
     """Installer for MQTT broker"""
@@ -87,6 +91,13 @@ class MqttInstaller(BaseInstaller):
             "/etc/mosquitto/certs", "mosquitto:mosquitto", "700", recursive=True
         )
 
+        # The monitor verifies the broker certificate against the CA, so it needs its own
+        # readable copy: /etc/mosquitto/certs is only accessible by the mosquitto user.
+        SystemHelper.run_command(f"mkdir -p {CLIENT_CA_DIR}")
+        SystemHelper.run_command(f"cp {ETC_DIR}/nginx/ssl/arpi_ca.crt {CLIENT_CA_CERT}")
+        SecurityHelper.set_permissions(CLIENT_CA_CERT, f"root:{self.user}", "640")
+        click.echo(f"   ✓ MQTT CA certificate installed for the monitor at {CLIENT_CA_CERT}")
+
         click.echo("   ✓ MQTT SSL self-signed certificates installed")
 
     def configure_mqtt(self):
@@ -96,6 +107,10 @@ class MqttInstaller(BaseInstaller):
         # Copy auth and logging configurations
         SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/auth.conf /etc/mosquitto/conf.d/")
         SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/logging.conf /etc/mosquitto/conf.d/")
+
+        SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/acl.conf /etc/mosquitto/acl.conf")
+        SecurityHelper.set_permissions("/etc/mosquitto/acl.conf", "mosquitto:mosquitto", "600")
+        click.echo("   ✓ MQTT access control list installed")
 
         # Create configs-available directory and copy SSL configs
         SystemHelper.run_command("mkdir -p /etc/mosquitto/configs-available/")
@@ -140,6 +155,15 @@ class MqttInstaller(BaseInstaller):
                 )
                 click.echo("   ✓ Reader MQTT password created")
 
+            argus_control_password = self.secrets_manager.get_secret("ARGUS_CONTROL_MQTT_PASSWORD")
+            if argus_control_password:
+                click.echo("   ✓ Control MQTT password already exists")
+            else:
+                argus_control_password = self.secrets_manager.generate_secret(
+                    "ARGUS_CONTROL_MQTT_PASSWORD"
+                )
+                click.echo("   ✓ Control MQTT password created")
+
             # configure password for argus user
             create_flag = "-c" if not os.path.exists("/etc/mosquitto/.passwd") else ""
             SystemHelper.run_command(
@@ -149,9 +173,14 @@ class MqttInstaller(BaseInstaller):
             SystemHelper.run_command(
                 f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader "{argus_reader_password}"'
             )
+            SystemHelper.run_command(
+                f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_control "{argus_control_password}"'
+            )
             SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
+            # the passwords must not end up in the install log, the reader and control passwords
+            # can be looked up by an administrator in the MQTT configuration of the web application
             click.echo(
-                f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}"
+                "   ✓ MQTT authentication configured for argus, argus_reader and argus_control"
             )
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
@@ -178,6 +207,8 @@ class MqttInstaller(BaseInstaller):
             "Mosquitto running": ServiceHelper.is_service_running("mosquitto"),
             "Mosquitto enabled": ServiceHelper.is_service_enabled("mosquitto"),
             "Mosquitto authentication configured": os.path.exists("/etc/mosquitto/.passwd"),
+            "Mosquitto ACL configured": os.path.exists("/etc/mosquitto/acl.conf"),
+            "MQTT CA certificate for the monitor": os.path.exists(CLIENT_CA_CERT),
             "Mosquitto SSL configured": (
                 os.path.exists("/etc/mosquitto/certs/arpi_app.crt")
                 and os.path.exists("/etc/mosquitto/certs/arpi_app.key")

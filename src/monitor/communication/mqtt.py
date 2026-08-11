@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import socket
 import ssl
 from enum import Enum
@@ -12,7 +13,7 @@ from monitor.config.models import (
     MQTTConfigInternalPublish,
     MQTTConnection,
 )
-from utils.constants import ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MQTT
+from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MQTT
 
 logger = logging.getLogger(LOG_MQTT)
 
@@ -41,14 +42,67 @@ ARPI_PREFIX = "arpi/"
 SENSOR_TOPIC_PREFIX = f"{ARPI_PREFIX}binary_sensor/"
 AREA_TOPIC_PREFIX = f"{ARPI_PREFIX}alarm_control_panel/"
 
+SYSTEM_TOPIC_NAME = "system"
+COMMAND_SUFFIX = "state/set"
+COMMAND_TOPIC_FILTER = f"{AREA_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
+
+# command payload template for home assistant: it fills in the action and the code
+COMMAND_TEMPLATE = '{"action": "{{ action }}", "code": "{{ code }}"}'
+
+# home assistant state of a panel while its exit delay is running
+ARMING_PAYLOAD = "arming"
+
+HA_ACTION_MAPPING = {
+    "ARM_AWAY": ARM_AWAY,
+    "ARM_HOME": ARM_STAY,
+    "DISARM": ARM_DISARM,
+}
+
+
+def parse_command_topic(topic) -> str | None:
+    """
+    Return the panel name of a command topic, or None if it is not a command topic.
+    """
+    suffix = f"/{COMMAND_SUFFIX}"
+    if not topic.startswith(AREA_TOPIC_PREFIX) or not topic.endswith(suffix):
+        return None
+
+    return topic[len(AREA_TOPIC_PREFIX) : -len(suffix)] or None
+
+
+def parse_command_payload(payload: bytes) -> tuple[str | None, str | None]:
+    """
+    Return the (action, code) of a command payload.
+
+    The payload contains the access code, so it must never be logged.
+    """
+    message = payload.decode("utf-8", errors="replace").strip()
+
+    try:
+        data = json.loads(message)
+    except json.JSONDecodeError:
+        # commands without a code are sent as a plain action
+        return message, None
+
+    if not isinstance(data, dict):
+        return None, None
+
+    return data.get("action"), data.get("code") or None
+
 
 class MQTTClient:
     """
     Class for publishing and subscribing to MQTT topics.
     """
 
-    def __init__(self):
+    def __init__(self, on_command=None):
+        """
+        :param on_command: called as on_command(panel_name, arm_type, code) for every
+            arm/disarm command received from the broker. Subscribing to the command
+            topics only happens when it is set.
+        """
         self._client = None
+        self._on_command = on_command
 
     def connect(self, client_id=None):
         """
@@ -95,9 +149,7 @@ class MQTTClient:
                 return
 
         if mqtt_config.tls_enabled:
-            self._client.tls_set(cert_reqs=ssl.CERT_NONE)
-            if mqtt_config.tls_insecure:
-                self._client.tls_insecure_set(True)
+            self._setup_tls(mqtt_config)
 
         host = mqtt_config.hostname
         port = mqtt_config.port
@@ -127,6 +179,41 @@ class MQTTClient:
         except Exception:
             logger.exception("Failed to connect to MQTT broker")
 
+    def _setup_tls(self, mqtt_config):
+        """
+        Configure TLS for the client.
+
+        The command topics carry the access code of the user, so the broker must be
+        authenticated: an unverified connection can be terminated by a man in the middle
+        who then reads the code and injects arm/disarm commands.
+
+        tls_insecure only turns off the *hostname* check, the certificate chain is still
+        verified. The internal connections need this, because they connect to localhost
+        while the self signed certificate is issued for arpi.local.
+        """
+        ca_certs = mqtt_config.ca_certs or None
+        if ca_certs and not os.path.exists(ca_certs):
+            # keep the alarm system working, but make the misconfiguration loud
+            logger.error(
+                "MQTT CA certificate '%s' not found, falling back to an UNVERIFIED "
+                "TLS connection! The access code sent by Home Assistant is not protected "
+                "against a man in the middle.",
+                ca_certs,
+            )
+            self._client.tls_set(cert_reqs=ssl.CERT_NONE)
+            self._client.tls_insecure_set(True)
+            return
+
+        # without an explicit CA the system certificate store is used, which is what a
+        # broker with a publicly signed certificate needs
+        self._client.tls_set(ca_certs=ca_certs, cert_reqs=ssl.CERT_REQUIRED)
+        self._client.tls_insecure_set(mqtt_config.tls_insecure)
+        logger.info(
+            "MQTT TLS configured, CA: %s hostname check: %s",
+            ca_certs or "system store",
+            not mqtt_config.tls_insecure,
+        )
+
     def close(self):
         """
         Close connection to MQTT broker.
@@ -140,6 +227,11 @@ class MQTTClient:
         Callback when connected to MQTT broker.
         """
         logger.debug("Connected with reason code: %s", reason_code)
+
+        # subscriptions are not restored automatically after a reconnect
+        if self._on_command is not None:
+            client.subscribe(COMMAND_TOPIC_FILTER, qos=1)
+            logger.info("Subscribed to MQTT command topics %s", COMMAND_TOPIC_FILTER)
 
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
@@ -160,37 +252,117 @@ class MQTTClient:
     def _on_message(self, client, userdata, msg):
         """
         Callback when message received from MQTT broker.
+
+        The payload contains the access code of the user, so it is never logged.
         """
-        logger.debug("Received MQTT message on topic %s: %s", msg.topic, msg.payload)
+        logger.debug("Received MQTT message on topic %s", msg.topic)
+
+        if self._on_command is None:
+            return
+
+        if msg.retain:
+            # A retained command is redelivered on every reconnect, so a retained disarm
+            # with a valid code would disarm the system again after every restart. Drop it
+            # and clear the topic, otherwise it comes back with the next subscription.
+            logger.warning("Ignoring retained MQTT command on topic %s", msg.topic)
+            client.publish(msg.topic, b"", qos=1, retain=True)
+            return
+
+        if not msg.payload:
+            # the empty message deleting a retained command comes back to us as well
+            return
+
+        panel_name = parse_command_topic(msg.topic)
+        if panel_name is None:
+            logger.error("Received MQTT message on unexpected topic %s", msg.topic)
+            return
+
+        action, code = parse_command_payload(msg.payload)
+        arm_type = HA_ACTION_MAPPING.get(action) if isinstance(action, str) else None
+        if arm_type is None:
+            logger.error("Received invalid MQTT command on topic %s", msg.topic)
+            return
+
+        try:
+            self._on_command(panel_name, arm_type, code)
+        except Exception:
+            logger.exception("Failed to handle MQTT command from topic %s", msg.topic)
 
     def _delete_object(self, topic_prefix):
         """
         Delete the MQTT object (config and state) with the given prefix.
         """
         logger.debug("Deleting MQTT prefix %s", topic_prefix)
-        self._client.publish(f"{topic_prefix}/config", "", qos=1, retain=False)
-        self._client.publish(f"{topic_prefix}/state", "", qos=1, retain=False)
+        # config and state are published retained, so the empty message must be
+        # retained as well to remove them from the broker - otherwise the deleted
+        # object comes back with the next home assistant reconnect
+        self._client.publish(f"{topic_prefix}/config", "", qos=1, retain=True)
+        self._client.publish(f"{topic_prefix}/state", "", qos=1, retain=True)
 
-    def publish_area_config(self, name="arpi"):
+    def _publish_panel_config(self, topic_prefix, unique_id, name):
         """
-        Publish the MQTT HomeAssistant config for the given area.
+        Publish the MQTT HomeAssistant config of an alarm control panel.
         """
-        if self._client is None:
-            return
-
-        topic_prefix = AREA_TOPIC_PREFIX + sanitize(name)
         config = json.dumps(
             {
-                "name": f"ArPI {name}",
+                "name": name,
+                "unique_id": unique_id,
+                "device": {"identifiers": [unique_id], "name": name},
                 "supported_features": ["arm_home", "arm_away"],
                 "state_topic": f"{topic_prefix}/state",
-                "command_topic": f"{topic_prefix}/state/set",
+                "command_topic": f"{topic_prefix}/{COMMAND_SUFFIX}",
+                # the access code identifies the user, so it is required for every command
+                "code": "REMOTE_CODE",
+                "code_arm_required": True,
+                "code_disarm_required": True,
+                "command_template": COMMAND_TEMPLATE,
             }
         )
 
         topic = f"{topic_prefix}/config"
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
+
+    def _publish_panel_state(self, topic_prefix, state):
+        """
+        Publish the MQTT HomeAssistant state of an alarm control panel.
+        """
+        if state == ARM_AWAY:
+            payload = "armed_away"
+        elif state == ARM_STAY:
+            payload = "armed_home"
+        elif state == ARM_DISARM:
+            payload = "disarmed"
+        elif state == ARM_MIXED:
+            # home assistant has no mixed state, report the armed areas as armed away
+            logger.info("Publishing mixed arm state as armed_away")
+            payload = "armed_away"
+        else:
+            logger.error("Unknown state %s", state)
+            return
+
+        self._publish_state_payload(topic_prefix, payload)
+
+    def _publish_state_payload(self, topic_prefix, payload):
+        """
+        Publish a raw home assistant state payload of an alarm control panel.
+        """
+        topic = f"{topic_prefix}/state"
+        logger.debug("Publishing MQTT state %s=%s", topic, payload)
+        self._client.publish(topic, payload, qos=1, retain=True)
+
+    def publish_area_config(self, area_id, name):
+        """
+        Publish the MQTT HomeAssistant config for the given area.
+        """
+        if self._client is None:
+            return
+
+        self._publish_panel_config(
+            topic_prefix=AREA_TOPIC_PREFIX + sanitize(name),
+            unique_id=f"area{area_id}",
+            name=f"ArPI {name}",
+        )
 
     def delete_area(self, name):
         """
@@ -208,19 +380,47 @@ class MQTTClient:
         if self._client is None:
             return
 
-        topic = f"{AREA_TOPIC_PREFIX}{sanitize(name)}/state"
-        if state == ARM_AWAY:
-            payload = "armed_away"
-        elif state == ARM_STAY:
-            payload = "armed_home"
-        elif state == ARM_DISARM:
-            payload = "disarmed"
-        else:
-            logger.error("Unknown state %s", state)
+        self._publish_panel_state(AREA_TOPIC_PREFIX + sanitize(name), state)
+
+    def publish_area_arming(self, name):
+        """
+        Show the area panel as arming in Home Assistant while the exit delay runs.
+        """
+        if self._client is None:
             return
 
-        logger.debug("Publishing MQTT state %s=%s", topic, payload)
-        self._client.publish(topic, payload, qos=1, retain=True)
+        self._publish_state_payload(AREA_TOPIC_PREFIX + sanitize(name), ARMING_PAYLOAD)
+
+    def publish_system_config(self):
+        """
+        Publish the MQTT HomeAssistant config of the panel controlling the whole system.
+        """
+        if self._client is None:
+            return
+
+        self._publish_panel_config(
+            topic_prefix=AREA_TOPIC_PREFIX + SYSTEM_TOPIC_NAME,
+            unique_id=SYSTEM_TOPIC_NAME,
+            name="ArPI System",
+        )
+
+    def publish_system_state(self, state):
+        """
+        Publish the MQTT HomeAssistant state of the panel controlling the whole system.
+        """
+        if self._client is None:
+            return
+
+        self._publish_panel_state(AREA_TOPIC_PREFIX + SYSTEM_TOPIC_NAME, state)
+
+    def publish_system_arming(self):
+        """
+        Show the system panel as arming in Home Assistant while the exit delay runs.
+        """
+        if self._client is None:
+            return
+
+        self._publish_state_payload(AREA_TOPIC_PREFIX + SYSTEM_TOPIC_NAME, ARMING_PAYLOAD)
 
     def publish_sensor_config(self, id, type, name):
         """

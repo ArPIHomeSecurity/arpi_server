@@ -76,8 +76,14 @@ def get_arm_state(session) -> str:
         logger.debug("Areas state %s", ARM_MIXED)
         return ARM_MIXED
 
+    # at most one armed state is left, so the query is unambiguous.
+    # the disarmed areas have to stay excluded, otherwise DISTINCT ON would return
+    # either the armed or the disarmed state depending on the row order.
     result = session.execute(
-        select(Area.arm_state).where(Area.deleted == False).distinct(Area.arm_state)
+        select(Area.arm_state)
+        .where(Area.arm_state != ARM_DISARM)
+        .where(Area.deleted == False)
+        .distinct(Area.arm_state)
     ).first()
 
     if result is None:

@@ -3,6 +3,7 @@ from dataclasses import asdict
 from monitor.config.helper import save_config
 from monitor.config.models import (
     MQTTConfigExternalPublish,
+    MQTTConfigInternalControl,
     MQTTConfigInternalRead,
     MQTTConnection,
 )
@@ -46,6 +47,12 @@ class MQTTService(BaseService):
         Get the internal MQTT broker read configuration (read-only)
         """
         return MQTTConfigInternalRead.load_config(session=self._db_session)
+
+    def get_internal_control_config(self) -> MQTTConfigInternalControl:
+        """
+        Get the internal MQTT broker read and control configuration (read-only)
+        """
+        return MQTTConfigInternalControl.load_config(session=self._db_session)
 
     def get_external_publish_config(self) -> MQTTConfigExternalPublish:
         """

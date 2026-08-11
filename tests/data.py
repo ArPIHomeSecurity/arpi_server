@@ -259,6 +259,139 @@ def create_test_no_delay_v2():
     logger.info("Database setup is complete")
 
 
+def create_test_two_areas_v2():
+    """
+    Two areas with their own sensors, without any delays.
+
+    The area created first stays disarmed in the tests and only the second one is
+    armed, so a non deterministic arm state calculation is detected.
+    """
+    session = get_database_session()
+
+    _create_users(session)
+    _create_options(session)
+    sensor_types = _create_sensor_types(session)
+
+    house = Area(name="House")
+    garage = Area(name="Garage")
+    session.add_all([house, garage])
+    logger.info(" - Created areas")
+
+    zones = create_zones(session)
+    create_sensors(
+        session, sensor_types, house, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
+    )
+
+    session.add(
+        Sensor(
+            channel=3,
+            channel_type=ChannelTypes.NORMAL,
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            sensor_type=sensor_types["Motion"],
+            area=garage,
+            zone=zones["no_delay"],
+            name="Garage",
+            description="Test garage movement sensor",
+        )
+    )
+    logger.info(" - Created garage sensor")
+
+    session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
+    logger.info("Database setup is complete")
+
+
+def create_test_two_areas_with_delay_v2():
+    """
+    Two areas with their own delayed sensors, for testing the exit delay when only a
+    part of the areas is armed or disarmed.
+    """
+    session = get_database_session()
+
+    _create_users(session)
+    _create_options(session)
+    sensor_types = _create_sensor_types(session)
+
+    house = Area(name="House")
+    garage = Area(name="Garage")
+    session.add_all([house, garage])
+    logger.info(" - Created areas")
+
+    zones = create_zones(session)
+    create_sensors(
+        session, sensor_types, house, [zones["delayed"], zones["delayed"], zones["tamper"]]
+    )
+
+    session.add(
+        Sensor(
+            channel=3,
+            channel_type=ChannelTypes.NORMAL,
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            sensor_type=sensor_types["Motion"],
+            area=garage,
+            zone=zones["delayed"],
+            name="Garage",
+            description="Test garage movement sensor",
+        )
+    )
+    logger.info(" - Created garage sensor")
+
+    session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
+    logger.info("Database setup is complete")
+
+
+def create_test_colliding_areas_v2():
+    """
+    Areas whose names collide on the MQTT topics.
+
+    "A B" and "A.B" both sanitize to "a_b" and "System" collides with the panel
+    controlling the whole system. Only "Backyard" has its own topic.
+    """
+    session = get_database_session()
+
+    _create_users(session)
+    _create_options(session)
+    sensor_types = _create_sensor_types(session)
+
+    backyard = Area(name="Backyard")
+    system = Area(name="System")
+    session.add_all([backyard, Area(name="A B"), Area(name="A.B"), system])
+    logger.info(" - Created areas")
+
+    zones = create_zones(session)
+    create_sensors(
+        session, sensor_types, backyard, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
+    )
+
+    # the colliding area needs a sensor as well, an area without sensors cannot be armed
+    session.add(
+        Sensor(
+            channel=3,
+            channel_type=ChannelTypes.NORMAL,
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            sensor_type=sensor_types["Motion"],
+            area=system,
+            zone=zones["no_delay"],
+            name="System room",
+            description="Test movement sensor in the colliding area",
+        )
+    )
+
+    session.commit()
+    engine = session.get_bind()
+    session.close()
+    engine.dispose()
+    logger.info("Database setup is complete")
+
+
 def create_test_no_delay_v2_armed():
     """
     This configuration is for basic testing with board v2 without any delays.
