@@ -171,6 +171,11 @@ class AlertSensitivityConfig(BaseConfig):
     """
 
 
+# CA certificate used to verify the internal broker, installed next to the other
+# configuration of the server. Overridable for setups with a differently placed CA.
+DEFAULT_MQTT_CA_CERT = os.environ.get("ARGUS_MQTT_CA_CERT", "/etc/arpi-server/certs/arpi_ca.crt")
+
+
 @dataclass
 class MQTTConnection(BaseConfig):
     OPTION_NAME = "mqtt"
@@ -194,7 +199,28 @@ class MQTTConfigInternalRead(BaseConfig):
     username: str = "argus_reader"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_READER_MQTT_PASSWORD"))
     tls_enabled: bool = True
+    # only turns off the hostname check, the certificate chain is still verified
     tls_insecure: bool = True
+    ca_certs: str = DEFAULT_MQTT_CA_CERT
+
+
+@dataclass
+class MQTTConfigInternalControl(BaseConfig):
+    """
+    Access configuration to the internal MQTT broker for external clients that also
+    arm and disarm, in addition to reading the state.
+    """
+
+    OPTION_NAME = "mqtt"
+    SECTION_NAME = "internal_control"
+
+    hostname: str = "arpi.local"
+    port: int = 8883
+    username: str = "argus_control"
+    password: str = field(default_factory=lambda: os.environ.get("ARGUS_CONTROL_MQTT_PASSWORD"))
+    tls_enabled: bool = True
+    tls_insecure: bool = True
+    ca_certs: str = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
@@ -211,7 +237,10 @@ class MQTTConfigInternalPublish(BaseConfig):
     username: str = "argus"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
     tls_enabled: bool = True
+    # the self signed certificate is issued for arpi.local, but we connect to localhost,
+    # so the hostname check is off while the certificate chain is still verified
     tls_insecure: bool = True
+    ca_certs: str = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
@@ -228,4 +257,8 @@ class MQTTConfigExternalPublish(BaseConfig):
     username: str = None
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
     tls_enabled: bool = True
-    tls_insecure: bool = True
+    # an external broker is reached over an untrusted network and is expected to have a
+    # publicly signed certificate, so it is verified including its hostname
+    tls_insecure: bool = False
+    # no explicit CA means the system certificate store is used
+    ca_certs: str = None

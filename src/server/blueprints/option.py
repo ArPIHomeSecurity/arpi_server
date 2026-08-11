@@ -12,6 +12,7 @@ from monitor.config.models import (
     GSMConfig,
     LocationConfig,
     MQTTConfigExternalPublish,
+    MQTTConfigInternalControl,
     MQTTConfigInternalPublish,
     MQTTConfigInternalRead,
     MQTTConnection,
@@ -82,6 +83,11 @@ def option_get(option_name, section) -> Response:
         and section == MQTTConfigInternalRead.SECTION_NAME
     ):
         value = asdict(MQTTService(db.session).get_internal_read_config())
+    elif (
+        option_name == MQTTConfigInternalControl.OPTION_NAME
+        and section == MQTTConfigInternalControl.SECTION_NAME
+    ):
+        value = asdict(MQTTService(db.session).get_internal_control_config())
     elif option_name == DyndnsConfig.OPTION_NAME and section == DyndnsConfig.SECTION_NAME:
         value = asdict(DyndnsService(db.session).get_dyndns_config())
     elif option_name == LocationConfig.OPTION_NAME and section == LocationConfig.SECTION_NAME:

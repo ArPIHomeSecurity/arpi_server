@@ -15,6 +15,7 @@ from sqlalchemy import select
 from monitor.action_handler import ActionHandler, MonitorActionResult, handle_action
 from monitor.actions import (
     MonitorArmAwayCommand,
+    MonitorArmDelayExpiredCommand,
     MonitorArmStayCommand,
     MonitorDisarmCommand,
     MonitoringAlertCommand,
@@ -81,6 +82,7 @@ class Monitor(Thread, ActionHandler):
         self._power_source = None
         self._db_session = None
         self._delay_timer = None
+        self._delay_generation = 0
         self._sensor_handler = None
         self._area_handler = None
         self._secure_connection = None
@@ -194,7 +196,7 @@ class Monitor(Thread, ActionHandler):
             send_alert_state(None)
             send_syren_state(None)
 
-        self._area_handler = AreaHandler(session=self._db_session)
+        self._area_handler = AreaHandler(session=self._db_session, broadcaster=self._broadcaster)
         self._area_handler.load_areas()
         self._area_handler.publish_areas()
 
@@ -258,6 +260,29 @@ class Monitor(Thread, ActionHandler):
         """
         self.arm_monitoring(ARM_STAY, user_id, keypad_id, use_delay, area_id)
 
+    @handle_action(MonitorArmDelayExpiredCommand())
+    def _handle_action_arm_delay_expired(self, generation):
+        """
+        The exit delay expired, publish the armed states.
+
+        Sent by the timer thread to get back onto the monitoring thread, which owns
+        the database session, see arm_system().
+        """
+        if generation != self._delay_generation:
+            # an expired timer of an arm that was replaced in the meantime
+            return
+
+        # the timer can lose the race against a disarm cancelling it, the already
+        # published disarmed state must not be overwritten in that case
+        if States.get(State.MONITORING) != MONITORING_ARM_DELAY:
+            return
+
+        States.set(State.MONITORING, MONITORING_ARMED)
+        self._area_handler.publish_arm_states()
+
+        # update output channel
+        OutputHandler.send_system_armed()
+
     @handle_action(MonitorDisarmCommand())
     def _handle_action_disarm(self, user_id, keypad_id, area_id):
         """
@@ -320,7 +345,15 @@ class Monitor(Thread, ActionHandler):
             arm_state_after = get_arm_state(self._db_session)
 
             if arm_state_before != arm_state_after:
-                self.arm_system(arm_type, use_delay=False)
+                # arming an area that arms the whole system gets the exit delay too,
+                # otherwise leaving the building would trip the sensors right away
+                self.arm_system(arm_type, use_delay)
+            elif States.get(State.MONITORING) == MONITORING_ARM_DELAY:
+                # the new area joins the running exit delay
+                self._area_handler.publish_arming()
+            else:
+                # the system was already armed, publish the new area state immediately
+                self._area_handler.publish_arm_states()
 
         if arm_changed:
             self.update_database_arm(arm_type=arm_type, user_id=user_id, keypad_id=keypad_id)
@@ -331,26 +364,40 @@ class Monitor(Thread, ActionHandler):
         """
         logger.info("Arming system to %s", arm_type)
 
+        # a new arm replaces a running exit delay, two live timers would end the
+        # delay too early
+        if self._delay_timer:
+            self._delay_timer.cancel()
+            self._delay_timer = None
+        self._delay_generation += 1
+        generation = self._delay_generation
+
         # get max delay of arm
         arm_delay = get_arm_delay(self._db_session, arm_type) if use_delay else None
 
         def stop_arm_delay():
             logger.debug("End arm delay => armed!!!")
-            States.set(State.MONITORING, MONITORING_ARMED)
+            # timer thread: no database access here, the command handler publishes
+            # the armed states on the monitoring thread
+            self._broadcaster.send_message(MonitorArmDelayExpiredCommand(generation=generation))
 
         logger.debug("Arm with delay: %s / %s", arm_delay, arm_type)
-        if arm_delay is not None:
+        # a delay of 0 means no exit delay, the system has to be armed immediately
+        if arm_delay:
             States.set(State.MONITORING, MONITORING_ARM_DELAY)
+            # home assistant shows the exit delay as arming, the armed state of the
+            # panels is only published when the delay expires
+            self._area_handler.publish_arming()
             self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
         else:
             States.set(State.MONITORING, MONITORING_ARMED)
+            self._area_handler.publish_arm_states()
 
             # update output channel
             OutputHandler.send_system_armed()
 
-        arm_state = get_arm_state(self._db_session)
-        send_arm_state(arm_state)
+        send_arm_state(get_arm_state(self._db_session))
 
     def disarm_monitoring(self, user_id, keypad_id, area_id):
         """
@@ -368,17 +415,23 @@ class Monitor(Thread, ActionHandler):
             return
 
         if area_id is not None:
-            # arm the system and the area
+            # disarm only the area, and the system if no armed area is left
             self._area_handler.change_area_arm(ARM_DISARM, area_id)
             areas_state = get_arm_state(self._db_session)
             if areas_state == ARM_DISARM:
                 self.disarm_system(user_id, keypad_id)
 
+            if States.get(State.MONITORING) == MONITORING_ARM_DELAY:
+                # the remaining areas are still in the exit delay, keep them arming
+                self._area_handler.publish_arming()
+            else:
+                self._area_handler.publish_arm_states()
             send_arm_state(areas_state)
         else:
             # disarm system and all the areas
             self._area_handler.change_areas_arm(ARM_DISARM)
             self.disarm_system(user_id, keypad_id)
+            self._area_handler.publish_arm_states()
 
     def disarm_system(self, user_id, keypad_id):
         """

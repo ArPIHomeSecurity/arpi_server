@@ -66,6 +66,7 @@ class AreaService(BaseService):
         new_area = Area(name=name)
         self._db_session.add(new_area)
         self._db_session.commit()
+        IPCClient().update_configuration()
         return new_area
 
     def update_area(self, area_id: int, area_name: str) -> Area:
@@ -88,6 +89,7 @@ class AreaService(BaseService):
 
         area.name = area_name
         self._db_session.commit()
+        IPCClient().update_configuration()
         return area
 
     def delete_area(self, area_id: int) -> None:
@@ -114,6 +116,7 @@ class AreaService(BaseService):
 
         area.deleted = True
         self._db_session.commit()
+        IPCClient().update_configuration()
 
     def arm(self, area_id: int, arm_type: str, user_id: int) -> Area:
         """

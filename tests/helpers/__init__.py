@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from time import sleep, time
 
+import paho.mqtt.client as mqtt
 import requests
 import socketio
 from deepdiff import DeepDiff
@@ -95,6 +96,14 @@ class MonitorEventsClient:
                     )
 
         return False
+
+    def assert_not_received(self, event: MonitorEvent):
+        """
+        Assert that a specific Socket.IO event has not been received so far.
+        """
+        assert not self._find_event(event), (
+            f"Socket.IO event '{event.name}' unexpectedly received at {_get_time_string()}"
+        )
 
     def wait_for_event(self, event: MonitorEvent, delay=0, timeout=10):
         """
@@ -240,3 +249,71 @@ def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
         raise RuntimeError(
             "Monitoring did not reach state '%s' within %s seconds" % (state, timeout)
         )
+
+
+class MqttStateRecorder:
+    """
+    Context manager recording every payload published to an MQTT topic.
+
+    The retained message delivered on subscribe is dropped, so the recorded
+    payloads only contain what was published while the recorder was active.
+    """
+
+    def __init__(self, topic: str, host: str = "localhost", port: int = 2883):
+        self.payloads = []
+        self._topic = topic
+        self._host = host
+        self._port = port
+        # recorders with the same client id would kick each other off the broker
+        client_id = "test_state_recorder_" + "".join(c if c.isalnum() else "_" for c in topic)
+        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
+        self._client.on_message = self._on_message
+
+    def _on_message(self, _client, _userdata, msg):
+        payload = msg.payload.decode()
+        logger.debug("Recorded MQTT state %s=%s at %s", msg.topic, payload, _get_time_string())
+        self.payloads.append(payload)
+
+    def __enter__(self):
+        self._client.connect(self._host, self._port, keepalive=10)
+        self._client.subscribe(self._topic, qos=1)
+        self._client.loop_start()
+        # let the retained message arrive, it is not part of the recording
+        sleep(0.5)
+        self.payloads.clear()
+        return self
+
+    def __exit__(self, *args):
+        self._client.loop_stop()
+        self._client.disconnect()
+
+    def wait_for(self, payload: str, after_index: int = 0, timeout: float = 10.0) -> int:
+        """
+        Wait until the payload appears at or after the given index and return its index.
+        """
+        end = time() + timeout
+        while time() < end:
+            try:
+                return self.payloads.index(payload, after_index)
+            except ValueError:
+                sleep(0.1)
+
+        raise AssertionError(
+            f"MQTT state '{payload}' not received within {timeout}s, got {self.payloads}"
+        )
+
+
+def collect_retained_messages(topic_filter: str, host="localhost", port=2883, duration=1.0):
+    """
+    Return the retained MQTT messages matching the topic filter as topic => payload.
+    """
+    messages = {}
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="test_retained_observer")
+    client.on_message = lambda _client, _userdata, msg: messages.update({msg.topic: msg.payload})
+    client.connect(host, port, keepalive=10)
+    client.subscribe(topic_filter, qos=1)
+    client.loop_start()
+    sleep(duration)
+    client.loop_stop()
+    client.disconnect()
+    return messages

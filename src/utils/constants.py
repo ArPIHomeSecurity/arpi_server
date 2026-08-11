@@ -63,6 +63,7 @@ LOGGING_MODULES = [
 # monitoring system commands
 MONITOR_ARM_AWAY = "monitor_arm_away"
 MONITOR_ARM_STAY = "monitor_arm_stay"
+MONITOR_ARM_DELAY_EXPIRED = "monitor_arm_delay_expired"
 MONITOR_DISARM = "monitor_disarm"
 MONITOR_GET_STATE = "monitor_get_state"
 MONITOR_UPDATE_CONFIG = "monitor_update_config"
