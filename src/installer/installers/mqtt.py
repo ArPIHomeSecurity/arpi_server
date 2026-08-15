@@ -5,10 +5,11 @@ import click
 from installer.helpers import PackageHelper, SecurityHelper, ServiceHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
 
+# source etc directory for configuration files
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
 # must stay in sync with DEFAULT_MQTT_CA_CERT in monitor.config.models
-CLIENT_CA_DIR = "/etc/arpi-server/certs"
+CLIENT_CA_DIR = "/home/argus/.local/etc/arpi-server/certs"
 CLIENT_CA_CERT = f"{CLIENT_CA_DIR}/arpi_ca.crt"
 
 
@@ -95,7 +96,7 @@ class MqttInstaller(BaseInstaller):
         # readable copy: /etc/mosquitto/certs is only accessible by the mosquitto user.
         SystemHelper.run_command(f"mkdir -p {CLIENT_CA_DIR}")
         SystemHelper.run_command(f"cp {ETC_DIR}/nginx/ssl/arpi_ca.crt {CLIENT_CA_CERT}")
-        SecurityHelper.set_permissions(CLIENT_CA_CERT, f"root:{self.user}", "640")
+        SecurityHelper.set_permissions(CLIENT_CA_CERT, "argus:argus", "640")
         click.echo(f"   ✓ MQTT CA certificate installed for the monitor at {CLIENT_CA_CERT}")
 
         click.echo("   ✓ MQTT SSL self-signed certificates installed")
