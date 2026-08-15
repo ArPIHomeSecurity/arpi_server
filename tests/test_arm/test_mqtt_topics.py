@@ -45,9 +45,7 @@ def test_01_colliding_areas_are_not_published(device_token):
     """
     wait_for_monitoring_ready(device_token)
 
-    panels = collect_retained_messages(
-        f"{PANEL_TOPIC_PREFIX}#", host=BROKER_HOST, port=BROKER_PORT
-    )
+    panels = collect_retained_messages(f"{PANEL_TOPIC_PREFIX}#", host=BROKER_HOST, port=BROKER_PORT)
 
     # "A B" and "A.B" both sanitize to "a_b"
     assert f"{PANEL_TOPIC_PREFIX}a_b/config" not in panels, "colliding config was published"

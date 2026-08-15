@@ -63,8 +63,7 @@ def get_internal_read_config() -> dict:
 @mqtt_option_mcp.tool(
     name="get_internal_control_config",
     description=(
-        "Get the internal MQTT broker read and control configuration "
-        "(read-only, system-managed)"
+        "Get the internal MQTT broker read and control configuration (read-only, system-managed)"
     ),
 )
 def get_internal_control_config() -> dict:
