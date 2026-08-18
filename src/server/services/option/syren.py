@@ -32,7 +32,7 @@ class SyrenService(BaseService):
 
         save_config(
             SyrenConfig.OPTION_NAME,
-            SyrenConfig.OPTION_SECTION,
+            SyrenConfig.SECTION_NAME,
             asdict(config),
             session=self._db_session,
         )
