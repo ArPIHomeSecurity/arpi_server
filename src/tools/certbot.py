@@ -8,12 +8,22 @@ from time import time
 
 from cryptography import x509
 
-from monitor.config.models import DyndnsConfig
+from monitor.config.helper import save_config
+from monitor.config.models import DEFAULT_MQTT_CA_CERT, DyndnsConfig, MQTTConfigInternalPublish, MQTTConfigExternalPublish, MQTTConnection
 from utils.constants import LOG_SC_CERTBOT
 from utils.dictionary import filter_keys
 
 logger = logging.getLogger(LOG_SC_CERTBOT)
 
+
+MOSQUITTO_CONF_DIR = "/etc/mosquitto"
+MOSQUITTO_REMOTE_AVAILABLE = f"{MOSQUITTO_CONF_DIR}/configs-available/ssl-certbot.conf"
+MOSQUITTO_SELF_SIGNED_AVAILABLE = f"{MOSQUITTO_CONF_DIR}/configs-available/ssl-self-signed.conf"
+MOSQUITTO_SSL_CONF = f"{MOSQUITTO_CONF_DIR}/conf.d/ssl.conf"
+
+NGINX_CONF_DIR = "/usr/local/nginx/conf"
+NGINX_REMOTE_AVAILABLE = f"{NGINX_CONF_DIR}/sites-available/remote.conf"
+NGINX_REMOTE_CONF = f"{NGINX_CONF_DIR}/sites-enabled/remote.conf"
 
 class Certbot:
     CERT_NAME = "arpi"
@@ -136,16 +146,44 @@ class Certbot:
         if enable:
             self._update_nginx_remote()
             self._enable_configuration(
-                "/usr/local/nginx/conf/sites-enabled/remote.conf",
-                "/usr/local/nginx/conf/sites-available/remote.conf",
+                NGINX_REMOTE_CONF,
+                NGINX_REMOTE_AVAILABLE,
             )
             self._enable_configuration(
                 "/etc/mosquitto/conf.d/ssl.conf",
                 "/etc/mosquitto/configs-available/ssl-certbot.conf",
             )
+            self._set_mqtt_ca_certificate(None)
         else:
-            self._disable_configuration("/usr/local/nginx/conf/sites-enabled/remote.conf")
+            self._disable_configuration(NGINX_REMOTE_CONF)
             self._disable_configuration("/etc/mosquitto/conf.d/ssl.conf")
+            self._set_mqtt_ca_certificate(DEFAULT_MQTT_CA_CERT)
+
+    def _set_mqtt_ca_certificate(self, ca_certificate):
+        """
+        Keep the ArPI CA configuration aligned with Mosquitto's certificate.
+        """
+        dyndns_config = DyndnsConfig.load_config()
+
+        mqtt_connection = MQTTConnection().load_config()
+
+        if mqtt_connection.external:
+            mqtt_config = MQTTConfigExternalPublish.load_config()
+            mqtt_config.ca_certs = ca_certificate
+            save_config(
+                MQTTConfigExternalPublish.OPTION_NAME,
+                MQTTConfigExternalPublish.SECTION_NAME,
+                asdict(mqtt_config),
+            )
+        else:
+            mqtt_config = MQTTConfigInternalPublish.load_config()
+            mqtt_config.hostname = dyndns_config.hostname
+            mqtt_config.ca_certs = ca_certificate
+            save_config(
+                MQTTConfigInternalPublish.OPTION_NAME,
+                MQTTConfigInternalPublish.SECTION_NAME,
+                asdict(mqtt_config),
+            )
 
     def _update_nginx_remote(self):
         """
@@ -157,6 +195,7 @@ class Certbot:
             return
 
         logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
+        # it is linked to NGINX_REMOTE_AVAILABLE
         remote_conf = os.path.expanduser("~/.local/etc/arpi-server/remote.conf")
         if os.path.isfile(remote_conf):
             with open(remote_conf, "r", encoding="utf-8") as file:
@@ -172,6 +211,9 @@ class Certbot:
                 file.writelines(lines)
 
     def _enable_configuration(self, destination_config, source_config):
+        """
+        Enables a configuration by creating a symlink from source_config to destination_config.
+        """
         logger.info("Updating configuration %s with %s", destination_config, source_config)
         if Path(destination_config).exists():
             try:
@@ -182,6 +224,9 @@ class Certbot:
         os.symlink(source_config, destination_config)
 
     def _disable_configuration(self, destination_config):
+        """
+        Disables a configuration by removing the symlink at destination_config.
+        """
         logger.info("Disabling configuration %s", destination_config)
         try:
             subprocess.run(["sudo", "rm", destination_config], check=True)
@@ -236,6 +281,42 @@ class Certbot:
         logger.info("Certificate does not exist")
         return False
 
+    def verify_configuration(self, fix=True):
+        """
+        Verify that the system configuration matches the state stored in the database
+        and fix it if they diverged (eg. certificate changed while the backend was down).
+
+        Returns: True if the configuration was changed, False otherwise
+        """
+        logger.info("Verifying certificate configuration")
+        dyndns_config = DyndnsConfig.load_config()
+        use_certbot = bool(dyndns_config.provider) and self.check_certificate_exists()
+
+        nginx_enabled = Path(NGINX_REMOTE_CONF).exists()
+        mosquitto_ssl = Path("/etc/mosquitto/conf.d/ssl.conf")
+        mosquitto_remote_enabled = (
+            mosquitto_ssl.is_symlink() and "ssl-certbot.conf" in os.readlink(mosquitto_ssl)
+        )
+
+        logger.info(
+            "Remote certificate configuration: expected=%s, nginx=%s, mosquitto=%s",
+            use_certbot,
+            nginx_enabled,
+            mosquitto_remote_enabled
+        )
+        if all(state == use_certbot for state in (nginx_enabled, mosquitto_remote_enabled)):
+            logger.info("Configuration is consistent (certbot=%s)", use_certbot)
+            return False
+
+        if not fix:
+            return False
+
+        logger.warning("Inconsistent configuration, switching certbot to: %s", use_certbot)
+        self._update_remote_configurations(enable=use_certbot)
+        self._restart_systemd_service("mosquitto.service")
+        self._restart_systemd_service("nginx.service")
+        return True
+
     def get_certificate_timestamp(self):
         """
         Get the timestamp of the certificate
@@ -272,7 +353,7 @@ class Certbot:
             self.generate_certificate()
 
             if self.check_certificate_exists():
-                if Path("/usr/local/nginx/conf/sites-enabled/remote.conf").exists():
+                if Path(NGINX_REMOTE_CONF).exists():
                     logger.info("Using certbot certificates")
                 else:
                     logger.info("NGINX uses self-signed certificates")

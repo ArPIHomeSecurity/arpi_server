@@ -14,7 +14,7 @@ from monitor.actions import (
     MonitorDisarmCommand,
 )
 from monitor.broadcast import Broadcaster
-from monitor.communication.mqtt import SYSTEM_TOPIC_NAME, MQTTClient, sanitize
+from monitor.communication.mqtt import SYSTEM_TOPIC_NAME, MQTTClient
 from monitor.database import get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_area_state
@@ -60,9 +60,32 @@ class AreaHandler:
         self._failed_code_times = []
         self._locked_out_until = 0
 
-        self._mqtt_client = MQTTClient(on_command=self._handle_mqtt_command)
+        self._mqtt_client = MQTTClient(
+            on_command=self._handle_mqtt_command,
+            topic_validator=self.is_areaname_valid,
+        )
         self._mqtt_client.connect(client_id="arpi_area")
         logger.debug("AreaHandler initialized")
+
+    def is_areaname_valid(self, item_id: int | None, item_name: str) -> bool:
+        """
+        Return whether a retained MQTT name belongs to a current area panel.
+
+        System panel => item_id=None, item_name=system
+        Area panel => item_id=area id, item_name=area name
+        """
+        if item_name == SYSTEM_TOPIC_NAME:
+            return True
+
+        with get_database_session() as session:
+            for area in session.query(Area).filter(Area.deleted == False).all():
+                if area.id == item_id:
+                    return True
+
+        logger.warning(
+            "MQTT topic '%s / %s' does not match any current area panel", item_name, item_id
+        )
+        return False
 
     def _register_code_failure(self) -> bool:
         """
@@ -90,13 +113,16 @@ class AreaHandler:
         with self._mqtt_lock:
             return monotonic() < self._locked_out_until
 
-    def _handle_mqtt_command(self, panel_name, arm_type, code):
+    def _handle_mqtt_command(self, panel_id, panel_name, arm_type, code):
         """
         Handle an arm/disarm command received from MQTT (Home Assistant).
 
         Runs on the MQTT client thread, so it must not use the database session of
         the monitoring thread. The access code identifies the user, without a valid
         code the command is dropped.
+
+        System panel => panel_id=None, panel_name=system
+        Area panel => panel_id=area id, panel_name=area name
         """
         if self._is_locked_out():
             logger.warning(
@@ -105,13 +131,18 @@ class AreaHandler:
             )
             return
 
+        if not code:
+            return
+
+        # using a new session here
+        # because the MQTT client thread cannot use the active session of the monitoring thread
         user_id = None
-        with get_database_session() as db_session:
-            user = get_user_with_access_code(db_session, code) if code else None
-            if user is not None:
+        with get_database_session() as session:
+            user = get_user_with_access_code(session, code)
+            if user:
                 user_id = user.id
 
-        if user_id is None:
+        if not user_id:
             logger.warning("Rejected MQTT command for '%s': invalid access code", panel_name)
             if self._register_code_failure():
                 logger.error(
@@ -120,20 +151,20 @@ class AreaHandler:
                 )
             return
 
-        if panel_name == SYSTEM_TOPIC_NAME:
-            area_id = None
-        else:
-            area_id = self._area_ids_by_topic.get(panel_name)
-            if area_id is None:
-                logger.error("Received MQTT command for unknown area '%s'", panel_name)
-                return
+        if panel_name != SYSTEM_TOPIC_NAME and panel_id is None:
+            logger.error(
+                "Received MQTT command for unknown area '%s' with panel id '%s'",
+                panel_name,
+                panel_id,
+            )
+            return
 
         if arm_type == ARM_AWAY:
-            command = MonitorArmAwayCommand(user_id=user_id, area_id=area_id, use_delay=True)
+            command = MonitorArmAwayCommand(user_id=user_id, area_id=panel_id, use_delay=True)
         elif arm_type == ARM_STAY:
-            command = MonitorArmStayCommand(user_id=user_id, area_id=area_id, use_delay=True)
+            command = MonitorArmStayCommand(user_id=user_id, area_id=panel_id, use_delay=True)
         elif arm_type == ARM_DISARM:
-            command = MonitorDisarmCommand(user_id=user_id, area_id=area_id)
+            command = MonitorDisarmCommand(user_id=user_id, area_id=panel_id)
         else:
             logger.error("Received MQTT command with unknown arm type '%s'", arm_type)
             return
@@ -146,29 +177,12 @@ class AreaHandler:
         )
         self._broadcaster.send_message(command)
 
-    def _has_own_topic(self, area) -> bool:
-        """
-        Return True if the area owns its MQTT topics, False if it collides with
-        another area or the system panel and must not be published.
-        """
-        return self._area_ids_by_topic.get(sanitize(area.name)) == area.id
-
-    def _panel_areas(self):
-        """
-        The areas published as their own MQTT panel.
-        """
-        return [
-            area
-            for area in self._db_session.query(Area).filter(Area.deleted == False).all()
-            if self._has_own_topic(area)
-        ]
-
     def publish_arm_states(self):
         """
         Publish the current arm states of the MQTT panels (monitoring thread only).
         """
-        for area in self._panel_areas():
-            self._mqtt_client.publish_area_state(area.name, area.arm_state)
+        for area in self._db_session.query(Area).filter(Area.deleted == False).all():
+            self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
 
         self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
 
@@ -178,11 +192,11 @@ class AreaHandler:
         only). The areas staying disarmed keep their disarmed state, they are not
         part of the running arm.
         """
-        for area in self._panel_areas():
+        for area in self._db_session.query(Area).filter(Area.deleted == False).all():
             if area.arm_state == ARM_DISARM:
-                self._mqtt_client.publish_area_state(area.name, area.arm_state)
+                self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
             else:
-                self._mqtt_client.publish_area_arming(area.name)
+                self._mqtt_client.publish_area_arming(area.id, area.name)
 
         self._mqtt_client.publish_system_arming()
 
@@ -214,59 +228,16 @@ class AreaHandler:
         """
         Load all the areas from the database.
         """
-        areas = self._db_session.query(Area).all()
-
-        area_ids_by_topic = {}
-        # sanitize() is not injective ("A B" and "A.B" both become "a_b"), so two areas can
-        # end up on the same topics. Their configs and states would overwrite each other and
-        # routing a command to either of them would be a guess, so colliding areas (including
-        # an area colliding with the system panel) are not published over MQTT at all.
-        colliding_topics = set()
+        areas = self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
         for area in areas:
-            if area.deleted:
-                continue
-
-            topic_name = sanitize(area.name)
-            if topic_name == SYSTEM_TOPIC_NAME:
-                logger.warning(
-                    "Area '%s' collides with the system panel topic, it is not available over MQTT",
-                    area.name,
-                )
-            elif topic_name in area_ids_by_topic or topic_name in colliding_topics:
-                logger.warning(
-                    "Area '%s' collides with another area on the MQTT topic '%s', "
-                    "neither of them is available over MQTT",
-                    area.name,
-                    topic_name,
-                )
-                colliding_topics.add(topic_name)
-                area_ids_by_topic.pop(topic_name, None)
-            else:
-                area_ids_by_topic[topic_name] = area.id
-
-        self._area_ids_by_topic = area_ids_by_topic
-
-        # Topics that lost their area (renamed or now colliding) keep their retained
-        # config/state on the broker: home assistant would show a ghost panel that
-        # silently ignores every command, so those topics are cleaned up. Ghosts of
-        # areas changed while the monitor was not running are not detected.
-        published_topics = set(area_ids_by_topic)
-        for topic_name in (self._published_topics | colliding_topics) - published_topics:
-            logger.info("Deleting MQTT topics of the removed area panel '%s'", topic_name)
-            self._mqtt_client.delete_area(topic_name)
-        self._published_topics = published_topics
-
-        for area in areas:
-            if not area.deleted:
-                if self._has_own_topic(area):
-                    self._mqtt_client.publish_area_config(area.id, area.name)
-                    self._mqtt_client.publish_area_state(area.name, area.arm_state)
-                send_area_state(area.serialized)
-            else:
-                self._mqtt_client.delete_area(area.name)
+            if len(areas) > 1:
+                self._mqtt_client.publish_area_config(area.id, area.name)
+                self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
+            send_area_state(area.serialized)
 
         self._mqtt_client.publish_system_config()
         self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
+        self._mqtt_client.subscribe_to_areas()
 
     def change_area_arm(self, arm_type, area_id=None) -> bool:
         """

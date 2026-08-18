@@ -68,10 +68,22 @@ class SensorHandler:
         self._mqtt_client = None
 
     def initialize(self):
-        self._mqtt_client = MQTTClient()
+        self._mqtt_client = MQTTClient(topic_validator=self.is_sensorname_valid)
         self._mqtt_client.connect(client_id="arpi_sensors")
         self._db_session = get_database_session()
         self._sensor_adapter = get_sensor_adapter()
+
+    def is_sensorname_valid(self, item_id: int | None, item_name: str):
+        """Return whether a retained MQTT name belongs to a current sensor."""
+        with get_database_session() as session:
+            for sensor in session.query(Sensor).filter(Sensor.deleted == False).all():
+                if sensor.id == item_id:
+                    return True
+
+        logger.warning(
+            "MQTT topic '%s / %s' does not match any current sensor", item_name, item_id
+        )
+        return False
 
     def update_mqtt_config(self):
         """
@@ -186,13 +198,12 @@ class SensorHandler:
         """
         Publish the sensor configuration to the MQTT.
         """
-        sensors = self._db_session.execute(select(Sensor)).scalars().all()
-        for sensor in sensors:
-            if not sensor.deleted:
-                self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
-                self._mqtt_client.publish_sensor_state(sensor.name, False)
-            else:
-                self._mqtt_client.delete_sensor(sensor.name)
+        self._sensors = self._db_session.execute(select(Sensor).filter(Sensor.deleted == False)).scalars().all()
+        for sensor in self._sensors:
+            self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
+            self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, False)
+
+        self._mqtt_client.subscribe_to_sensors()
 
     def validate_sensor_config(self):
         """
@@ -267,7 +278,7 @@ class SensorHandler:
             )
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
-                self._mqtt_client.publish_sensor_state(sensor.name, sensor.alert)
+                self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.alert)
                 changes = True
 
             is_error = detect_error(sensor, value)
@@ -280,7 +291,7 @@ class SensorHandler:
             )
             if is_error != sensor.error:
                 sensor.error = is_error
-                # self._mqtt_client.publish_sensor_state(sensor.name, sensor.error)
+                # self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.error)
                 changes = True
 
             if sensor.alert and sensor.enabled:

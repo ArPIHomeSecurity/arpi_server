@@ -31,6 +31,8 @@ class SensorState(Enum):
     ON = "ON"
 
 
+# Mapping of sensor types to Home Assistant device classes
+# See: SensorType values in data.py
 SENSOR_DEVICE_MAPPING = {
     "Motion": "motion",
     "Tamper": "tamper",
@@ -59,15 +61,28 @@ HA_ACTION_MAPPING = {
 }
 
 
-def parse_command_topic(topic) -> str | None:
+def parse_command_topic(topic) -> tuple[str | None, str | None]:
     """
-    Return the panel name of a command topic, or None if it is not a command topic.
+    Return the (panel name, panel id) of a command topic, or (None, None) if it is not a command topic.
+
+    arpi/alarm_control_panel/system/state/set -> name: system; id: none
+    arpi/alarm_control_panel/house_1/state/set -> name: house; id:1
     """
     suffix = f"/{COMMAND_SUFFIX}"
     if not topic.startswith(AREA_TOPIC_PREFIX) or not topic.endswith(suffix):
-        return None
+        return None, None
 
-    return topic[len(AREA_TOPIC_PREFIX) : -len(suffix)] or None
+    panel = topic[len(AREA_TOPIC_PREFIX) : -len(suffix)] or None
+    if panel is None:
+        return None, None
+
+    # area panel
+    if "_" in panel:
+        name, id_ = panel.rsplit("_", 1)
+        return name, id_
+
+    # system panel
+    return panel, None
 
 
 def parse_command_payload(payload: bytes) -> tuple[str | None, str | None]:
@@ -95,7 +110,7 @@ class MQTTClient:
     Class for publishing and subscribing to MQTT topics.
     """
 
-    def __init__(self, on_command=None):
+    def __init__(self, on_command=None, topic_validator=None):
         """
         :param on_command: called as on_command(panel_name, arm_type, code) for every
             arm/disarm command received from the broker. Subscribing to the command
@@ -103,6 +118,7 @@ class MQTTClient:
         """
         self._client = None
         self._on_command = on_command
+        self._topic_validator = topic_validator
 
     def connect(self, client_id=None):
         """
@@ -179,7 +195,7 @@ class MQTTClient:
         except Exception:
             logger.exception("Failed to connect to MQTT broker")
 
-    def _setup_tls(self, mqtt_config):
+    def _setup_tls(self, mqtt_config: MQTTConfigExternalPublish | MQTTConfigInternalPublish):
         """
         Configure TLS for the client.
 
@@ -191,28 +207,23 @@ class MQTTClient:
         verified. The internal connections need this, because they connect to localhost
         while the self signed certificate is issued for arpi.local.
         """
-        ca_certs = mqtt_config.ca_certs or None
-        if ca_certs and not os.path.exists(ca_certs):
-            # keep the alarm system working, but make the misconfiguration loud
-            logger.error(
-                "MQTT CA certificate '%s' not found, falling back to an UNVERIFIED "
-                "TLS connection! The access code sent by Home Assistant is not protected "
-                "against a man in the middle.",
-                ca_certs,
-            )
-            self._client.tls_set(cert_reqs=ssl.CERT_NONE)
-            self._client.tls_insecure_set(True)
-            return
-
-        # without an explicit CA the system certificate store is used, which is what a
-        # broker with a publicly signed certificate needs
-        self._client.tls_set(ca_certs=ca_certs, cert_reqs=ssl.CERT_REQUIRED)
-        self._client.tls_insecure_set(mqtt_config.tls_insecure)
         logger.info(
             "MQTT TLS configured, CA: %s hostname check: %s",
-            ca_certs or "system store",
+            mqtt_config.ca_certs or "system store",
             not mqtt_config.tls_insecure,
         )
+        if mqtt_config.ca_certs and os.path.exists(mqtt_config.ca_certs):
+            # the CA is explicitly set, so it is used instead of the system certificate store
+            self._client.tls_set(ca_certs=mqtt_config.ca_certs, cert_reqs=ssl.CERT_REQUIRED)
+            self._client.tls_insecure_set(mqtt_config.tls_insecure)
+        elif mqtt_config.ca_certs and not os.path.exists(mqtt_config.ca_certs):
+            logger.error("MQTT TLS CA file %s does not exist. No TLS will be established.", mqtt_config.ca_certs)
+        elif not mqtt_config.ca_certs:
+            # no explicit CA means the system certificate store is used, which is expected
+            self._client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+            self._client.tls_insecure_set(mqtt_config.tls_insecure)
+            return
+
 
     def close(self):
         """
@@ -233,6 +244,14 @@ class MQTTClient:
             client.subscribe(COMMAND_TOPIC_FILTER, qos=1)
             logger.info("Subscribed to MQTT command topics %s", COMMAND_TOPIC_FILTER)
 
+    def subscribe_to_areas(self):
+        if self._client is not None:
+            self._client.subscribe(f"{AREA_TOPIC_PREFIX}#", qos=1)
+
+    def subscribe_to_sensors(self):
+        if self._client is not None:
+            self._client.subscribe(f"{SENSOR_TOPIC_PREFIX}#", qos=1)
+
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
         Callback when disconnected from MQTT broker.
@@ -249,44 +268,74 @@ class MQTTClient:
             self._client.disconnect()
             self._client = None
 
-    def _on_message(self, client, userdata, msg):
+    def _on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         """
         Callback when message received from MQTT broker.
 
-        The payload contains the access code of the user, so it is never logged.
+        The payload can contain the access code of the user, so it is logged only in debug mode.
         """
-        logger.debug("Received MQTT message on topic %s", msg.topic)
+        logger.debug(
+            "Received MQTT message on topic %s(qos: %s, retain: %s): %s",
+            msg.topic,
+            msg.qos,
+            msg.retain,
+            msg.payload,
+        )
 
+        # if it is not a command topic, check for orphaned topics that must be deleted
+        if not msg.topic.endswith(COMMAND_SUFFIX):
+            self._delete_orphan(msg.topic)
+            return
+
+        # if it is a command topic, skip if no callback is set
         if self._on_command is None:
             return
 
-        if msg.retain:
+        if msg.retain and msg.topic.endswith(COMMAND_SUFFIX):
             # A retained command is redelivered on every reconnect, so a retained disarm
             # with a valid code would disarm the system again after every restart. Drop it
             # and clear the topic, otherwise it comes back with the next subscription.
+            # commands are normally not retained
             logger.warning("Ignoring retained MQTT command on topic %s", msg.topic)
             client.publish(msg.topic, b"", qos=1, retain=True)
             return
 
+        # we can't do anything with an empty payload
         if not msg.payload:
-            # the empty message deleting a retained command comes back to us as well
             return
 
-        panel_name = parse_command_topic(msg.topic)
+        panel_name, panel_id = parse_command_topic(msg.topic)
         if panel_name is None:
             logger.error("Received MQTT message on unexpected topic %s", msg.topic)
             return
 
         action, code = parse_command_payload(msg.payload)
-        arm_type = HA_ACTION_MAPPING.get(action) if isinstance(action, str) else None
+        arm_type = HA_ACTION_MAPPING.get(action, None)
         if arm_type is None:
-            logger.error("Received invalid MQTT command on topic %s", msg.topic)
+            logger.error("Received unknown action \"%s\" on topic %s", action, msg.topic)
             return
 
         try:
-            self._on_command(panel_name, arm_type, code)
-        except Exception:
+            self._on_command(panel_id, panel_name, arm_type, code)
+        except Exception: # pylint: disable=broad-except
             logger.exception("Failed to handle MQTT command from topic %s", msg.topic)
+
+    def _delete_orphan(self, topic):
+        """
+        Delete the MQTT object (config and state) if it is not a valid area or sensor.
+        """
+        # skip the non ArPI topics, they are not managed by us
+        if not topic.startswith(ARPI_PREFIX):
+            return
+
+        # skip the ArPI topics that are valid areas or sensors, they are managed by us
+        _, _, item, _ = topic.split("/")
+        item_name, item_id = item.rsplit("_", 1) if "_" in item else (item, None)
+        item_id = int(item_id) if item_id and item_id.isdigit() else None
+        if self._topic_validator is None or self._topic_validator(item_id, item_name):
+            return
+
+        self._delete_object(topic.rsplit("/", 1)[0])
 
     def _delete_object(self, topic_prefix):
         """
@@ -359,37 +408,37 @@ class MQTTClient:
             return
 
         self._publish_panel_config(
-            topic_prefix=AREA_TOPIC_PREFIX + sanitize(name),
-            unique_id=f"area{area_id}",
+            topic_prefix=f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}",
+            unique_id=f"{area_id}",
             name=f"ArPI {name}",
         )
 
-    def delete_area(self, name):
+    def delete_area(self, area_id, name):
         """
         Delete the MQTT HomeAssistant config/state for the given area.
         """
         if self._client is None:
             return
 
-        self._delete_object(f"{AREA_TOPIC_PREFIX}{sanitize(name)}")
+        self._delete_object(f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}")
 
-    def publish_area_state(self, name, state):
+    def publish_area_state(self, area_id, name, state):
         """
         Publish the MQTT HomeAssistant state for the given area.
         """
         if self._client is None:
             return
 
-        self._publish_panel_state(AREA_TOPIC_PREFIX + sanitize(name), state)
+        self._publish_panel_state(f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}", state)
 
-    def publish_area_arming(self, name):
+    def publish_area_arming(self, area_id, name):
         """
         Show the area panel as arming in Home Assistant while the exit delay runs.
         """
         if self._client is None:
             return
 
-        self._publish_state_payload(AREA_TOPIC_PREFIX + sanitize(name), ARMING_PAYLOAD)
+        self._publish_state_payload(f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}", ARMING_PAYLOAD)
 
     def publish_system_config(self):
         """
@@ -422,45 +471,45 @@ class MQTTClient:
 
         self._publish_state_payload(AREA_TOPIC_PREFIX + SYSTEM_TOPIC_NAME, ARMING_PAYLOAD)
 
-    def publish_sensor_config(self, id, type, name):
+    def publish_sensor_config(self, sensor_id, type, name):
         """
         Publish the MQTT HomeAssistant config for the given sensor.
         """
         if self._client is None:
             return
 
-        topic_prefix = SENSOR_TOPIC_PREFIX + sanitize(name)
+        topic_prefix = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}"
         config = json.dumps(
             {
-                "name": None,
+                "name": name,
                 "device_class": SENSOR_DEVICE_MAPPING[type],
                 "state_topic": f"{topic_prefix}/state",
-                "unique_id": f"sensor{id}",
-                "device": {"identifiers": [id], "name": name},
+                "unique_id": f"sensor{sensor_id}",
+                "device": {"identifiers": [sensor_id], "name": name},
             }
         )
 
         topic = f"{topic_prefix}/config"
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
-
-    def delete_sensor(self, name):
+    
+    def delete_sensor(self, sensor_id, name):
         """
         Delete the MQTT HomeAssistant config/state for the given sensor.
         """
         if self._client is None:
             return
 
-        self._delete_object(f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}")
+        self._delete_object(f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}")
 
-    def publish_sensor_state(self, name, state: bool):
+    def publish_sensor_state(self, sensor_id, name, state: bool):
         """
         Publish the MQTT HomeAssistant state for the given sensor.
         """
         if self._client is None:
             return
 
-        topic = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}/state"
+        topic = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}/state"
         payload = SensorState.ON.value if state else SensorState.OFF.value
         logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)

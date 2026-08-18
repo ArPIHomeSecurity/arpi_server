@@ -38,6 +38,7 @@ from monitor.sensor.handler import SensorHandler
 from monitor.socket_io import send_alert_state, send_arm_state, send_power_state, send_syren_state
 from monitor.storage import State, States
 from monitor.syren import Syren
+from tools.certbot import Certbot
 from utils.constants import (
     ARM_AWAY,
     ARM_DISARM,
@@ -128,6 +129,8 @@ class Monitor(Thread, ActionHandler):
         """
         # create the database session in the thread
         self._db_session = get_database_session()
+
+        Certbot().verify_configuration()
 
         # setup the states
         States.open()
