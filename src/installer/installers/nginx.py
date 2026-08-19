@@ -49,9 +49,10 @@ class NginxInstaller(BaseInstaller):
 
             nginx_source_dir = os.path.join(temp_dir, nginx_dir)
 
-            # Configure build
+            # the stream modules are required to proxy the MQTT broker on port 8883
             SystemHelper.run_command(
-                "./configure --with-http_stub_status_module --with-http_ssl_module",
+                "./configure --with-http_stub_status_module --with-http_ssl_module"
+                " --with-stream --with-stream_ssl_module",
                 cwd=nginx_source_dir,
             )
 
@@ -96,6 +97,15 @@ class NginxInstaller(BaseInstaller):
             SystemHelper.run_command(
                 "ln -s /usr/local/nginx/conf/sites-available/remote.conf /usr/local/nginx/conf/sites-enabled/remote.conf"
             )
+
+        # create stream-enabled directory and the MQTT symlink, the certificate follows
+        # the remote configuration because certbot enables them together
+        SystemHelper.run_command("mkdir -p /usr/local/nginx/conf/stream-enabled/")
+        mqtt_stream_conf = "mqtt-certbot.conf" if is_remote_enabled else "mqtt-self-signed.conf"
+        SystemHelper.run_command(
+            f"ln -s /usr/local/nginx/conf/stream-available/{mqtt_stream_conf} "
+            "/usr/local/nginx/conf/stream-enabled/mqtt.conf"
+        )
 
         # copy dhparam file
         SystemHelper.run_command(

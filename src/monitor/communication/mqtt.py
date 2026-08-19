@@ -1,3 +1,4 @@
+from collections.abc import Callable
 import json
 import logging
 import os
@@ -60,6 +61,11 @@ HA_ACTION_MAPPING = {
     "DISARM": ARM_DISARM,
 }
 
+# on_command action handler type
+OnCommandHandler = Callable[[str, str, str | None], None]
+# topic_validator type
+TopicValidator = Callable[[int | None, str], bool]
+
 
 def parse_command_topic(topic) -> tuple[str | None, str | None]:
     """
@@ -110,11 +116,14 @@ class MQTTClient:
     Class for publishing and subscribing to MQTT topics.
     """
 
-    def __init__(self, on_command=None, topic_validator=None):
+    def __init__(self, on_command: OnCommandHandler | None = None, topic_validator: TopicValidator | None = None):
         """
-        :param on_command: called as on_command(panel_name, arm_type, code) for every
+        :param on_command: called as on_command(panel_name, action, code) for every
             arm/disarm command received from the broker. Subscribing to the command
             topics only happens when it is set.
+        :param topic_validator: called as topic_validator(item_id, item_name) for every
+            area or sensor topic received from the broker. If it returns False, the
+            topic is considered orphaned and can be deleted.
         """
         self._client = None
         self._on_command = on_command
@@ -178,8 +187,8 @@ class MQTTClient:
         )
         try:
             self._client.connect(host, port, keepalive=60)
-            logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
             self._client.loop_start()
+            logger.info("MQTT client (%s) connected! %s:%s", client_id, host, port)
         except socket.gaierror:
             logger.error("Failed to resolve MQTT broker hostname %s", host)
             self._client.disconnect()
