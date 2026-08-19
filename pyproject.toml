@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 simulator = [
-    "textual~=5.3",
+    "textual~=8.2",
     "textual-dev",
 ]
 device = [
@@ -119,7 +119,7 @@ omit = [
 [dependency-groups]
 dev = [
     "build~=1.4",
-    "cryptography~=48.0",
+    "cryptography>=50",
     "deepdiff>=9.0.0",
     "pytest~=9.0",
     "pytest-coverage>=0.0",
