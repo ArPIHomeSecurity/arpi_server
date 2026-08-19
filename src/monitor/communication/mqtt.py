@@ -253,14 +253,6 @@ class MQTTClient:
             client.subscribe(COMMAND_TOPIC_FILTER, qos=1)
             logger.info("Subscribed to MQTT command topics %s", COMMAND_TOPIC_FILTER)
 
-    def subscribe_to_areas(self):
-        if self._client is not None:
-            self._client.subscribe(f"{AREA_TOPIC_PREFIX}#", qos=1)
-
-    def subscribe_to_sensors(self):
-        if self._client is not None:
-            self._client.subscribe(f"{SENSOR_TOPIC_PREFIX}#", qos=1)
-
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
         Callback when disconnected from MQTT broker.

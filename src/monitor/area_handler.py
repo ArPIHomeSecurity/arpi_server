@@ -45,9 +45,10 @@ class AreaHandler:
     """
     Class for managing areas
     """
+    MQTT_CLIENT_ID = "arpi_area"
 
-    def __init__(self, session, broadcaster: Broadcaster):
-        self._db_session = session
+    def __init__(self, broadcaster: Broadcaster):
+        self._db_session = None
         self._broadcaster = broadcaster
         # sanitized area name => area id, used to route the MQTT commands
         self._area_ids_by_topic = {}
@@ -56,16 +57,27 @@ class AreaHandler:
         self._published_topics = set()
 
         # guards the fields below, they are written from the MQTT client thread
-        self._mqtt_lock = Lock()
+        self._mqtt_client = None
+        self._mqtt_lock = None
         self._failed_code_times = []
         self._locked_out_until = 0
 
+    def initialize(self):
         self._mqtt_client = MQTTClient(
             on_command=self._handle_mqtt_command,
             topic_validator=self.is_areaname_valid,
         )
-        self._mqtt_client.connect(client_id="arpi_area")
-        logger.debug("AreaHandler initialized")
+        self._mqtt_lock = Lock()
+        self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
+        self._db_session = get_database_session()
+
+    def update_mqtt_config(self):
+        """
+        Update the MQTT configuration.
+        """
+        if self._mqtt_client is not None:
+            self._mqtt_client.close()
+            self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
 
     def is_areaname_valid(self, item_id: int | None, item_name: str) -> bool:
         """
@@ -134,6 +146,10 @@ class AreaHandler:
         if not code:
             return
 
+        # publish arming state to the MQTT panels while the exit delay runs, so that Home Assistant
+        # shows the correct state
+        self.publish_arm_states(arming=True)
+
         # using a new session here
         # because the MQTT client thread cannot use the active session of the monitoring thread
         user_id = None
@@ -149,6 +165,10 @@ class AreaHandler:
                     "Too many invalid access codes over MQTT, ignoring commands for %s minutes",
                     MQTT_LOCKOUT_SEC // 60,
                 )
+
+            # re-publish the current arm states to the MQTT panels, so that Home Assistant
+            # does not show the wrong state after a failed command
+            self.publish_arm_states()
             return
 
         if panel_name != SYSTEM_TOPIC_NAME and panel_id is None:
@@ -177,28 +197,42 @@ class AreaHandler:
         )
         self._broadcaster.send_message(command)
 
-    def publish_arm_states(self):
+    def publish_areas(self):
         """
-        Publish the current arm states of the MQTT panels (monitoring thread only).
+        Publish the area configs and states to the MQTT panels.
         """
-        for area in self._db_session.query(Area).filter(Area.deleted == False).all():
-            self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
+        areas = self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
+        for area in areas:
+            # in case of a single area, we don't need to publish the area config
+            # the system is enough to show the arm state in Home Assistant
+            if len(areas) > 1:
+                self._mqtt_client.publish_area_config(area.id, area.name)
+                self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
+            send_area_state(area.serialized)
 
+        self._mqtt_client.publish_system_config()
         self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
 
-    def publish_arming(self):
+    def publish_arm_states(self, arming=False):
         """
-        Show the MQTT panels as arming while the exit delay runs (monitoring thread
-        only). The areas staying disarmed keep their disarmed state, they are not
-        part of the running arm.
+        Publish only the current arm states of the MQTT panels.
         """
-        for area in self._db_session.query(Area).filter(Area.deleted == False).all():
-            if area.arm_state == ARM_DISARM:
-                self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
-            else:
-                self._mqtt_client.publish_area_arming(area.id, area.name)
+        areas = self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
+        for area in areas:
+            # in case of a single area, we don't need to publish the area config
+            # the system is enough to show the arm state in Home Assistant
+            if len(areas) > 1:
+                if arming:
+                    self._mqtt_client.publish_area_arming(area.id, area.name)
+                else:
+                    self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
 
-        self._mqtt_client.publish_system_arming()
+            send_area_state(area.serialized)
+
+        if arming:
+            self._mqtt_client.publish_system_arming()
+        else:
+            self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
 
     def load_areas(self):
         """
@@ -224,28 +258,13 @@ class AreaHandler:
 
         self._db_session.commit()
 
-    def publish_areas(self):
-        """
-        Load all the areas from the database.
-        """
-        areas = self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
-        for area in areas:
-            if len(areas) > 1:
-                self._mqtt_client.publish_area_config(area.id, area.name)
-                self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
-            send_area_state(area.serialized)
-
-        self._mqtt_client.publish_system_config()
-        self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
-        self._mqtt_client.subscribe_to_areas()
-
     def change_area_arm(self, arm_type, area_id=None) -> bool:
         """
         Change the arm state of the given area.
 
         The MQTT panels are not updated here: whether the new state or arming has to be
         published depends on the exit delay, which is only known to the caller. See
-        publish_arm_states() and publish_arming().
+        publish_arm_states(arming=False) and publish_arm_states(arming=True).
 
         Return True if the area was found and the arm state was changed.
         """
@@ -287,12 +306,9 @@ class AreaHandler:
         Return True if at least one area was found and the arm state was changed.
         """
         logger.info("Arming areas to %s", arm_type)
-        areas = (
-            self._db_session.query(Area)
-            .filter(Area.deleted == False)
-            .filter(Area.sensors.any())
-            .all()
-        )
+        areas = self._db_session.execute(
+                select(Area).filter(Area.deleted == False, Area.sensors.any())
+        ).scalars().all()
 
         arm_changed = False
         for area in areas:

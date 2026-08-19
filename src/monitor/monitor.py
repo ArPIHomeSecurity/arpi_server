@@ -199,7 +199,8 @@ class Monitor(Thread, ActionHandler):
             send_alert_state(None)
             send_syren_state(None)
 
-        self._area_handler = AreaHandler(session=self._db_session, broadcaster=self._broadcaster)
+        self._area_handler = AreaHandler(broadcaster=self._broadcaster)
+        self._area_handler.initialize()
         self._area_handler.load_areas()
         self._area_handler.publish_areas()
 
@@ -221,6 +222,7 @@ class Monitor(Thread, ActionHandler):
         Handle the update config action.
         """
         logger.info("Update config command received, updating config...")
+        self._area_handler.update_mqtt_config()
         self._area_handler.load_areas()
         self._area_handler.publish_areas()
         self._sensor_handler.update_mqtt_config()
@@ -353,7 +355,7 @@ class Monitor(Thread, ActionHandler):
                 self.arm_system(arm_type, use_delay)
             elif States.get(State.MONITORING) == MONITORING_ARM_DELAY:
                 # the new area joins the running exit delay
-                self._area_handler.publish_arming()
+                self._area_handler.publish_arm_states(arming=True)
             else:
                 # the system was already armed, publish the new area state immediately
                 self._area_handler.publish_arm_states()
@@ -390,7 +392,7 @@ class Monitor(Thread, ActionHandler):
             States.set(State.MONITORING, MONITORING_ARM_DELAY)
             # home assistant shows the exit delay as arming, the armed state of the
             # panels is only published when the delay expires
-            self._area_handler.publish_arming()
+            self._area_handler.publish_arm_states(arming=True)
             self._delay_timer = Timer(arm_delay, stop_arm_delay)
             self._delay_timer.start()
         else:
@@ -426,9 +428,10 @@ class Monitor(Thread, ActionHandler):
 
             if States.get(State.MONITORING) == MONITORING_ARM_DELAY:
                 # the remaining areas are still in the exit delay, keep them arming
-                self._area_handler.publish_arming()
+                self._area_handler.publish_arm_states(arming=True)
             else:
                 self._area_handler.publish_arm_states()
+
             send_arm_state(areas_state)
         else:
             # disarm system and all the areas

@@ -58,6 +58,8 @@ class SensorHandler:
     Handles the sensors monitoring and alerting.
     """
 
+    MQTT_CLIENT_ID = "arpi_sensors"
+
     def __init__(self, broadcaster):
         self._db_session = None
         self._broadcaster = broadcaster
@@ -69,9 +71,17 @@ class SensorHandler:
 
     def initialize(self):
         self._mqtt_client = MQTTClient(topic_validator=self.is_sensorname_valid)
-        self._mqtt_client.connect(client_id="arpi_sensors")
+        self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
         self._db_session = get_database_session()
         self._sensor_adapter = get_sensor_adapter()
+
+    def update_mqtt_config(self):
+        """
+        Update the MQTT configuration.
+        """
+        if self._mqtt_client is not None:
+            self._mqtt_client.close()
+            self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
 
     def is_sensorname_valid(self, item_id: int | None, item_name: str):
         """Return whether a retained MQTT name belongs to a current sensor."""
@@ -84,14 +94,6 @@ class SensorHandler:
             "MQTT topic '%s / %s' does not match any current sensor", item_name, item_id
         )
         return False
-
-    def update_mqtt_config(self):
-        """
-        Update the MQTT configuration.
-        """
-        if self._mqtt_client is not None:
-            self._mqtt_client.close()
-            self._mqtt_client.connect(client_id="arpi_sensors")
 
     def calibrate_sensors(self):
         """
@@ -202,8 +204,6 @@ class SensorHandler:
         for sensor in self._sensors:
             self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
             self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, False)
-
-        self._mqtt_client.subscribe_to_sensors()
 
     def validate_sensor_config(self):
         """
