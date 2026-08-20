@@ -9,7 +9,13 @@ from time import time
 from cryptography import x509
 
 from monitor.config.helper import save_config
-from monitor.config.models import DEFAULT_MQTT_CA_CERT, DyndnsConfig, MQTTConfigInternalPublish, MQTTConfigExternalPublish, MQTTConnection
+from monitor.config.models import (
+    DEFAULT_MQTT_CA_CERT,
+    DyndnsConfig,
+    MQTTConfigInternalPublish,
+    MQTTConfigExternalPublish,
+    MQTTConnection,
+)
 from utils.constants import LOG_SC_CERTBOT
 from utils.dictionary import filter_keys
 
@@ -19,11 +25,10 @@ logger = logging.getLogger(LOG_SC_CERTBOT)
 NGINX_CONF_DIR = "/usr/local/nginx/conf"
 NGINX_REMOTE_AVAILABLE = f"{NGINX_CONF_DIR}/sites-available/remote.conf"
 NGINX_REMOTE_CONF = f"{NGINX_CONF_DIR}/sites-enabled/remote.conf"
-NGINX_MQTT_SELF_SIGNED_AVAILABLE = (
-    f"{NGINX_CONF_DIR}/stream-available/mqtt-self-signed.conf"
-)
+NGINX_MQTT_SELF_SIGNED_AVAILABLE = f"{NGINX_CONF_DIR}/stream-available/mqtt-self-signed.conf"
 NGINX_MQTT_CERTBOT_AVAILABLE = f"{NGINX_CONF_DIR}/stream-available/mqtt-certbot.conf"
 NGINX_MQTT_CONF = f"{NGINX_CONF_DIR}/stream-enabled/mqtt.conf"
+
 
 class Certbot:
     CERT_NAME = "arpi"
@@ -300,8 +305,7 @@ class Certbot:
         nginx_enabled = Path(NGINX_REMOTE_CONF).exists()
         mqtt_stream = Path(NGINX_MQTT_CONF)
         mqtt_certbot_enabled = (
-            mqtt_stream.is_symlink()
-            and os.readlink(mqtt_stream) == NGINX_MQTT_CERTBOT_AVAILABLE
+            mqtt_stream.is_symlink() and os.readlink(mqtt_stream) == NGINX_MQTT_CERTBOT_AVAILABLE
         )
 
         logger.info(

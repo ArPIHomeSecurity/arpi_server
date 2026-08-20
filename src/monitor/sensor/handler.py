@@ -90,9 +90,7 @@ class SensorHandler:
                 if sensor.id == item_id:
                     return True
 
-        logger.warning(
-            "MQTT topic '%s / %s' does not match any current sensor", item_name, item_id
-        )
+        logger.warning("MQTT topic '%s / %s' does not match any current sensor", item_name, item_id)
         return False
 
     def calibrate_sensors(self):
@@ -200,7 +198,9 @@ class SensorHandler:
         """
         Publish the sensor configuration to the MQTT.
         """
-        self._sensors = self._db_session.execute(select(Sensor).filter(Sensor.deleted == False)).scalars().all()
+        self._sensors = (
+            self._db_session.execute(select(Sensor).filter(Sensor.deleted == False)).scalars().all()
+        )
         for sensor in self._sensors:
             self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
             self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, False)

@@ -116,7 +116,11 @@ class MQTTClient:
     Class for publishing and subscribing to MQTT topics.
     """
 
-    def __init__(self, on_command: OnCommandHandler | None = None, topic_validator: TopicValidator | None = None):
+    def __init__(
+        self,
+        on_command: OnCommandHandler | None = None,
+        topic_validator: TopicValidator | None = None,
+    ):
         """
         :param on_command: called as on_command(panel_name, action, code) for every
             arm/disarm command received from the broker. Subscribing to the command
@@ -226,13 +230,15 @@ class MQTTClient:
             self._client.tls_set(ca_certs=mqtt_config.ca_certs, cert_reqs=ssl.CERT_REQUIRED)
             self._client.tls_insecure_set(mqtt_config.tls_insecure)
         elif mqtt_config.ca_certs and not os.path.exists(mqtt_config.ca_certs):
-            logger.error("MQTT TLS CA file %s does not exist. No TLS will be established.", mqtt_config.ca_certs)
+            logger.error(
+                "MQTT TLS CA file %s does not exist. No TLS will be established.",
+                mqtt_config.ca_certs,
+            )
         elif not mqtt_config.ca_certs:
             # no explicit CA means the system certificate store is used, which is expected
             self._client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
             self._client.tls_insecure_set(mqtt_config.tls_insecure)
             return
-
 
     def close(self):
         """
@@ -313,12 +319,12 @@ class MQTTClient:
         action, code = parse_command_payload(msg.payload)
         arm_type = HA_ACTION_MAPPING.get(action, None)
         if arm_type is None:
-            logger.error("Received unknown action \"%s\" on topic %s", action, msg.topic)
+            logger.error('Received unknown action "%s" on topic %s', action, msg.topic)
             return
 
         try:
             self._on_command(panel_id, panel_name, arm_type, code)
-        except Exception: # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to handle MQTT command from topic %s", msg.topic)
 
     def _delete_orphan(self, topic):
@@ -439,7 +445,9 @@ class MQTTClient:
         if self._client is None:
             return
 
-        self._publish_state_payload(f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}", ARMING_PAYLOAD)
+        self._publish_state_payload(
+            f"{AREA_TOPIC_PREFIX}{sanitize(name)}_{area_id}", ARMING_PAYLOAD
+        )
 
     def publish_system_config(self):
         """
@@ -493,7 +501,7 @@ class MQTTClient:
         topic = f"{topic_prefix}/config"
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
-    
+
     def delete_sensor(self, sensor_id, name):
         """
         Delete the MQTT HomeAssistant config/state for the given sensor.

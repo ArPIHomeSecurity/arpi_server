@@ -45,6 +45,7 @@ class AreaHandler:
     """
     Class for managing areas
     """
+
     MQTT_CLIENT_ID = "arpi_area"
 
     def __init__(self, broadcaster: Broadcaster):
@@ -306,9 +307,11 @@ class AreaHandler:
         Return True if at least one area was found and the arm state was changed.
         """
         logger.info("Arming areas to %s", arm_type)
-        areas = self._db_session.execute(
-                select(Area).filter(Area.deleted == False, Area.sensors.any())
-        ).scalars().all()
+        areas = (
+            self._db_session.execute(select(Area).filter(Area.deleted == False, Area.sensors.any()))
+            .scalars()
+            .all()
+        )
 
         arm_changed = False
         for area in areas:

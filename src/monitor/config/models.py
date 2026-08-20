@@ -173,7 +173,10 @@ class AlertSensitivityConfig(BaseConfig):
 
 # CA certificate used to verify the internal broker, installed next to the other
 # configuration of the server. Overridable for setups with a differently placed CA.
-DEFAULT_MQTT_CA_CERT = os.environ.get("ARGUS_MQTT_CA_CERT", os.path.expanduser("~/.local/etc/arpi-server/certs/arpi_ca.crt"))
+DEFAULT_MQTT_CA_CERT = os.environ.get(
+    "ARGUS_MQTT_CA_CERT", os.path.expanduser("~/.local/etc/arpi-server/certs/arpi_ca.crt")
+)
+
 
 @dataclass
 class MQTTConnection(BaseConfig):
