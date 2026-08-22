@@ -20,6 +20,9 @@ jobs:
         (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
       }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # Required for SARIF upload
 
     steps:
       - name: Checkout repository 🛎️
@@ -34,7 +37,7 @@ jobs:
             pip-cache-${{ runner.os }}-
 
       - name: Setup Python 🐍
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -47,4 +50,10 @@ jobs:
 
       - name: Lint code 🧹
         run: |
-          task lint
+          task lint:sarif
+
+      - name: Upload SARIF file to GitHub Code Scanning 🕵️
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: ruff.sarif

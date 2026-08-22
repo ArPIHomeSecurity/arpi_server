@@ -59,9 +59,10 @@ def monitoring_ready(device_token):
 
 
 class _FakeMessage:
-    def __init__(self, topic, payload, retain):
+    def __init__(self, topic, payload, qos, retain):
         self.topic = topic
         self.payload = payload
+        self.qos = qos
         self.retain = retain
 
 
@@ -90,7 +91,9 @@ def test_01_retained_command_is_ignored_and_cleared():
     fake_client = _FakeClient()
 
     payload = json.dumps({"action": "DISARM", "code": ADMIN_CODE}).encode()
-    client._on_message(fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, payload, retain=True))
+    client._on_message(
+        fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, payload, qos=1, retain=True)
+    )
 
     assert commands == [], "a retained command must not be executed"
     assert fake_client.published == [(SYSTEM_COMMAND_TOPIC, b"", True)], (
@@ -108,7 +111,9 @@ def test_02_live_command_is_still_executed():
     fake_client = _FakeClient()
 
     payload = json.dumps({"action": "DISARM", "code": ADMIN_CODE}).encode()
-    client._on_message(fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, payload, retain=False))
+    client._on_message(
+        fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, payload, qos=1, retain=False)
+    )
 
     assert len(commands) == 1
     assert fake_client.published == []
@@ -125,7 +130,9 @@ def test_03_cleared_retained_command_is_not_an_error():
     client = MQTTClient(on_command=lambda *args: commands.append(args))
     fake_client = _FakeClient()
 
-    client._on_message(fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, b"", retain=False))
+    client._on_message(
+        fake_client, None, _FakeMessage(SYSTEM_COMMAND_TOPIC, b"", qos=1, retain=False)
+    )
 
     assert commands == []
     assert fake_client.published == []

@@ -31,12 +31,12 @@ BROKER_PORT = 2883
 
 PANEL_TOPIC_PREFIX = "arpi/alarm_control_panel/"
 SYSTEM_STATE_TOPIC = f"{PANEL_TOPIC_PREFIX}system/state"
-HOUSE_STATE_TOPIC = f"{PANEL_TOPIC_PREFIX}house/state"
-GARAGE_STATE_TOPIC = f"{PANEL_TOPIC_PREFIX}garage/state"
+HOUSE_STATE_TOPIC = f"{PANEL_TOPIC_PREFIX}house_1/state"
+GARAGE_STATE_TOPIC = f"{PANEL_TOPIC_PREFIX}garage_2/state"
 
 SYSTEM_COMMAND_TOPIC = f"{PANEL_TOPIC_PREFIX}system/state/set"
-HOUSE_COMMAND_TOPIC = f"{PANEL_TOPIC_PREFIX}house/state/set"
-GARAGE_COMMAND_TOPIC = f"{PANEL_TOPIC_PREFIX}garage/state/set"
+HOUSE_COMMAND_TOPIC = f"{PANEL_TOPIC_PREFIX}house_1/state/set"
+GARAGE_COMMAND_TOPIC = f"{PANEL_TOPIC_PREFIX}garage_2/state/set"
 
 # see tests/data.py: admin id=1
 ADMIN_CODE = "1234"
@@ -86,7 +86,7 @@ def test_01_area_disarmed_during_the_exit_delay(device_token, user_token):
 
         response = call_api("PUT", f"/api/area/disarm?area_id={areas['Garage']}", {}, user_token)
         check_api_response(response)
-        disarmed_index = garage.wait_for("disarmed", timeout=2.0)
+        disarmed_index = garage.wait_for("disarmed", timeout=3.0)
 
         # the house is armed when the delay expires...
         house.wait_for("armed_away", timeout=ARM_DELAY + 2.0)

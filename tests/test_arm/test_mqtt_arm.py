@@ -26,7 +26,7 @@ BROKER_HOST = "localhost"
 BROKER_PORT = 2883
 
 SYSTEM_COMMAND_TOPIC = "arpi/alarm_control_panel/system/state/set"
-AREA_COMMAND_TOPIC = "arpi/alarm_control_panel/house/state/set"
+AREA_COMMAND_TOPIC = "arpi/alarm_control_panel/house_1/state/set"
 
 # see tests/data.py: admin id=1 / user id=2
 ADMIN_CODE = "1234"

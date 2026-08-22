@@ -12,8 +12,8 @@ from monitor.config.helper import save_config
 from monitor.config.models import (
     DEFAULT_MQTT_CA_CERT,
     DyndnsConfig,
-    MQTTConfigInternalPublish,
     MQTTConfigExternalPublish,
+    MQTTConfigInternalPublish,
     MQTTConnection,
 )
 from utils.constants import LOG_SC_CERTBOT

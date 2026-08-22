@@ -57,8 +57,8 @@ def test_01_colliding_areas_are_not_published(device_token):
     assert panels[SYSTEM_STATE_TOPIC] == b"disarmed"
 
     # the area without a collision is published normally
-    assert f"{PANEL_TOPIC_PREFIX}backyard/config" in panels
-    assert panels[f"{PANEL_TOPIC_PREFIX}backyard/state"] == b"disarmed"
+    assert f"{PANEL_TOPIC_PREFIX}backyard_1/config" in panels
+    assert panels[f"{PANEL_TOPIC_PREFIX}backyard_1/state"] == b"disarmed"
 
 
 @pytest.mark.parametrize("database_data", [create_test_colliding_areas_v2], indirect=True)

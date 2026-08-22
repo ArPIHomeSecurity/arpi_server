@@ -10,7 +10,7 @@ from threading import Event, Thread
 from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
 from monitor.adapters.output import get_output_adapter
 from monitor.broadcast import Broadcaster
-from monitor.database import get_database_session
+from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from monitor.output.notification import EventType, Notification, TriggerSource
 from monitor.output.sign import OutputSign
@@ -94,20 +94,18 @@ class OutputHandler(Thread):
         Load outputs from database
         """
         logger.debug("Loading outputs from database")
-        db_session = get_database_session()
-        self._outputs = db_session.query(Output).all()
+        with create_database_session() as db_session:
+            self._outputs = db_session.query(Output).all()
 
-        # initialize output default states
-        logger.info("Initializing outputs from database")
-        adapter = get_output_adapter()
-        for output in self._outputs:
-            if output.channel is not None:
-                adapter.control_channel(output.channel, output.default_state)
-                send_output_state(output.id, output.state)
+            # initialize output default states
+            logger.info("Initializing outputs from database")
+            adapter = get_output_adapter()
+            for output in self._outputs:
+                if output.channel is not None:
+                    adapter.control_channel(output.channel, output.default_state)
+                    send_output_state(output.id, output.state)
 
-        db_session.close()
-
-        logger.debug("Loaded %s outputs", len(self._outputs))
+            logger.debug("Loaded %s outputs", len(self._outputs))
 
     def run(self) -> None:
         self.load_outputs()

@@ -15,7 +15,7 @@ from monitor.actions import (
 )
 from monitor.broadcast import Broadcaster
 from monitor.communication.mqtt import SYSTEM_TOPIC_NAME, MQTTClient
-from monitor.database import get_database_session
+from monitor.database import create_database_session, get_database_session
 from monitor.output.handler import OutputHandler
 from monitor.socket_io import send_area_state
 from monitor.storage import State, States
@@ -51,15 +51,13 @@ class AreaHandler:
     def __init__(self, broadcaster: Broadcaster):
         self._db_session = None
         self._broadcaster = broadcaster
-        # sanitized area name => area id, used to route the MQTT commands
-        self._area_ids_by_topic = {}
         # topics published as area panels, used to clean up the topics of areas that
         # were renamed or started colliding since the last publish
-        self._published_topics = set()
+        self._published_topics: set[tuple[int | None, str]] = set()
+        self._mqtt_client: MQTTClient | None = None
 
         # guards the fields below, they are written from the MQTT client thread
-        self._mqtt_client = None
-        self._mqtt_lock = None
+        self._mqtt_lock: Lock | None = None
         self._failed_code_times = []
         self._locked_out_until = 0
 
@@ -70,6 +68,7 @@ class AreaHandler:
         )
         self._mqtt_lock = Lock()
         self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
+        self._mqtt_client.subscribe_areas()
         self._db_session = get_database_session()
 
     def update_mqtt_config(self):
@@ -90,7 +89,7 @@ class AreaHandler:
         if item_name == SYSTEM_TOPIC_NAME:
             return True
 
-        with get_database_session() as session:
+        with create_database_session() as session:
             for area in session.query(Area).filter(Area.deleted == False).all():
                 if area.id == item_id:
                     return True
@@ -154,7 +153,7 @@ class AreaHandler:
         # using a new session here
         # because the MQTT client thread cannot use the active session of the monitoring thread
         user_id = None
-        with get_database_session() as session:
+        with create_database_session() as session:
             user = get_user_with_access_code(session, code)
             if user:
                 user_id = user.id
@@ -201,7 +200,13 @@ class AreaHandler:
     def publish_areas(self):
         """
         Publish the area configs and states to the MQTT panels.
+
+        Based on the previously published topics, remove the state and configs of areas
+        that were renamed or deleted.
         """
+        previously_published_topics = self._published_topics
+
+        self._published_topics = set()
         areas = self._db_session.execute(select(Area).filter(Area.deleted == False)).scalars().all()
         for area in areas:
             # in case of a single area, we don't need to publish the area config
@@ -209,10 +214,21 @@ class AreaHandler:
             if len(areas) > 1:
                 self._mqtt_client.publish_area_config(area.id, area.name)
                 self._mqtt_client.publish_area_state(area.id, area.name, area.arm_state)
+                self._published_topics.add((area.id, area.name))
             send_area_state(area.serialized)
 
         self._mqtt_client.publish_system_config()
         self._mqtt_client.publish_system_state(get_arm_state(self._db_session))
+        self._published_topics.add((None, SYSTEM_TOPIC_NAME))
+
+        orphaned_topics = previously_published_topics - self._published_topics
+        for area_id, area_name in orphaned_topics:
+            logger.info(
+                "Removing orphaned MQTT topic for area '%s' (id=%s) that was renamed or deleted",
+                area_name,
+                area_id,
+            )
+            self._mqtt_client.delete_area(area_id, area_name)
 
     def publish_arm_states(self, arming=False):
         """
@@ -342,3 +358,6 @@ class AreaHandler:
         """
         logger.debug("Closing MQTT client...")
         self._mqtt_client.close()
+        self._mqtt_client = None
+        self._mqtt_lock = None
+        self._db_session.close()

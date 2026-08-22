@@ -23,12 +23,18 @@ tasks:
   lint:
     desc: Lint python code using ruff
     cmds:
-      - cmd: uvx ruff check .
+      - cmd: uvx ruff check . ${{.CLI_ARGS}}
         ignore_error: true
       - cmd: uvx ruff check . --statistics
         ignore_error: true
 
-  lint-fix:
+  lint:sarif:
+    desc: Lint python code using ruff and output SARIF report
+    cmds:
+      - cmd: uvx ruff check . --output-format=sarif --output-file=ruff.sarif
+        ignore_error: true
+
+  lint:fix:
     desc: Fix linting issues using ruff
     cmds:
       - uvx ruff check --fix
@@ -150,6 +156,7 @@ tasks:
       - |
         uv run pytest \
           -v \
+          --junitxml=junit.xml \
           --cov=src \
           --cov-report=xml \
           --cov-report=term \

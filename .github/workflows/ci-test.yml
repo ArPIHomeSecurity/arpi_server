@@ -34,26 +34,38 @@ jobs:
             pip-cache-${{ runner.os }}-
 
       - name: Setup Python 🐍
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
       - name: Install dependencies 📦
         run: |
           curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash
-          sudo apt update && sudo apt install -y jq task
+          sudo apt update && sudo apt install -y jq
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          task create-environment
+
+      - name: Install Task 🛠️
+        uses: go-task/setup-task@v2
 
       - name: Run tests 🔍
         run: |
+          task create-environment
           if [ "$RUNNER_DEBUG" = "1" ]; then
             task test-debug
           else
             task test
           fi
 
+      - name: Publish test results📄
+        if: always()
+        uses: dorny/test-reporter@v3
+        with:
+          name: pytest
+          reporter: python-xunit
+          path: junit.xml
+
       - name: Code Coverage Report
+        if: always()
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: coverage.xml

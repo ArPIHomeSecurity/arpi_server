@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
-from monitor.database import get_database_session
+from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
 
@@ -197,42 +197,43 @@ def load_channel_configs(input_number: int) -> dict:
     Load channel configurations from the database.
     Returns a dict mapping channel names (CH01, CH02, ...) to ChannelConfig instances.
     """
-    session = get_database_session()
-    sensors = (
-        session.query(Sensor)
-        .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
-        .order_by(Sensor.channel)
-        .all()
-    )
-
-    channel_configs = {
-        f"CH{i:02d}": ChannelConfig(
-            wiring_strategy=WiringStrategies.CUT.value,
-            contact_type=SensorContactTypes.NC,
-        )
-        for i in range(1, input_number + 1)
-    }
-
-    # Update configs from DB
-    for sensor in sensors:
-        channel_name = f"CH{sensor.channel + 1:02d}"
-        # Map DB fields to simulator config
-        wiring_strategy = WiringStrategies.CUT.value
-        if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
-            wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
-        elif (
-            sensor.channel_type == ChannelTypes.BASIC or sensor.channel_type == ChannelTypes.NORMAL
-        ):
-            wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
-        elif (
-            sensor.channel_type == ChannelTypes.CHANNEL_A
-            or sensor.channel_type == ChannelTypes.CHANNEL_B
-        ):
-            wiring_strategy = WiringStrategies.DUAL.value
-
-        channel_configs[channel_name] = ChannelConfig(
-            wiring_strategy=wiring_strategy,
-            contact_type=SensorContactTypes(sensor.sensor_contact_type),
+    with create_database_session() as session:
+        sensors = (
+            session.query(Sensor)
+            .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
+            .order_by(Sensor.channel)
+            .all()
         )
 
-    return channel_configs
+        channel_configs = {
+            f"CH{i:02d}": ChannelConfig(
+                wiring_strategy=WiringStrategies.CUT.value,
+                contact_type=SensorContactTypes.NC,
+            )
+            for i in range(1, input_number + 1)
+        }
+
+        # Update configs from DB
+        for sensor in sensors:
+            channel_name = f"CH{sensor.channel + 1:02d}"
+            # Map DB fields to simulator config
+            wiring_strategy = WiringStrategies.CUT.value
+            if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
+                wiring_strategy = WiringStrategies.SINGLE_WITH_2EOL.value
+            elif (
+                sensor.channel_type == ChannelTypes.BASIC
+                or sensor.channel_type == ChannelTypes.NORMAL
+            ):
+                wiring_strategy = WiringStrategies.SINGLE_WITH_EOL.value
+            elif (
+                sensor.channel_type == ChannelTypes.CHANNEL_A
+                or sensor.channel_type == ChannelTypes.CHANNEL_B
+            ):
+                wiring_strategy = WiringStrategies.DUAL.value
+
+            channel_configs[channel_name] = ChannelConfig(
+                wiring_strategy=wiring_strategy,
+                contact_type=SensorContactTypes(sensor.sensor_contact_type),
+            )
+
+        return channel_configs

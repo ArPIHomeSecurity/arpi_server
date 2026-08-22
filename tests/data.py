@@ -7,7 +7,7 @@ from psycopg2 import ProgrammingError
 from sqlalchemy import Integer, text
 
 from monitor.config.models import MQTTConfigInternalPublish
-from monitor.database import get_database_session
+from monitor.database import create_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
     Alert,
@@ -59,21 +59,21 @@ def _reset_sequences(session):
 
 
 def cleanup_database():
-    session = get_database_session()
-    logger.info("Clearing events...")
-    session.execute(ArmSensor.__table__.delete())
-    session.execute(AlertSensor.__table__.delete())
-    session.execute(Disarm.__table__.delete())
-    session.execute(Arm.__table__.delete())
-    session.execute(Alert.__table__.delete())
-    session.commit()
+    with create_database_session() as session:
+        logger.info("Clearing events...")
+        session.execute(ArmSensor.__table__.delete())
+        session.execute(AlertSensor.__table__.delete())
+        session.execute(Disarm.__table__.delete())
+        session.execute(Arm.__table__.delete())
+        session.execute(Alert.__table__.delete())
+        session.commit()
 
-    _reset_sequences(session)
+        _reset_sequences(session)
 
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Events cleared")
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Events cleared")
 
 
 def _create_sensor_types(session):
@@ -214,49 +214,48 @@ def create_sensors(session, sensor_types, area, zones):
 
 
 def clear_database():
-    session = get_database_session()
-    logger.info("Clean up database...")
-    for table in reversed(metadata.sorted_tables):
-        logger.info(" - Clear table %s", table)
-        try:
-            session.execute(table.delete())
-            session.commit()
-        except ProgrammingError:
-            logger.warning("   Table %s does not exist, skipping", table)
-            session.rollback()
+    with create_database_session() as session:
+        logger.info("Clean up database...")
+        for table in reversed(metadata.sorted_tables):
+            logger.info(" - Clear table %s", table)
+            try:
+                session.execute(table.delete())
+                session.commit()
+            except ProgrammingError:
+                logger.warning("   Table %s does not exist, skipping", table)
+                session.rollback()
 
-    _reset_sequences(session)
+        _reset_sequences(session)
 
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database is empty")
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database is empty")
 
 
 def create_test_no_delay_v2():
     """
     This configuration is for basic testing with board v2 without any delays.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        area = Area(name="House")
+        session.add(area)
+        logger.info(" - Created area")
 
-    area = Area(name="House")
-    session.add(area)
-    logger.info(" - Created area")
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
+        )
 
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-    )
-
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
 
 
 def create_test_two_areas_v2():
@@ -266,42 +265,41 @@ def create_test_two_areas_v2():
     The area created first stays disarmed in the tests and only the second one is
     armed, so a non deterministic arm state calculation is detected.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        house = Area(name="House")
+        garage = Area(name="Garage")
+        session.add_all([house, garage])
+        logger.info(" - Created areas")
 
-    house = Area(name="House")
-    garage = Area(name="Garage")
-    session.add_all([house, garage])
-    logger.info(" - Created areas")
-
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, house, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-    )
-
-    session.add(
-        Sensor(
-            channel=3,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=sensor_types["Motion"],
-            area=garage,
-            zone=zones["no_delay"],
-            name="Garage",
-            description="Test garage movement sensor",
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, house, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
-    )
-    logger.info(" - Created garage sensor")
 
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        session.add(
+            Sensor(
+                channel=3,
+                channel_type=ChannelTypes.NORMAL,
+                sensor_contact_type=SensorContactTypes.NC,
+                sensor_eol_count=SensorEOLCount.SINGLE,
+                sensor_type=sensor_types["Motion"],
+                area=garage,
+                zone=zones["no_delay"],
+                name="Garage",
+                description="Test garage movement sensor",
+            )
+        )
+        logger.info(" - Created garage sensor")
+
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
 
 
 def create_test_two_areas_with_delay_v2():
@@ -309,42 +307,41 @@ def create_test_two_areas_with_delay_v2():
     Two areas with their own delayed sensors, for testing the exit delay when only a
     part of the areas is armed or disarmed.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        house = Area(name="House")
+        garage = Area(name="Garage")
+        session.add_all([house, garage])
+        logger.info(" - Created areas")
 
-    house = Area(name="House")
-    garage = Area(name="Garage")
-    session.add_all([house, garage])
-    logger.info(" - Created areas")
-
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, house, [zones["delayed"], zones["delayed"], zones["tamper"]]
-    )
-
-    session.add(
-        Sensor(
-            channel=3,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=sensor_types["Motion"],
-            area=garage,
-            zone=zones["delayed"],
-            name="Garage",
-            description="Test garage movement sensor",
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, house, [zones["delayed"], zones["delayed"], zones["tamper"]]
         )
-    )
-    logger.info(" - Created garage sensor")
 
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        session.add(
+            Sensor(
+                channel=3,
+                channel_type=ChannelTypes.NORMAL,
+                sensor_contact_type=SensorContactTypes.NC,
+                sensor_eol_count=SensorEOLCount.SINGLE,
+                sensor_type=sensor_types["Motion"],
+                area=garage,
+                zone=zones["delayed"],
+                name="Garage",
+                description="Test garage movement sensor",
+            )
+        )
+        logger.info(" - Created garage sensor")
+
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
 
 
 def create_test_colliding_areas_v2():
@@ -354,42 +351,41 @@ def create_test_colliding_areas_v2():
     "A B" and "A.B" both sanitize to "a_b" and "System" collides with the panel
     controlling the whole system. Only "Backyard" has its own topic.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        backyard = Area(name="Backyard")
+        system = Area(name="System")
+        session.add_all([backyard, Area(name="A B"), Area(name="A.B"), system])
+        logger.info(" - Created areas")
 
-    backyard = Area(name="Backyard")
-    system = Area(name="System")
-    session.add_all([backyard, Area(name="A B"), Area(name="A.B"), system])
-    logger.info(" - Created areas")
-
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, backyard, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-    )
-
-    # the colliding area needs a sensor as well, an area without sensors cannot be armed
-    session.add(
-        Sensor(
-            channel=3,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=sensor_types["Motion"],
-            area=system,
-            zone=zones["no_delay"],
-            name="System room",
-            description="Test movement sensor in the colliding area",
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, backyard, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
-    )
 
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        # the colliding area needs a sensor as well, an area without sensors cannot be armed
+        session.add(
+            Sensor(
+                channel=3,
+                channel_type=ChannelTypes.NORMAL,
+                sensor_contact_type=SensorContactTypes.NC,
+                sensor_eol_count=SensorEOLCount.SINGLE,
+                sensor_type=sensor_types["Motion"],
+                area=system,
+                zone=zones["no_delay"],
+                name="System room",
+                description="Test movement sensor in the colliding area",
+            )
+        )
+
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
 
 
 def create_test_no_delay_v2_armed():
@@ -397,52 +393,50 @@ def create_test_no_delay_v2_armed():
     This configuration is for basic testing with board v2 without any delays.
     But the area is armed, so we can test starting in armed state.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        users = _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    users = _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        area = Area(name="House", arm_state=ArmStates.AWAY)
+        session.add(area)
+        logger.info(" - Created area")
 
-    area = Area(name="House", arm_state=ArmStates.AWAY)
-    session.add(area)
-    logger.info(" - Created area")
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
+        )
 
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-    )
+        arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now(), user=users["admin"])
+        session.add(arm)
 
-    arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now(), user=users["admin"])
-    session.add(arm)
-
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
 
 
 def create_test_with_delay_v2():
     """
     This configuration is for basic testing with board v2.
     """
-    session = get_database_session()
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
 
-    _create_users(session)
-    _create_options(session)
-    sensor_types = _create_sensor_types(session)
+        area = Area(name="House")
+        session.add(area)
+        logger.info(" - Created area")
 
-    area = Area(name="House")
-    session.add(area)
-    logger.info(" - Created area")
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, area, [zones["delayed"], zones["delayed"], zones["tamper"]]
+        )
 
-    zones = create_zones(session)
-    create_sensors(
-        session, sensor_types, area, [zones["delayed"], zones["delayed"], zones["tamper"]]
-    )
-
-    session.commit()
-    engine = session.get_bind()
-    session.close()
-    engine.dispose()
-    logger.info("Database setup is complete")
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")

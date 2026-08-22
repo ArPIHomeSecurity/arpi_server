@@ -110,4 +110,5 @@ class OutputSign(Thread):
         # update state in database
         session.query(Output).filter_by(id=self._output.id).update({"state": False})
         session.commit()
+        session.close()
         send_output_state(self._output.id, False)

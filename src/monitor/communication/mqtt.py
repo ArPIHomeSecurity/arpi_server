@@ -1,9 +1,9 @@
-from collections.abc import Callable
 import json
 import logging
 import os
 import socket
 import ssl
+from collections.abc import Callable
 from enum import Enum
 from unicodedata import normalize
 
@@ -132,6 +132,7 @@ class MQTTClient:
         self._client = None
         self._on_command = on_command
         self._topic_validator = topic_validator
+        self._subscriptions: set[str] = set()
 
     def connect(self, client_id=None):
         """
@@ -172,8 +173,10 @@ class MQTTClient:
                 # FIXME:theoretically self._client should never be None here
                 # but we see errors in logs, so need to add a check
                 self._client.username_pw_set(username, password)
-            except AttributeError:
-                logger.error("Failed to set MQTT username and password")
+            except AttributeError as error:
+                logger.error(
+                    "Failed to set MQTT username=%s and password=%s: %s", username, password, error
+                )
                 self._client = None
                 return
 
@@ -240,6 +243,29 @@ class MQTTClient:
             self._client.tls_insecure_set(mqtt_config.tls_insecure)
             return
 
+    def subscribe_areas(self):
+        """
+        Receive the retained configs of the area panels, they are the only way to find
+        the topics of areas that were deleted or renamed while the monitor was down.
+        """
+        self._subscribe(f"{AREA_TOPIC_PREFIX}+/config")
+
+    def subscribe_sensors(self):
+        """
+        Receive the retained configs of the sensors, they are the only way to find the
+        topics of sensors that were deleted or renamed while the monitor was down.
+        """
+        self._subscribe(f"{SENSOR_TOPIC_PREFIX}+/config")
+
+    def _subscribe(self, topic_filter):
+        """
+        Subscribe now if connected, and remember the filter for the next reconnect.
+        """
+        self._subscriptions.add(topic_filter)
+        if self._client is not None:
+            self._client.subscribe(topic_filter, qos=1)
+            logger.info("Subscribed to MQTT topics %s", topic_filter)
+
     def close(self):
         """
         Close connection to MQTT broker.
@@ -258,6 +284,10 @@ class MQTTClient:
         if self._on_command is not None:
             client.subscribe(COMMAND_TOPIC_FILTER, qos=1)
             logger.info("Subscribed to MQTT command topics %s", COMMAND_TOPIC_FILTER)
+
+        for topic_filter in self._subscriptions:
+            client.subscribe(topic_filter, qos=1)
+            logger.info("Subscribed to MQTT topics %s", topic_filter)
 
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """
@@ -291,7 +321,10 @@ class MQTTClient:
 
         # if it is not a command topic, check for orphaned topics that must be deleted
         if not msg.topic.endswith(COMMAND_SUFFIX):
-            self._delete_orphan(msg.topic)
+            # an empty payload is the deletion we published ourselves, handling it
+            # again would delete the topic in an endless loop
+            if msg.payload:
+                self._delete_orphan(msg.topic)
             return
 
         # if it is a command topic, skip if no callback is set
@@ -511,7 +544,7 @@ class MQTTClient:
 
         self._delete_object(f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}")
 
-    def publish_sensor_state(self, sensor_id, name, state: bool):
+    def publish_sensor_state(self, sensor_id: int, name: str, state: bool):
         """
         Publish the MQTT HomeAssistant state for the given sensor.
         """

@@ -14,7 +14,7 @@ from monitor.adapters.sensor import get_sensor_adapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
-from monitor.database import get_database_session
+from monitor.database import create_database_session, get_database_session
 from monitor.sensor.detector import detect_alert, detect_error
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_error, send_sensors_state
@@ -67,11 +67,13 @@ class SensorHandler:
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
-        self._mqtt_client = None
+        self._mqtt_client: MQTTClient | None = None
+        self._published_topics: set[tuple[int | None, str]] = set()
 
     def initialize(self):
         self._mqtt_client = MQTTClient(topic_validator=self.is_sensorname_valid)
         self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
+        self._mqtt_client.subscribe_sensors()
         self._db_session = get_database_session()
         self._sensor_adapter = get_sensor_adapter()
 
@@ -85,7 +87,7 @@ class SensorHandler:
 
     def is_sensorname_valid(self, item_id: int | None, item_name: str):
         """Return whether a retained MQTT name belongs to a current sensor."""
-        with get_database_session() as session:
+        with create_database_session() as session:
             for sensor in session.query(Sensor).filter(Sensor.deleted == False).all():
                 if sensor.id == item_id:
                     return True
@@ -197,13 +199,23 @@ class SensorHandler:
     def publish_sensors(self):
         """
         Publish the sensor configuration to the MQTT.
+
+        Based on the previously published topics, remove the state and configs of the sensors
+        that were renamed or deleted.
         """
+        previously_published_topics = self._published_topics
+        self._published_topics = set()
         self._sensors = (
             self._db_session.execute(select(Sensor).filter(Sensor.deleted == False)).scalars().all()
         )
         for sensor in self._sensors:
             self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
             self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, False)
+            self._published_topics.add((sensor.id, sensor.name))
+
+        orphaned_topics = previously_published_topics - self._published_topics
+        for sensor_id, sensor_name in orphaned_topics:
+            self._mqtt_client.delete_sensor(sensor_id, sensor_name)
 
     def validate_sensor_config(self):
         """
@@ -448,6 +460,7 @@ class SensorHandler:
         logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
         self._mqtt_client.close()
+        self._db_session.close()
 
     @staticmethod
     def get_alert_type(sensor, monitoring_state):
