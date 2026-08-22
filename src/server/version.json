@@ -1,9 +1,9 @@
 {
-  "version": "v2.7.0:5f4796a",
+  "version": "v2.7.0_RC01:fa4855c",
   "major": 2,
   "minor": 7,
   "patch": 0,
-  "prerelease": null,
-  "prerelease_num": null,
-  "commit_id": "5f4796a"
+  "prerelease": "RC",
+  "prerelease_num": "01",
+  "commit_id": "fa4855c"
 }
