@@ -36,7 +36,7 @@ jobs:
     name: Release
     if: >-
       ${{
-        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || startsWith(github.ref_name, 'dev_'))) ||
         (
           github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.event == 'push' &&
@@ -79,11 +79,11 @@ jobs:
             }
             core.notice(`All CI workflows passed for ${sha}`);
 
-      - name: Ensure manual release runs only on main branch 🚦
+      - name: Ensure manual release runs only on allowed branches 🚦
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "This workflow can only be run on the main branch. Current ref: ${{ github.ref }}"
+          if [[ "${{ github.ref }}" != "refs/heads/main" && "${{ github.ref_name }}" != dev_* ]]; then
+            echo "This workflow can only be run on main or dev_* branches. Current ref: ${{ github.ref }}"
             exit 1
           fi
 
