@@ -73,4 +73,10 @@ jobs:
           fail_below_min: false
           format: markdown
           indicators: true
-          output: both
+          output: file
+
+      - name: Report Code Coverage Summary
+        if: always()
+        run: |
+          echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
