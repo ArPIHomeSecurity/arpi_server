@@ -87,7 +87,7 @@ def test_01_retained_command_is_ignored_and_cleared():
     subscription, so this is exercised directly on the callback.
     """
     commands = []
-    client = MQTTClient(on_command=lambda *args: commands.append(args))
+    client = MQTTClient(on_arm_command=lambda *args: commands.append(args))
     fake_client = _FakeClient()
 
     payload = json.dumps({"action": "DISARM", "code": ADMIN_CODE}).encode()
@@ -107,7 +107,7 @@ def test_02_live_command_is_still_executed():
     Guard for the retain check above: a normal command must keep working.
     """
     commands = []
-    client = MQTTClient(on_command=lambda *args: commands.append(args))
+    client = MQTTClient(on_arm_command=lambda *args: commands.append(args))
     fake_client = _FakeClient()
 
     payload = json.dumps({"action": "DISARM", "code": ADMIN_CODE}).encode()
@@ -127,7 +127,7 @@ def test_03_cleared_retained_command_is_not_an_error():
     invalid command.
     """
     commands = []
-    client = MQTTClient(on_command=lambda *args: commands.append(args))
+    client = MQTTClient(on_arm_command=lambda *args: commands.append(args))
     fake_client = _FakeClient()
 
     client._on_message(

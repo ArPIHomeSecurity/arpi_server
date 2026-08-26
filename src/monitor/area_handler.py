@@ -63,7 +63,7 @@ class AreaHandler:
 
     def initialize(self):
         self._mqtt_client = MQTTClient(
-            on_command=self._handle_mqtt_command,
+            on_arm_command=self._handle_mqtt_command,
             topic_validator=self.is_areaname_valid,
         )
         self._mqtt_lock = Lock()

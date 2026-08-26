@@ -19,6 +19,8 @@ from utils.models import (
     ChannelTypes,
     Disarm,
     Option,
+    Output,
+    OutputTriggerType,
     Sensor,
     SensorContactTypes,
     SensorEOLCount,
@@ -250,6 +252,70 @@ def create_test_no_delay_v2():
         create_sensors(
             session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
+
+        session.commit()
+        engine = session.get_bind()
+        session.close()
+        engine.dispose()
+        logger.info("Database setup is complete")
+
+
+def create_test_outputs_v2():
+    """
+    This configuration has one output of every trigger type.
+    """
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
+
+        area = Area(name="House")
+        session.add(area)
+
+        zones = create_zones(session)
+        create_sensors(
+            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
+        )
+        session.commit()
+
+        session.add_all(
+            [
+                Output(
+                    name="Button",
+                    description="Button output",
+                    channel=0,
+                    trigger_type=OutputTriggerType.BUTTON.value,
+                    area_id=None,
+                    delay=0,
+                    duration=1,
+                    default_state=False,
+                    enabled=True,
+                ),
+                Output(
+                    name="Area",
+                    description="Area output",
+                    channel=1,
+                    trigger_type=OutputTriggerType.AREA.value,
+                    area_id=area.id,
+                    delay=0,
+                    duration=1,
+                    default_state=False,
+                    enabled=True,
+                ),
+                Output(
+                    name="System",
+                    description="System output",
+                    channel=2,
+                    trigger_type=OutputTriggerType.SYSTEM.value,
+                    area_id=None,
+                    delay=0,
+                    duration=1,
+                    default_state=False,
+                    enabled=True,
+                ),
+            ]
+        )
+        logger.info(" - Created outputs")
 
         session.commit()
         engine = session.get_bind()

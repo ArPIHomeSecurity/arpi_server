@@ -41,13 +41,17 @@ SENSOR_DEVICE_MAPPING = {
     "Break": "glass_break",
 }
 
+COMMAND_SUFFIX = "state/set"
+
 ARPI_PREFIX = "arpi/"
 SENSOR_TOPIC_PREFIX = f"{ARPI_PREFIX}binary_sensor/"
 AREA_TOPIC_PREFIX = f"{ARPI_PREFIX}alarm_control_panel/"
+OUTPUT_TOPIC_PREFIX = f"{ARPI_PREFIX}switch/"
 
 SYSTEM_TOPIC_NAME = "system"
-COMMAND_SUFFIX = "state/set"
-COMMAND_TOPIC_FILTER = f"{AREA_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
+AREA_TOPIC_FILTER = f"{AREA_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
+
+SWITCH_COMMAND_TOPIC_FILTER = f"{OUTPUT_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
 
 # command payload template for home assistant: it fills in the action and the code
 COMMAND_TEMPLATE = '{"action": "{{ action }}", "code": "{{ code }}"}'
@@ -61,8 +65,10 @@ HA_ACTION_MAPPING = {
     "DISARM": ARM_DISARM,
 }
 
-# on_command action handler type
-OnCommandHandler = Callable[[str, str, str | None], None]
+# on_arm_command action handler type
+OnArmCommandHandler = Callable[[str, str, str | None], None]
+# on_switch_command action handler type
+OnSwitchCommandHandler = Callable[[int | None, str, bool], None]
 # topic_validator type
 TopicValidator = Callable[[int | None, str], bool]
 
@@ -89,6 +95,27 @@ def parse_command_topic(topic) -> tuple[str | None, str | None]:
 
     # system panel
     return panel, None
+
+
+def parse_switch_command_topic(topic) -> tuple[str | None, int | None]:
+    """
+    Return the (output name, output id) of a switch command topic.
+
+    arpi/switch/siren_1/state/set -> name: siren; id: 1
+    """
+    suffix = f"/{COMMAND_SUFFIX}"
+    if not topic.startswith(OUTPUT_TOPIC_PREFIX) or not topic.endswith(suffix):
+        return None, None
+
+    switch = topic[len(OUTPUT_TOPIC_PREFIX) : -len(suffix)]
+    if "_" not in switch:
+        return None, None
+
+    name, id_ = switch.rsplit("_", 1)
+    if not name or not id_.isdigit():
+        return None, None
+
+    return name, int(id_)
 
 
 def parse_command_payload(payload: bytes) -> tuple[str | None, str | None]:
@@ -118,19 +145,24 @@ class MQTTClient:
 
     def __init__(
         self,
-        on_command: OnCommandHandler | None = None,
+        on_arm_command: OnArmCommandHandler | None = None,
+        on_switch_command: OnSwitchCommandHandler | None = None,
         topic_validator: TopicValidator | None = None,
     ):
         """
-        :param on_command: called as on_command(panel_name, action, code) for every
+        :param on_arm_command: called as on_arm_command(panel_name, action, code) for every
             arm/disarm command received from the broker. Subscribing to the command
             topics only happens when it is set.
+        :param on_switch_command: called as on_switch_command(output_id, output_name, state)
+            for every switch command received from the broker. Subscribing to the switch
+            command topics only happens when it is set.
         :param topic_validator: called as topic_validator(item_id, item_name) for every
             area or sensor topic received from the broker. If it returns False, the
             topic is considered orphaned and can be deleted.
         """
         self._client = None
-        self._on_command = on_command
+        self._on_arm_command = on_arm_command
+        self._on_switch_command = on_switch_command
         self._topic_validator = topic_validator
         self._subscriptions: set[str] = set()
 
@@ -257,6 +289,13 @@ class MQTTClient:
         """
         self._subscribe(f"{SENSOR_TOPIC_PREFIX}+/config")
 
+    def subscribe_outputs(self):
+        """
+        Receive the retained configs of the outputs, they are the only way to find the
+        topics of outputs that were deleted or renamed while the monitor was down.
+        """
+        self._subscribe(f"{OUTPUT_TOPIC_PREFIX}+/config")
+
     def _subscribe(self, topic_filter):
         """
         Subscribe now if connected, and remember the filter for the next reconnect.
@@ -281,9 +320,13 @@ class MQTTClient:
         logger.debug("Connected with reason code: %s", reason_code)
 
         # subscriptions are not restored automatically after a reconnect
-        if self._on_command is not None:
-            client.subscribe(COMMAND_TOPIC_FILTER, qos=1)
-            logger.info("Subscribed to MQTT command topics %s", COMMAND_TOPIC_FILTER)
+        if self._on_arm_command is not None:
+            client.subscribe(AREA_TOPIC_FILTER, qos=1)
+            logger.info("Subscribed to MQTT command topics %s", AREA_TOPIC_FILTER)
+
+        if self._on_switch_command is not None:
+            client.subscribe(SWITCH_COMMAND_TOPIC_FILTER, qos=1)
+            logger.info("Subscribed to MQTT switch command topics %s", SWITCH_COMMAND_TOPIC_FILTER)
 
         for topic_filter in self._subscriptions:
             client.subscribe(topic_filter, qos=1)
@@ -319,19 +362,32 @@ class MQTTClient:
             msg.payload,
         )
 
-        # if it is not a command topic, check for orphaned topics that must be deleted
-        if not msg.topic.endswith(COMMAND_SUFFIX):
-            # an empty payload is the deletion we published ourselves, handling it
-            # again would delete the topic in an endless loop
-            if msg.payload:
-                self._delete_orphan(msg.topic)
+        if msg.topic.startswith(OUTPUT_TOPIC_PREFIX) and msg.topic.endswith(
+            f"/{COMMAND_SUFFIX}"
+        ):
+            self._handle_switch_command(client, msg)
             return
 
-        # if it is a command topic, skip if no callback is set
-        if self._on_command is None:
+        if msg.topic.startswith(AREA_TOPIC_PREFIX) and msg.topic.endswith(f"/{COMMAND_SUFFIX}"):
+            self._handle_arm_command(client, msg)
             return
 
-        if msg.retain and msg.topic.endswith(COMMAND_SUFFIX):
+        # it is not a command topic, check for orphaned topics that must be deleted
+        # an empty payload is the deletion we published ourselves, handling it
+        # again would delete the topic in an endless loop
+        if msg.payload:
+            self._delete_orphan(msg.topic)
+
+    def _handle_arm_command(self, client, msg: mqtt.MQTTMessage):
+        """
+        Handle an arm/disarm command sent to the command topic of a panel.
+
+        The payload contains the access code of the user, so it must never be logged.
+        """
+        if self._on_arm_command is None:
+            return
+
+        if msg.retain:
             # A retained command is redelivered on every reconnect, so a retained disarm
             # with a valid code would disarm the system again after every restart. Drop it
             # and clear the topic, otherwise it comes back with the next subscription.
@@ -356,9 +412,43 @@ class MQTTClient:
             return
 
         try:
-            self._on_command(panel_id, panel_name, arm_type, code)
+            self._on_arm_command(panel_id, panel_name, arm_type, code)
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to handle MQTT command from topic %s", msg.topic)
+
+    def _handle_switch_command(self, client, msg: mqtt.MQTTMessage):
+        """
+        Handle an ON/OFF command sent to the switch topic of an output.
+        """
+        if self._on_switch_command is None:
+            return
+
+        if msg.retain:
+            # a retained command would be replayed on every reconnect and switch the
+            # output on again after every restart, so drop it and clear the topic
+            logger.warning("Ignoring retained MQTT switch command on topic %s", msg.topic)
+            client.publish(msg.topic, b"", qos=1, retain=True)
+            return
+
+        if not msg.payload:
+            return
+
+        output_name, output_id = parse_switch_command_topic(msg.topic)
+        if output_id is None:
+            logger.error("Received MQTT switch command on unexpected topic %s", msg.topic)
+            return
+
+        payload = msg.payload.decode("utf-8", errors="replace").strip().upper()
+        try:
+            state = SensorState(payload)
+        except ValueError:
+            logger.error('Received unknown switch payload "%s" on topic %s', payload, msg.topic)
+            return
+
+        try:
+            self._on_switch_command(output_id, output_name, state == SensorState.ON)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("Failed to handle MQTT switch command from topic %s", msg.topic)
 
     def _delete_orphan(self, topic):
         """
@@ -552,6 +642,54 @@ class MQTTClient:
             return
 
         topic = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}/state"
+        payload = SensorState.ON.value if state else SensorState.OFF.value
+        logger.debug("Publishing MQTT state %s=%s", topic, payload)
+        self._client.publish(topic, payload, qos=1, retain=True)
+
+    def publish_output_config(self, output_id: int, name: str, controllable: bool):
+        """
+        Publish the MQTT HomeAssistant config for the given output.
+
+        Only controllable (button) outputs get a command topic, without it Home Assistant
+        shows the switch as read only, which is what the area and system outputs need.
+        """
+        if self._client is None:
+            return
+
+        topic_prefix = f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}"
+        config = {
+            "name": name,
+            "state_topic": f"{topic_prefix}/state",
+            "unique_id": f"output{output_id}",
+            "device": {"identifiers": [f"output{output_id}"], "name": name},
+            "payload_on": SensorState.ON.value,
+            "payload_off": SensorState.OFF.value,
+        }
+        if controllable:
+            config["command_topic"] = f"{topic_prefix}/{COMMAND_SUFFIX}"
+            config["optimistic"] = False
+
+        topic = f"{topic_prefix}/config"
+        logger.debug("Publishing MQTT config %s=%s", topic, config)
+        self._client.publish(topic, json.dumps(config), qos=1, retain=True)
+
+    def delete_output(self, output_id: int, name: str):
+        """
+        Delete the MQTT HomeAssistant config/state for the given output.
+        """
+        if self._client is None:
+            return
+
+        self._delete_object(f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}")
+
+    def publish_output_state(self, output_id: int, name: str, state: bool):
+        """
+        Publish the MQTT HomeAssistant state for the given output.
+        """
+        if self._client is None:
+            return
+
+        topic = f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}/state"
         payload = SensorState.ON.value if state else SensorState.OFF.value
         logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)
