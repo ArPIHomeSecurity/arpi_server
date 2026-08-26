@@ -20,7 +20,14 @@ from helpers import (
     wait_for_monitoring_ready,
 )
 
-from monitor.communication.mqtt import AREA_TOPIC_PREFIX, SENSOR_TOPIC_PREFIX, MQTTClient
+from monitor.communication.mqtt import (
+    AREA_TOPIC_PREFIX,
+    CONFIG_SUFFIX,
+    SENSOR_TOPIC_PREFIX,
+    STATE_SUFFIX,
+    MQTTClient,
+    join_topic,
+)
 
 load_dotenv(".env.pytest")
 
@@ -34,7 +41,10 @@ def get_area_ids(user_token) -> dict:
 
 
 def panel_topics(name: str) -> list:
-    return [f"{AREA_TOPIC_PREFIX}{name}/config", f"{AREA_TOPIC_PREFIX}{name}/state"]
+    return [
+        join_topic(AREA_TOPIC_PREFIX, name, CONFIG_SUFFIX),
+        join_topic(AREA_TOPIC_PREFIX, name, STATE_SUFFIX),
+    ]
 
 
 def get_sensor_ids(user_token) -> dict:
@@ -44,7 +54,10 @@ def get_sensor_ids(user_token) -> dict:
 
 
 def sensor_topics(name: str) -> list:
-    return [f"{SENSOR_TOPIC_PREFIX}{name}/config", f"{SENSOR_TOPIC_PREFIX}{name}/state"]
+    return [
+        join_topic(SENSOR_TOPIC_PREFIX, name, CONFIG_SUFFIX),
+        join_topic(SENSOR_TOPIC_PREFIX, name, STATE_SUFFIX),
+    ]
 
 
 def wait_for_retained_topics(prefix: str, present: list, absent: list, timeout=10.0):

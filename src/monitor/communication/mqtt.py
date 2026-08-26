@@ -19,6 +19,13 @@ from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MQTT
 logger = logging.getLogger(LOG_MQTT)
 
 
+def join_topic(*parts: str | None) -> str:
+    """
+    Join topic segments using '/', filtering out empty or None values and trimming extra slashes.
+    """
+    return "/".join(p.strip("/") for p in parts if p)
+
+
 def sanitize(name):
     """
     Convert name to [a-zA-Z0-9_-] for home assistant
@@ -41,6 +48,8 @@ SENSOR_DEVICE_MAPPING = {
     "Break": "glass_break",
 }
 
+CONFIG_SUFFIX = "config"
+STATE_SUFFIX = "state"
 COMMAND_SUFFIX = "state/set"
 
 ARPI_PREFIX = "arpi/"
@@ -49,9 +58,8 @@ AREA_TOPIC_PREFIX = f"{ARPI_PREFIX}alarm_control_panel/"
 OUTPUT_TOPIC_PREFIX = f"{ARPI_PREFIX}switch/"
 
 SYSTEM_TOPIC_NAME = "system"
-AREA_TOPIC_FILTER = f"{AREA_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
-
-SWITCH_COMMAND_TOPIC_FILTER = f"{OUTPUT_TOPIC_PREFIX}+/{COMMAND_SUFFIX}"
+AREA_TOPIC_FILTER = join_topic(AREA_TOPIC_PREFIX, "+", COMMAND_SUFFIX)
+OUTPUT_COMMAND_TOPIC_FILTER = join_topic(OUTPUT_TOPIC_PREFIX, "+", COMMAND_SUFFIX)
 
 # command payload template for home assistant: it fills in the action and the code
 COMMAND_TEMPLATE = '{"action": "{{ action }}", "code": "{{ code }}"}'
@@ -80,11 +88,11 @@ def parse_command_topic(topic) -> tuple[str | None, str | None]:
     arpi/alarm_control_panel/system/state/set -> name: system; id: none
     arpi/alarm_control_panel/house_1/state/set -> name: house; id:1
     """
-    suffix = f"/{COMMAND_SUFFIX}"
-    if not topic.startswith(AREA_TOPIC_PREFIX) or not topic.endswith(suffix):
+    command_topic_suffix = f"/{COMMAND_SUFFIX}"
+    if not topic.startswith(AREA_TOPIC_PREFIX) or not topic.endswith(command_topic_suffix):
         return None, None
 
-    panel = topic[len(AREA_TOPIC_PREFIX) : -len(suffix)] or None
+    panel = topic.removeprefix(AREA_TOPIC_PREFIX).removesuffix(command_topic_suffix) or None
     if panel is None:
         return None, None
 
@@ -103,11 +111,10 @@ def parse_switch_command_topic(topic) -> tuple[str | None, int | None]:
 
     arpi/switch/siren_1/state/set -> name: siren; id: 1
     """
-    suffix = f"/{COMMAND_SUFFIX}"
-    if not topic.startswith(OUTPUT_TOPIC_PREFIX) or not topic.endswith(suffix):
+    if not topic.startswith(OUTPUT_TOPIC_PREFIX) or not topic.endswith(f"/{COMMAND_SUFFIX}"):
         return None, None
 
-    switch = topic[len(OUTPUT_TOPIC_PREFIX) : -len(suffix)]
+    switch = topic.removeprefix(OUTPUT_TOPIC_PREFIX).removesuffix(f"/{COMMAND_SUFFIX}")
     if "_" not in switch:
         return None, None
 
@@ -280,21 +287,21 @@ class MQTTClient:
         Receive the retained configs of the area panels, they are the only way to find
         the topics of areas that were deleted or renamed while the monitor was down.
         """
-        self._subscribe(f"{AREA_TOPIC_PREFIX}+/config")
+        self._subscribe(join_topic(AREA_TOPIC_PREFIX, "+", CONFIG_SUFFIX))
 
     def subscribe_sensors(self):
         """
         Receive the retained configs of the sensors, they are the only way to find the
         topics of sensors that were deleted or renamed while the monitor was down.
         """
-        self._subscribe(f"{SENSOR_TOPIC_PREFIX}+/config")
+        self._subscribe(join_topic(SENSOR_TOPIC_PREFIX, "+", CONFIG_SUFFIX))
 
     def subscribe_outputs(self):
         """
         Receive the retained configs of the outputs, they are the only way to find the
         topics of outputs that were deleted or renamed while the monitor was down.
         """
-        self._subscribe(f"{OUTPUT_TOPIC_PREFIX}+/config")
+        self._subscribe(join_topic(OUTPUT_TOPIC_PREFIX, "+", CONFIG_SUFFIX))
 
     def _subscribe(self, topic_filter):
         """
@@ -325,8 +332,8 @@ class MQTTClient:
             logger.info("Subscribed to MQTT command topics %s", AREA_TOPIC_FILTER)
 
         if self._on_switch_command is not None:
-            client.subscribe(SWITCH_COMMAND_TOPIC_FILTER, qos=1)
-            logger.info("Subscribed to MQTT switch command topics %s", SWITCH_COMMAND_TOPIC_FILTER)
+            client.subscribe(OUTPUT_COMMAND_TOPIC_FILTER, qos=1)
+            logger.info("Subscribed to MQTT switch command topics %s", OUTPUT_COMMAND_TOPIC_FILTER)
 
         for topic_filter in self._subscriptions:
             client.subscribe(topic_filter, qos=1)
@@ -362,9 +369,7 @@ class MQTTClient:
             msg.payload,
         )
 
-        if msg.topic.startswith(OUTPUT_TOPIC_PREFIX) and msg.topic.endswith(
-            f"/{COMMAND_SUFFIX}"
-        ):
+        if msg.topic.startswith(OUTPUT_TOPIC_PREFIX) and msg.topic.endswith(f"/{COMMAND_SUFFIX}"):
             self._handle_switch_command(client, msg)
             return
 
@@ -475,8 +480,8 @@ class MQTTClient:
         # config and state are published retained, so the empty message must be
         # retained as well to remove them from the broker - otherwise the deleted
         # object comes back with the next home assistant reconnect
-        self._client.publish(f"{topic_prefix}/config", "", qos=1, retain=True)
-        self._client.publish(f"{topic_prefix}/state", "", qos=1, retain=True)
+        self._client.publish(join_topic(topic_prefix, CONFIG_SUFFIX), "", qos=1, retain=True)
+        self._client.publish(join_topic(topic_prefix, STATE_SUFFIX), "", qos=1, retain=True)
 
     def _publish_panel_config(self, topic_prefix, unique_id, name):
         """
@@ -488,8 +493,8 @@ class MQTTClient:
                 "unique_id": unique_id,
                 "device": {"identifiers": [unique_id], "name": name},
                 "supported_features": ["arm_home", "arm_away"],
-                "state_topic": f"{topic_prefix}/state",
-                "command_topic": f"{topic_prefix}/{COMMAND_SUFFIX}",
+                "state_topic": join_topic(topic_prefix, STATE_SUFFIX),
+                "command_topic": join_topic(topic_prefix, COMMAND_SUFFIX),
                 # the access code identifies the user, so it is required for every command
                 "code": "REMOTE_CODE",
                 "code_arm_required": True,
@@ -498,7 +503,7 @@ class MQTTClient:
             }
         )
 
-        topic = f"{topic_prefix}/config"
+        topic = join_topic(topic_prefix, CONFIG_SUFFIX)
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
 
@@ -526,7 +531,7 @@ class MQTTClient:
         """
         Publish a raw home assistant state payload of an alarm control panel.
         """
-        topic = f"{topic_prefix}/state"
+        topic = join_topic(topic_prefix, STATE_SUFFIX)
         logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)
 
@@ -615,13 +620,13 @@ class MQTTClient:
             {
                 "name": name,
                 "device_class": SENSOR_DEVICE_MAPPING[type],
-                "state_topic": f"{topic_prefix}/state",
+                "state_topic": join_topic(topic_prefix, STATE_SUFFIX),
                 "unique_id": f"sensor{sensor_id}",
                 "device": {"identifiers": [sensor_id], "name": name},
             }
         )
 
-        topic = f"{topic_prefix}/config"
+        topic = join_topic(topic_prefix, CONFIG_SUFFIX)
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, config, qos=1, retain=True)
 
@@ -641,7 +646,7 @@ class MQTTClient:
         if self._client is None:
             return
 
-        topic = f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}/state"
+        topic = join_topic(f"{SENSOR_TOPIC_PREFIX}{sanitize(name)}_{sensor_id}", STATE_SUFFIX)
         payload = SensorState.ON.value if state else SensorState.OFF.value
         logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)
@@ -659,17 +664,17 @@ class MQTTClient:
         topic_prefix = f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}"
         config = {
             "name": name,
-            "state_topic": f"{topic_prefix}/state",
+            "state_topic": join_topic(topic_prefix, STATE_SUFFIX),
             "unique_id": f"output{output_id}",
             "device": {"identifiers": [f"output{output_id}"], "name": name},
             "payload_on": SensorState.ON.value,
             "payload_off": SensorState.OFF.value,
         }
         if controllable:
-            config["command_topic"] = f"{topic_prefix}/{COMMAND_SUFFIX}"
+            config["command_topic"] = join_topic(topic_prefix, COMMAND_SUFFIX)
             config["optimistic"] = False
 
-        topic = f"{topic_prefix}/config"
+        topic = join_topic(topic_prefix, CONFIG_SUFFIX)
         logger.debug("Publishing MQTT config %s=%s", topic, config)
         self._client.publish(topic, json.dumps(config), qos=1, retain=True)
 
@@ -689,7 +694,7 @@ class MQTTClient:
         if self._client is None:
             return
 
-        topic = f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}/state"
+        topic = join_topic(f"{OUTPUT_TOPIC_PREFIX}{sanitize(name)}_{output_id}", STATE_SUFFIX)
         payload = SensorState.ON.value if state else SensorState.OFF.value
         logger.debug("Publishing MQTT state %s=%s", topic, payload)
         self._client.publish(topic, payload, qos=1, retain=True)

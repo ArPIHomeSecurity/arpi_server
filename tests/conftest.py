@@ -56,6 +56,7 @@ def database_host():
             ["docker", "exec", "argus-test-database", "pg_isready", "-U", DB_USER],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode == 0:
             logger.debug("Database is ready")
@@ -77,9 +78,10 @@ def database_data(request, database_host):
     logger.debug("Running database initialization and data population")
     subprocess.run(["uv", "run", "flask", "--app", "server:app", "db", "upgrade"], check=True)
 
-    seed_function = request.param
-    logger.debug("Applying database seed function: %s", seed_function.__name__)
-    seed_function()
+    seed_function = getattr(request, "param", None)
+    if seed_function:
+        logger.debug("Applying database seed function: %s", seed_function.__name__)
+        seed_function()
 
     yield
 
@@ -168,7 +170,7 @@ def authenticate(device_token):
 @pytest.fixture(scope="function", autouse=True)
 def reset_input_states():
     logger.debug("Resetting input states...")
-    num_channels = int(os.environ.get("INPUT_NUMBER", 15))
+    num_channels = int(os.environ.get("INPUT_NUMBER", "15"))
     channel_values = [0] * num_channels + [1]  # 0 for channels, 1 for POWER
     set_input_states(channel_values)
     yield
