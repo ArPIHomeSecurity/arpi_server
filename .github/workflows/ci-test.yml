@@ -6,7 +6,13 @@ permissions:
 
 on:
   pull_request:
+    paths:
+      - '**.py'
+      - '.github/workflows/ci-test.yml'
   push:
+    paths:
+      - '**.py'
+      - '.github/workflows/ci-test.yml'
     branches:
       - 'main'
       - 'dev_*'
