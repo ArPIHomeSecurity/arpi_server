@@ -22,8 +22,7 @@ from monitor.communication.mqtt import (
     MQTTClient,
     join_topic,
 )
-from tests.test_functional.data import create_test_two_areas_v2
-from tests.test_functional.data import create_test_outputs_v2
+from tests.test_functional.data import create_test_outputs_v2, create_test_two_areas_v2
 from tests.test_functional.helpers import (
     call_api,
     check_api_response,
@@ -179,9 +178,7 @@ def test_05_renaming_an_output_moves_its_topics(device_token, user_token):
     check_api_response(response)
     outputs = {output["name"]: output["id"] for output in response.json()}
 
-    response = call_api(
-        "PUT", f"/api/output/{outputs['Button']}", {"name": "Relay"}, user_token
-    )
+    response = call_api("PUT", f"/api/output/{outputs['Button']}", {"name": "Relay"}, user_token)
     check_api_response(response)
 
     wait_for_retained_topics(
@@ -207,4 +204,3 @@ def test_06_remove_orphan_output_on_startup(device_token, user_token):
     wait_for_retained_topics(
         prefix=OUTPUT_TOPIC_PREFIX, present=[], absent=switch_topics("orphan_output_999")
     )
-
