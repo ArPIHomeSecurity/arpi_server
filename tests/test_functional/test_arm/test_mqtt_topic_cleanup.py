@@ -16,12 +16,14 @@ from dotenv import load_dotenv
 from monitor.communication.mqtt import (
     AREA_TOPIC_PREFIX,
     CONFIG_SUFFIX,
+    OUTPUT_TOPIC_PREFIX,
     SENSOR_TOPIC_PREFIX,
     STATE_SUFFIX,
     MQTTClient,
     join_topic,
 )
 from tests.test_functional.data import create_test_two_areas_v2
+from tests.test_functional.data import create_test_outputs_v2
 from tests.test_functional.helpers import (
     call_api,
     check_api_response,
@@ -57,6 +59,13 @@ def sensor_topics(name: str) -> list:
     return [
         join_topic(SENSOR_TOPIC_PREFIX, name, CONFIG_SUFFIX),
         join_topic(SENSOR_TOPIC_PREFIX, name, STATE_SUFFIX),
+    ]
+
+
+def switch_topics(name: str) -> list:
+    return [
+        join_topic(OUTPUT_TOPIC_PREFIX, name, CONFIG_SUFFIX),
+        join_topic(OUTPUT_TOPIC_PREFIX, name, STATE_SUFFIX),
     ]
 
 
@@ -157,3 +166,45 @@ def test_04_remove_orphan_sensor_on_startup(device_token, user_token):
     wait_for_retained_topics(
         prefix=SENSOR_TOPIC_PREFIX, present=[], absent=sensor_topics("orphan_sensor_999")
     )
+
+
+@pytest.mark.parametrize("database_data", [create_test_outputs_v2], indirect=True)
+def test_05_renaming_an_output_moves_its_topics(device_token, user_token):
+    """
+    After a rename the switch is published under the new topic and the retained
+    config/state of the old topic is removed from the broker.
+    """
+    wait_for_monitoring_ready(device_token)
+    response = call_api("GET", "/api/outputs/", {}, user_token)
+    check_api_response(response)
+    outputs = {output["name"]: output["id"] for output in response.json()}
+
+    response = call_api(
+        "PUT", f"/api/output/{outputs['Button']}", {"name": "Relay"}, user_token
+    )
+    check_api_response(response)
+
+    wait_for_retained_topics(
+        prefix=OUTPUT_TOPIC_PREFIX,
+        present=switch_topics("relay_1") + switch_topics("area_2") + switch_topics("system_3"),
+        absent=switch_topics("button_1"),
+    )
+
+
+@pytest.mark.parametrize("database_data", [create_test_outputs_v2], indirect=True)
+def test_06_remove_orphan_output_on_startup(device_token, user_token):
+    """
+    If the monitor finds a retained topic that is not used by any output, it removes it.
+    """
+    client = MQTTClient()
+    client.connect()
+    client.publish_output_config(output_id=999, name="orphan_output", controllable=True)
+    client.publish_output_state(output_id=999, name="orphan_output", state=False)
+    client.close()
+
+    wait_for_monitoring_ready(device_token)
+
+    wait_for_retained_topics(
+        prefix=OUTPUT_TOPIC_PREFIX, present=[], absent=switch_topics("orphan_output_999")
+    )
+
