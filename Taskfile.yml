@@ -151,27 +151,39 @@ tasks:
             nginx
 
   test:
-    desc: Run tests
-    cmds:
-      - |
-        uv run pytest \
-          -v \
-          --junitxml=junit.xml \
-          --cov=src \
-          --cov-report=xml \
-          --cov-report=term \
-          {{.CLI_ARGS}}
+    deps: [test-unit, test-functional]
 
   test-debug:
     desc: Run tests in debug mode
-    cmds:
-      - |
-        uv run pytest \
-          -vv \
-          -s \
-          --setup-show \
-          --maxfail=1 \
-          {{.CLI_ARGS}}
+    cmd: |
+      uv run pytest \
+        -vv \
+        -s \
+        --setup-show \
+        --maxfail=1 \
+        {{.CLI_ARGS}}
+
+  test-unit:
+    desc: Run unit tests
+    cmd: |
+      uv run pytest tests/test_unit \
+        -v \
+        --junitxml=junit.xml \
+        --cov=src \
+        --cov-report=xml \
+        --cov-report=term \
+        {{.CLI_ARGS}}
+
+  test-functional:
+    desc: Run functional tests
+    cmd: |
+      uv run pytest tests/test_functional \
+        -v \
+        --junitxml=junit.xml \
+        --cov=src \
+        --cov-report=xml \
+        --cov-report=term \
+        {{.CLI_ARGS}}
 
   list-outdated-dependencies:
     desc: List outdated dependencies

@@ -99,7 +99,7 @@ class OutputHandler(Thread):
         Connect to the MQTT broker from the handler thread.
         """
         self._mqtt_client = MQTTClient(
-            on_switch_command=self._handle_mqtt_command,
+            on_output_command=self._handle_mqtt_command,
             topic_validator=self.is_outputname_valid,
         )
         self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)

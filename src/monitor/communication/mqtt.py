@@ -75,8 +75,8 @@ HA_ACTION_MAPPING = {
 
 # on_arm_command action handler type
 OnArmCommandHandler = Callable[[str, str, str | None], None]
-# on_switch_command action handler type
-OnSwitchCommandHandler = Callable[[int | None, str, bool], None]
+# on_output_command action handler type
+OnOutputCommandHandler = Callable[[int | None, str, bool], None]
 # topic_validator type
 TopicValidator = Callable[[int | None, str], bool]
 
@@ -105,7 +105,7 @@ def parse_command_topic(topic) -> tuple[str | None, str | None]:
     return panel, None
 
 
-def parse_switch_command_topic(topic) -> tuple[str | None, int | None]:
+def parse_output_command_topic(topic) -> tuple[str | None, int | None]:
     """
     Return the (output name, output id) of a switch command topic.
 
@@ -153,15 +153,15 @@ class MQTTClient:
     def __init__(
         self,
         on_arm_command: OnArmCommandHandler | None = None,
-        on_switch_command: OnSwitchCommandHandler | None = None,
+        on_output_command: OnOutputCommandHandler | None = None,
         topic_validator: TopicValidator | None = None,
     ):
         """
         :param on_arm_command: called as on_arm_command(panel_name, action, code) for every
             arm/disarm command received from the broker. Subscribing to the command
             topics only happens when it is set.
-        :param on_switch_command: called as on_switch_command(output_id, output_name, state)
-            for every switch command received from the broker. Subscribing to the switch
+        :param on_output_command: called as on_output_command(output_id, output_name, state)
+            for every output command received from the broker. Subscribing to the output
             command topics only happens when it is set.
         :param topic_validator: called as topic_validator(item_id, item_name) for every
             area or sensor topic received from the broker. If it returns False, the
@@ -169,7 +169,7 @@ class MQTTClient:
         """
         self._client = None
         self._on_arm_command = on_arm_command
-        self._on_switch_command = on_switch_command
+        self._on_output_command = on_output_command
         self._topic_validator = topic_validator
         self._subscriptions: set[str] = set()
 
@@ -331,7 +331,7 @@ class MQTTClient:
             client.subscribe(AREA_TOPIC_FILTER, qos=1)
             logger.info("Subscribed to MQTT command topics %s", AREA_TOPIC_FILTER)
 
-        if self._on_switch_command is not None:
+        if self._on_output_command is not None:
             client.subscribe(OUTPUT_COMMAND_TOPIC_FILTER, qos=1)
             logger.info("Subscribed to MQTT switch command topics %s", OUTPUT_COMMAND_TOPIC_FILTER)
 
@@ -370,7 +370,7 @@ class MQTTClient:
         )
 
         if msg.topic.startswith(OUTPUT_TOPIC_PREFIX) and msg.topic.endswith(f"/{COMMAND_SUFFIX}"):
-            self._handle_switch_command(client, msg)
+            self._handle_output_command(client, msg)
             return
 
         if msg.topic.startswith(AREA_TOPIC_PREFIX) and msg.topic.endswith(f"/{COMMAND_SUFFIX}"):
@@ -421,11 +421,11 @@ class MQTTClient:
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to handle MQTT command from topic %s", msg.topic)
 
-    def _handle_switch_command(self, client, msg: mqtt.MQTTMessage):
+    def _handle_output_command(self, client, msg: mqtt.MQTTMessage):
         """
         Handle an ON/OFF command sent to the switch topic of an output.
         """
-        if self._on_switch_command is None:
+        if self._on_output_command is None:
             return
 
         if msg.retain:
@@ -438,7 +438,7 @@ class MQTTClient:
         if not msg.payload:
             return
 
-        output_name, output_id = parse_switch_command_topic(msg.topic)
+        output_name, output_id = parse_output_command_topic(msg.topic)
         if output_id is None:
             logger.error("Received MQTT switch command on unexpected topic %s", msg.topic)
             return
@@ -451,7 +451,7 @@ class MQTTClient:
             return
 
         try:
-            self._on_switch_command(output_id, output_name, state == SensorState.ON)
+            self._on_output_command(output_id, output_name, state == SensorState.ON)
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to handle MQTT switch command from topic %s", msg.topic)
 
