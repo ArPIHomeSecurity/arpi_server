@@ -20,7 +20,7 @@ jobs:
     name: Run tests
     if: >-
       ${{
-        github.event_name == 'pull_request' ||
+        (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dev_')) ||
         (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
       }}
     runs-on: ubuntu-latest
