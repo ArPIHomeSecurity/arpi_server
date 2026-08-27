@@ -132,7 +132,7 @@ class Notification:
         template = Template(_get_sms_template(self.type))
         return template.safe_substitute(
             id=self.id,
-            sensors=", ".join(self.sensors),
+            sensors=", ".join(self.sensors or []),
             time=self.time,
             location=self.location,
         )

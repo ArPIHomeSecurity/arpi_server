@@ -6,6 +6,7 @@ from utils.constants import (
     MAKE_TEST_CALL,
     MONITOR_ACTIVATE_OUTPUT,
     MONITOR_ARM_AWAY,
+    MONITOR_ARM_DELAY_EXPIRED,
     MONITOR_ARM_STAY,
     MONITOR_DEACTIVATE_OUTPUT,
     MONITOR_DISARM,
@@ -64,6 +65,20 @@ class MonitorArmStayCommand:
     keypad_id: int | None = None
     use_delay: bool = True
     area_id: int | None = None
+
+
+@dataclass(frozen=True)
+class MonitorArmDelayExpiredCommand:
+    """
+    Sent by the exit delay timer thread, the armed states are published by the
+    monitoring thread handling this command (it owns the database session).
+
+    The generation identifies the arm that started the timer, so that the expiry of a
+    replaced timer that fired before it could be cancelled is ignored.
+    """
+
+    action: str = MONITOR_ARM_DELAY_EXPIRED
+    generation: int = 0
 
 
 @dataclass(frozen=True)
@@ -172,6 +187,7 @@ MonitorCommand = (
     | MonitorRegisterCardCommand
     | MonitorArmAwayCommand
     | MonitorArmStayCommand
+    | MonitorArmDelayExpiredCommand
     | MonitorDisarmCommand
     | MonitorActivateOutputCommand
     | MonitorDeactivateOutputCommand
@@ -204,6 +220,7 @@ _ACTION_TO_CLASS = {
     MONITOR_REGISTER_CARD: MonitorRegisterCardCommand,
     MONITOR_ARM_AWAY: MonitorArmAwayCommand,
     MONITOR_ARM_STAY: MonitorArmStayCommand,
+    MONITOR_ARM_DELAY_EXPIRED: MonitorArmDelayExpiredCommand,
     MONITOR_DISARM: MonitorDisarmCommand,
     MONITOR_ACTIVATE_OUTPUT: MonitorActivateOutputCommand,
     MONITOR_DEACTIVATE_OUTPUT: MonitorDeactivateOutputCommand,

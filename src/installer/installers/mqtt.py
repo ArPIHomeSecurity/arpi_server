@@ -5,7 +5,12 @@ import click
 from installer.helpers import PackageHelper, SecurityHelper, ServiceHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
 
+# source etc directory for configuration files
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
+
+# must stay in sync with DEFAULT_MQTT_CA_CERT in monitor.config.models
+CLIENT_CA_DIR = "/home/argus/.local/etc/arpi-server/certs"
+CLIENT_CA_CERT = f"{CLIENT_CA_DIR}/arpi_ca.crt"
 
 
 class MqttInstaller(BaseInstaller):
@@ -61,60 +66,52 @@ class MqttInstaller(BaseInstaller):
         if not ServiceHelper.is_service_running("mosquitto"):
             ServiceHelper.start_service("mosquitto")
 
-    def configure_mqtt_ssl_certificates(self):
-        """Configure SSL certificates for MQTT"""
-        click.echo("   🔐 Install MQTT SSL self-signed certificates...")
+    def install_client_ca_certificate(self):
+        """Install the CA certificate the MQTT clients verify the broker with"""
+        click.echo("   🔐 Install MQTT CA certificate...")
 
-        # Create certs directory and copy certificates
-        SystemHelper.run_command("mkdir -p /etc/mosquitto/certs")
+        # The clients connect through nginx, which presents the self signed certificate
+        # of the application, so they need a readable copy of the issuing CA.
+        SystemHelper.run_command(f"mkdir -p {CLIENT_CA_DIR}")
+        SystemHelper.run_command(f"cp {ETC_DIR}/nginx/ssl/arpi_ca.crt {CLIENT_CA_CERT}")
+        SecurityHelper.set_permissions(CLIENT_CA_CERT, "argus:argus", "640")
+        click.echo(f"   ✓ MQTT CA certificate installed for the monitor at {CLIENT_CA_CERT}")
 
-        # Copy dhparam file
-        SystemHelper.run_command(f"cp {ETC_DIR}/arpi_dhparam.pem /etc/mosquitto/certs/")
-        click.echo("   ✓ Copied dhparam file")
-
-        # Copy SSL certificates from nginx config
-        ssl_files = [
-            f"{ETC_DIR}/nginx/ssl/arpi_app.crt",
-            f"{ETC_DIR}/nginx/ssl/arpi_app.key",
-            f"{ETC_DIR}/nginx/ssl/arpi_ca.crt",
-        ]
-
-        for ssl_file in ssl_files:
-            SystemHelper.run_command(f"cp {ssl_file} /etc/mosquitto/certs/")
-
-        # Set proper ownership for certs directory
-        SecurityHelper.set_permissions(
-            "/etc/mosquitto/certs", "mosquitto:mosquitto", "700", recursive=True
-        )
-
-        click.echo("   ✓ MQTT SSL self-signed certificates installed")
+    def remove_legacy_ssl_configuration(self):
+        """Remove the TCP TLS listener of the previous versions"""
+        # nginx owns port 8883 now, an old listener would keep it occupied
+        SystemHelper.run_command("rm -f /etc/mosquitto/conf.d/ssl.conf")
+        SystemHelper.run_command("rm -f /etc/mosquitto/configs-available/ssl-self-signed.conf")
+        SystemHelper.run_command("rm -f /etc/mosquitto/configs-available/ssl-certbot.conf")
+        SystemHelper.run_command("rm -fr /etc/mosquitto/certs")
+        click.echo("   ✓ Legacy MQTT SSL configuration removed")
 
     def configure_mqtt(self):
         """Configure MQTT configuration files"""
         click.echo("   ⚙️ Configuring MQTT configuration files...")
 
-        # Copy auth and logging configurations
+        self.remove_legacy_ssl_configuration()
+
+        # Copy listener, auth and logging configurations
+        SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/listener.conf /etc/mosquitto/conf.d/")
         SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/auth.conf /etc/mosquitto/conf.d/")
         SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/logging.conf /etc/mosquitto/conf.d/")
 
-        # Create configs-available directory and copy SSL configs
-        SystemHelper.run_command("mkdir -p /etc/mosquitto/configs-available/")
-        SystemHelper.run_command(
-            f"cp {ETC_DIR}/mosquitto/ssl*.conf /etc/mosquitto/configs-available/"
-        )
-
-        if os.path.exists("/etc/mosquitto/conf.d/ssl.conf"):
-            click.echo("   ✓ MQTT SSL configuration already exists")
-        else:
-            # Create symlink for SSL configuration
-            SystemHelper.run_command(
-                "ln -sf /etc/mosquitto/configs-available/ssl-self-signed.conf /etc/mosquitto/conf.d/ssl.conf"
-            )
-            click.echo("   ✓ MQTT SSL configuration enabled")
+        SystemHelper.run_command(f"cp {ETC_DIR}/mosquitto/acl.conf /etc/mosquitto/acl.conf")
+        SecurityHelper.set_permissions("/etc/mosquitto/acl.conf", "mosquitto:mosquitto", "600")
+        click.echo("   ✓ MQTT access control list installed")
 
         SecurityHelper.set_permissions(
             "/etc/mosquitto/conf.d/", f"mosquitto:{self.user}", "774", recursive=True
         )
+
+        # the drop-in creates the socket directory and makes the socket readable by nginx
+        SystemHelper.run_command("mkdir -p /etc/systemd/system/mosquitto.service.d/")
+        SystemHelper.run_command(
+            f"cp {ETC_DIR}/systemd/mosquitto.service.d/arpi.conf "
+            "/etc/systemd/system/mosquitto.service.d/"
+        )
+        SystemHelper.run_command("systemctl daemon-reload")
 
         click.echo("   ✓ MQTT configuration files setup complete")
 
@@ -140,6 +137,15 @@ class MqttInstaller(BaseInstaller):
                 )
                 click.echo("   ✓ Reader MQTT password created")
 
+            argus_control_password = self.secrets_manager.get_secret("ARGUS_CONTROL_MQTT_PASSWORD")
+            if argus_control_password:
+                click.echo("   ✓ Control MQTT password already exists")
+            else:
+                argus_control_password = self.secrets_manager.generate_secret(
+                    "ARGUS_CONTROL_MQTT_PASSWORD"
+                )
+                click.echo("   ✓ Control MQTT password created")
+
             # configure password for argus user
             create_flag = "-c" if not os.path.exists("/etc/mosquitto/.passwd") else ""
             SystemHelper.run_command(
@@ -149,9 +155,14 @@ class MqttInstaller(BaseInstaller):
             SystemHelper.run_command(
                 f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_reader "{argus_reader_password}"'
             )
+            SystemHelper.run_command(
+                f'mosquitto_passwd -b /etc/mosquitto/.passwd argus_control "{argus_control_password}"'
+            )
             SecurityHelper.set_permissions("/etc/mosquitto/.passwd", "mosquitto:mosquitto", "700")
+            # the passwords must not end up in the install log, the reader and control passwords
+            # can be looked up by an administrator in the MQTT configuration of the web application
             click.echo(
-                f"   ✓ MQTT authentication configured argus:{argus_password} argus_reader:{argus_reader_password}"
+                "   ✓ MQTT authentication configured for argus, argus_reader and argus_control"
             )
         except Exception as e:
             click.echo(f"    ⚠️ WARNING: MQTT authentication setup failed: {e}")
@@ -166,7 +177,7 @@ class MqttInstaller(BaseInstaller):
     def install(self):
         """Install MQTT components"""
         self.install_mosquitto()
-        self.configure_mqtt_ssl_certificates()
+        self.install_client_ca_certificate()
         self.configure_mqtt()
         self.setup_mqtt_authentication()
         self.restart_service()
@@ -178,8 +189,10 @@ class MqttInstaller(BaseInstaller):
             "Mosquitto running": ServiceHelper.is_service_running("mosquitto"),
             "Mosquitto enabled": ServiceHelper.is_service_enabled("mosquitto"),
             "Mosquitto authentication configured": os.path.exists("/etc/mosquitto/.passwd"),
-            "Mosquitto SSL configured": (
-                os.path.exists("/etc/mosquitto/certs/arpi_app.crt")
-                and os.path.exists("/etc/mosquitto/certs/arpi_app.key")
+            "Mosquitto ACL configured": os.path.exists("/etc/mosquitto/acl.conf"),
+            "MQTT CA certificate for the monitor": os.path.exists(CLIENT_CA_CERT),
+            "Mosquitto socket listener configured": os.path.exists(
+                "/etc/mosquitto/conf.d/listener.conf"
             ),
+            "Mosquitto socket available": os.path.exists("/run/mosquitto/mosquitto.sock"),
         }

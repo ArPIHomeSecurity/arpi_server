@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 simulator = [
-    "textual~=5.3",
+    "textual~=8.2",
     "textual-dev",
 ]
 device = [
@@ -102,11 +102,9 @@ version = {attr = "server.version.__package_version__"}
 [tool.ruff]
 line-length = 100
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+pythonpath = ["."]
 log_level = "DEBUG"
 log_format = "%(asctime)s-[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s"
 
@@ -119,7 +117,7 @@ omit = [
 [dependency-groups]
 dev = [
     "build~=1.4",
-    "cryptography~=48.0",
+    "cryptography>=50",
     "deepdiff>=9.0.0",
     "pytest~=9.0",
     "pytest-coverage>=0.0",

@@ -1,0 +1,92 @@
+name: CI / Test
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    paths:
+      - '**.py'
+      - '.github/workflows/ci-test.yml'
+  push:
+    paths:
+      - '**.py'
+      - '.github/workflows/ci-test.yml'
+    branches:
+      - 'main'
+      - 'dev_*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Test:
+    name: Run tests
+    if: >-
+      ${{
+        (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dev_')) ||
+        (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
+      }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository 🛎️
+        uses: actions/checkout@v6
+
+      - name: Cache Python packages 📦
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: pip-cache-${{ runner.os }}-${{ hashFiles('Pipfile.lock') }}
+          restore-keys: |
+            pip-cache-${{ runner.os }}-
+
+      - name: Setup Python 🐍
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies 📦
+        run: |
+          curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash
+          sudo apt update && sudo apt install -y jq
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install Task 🛠️
+        uses: go-task/setup-task@v2
+
+      - name: Run tests 🔍
+        run: |
+          task create-environment
+          if [ "$RUNNER_DEBUG" = "1" ]; then
+            task test-debug
+          else
+            task test
+          fi
+
+      - name: Publish test results📄
+        if: always()
+        uses: dorny/test-reporter@v3
+        with:
+          name: pytest
+          reporter: python-xunit
+          path: junit.xml
+
+      - name: Code Coverage Report
+        if: always()
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          indicators: true
+          output: file
+
+      - name: Report Code Coverage Summary
+        if: always()
+        run: |
+          echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY

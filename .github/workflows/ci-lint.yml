@@ -1,0 +1,67 @@
+name: CI / Lint
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    paths:
+      - '**/*.py'
+  push:
+    paths:
+      - '**/*.py'
+    branches:
+      - 'main'
+      - 'dev_*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Lint:
+    name: Lint code
+    if: >-
+      ${{
+        (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dev_')) ||
+        (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # Required for SARIF upload
+
+    steps:
+      - name: Checkout repository 🛎️
+        uses: actions/checkout@v6
+
+      - name: Cache Python packages 📦
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: pip-cache-${{ runner.os }}-${{ hashFiles('Pipfile.lock') }}
+          restore-keys: |
+            pip-cache-${{ runner.os }}-
+
+      - name: Setup Python 🐍
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies 📦
+        run: |
+          curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash
+          sudo apt update && sudo apt install -y jq task
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          task create-environment
+
+      - name: Lint code 🧹
+        run: |
+          task lint:sarif
+
+      - name: Upload SARIF file to GitHub Code Scanning 🕵️
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: ruff.sarif

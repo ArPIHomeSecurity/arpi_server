@@ -42,7 +42,7 @@ Important tasks
 - task format: format Python code with Ruff.
 - task format-check: verify formatting.
 - task lint: run Ruff checks.
-- task lint-fix: auto-fix Ruff issues where possible.
+- task lint:fix: auto-fix Ruff issues where possible.
 - task test: run the pytest suite.
 - task test-debug: run pytest with verbose debug output.
 - task start-database: start the local PostgreSQL container.

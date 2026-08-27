@@ -76,10 +76,5 @@ class GSM:
         logger.info("Calling (%s) number: %s", call_type, phone_number)
         return True
 
-    @property
-    def incoming_dtmf(self):
-        # return None
-        return "1"
-
     def destroy(self):
         GSM.CONNECTS -= 1

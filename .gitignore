@@ -27,3 +27,7 @@ config.env
 *_input.json
 *_output.json
 *_keypad.json
+
+ruff.sarif
+junit.xml
+coverage.xml

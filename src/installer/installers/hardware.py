@@ -6,6 +6,7 @@ import click
 from installer.helpers import PackageHelper, ServiceHelper, SystemHelper
 from installer.installers.base import BaseInstaller, InstallerConfig
 
+# source etc directory for configuration files when installing
 ETC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "etc")
 
 

@@ -957,7 +957,9 @@ class Option(BaseModel):
     def serialized(self):
         filtered_value = deepcopy(json.loads(self.value))
         replace_keys(filtered_value, {"smtp_password": "******", "replace_empty": False})
-        if not (self.name == "mqtt" and self.section == "internal_read"):
+        # the credentials of the internal broker are system managed and have to be readable
+        # by an administrator to configure an external client like Home Assistant
+        if not (self.name == "mqtt" and self.section in ("internal_read", "internal_control")):
             replace_keys(filtered_value, {"password": "******", "replace_empty": False})
         return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
 

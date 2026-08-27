@@ -22,7 +22,7 @@ from monitor.adapters.keypads import get_wiegand_keypad
 from monitor.adapters.keypads.base import Action, Function, KeypadBase
 from monitor.adapters.keypads.dsc import DSCKeypad
 from monitor.broadcast import Broadcaster
-from monitor.database import get_database_session
+from monitor.database import create_database_session, get_database_session
 from monitor.socket_io import send_card_not_registered, send_card_registered
 from monitor.storage import State, States
 from utils.constants import (
@@ -52,7 +52,7 @@ class KeypadHandler(Thread):
 
     def configure(self):
         logger.debug("Configure keypad")
-        with get_database_session() as db_session:
+        with create_database_session() as db_session:
             keypad_settings = db_session.query(Keypad).first()
 
             if keypad_settings is None or not keypad_settings.enabled:
@@ -158,7 +158,7 @@ class KeypadHandler(Thread):
                     logger.error("Unknown keypad action: %s", action)
 
     def arm_keypad(self, arm_type, use_delay):
-        with get_database_session() as session:
+        with create_database_session() as session:
             arm_delay = get_arm_delay(session, arm_type) if use_delay else 0
             logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
             self._keypad.set_armed(True)
@@ -181,7 +181,7 @@ class KeypadHandler(Thread):
                 self._keypad.start_delay(arm.time, arm_delay)
 
     def alert_delay(self):
-        with get_database_session() as session:
+        with create_database_session() as session:
             arm_type = get_arm_state(session)
             alert_delay = get_alert_delay(session, arm_type)
             logger.info("Alert with delay: %s / %s", alert_delay, arm_type)
@@ -235,7 +235,7 @@ class KeypadHandler(Thread):
         """
         Find the first card from the database matching the card number
         """
-        with get_database_session() as db_session:
+        with create_database_session() as db_session:
             users = db_session.query(User).all()
 
             cards = []
@@ -255,7 +255,7 @@ class KeypadHandler(Thread):
         Parameters
         card_number : str - card number to register
         """
-        with get_database_session() as db_session:
+        with create_database_session() as db_session:
             users = db_session.query(User).filter(User.card_registration_expiry >= "NOW()").all()
             if users:
                 cards = db_session.query(Card).all()

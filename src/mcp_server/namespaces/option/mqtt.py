@@ -61,6 +61,21 @@ def get_internal_read_config() -> dict:
 
 
 @mqtt_option_mcp.tool(
+    name="get_internal_control_config",
+    description=(
+        "Get the internal MQTT broker read and control configuration (read-only, system-managed)"
+    ),
+)
+def get_internal_control_config() -> dict:
+    """
+    Get the internal MQTT broker read and control configuration
+    """
+    mqtt_service = MQTTService(get_database_session())
+    config = mqtt_service.get_internal_control_config()
+    return asdict(config) if config else {}
+
+
+@mqtt_option_mcp.tool(
     name="get_external_publish_config",
     description="Get the external MQTT broker publish configuration",
 )

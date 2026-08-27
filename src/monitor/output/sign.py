@@ -21,10 +21,11 @@ class OutputSign(Thread):
     Generating output sign
     """
 
-    def __init__(self, stop_event, output: Output):
+    def __init__(self, stop_event, output: Output, on_state_change=None):
         super().__init__(name="OutputSign")
         self._stop_event = stop_event
         self._output = output
+        self._on_state_change = on_state_change
         self._output_adapter = get_output_adapter()
 
         # set as daemon to avoid blocking the application
@@ -41,6 +42,7 @@ class OutputSign(Thread):
         session.query(Output).filter_by(id=self._output.id).update({"state": True})
         session.commit()
         send_output_state(self._output.id, True)
+        self._notify_state_change(True)
 
         logger.info(
             "Output sign on channel '%s' triggered (%d / %d)",
@@ -110,4 +112,10 @@ class OutputSign(Thread):
         # update state in database
         session.query(Output).filter_by(id=self._output.id).update({"state": False})
         session.commit()
+        session.close()
         send_output_state(self._output.id, False)
+        self._notify_state_change(False)
+
+    def _notify_state_change(self, state: bool):
+        if self._on_state_change is not None:
+            self._on_state_change(self._output.id, state)

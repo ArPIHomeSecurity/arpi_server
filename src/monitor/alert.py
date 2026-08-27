@@ -69,6 +69,8 @@ class SensorAlert(Thread):
                 db_session.commit()
                 Notifier.notify_alert_stopped(alert.id, alert.end_time)
 
+            db_session.close()
+
         send_alert_state(None)
         send_syren_state(None)
         logger.info("Alerts stopped")

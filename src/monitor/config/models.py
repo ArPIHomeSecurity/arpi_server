@@ -171,6 +171,13 @@ class AlertSensitivityConfig(BaseConfig):
     """
 
 
+# CA certificate used to verify the internal broker, installed next to the other
+# configuration of the server. Overridable for setups with a differently placed CA.
+DEFAULT_MQTT_CA_CERT = os.environ.get(
+    "ARGUS_MQTT_CA_CERT", os.path.expanduser("~/.local/etc/arpi-server/certs/arpi_ca.crt")
+)
+
+
 @dataclass
 class MQTTConnection(BaseConfig):
     OPTION_NAME = "mqtt"
@@ -194,7 +201,29 @@ class MQTTConfigInternalRead(BaseConfig):
     username: str = "argus_reader"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_READER_MQTT_PASSWORD"))
     tls_enabled: bool = True
+    # only turns off the hostname check, the certificate chain is still verified
     tls_insecure: bool = True
+    ca_certs: str | None = DEFAULT_MQTT_CA_CERT
+
+
+@dataclass
+class MQTTConfigInternalControl(BaseConfig):
+    """
+    Access configuration to the internal MQTT broker for external clients that also
+    arm and disarm, in addition to reading the state.
+    """
+
+    OPTION_NAME = "mqtt"
+    SECTION_NAME = "internal_control"
+
+    hostname: str = "arpi.local"
+    port: int = 8883
+    username: str = "argus_control"
+    password: str = field(default_factory=lambda: os.environ.get("ARGUS_CONTROL_MQTT_PASSWORD"))
+    tls_enabled: bool = True
+    # only turns off the hostname check, the certificate chain is still verified
+    tls_insecure: bool = False
+    ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
@@ -206,18 +235,21 @@ class MQTTConfigInternalPublish(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_publish"
 
-    hostname: str = "localhost"
+    hostname: str = "arpi.local"
     port: int = 8883
     username: str = "argus"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
     tls_enabled: bool = True
-    tls_insecure: bool = True
+    # the internal broker is reached over a trusted network and is expected to have a
+    # self signed certificate, so it is verified but the hostname check is turned off
+    tls_insecure: bool = False
+    ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
 class MQTTConfigExternalPublish(BaseConfig):
     """
-    Access configuration to the external MQTT broker for publishing.
+    Access configuration to the external MQTT broker for publishing by the monitor.
     """
 
     OPTION_NAME = "mqtt"
@@ -229,3 +261,5 @@ class MQTTConfigExternalPublish(BaseConfig):
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
     tls_enabled: bool = True
     tls_insecure: bool = True
+    # no explicit CA means the system certificate store is used
+    ca_certs: str | None = None

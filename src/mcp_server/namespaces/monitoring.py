@@ -70,6 +70,7 @@ def get_all_options() -> str:
     gsm_config = GSMService(db_session).get_gsm_config()
     mqtt_external_publish = MQTTService(db_session).get_external_publish_config()
     mqtt_internal_read = MQTTService(db_session).get_internal_read_config()
+    mqtt_internal_control = MQTTService(db_session).get_internal_control_config()
     smtp_config = SMTPService(db_session).get_smtp_config()
     ssh_config = SSHService(db_session).get_ssh_config()
     subscriptions = SubscriptionsService(db_session).get_subscriptions_config()
@@ -84,6 +85,7 @@ def get_all_options() -> str:
                 "gsm": asdict(gsm_config),
                 "mqtt_external_publish": asdict(mqtt_external_publish),
                 "mqtt_internal_read": asdict(mqtt_internal_read),
+                "mqtt_internal_control": asdict(mqtt_internal_control),
                 "smtp": asdict(smtp_config),
                 "ssh": asdict(ssh_config),
                 "subscriptions": asdict(subscriptions),
