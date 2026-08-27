@@ -213,9 +213,7 @@ class MQTTClient:
                 # but we see errors in logs, so need to add a check
                 self._client.username_pw_set(username, password)
             except AttributeError as error:
-                logger.error(
-                    "Failed to set MQTT username=%s and password=%s: %s", username, password, error
-                )
+                logger.error("Failed to set MQTT username=%s: %s", username, error)
                 self._client = None
                 return
 

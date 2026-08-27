@@ -5,8 +5,9 @@ Arm state of a system where only a part of the areas is armed.
 import logging
 
 import pytest
-from tests.test_functional.data import create_test_two_areas_v2
 from dotenv import load_dotenv
+
+from tests.test_functional.data import create_test_two_areas_v2
 from tests.test_functional.helpers import (
     MonitorEvent,
     MonitorEventsClient,

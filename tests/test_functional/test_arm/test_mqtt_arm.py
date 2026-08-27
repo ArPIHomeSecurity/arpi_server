@@ -8,8 +8,9 @@ from time import sleep
 
 import paho.mqtt.client as mqtt
 import pytest
-from tests.test_functional.data import create_test_no_delay_v2
 from dotenv import load_dotenv
+
+from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import (
     MonitorEvent,
     MonitorEventsClient,

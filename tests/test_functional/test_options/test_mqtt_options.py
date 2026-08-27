@@ -9,8 +9,9 @@ of the other options.
 import logging
 
 import pytest
-from tests.test_functional.data import create_test_no_delay_v2
 from dotenv import load_dotenv
+
+from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import call_api, check_api_response
 
 load_dotenv(".env.pytest")

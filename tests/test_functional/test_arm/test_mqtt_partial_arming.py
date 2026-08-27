@@ -13,8 +13,9 @@ from time import sleep
 
 import paho.mqtt.client as mqtt
 import pytest
-from tests.test_functional.data import create_test_two_areas_with_delay_v2
 from dotenv import load_dotenv
+
+from tests.test_functional.data import create_test_two_areas_with_delay_v2
 from tests.test_functional.helpers import (
     MqttStateRecorder,
     call_api,

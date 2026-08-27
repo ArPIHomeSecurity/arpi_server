@@ -11,14 +11,7 @@ import logging
 from time import sleep, time
 
 import pytest
-from tests.test_functional.data import create_test_two_areas_v2
 from dotenv import load_dotenv
-from tests.test_functional.helpers import (
-    call_api,
-    check_api_response,
-    collect_retained_messages,
-    wait_for_monitoring_ready,
-)
 
 from monitor.communication.mqtt import (
     AREA_TOPIC_PREFIX,
@@ -27,6 +20,13 @@ from monitor.communication.mqtt import (
     STATE_SUFFIX,
     MQTTClient,
     join_topic,
+)
+from tests.test_functional.data import create_test_two_areas_v2
+from tests.test_functional.helpers import (
+    call_api,
+    check_api_response,
+    collect_retained_messages,
+    wait_for_monitoring_ready,
 )
 
 load_dotenv(".env.pytest")
