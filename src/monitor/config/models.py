@@ -14,6 +14,10 @@ class Subscription:
     alert_stopped: bool = False
     power_outage_started: bool = False
     power_outage_stopped: bool = False
+    local_network_issue_started: bool = False
+    local_network_issue_stopped: bool = False
+    internet_issue_started: bool = False
+    internet_issue_stopped: bool = False
 
 
 @dataclass

@@ -58,3 +58,48 @@ Location: ${location}
 ArPI Home Security
 
 """
+
+
+LOCAL_NETWORK_ISSUE_STARTED_SMS = "Local network issue started at ${time}!"
+LOCAL_NETWORK_ISSUE_STARTED_EMAIL = """
+Hi,
+
+The local network (wifi) connection has been lost since ${time}.
+Location: ${location}
+
+ArPI Home Security
+
+"""
+
+LOCAL_NETWORK_ISSUE_STOPPED_SMS = "Local network issue stopped at ${time}!"
+LOCAL_NETWORK_ISSUE_STOPPED_EMAIL = """
+Hi,
+
+The local network (wifi) connection was restored at ${time}!
+Location: ${location}
+
+ArPI Home Security
+
+"""
+
+INTERNET_ISSUE_STARTED_SMS = "Internet issue started at ${time}!"
+INTERNET_ISSUE_STARTED_EMAIL = """
+Hi,
+
+The local network is fine, but the internet connection has been lost since ${time}.
+Location: ${location}
+
+ArPI Home Security
+
+"""
+
+INTERNET_ISSUE_STOPPED_SMS = "Internet issue stopped at ${time}!"
+INTERNET_ISSUE_STOPPED_EMAIL = """
+Hi,
+
+The internet connection was restored at ${time}!
+Location: ${location}
+
+ArPI Home Security
+
+"""

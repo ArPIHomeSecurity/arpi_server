@@ -90,6 +90,54 @@ class Notifier(Thread):
             )
         )
 
+    @classmethod
+    def notify_local_network_issue_started(cls, start_time):
+        logger.debug("Message adding local network issue start")
+        cls._notifications.put(
+            Notification(
+                type=NotificationType.LOCAL_NETWORK_ISSUE_STARTED,
+                id=None,
+                sensors=None,
+                time=start_time.strftime(Notifier.DATETIME_FORMAT),
+            )
+        )
+
+    @classmethod
+    def notify_local_network_issue_stopped(cls, stop_time):
+        logger.debug("Message adding local network issue end")
+        cls._notifications.put(
+            Notification(
+                type=NotificationType.LOCAL_NETWORK_ISSUE_STOPPED,
+                id=None,
+                sensors=None,
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT),
+            )
+        )
+
+    @classmethod
+    def notify_internet_issue_started(cls, start_time):
+        logger.debug("Message adding internet issue start")
+        cls._notifications.put(
+            Notification(
+                type=NotificationType.INTERNET_ISSUE_STARTED,
+                id=None,
+                sensors=None,
+                time=start_time.strftime(Notifier.DATETIME_FORMAT),
+            )
+        )
+
+    @classmethod
+    def notify_internet_issue_stopped(cls, stop_time):
+        logger.debug("Message adding internet issue end")
+        cls._notifications.put(
+            Notification(
+                type=NotificationType.INTERNET_ISSUE_STOPPED,
+                id=None,
+                sensors=None,
+                time=stop_time.strftime(Notifier.DATETIME_FORMAT),
+            )
+        )
+
     @staticmethod
     def send_test_email():
         logger.debug("Sending test email")

@@ -13,6 +13,7 @@ THREAD_ALERT = "Alert"
 THREAD_KEYPAD = "Keypad"
 THREAD_SECCON = "SecCon"
 THREAD_OUTPUT = "Output"
+THREAD_NETWORK = "Network"
 
 LOG_SERVICE = THREAD_SERVICE
 LOG_MONITOR = THREAD_MONITOR
@@ -33,6 +34,7 @@ LOG_SC_DYNDNS = "DynDns"
 LOG_SC_ACCESS = "SSH"
 LOG_CLOCK = "Clock"
 LOG_OUTPUT = THREAD_OUTPUT
+LOG_NETWORK = THREAD_NETWORK
 
 LOGGING_MODULES = [
     (LOG_SERVICE, INFO),
@@ -53,6 +55,7 @@ LOGGING_MODULES = [
     (LOG_SC_ACCESS, INFO),
     (LOG_CLOCK, INFO),
     (LOG_OUTPUT, INFO),
+    (LOG_NETWORK, INFO),
     ("gsmmodem.modem.GsmModem", ERROR),
     ("gsmmodem.serial_comms.SerialComms", ERROR),
     ("SocketIOServer", INFO),

@@ -8,6 +8,7 @@ from monitor.broadcast import Broadcaster
 from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler
 from monitor.monitor import Monitor
+from monitor.network_handler import NetworkHandler
 from monitor.notifications.notifier import Notifier
 
 # from monitor.logging import print_logging
@@ -88,10 +89,13 @@ class BackgroundService(Thread):
         keypad = KeypadHandler(self._broadcaster)
         keypad.start()
 
+        network_handler = NetworkHandler(self._broadcaster)
+        network_handler.start()
+
         ipc_server = IPCServer(self._stop_event, self._broadcaster)
         ipc_server.start()
 
-        self._threads = [monitor, ipc_server, notifier, output_handler, keypad]
+        self._threads = [monitor, ipc_server, notifier, output_handler, keypad, network_handler]
 
     def _stop_threads(self):
         logger.info("Stopping threads...")
