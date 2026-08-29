@@ -36,7 +36,7 @@ class Notifier(Thread):
     DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     MAX_RETRY = 5
-    RETRY_WAIT = 10
+    RETRY_WAIT = 200
 
     _notifications = Queue()
 
