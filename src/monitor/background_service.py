@@ -13,6 +13,7 @@ from monitor.notifications.notifier import Notifier
 
 # from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
+from monitor.sms_handler import SmsHandler
 from utils.constants import LOG_SERVICE
 
 logger = logging.getLogger(LOG_SERVICE)
@@ -83,6 +84,9 @@ class BackgroundService(Thread):
         notifier = Notifier(self._broadcaster)
         notifier.start()
 
+        sms_handler = SmsHandler(self._broadcaster)
+        sms_handler.start()
+
         output_handler = OutputHandler(broadcaster=self._broadcaster)
         output_handler.start()
 
@@ -95,7 +99,7 @@ class BackgroundService(Thread):
         ipc_server = IPCServer(self._stop_event, self._broadcaster)
         ipc_server.start()
 
-        self._threads = [monitor, ipc_server, notifier, output_handler, keypad, network_handler]
+        self._threads = [monitor, ipc_server, notifier, sms_handler, output_handler, keypad, network_handler]
 
     def _stop_threads(self):
         logger.info("Stopping threads...")

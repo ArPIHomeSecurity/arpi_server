@@ -77,6 +77,8 @@ class GSM:
         if self._modem:
             self.destroy()
 
+        self.setup()
+
     def setup(self):
         if not self._enabled:
             logger.debug("GSM disabled")
