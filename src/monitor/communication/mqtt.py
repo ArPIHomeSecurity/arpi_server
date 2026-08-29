@@ -308,7 +308,7 @@ class MQTTClient:
         self._subscriptions.add(topic_filter)
         if self._client is not None:
             self._client.subscribe(topic_filter, qos=1)
-            logger.info("Subscribed to MQTT topics %s", topic_filter)
+            logger.debug("Subscribed to MQTT topics %s", topic_filter)
 
     def close(self):
         """
