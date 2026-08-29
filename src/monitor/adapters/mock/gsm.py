@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from time import sleep
 
-from monitor.adapters.gsm import CallType
+from monitor.adapters.gsm import CallResult, CallType
 from utils.constants import LOG_ADGSM
 
 logger = logging.getLogger(LOG_ADGSM)
@@ -32,12 +32,46 @@ MESSAGES = [
 class GSM:
     CONNECTS = 0
 
-    def __init__(self, pin_code, port, baud):
+    def __init__(self, pin_code, port, baud, sms_received_callback=None, enabled=True):
         self._pin_code = pin_code
         self._port = port
         self._baud = baud
+        self._sms_received_callback = sms_received_callback
+        self._enabled = enabled
+        self._connected = False
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    def set_enabled(self, enabled):
+        if self._enabled == enabled:
+            return
+
+        self._enabled = enabled
+        if not enabled:
+            self.destroy()
+
+    def set_sms_received_callback(self, callback):
+        self._sms_received_callback = callback
+
+    def inject_message(self, number, text):
+        """Simulate an incoming SMS for testing the receiving path."""
+        message = Sms(
+            idx=max((msg.index for msg in MESSAGES), default=0) + 1,
+            number=number,
+            text=text,
+            time=datetime.now(),
+        )
+        logger.info('Message received from %s: "%s"', number, text)
+        if self._sms_received_callback:
+            self._sms_received_callback(message)
 
     def setup(self):
+        if not self._enabled:
+            logger.debug("GSM disabled")
+            return False
+
         if GSM.CONNECTS > 0:
             logger.warning("Connection already established! %s", GSM.CONNECTS)
         GSM.CONNECTS += 1
@@ -53,18 +87,28 @@ class GSM:
             self._pin_code or "-",
         )
 
+        self._connected = True
         return True
 
     def send_SMS(self, phone_number, message):
+        if not self._connect():
+            return False
+
         sleep(7)
         logger.info('Message sent to %s: "%s"', phone_number, message)
         return True
 
     def get_sms_messages(self):
+        if not self._connect():
+            return []
+
         sleep(3)
         return MESSAGES
 
     def delete_sms_message(self, message_id):
+        if not self._connect():
+            return False
+
         sleep(2)
         logger.info("Message deleted: %s", message_id)
         global MESSAGES
@@ -72,9 +116,17 @@ class GSM:
         return True
 
     def call(self, phone_number, call_type: CallType):
+        if not self._connect():
+            return CallResult.FAILED
+
         sleep(3)
         logger.info("Calling (%s) number: %s", call_type, phone_number)
-        return True
+        return CallResult.ANSWERED
 
     def destroy(self):
-        GSM.CONNECTS -= 1
+        if self._connected:
+            GSM.CONNECTS -= 1
+            self._connected = False
+
+    def _connect(self) -> bool:
+        return self._connected or self.setup()

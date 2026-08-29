@@ -43,16 +43,45 @@ class GSM:
     CONNECTS = 0
     RETRY_GAP_SECONDS = 5
     MAX_RETRY = 5
+    # upper bound for a full dial + DTMF playback + hangup cycle
+    CALL_TIMEOUT_SECONDS = 120
 
-    def __init__(self, pin_code, port, baud):
+    def __init__(self, pin_code, port, baud, sms_received_callback=None, enabled=True):
         self._pin_code = pin_code
         self._port = port
         self._baud = baud
+        self._sms_received_callback = sms_received_callback
+        self._enabled = enabled
         self._modem = None
         self._call_event = Event()
         self.call_result: CallResult = None
 
+    @property
+    def connected(self) -> bool:
+        return self._modem is not None
+
+    def set_enabled(self, enabled):
+        if self._enabled == enabled:
+            return
+
+        self._enabled = enabled
+        if not enabled:
+            self.destroy()
+
+    def set_sms_received_callback(self, callback):
+        """
+        The callback is passed to the modem on connect, so an already connected
+        modem has to be dropped to enable the new message indications.
+        """
+        self._sms_received_callback = callback
+        if self._modem:
+            self.destroy()
+
     def setup(self):
+        if not self._enabled:
+            logger.debug("GSM disabled")
+            return False
+
         if GSM.CONNECTS > 0:
             logger.warning("Connection already established! %s", GSM.CONNECTS)
         GSM.CONNECTS += 1
@@ -64,8 +93,11 @@ class GSM:
             logger.error("Invalid GSM options: %s %s", self._port, self._baud)
             return False
 
-        self._modem = GsmModem(self._port, int(self._baud))
-        # fix for call status parsing of SIM900
+        self._modem = GsmModem(
+            self._port,
+            int(self._baud),
+            smsReceivedCallbackFunc=self._sms_received_callback,
+        )
 
         attempts = 0
         while True:
@@ -83,6 +115,9 @@ class GSM:
                 self._modem._pollCallStatusRegex = re.compile(
                     r'^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)'
                 )
+
+                # set once here to keep the message parsing mode consistent for all users
+                self._modem.smsTextMode = True
 
                 logger.info("GSM modem connected")
                 return True
@@ -120,8 +155,6 @@ class GSM:
 
         if not self._modem:
             self.setup()
-
-        self._modem.smsTextMode = True
 
         if not self._modem:
             return False
@@ -169,7 +202,7 @@ class GSM:
             self.setup()
 
         if not self._modem:
-            return False
+            return []
 
         try:
             logger.info("Reading SMS messages...")
@@ -267,7 +300,9 @@ class GSM:
 
         # wait for callEvent finished
         logger.info("Waiting for call to finish...")
-        self._call_event.wait()
+        if not self._call_event.wait(timeout=GSM.CALL_TIMEOUT_SECONDS):
+            logger.error("Call did not finish in %s seconds", GSM.CALL_TIMEOUT_SECONDS)
+            return CallResult.FAILED
 
         if self.call_result is None:
             logger.error("Call finished with unknown result")

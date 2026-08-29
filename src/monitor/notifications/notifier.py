@@ -1,6 +1,5 @@
 import contextlib
 import logging
-import os
 from datetime import datetime
 from queue import Empty, Queue
 from threading import Thread
@@ -12,9 +11,10 @@ from monitor.actions import (
     MonitorUpdateConfigCommand,
 )
 from monitor.adapters.gsm import CallResult, CallType
+from monitor.adapters.gsm_provider import GSMProvider
 from monitor.adapters.smtp import SMTPSender
 from monitor.broadcast import Broadcaster
-from monitor.config.models import GSMConfig, LocationConfig, SMTPConfig, SubscriptionsConfig
+from monitor.config.models import LocationConfig, SMTPConfig, SubscriptionsConfig
 from monitor.database import create_database_session
 from monitor.notifications.notification import Notification, NotificationType
 from utils.constants import (
@@ -24,12 +24,6 @@ from utils.constants import (
 from utils.queries import get_user_with_access_code
 
 logger = logging.getLogger(LOG_NOTIFIER)
-
-# check if running with simulator
-if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
-    from monitor.adapters.gsm import GSM
-else:
-    from monitor.adapters.mock.gsm import GSM
 
 
 class Notifier(Thread):
@@ -181,116 +175,90 @@ class Notifier(Thread):
     @staticmethod
     def send_test_sms():
         logger.debug("Sending test SMS")
-        gsm_config = GSMConfig.load_config()
-        gsm = GSM(
-            pin_code=gsm_config.pin_code,
-            port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"],
-        )
+        gsm_config = GSMProvider.get_config()
 
         messages = {}
-        if not gsm.setup():
-            messages["connection"] = False
-            return False, messages
+        with GSMProvider.session() as gsm:
+            if not gsm.connected:
+                messages["connection"] = False
+                return False, messages
 
-        notification = Notification(
-            type=NotificationType.TEST_NOTIFICATION,
-            id=None,
-            sensors=None,
-            time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
-        )
-        if gsm_config.phone_number_1:
-            messages["phone1"] = gsm.send_SMS(
-                gsm_config.phone_number_1, notification.get_sms_content()
+            notification = Notification(
+                type=NotificationType.TEST_NOTIFICATION,
+                id=None,
+                sensors=None,
+                time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
             )
+            if gsm_config.phone_number_1:
+                messages["phone1"] = gsm.send_SMS(
+                    gsm_config.phone_number_1, notification.get_sms_content()
+                )
 
-        if gsm_config.phone_number_2:
-            messages["phone2"] = gsm.send_SMS(
-                gsm_config.phone_number_2, notification.get_sms_content()
-            )
+            if gsm_config.phone_number_2:
+                messages["phone2"] = gsm.send_SMS(
+                    gsm_config.phone_number_2, notification.get_sms_content()
+                )
 
-        gsm.destroy()
         return True, messages
 
     @staticmethod
     def get_sms_messages():
         logger.debug("Getting SMS messages")
-        gsm_config = GSMConfig.load_config()
-        gsm = GSM(
-            pin_code=gsm_config.pin_code,
-            port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"],
-        )
 
-        if not gsm.setup():
-            return False, []
+        with GSMProvider.session() as gsm:
+            if not gsm.connected:
+                return False, []
 
-        messages = []
-        for sms in gsm.get_sms_messages() or []:
-            messages.append(
-                {
-                    "idx": sms.index,
-                    "number": sms.number,
-                    "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    "text": sms.text,
-                }
-            )
+            messages = []
+            for sms in gsm.get_sms_messages() or []:
+                messages.append(
+                    {
+                        "idx": sms.index,
+                        "number": sms.number,
+                        "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                        "text": sms.text,
+                    }
+                )
 
-        gsm.destroy()
         return True, messages
 
     @staticmethod
     def delete_sms_message(message_id):
         logger.debug("Deleting SMS messages")
-        gsm_config = GSMConfig.load_config()
-        gsm = GSM(
-            pin_code=gsm_config.pin_code,
-            port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"],
-        )
 
-        if not gsm.setup():
-            return False
+        with GSMProvider.session() as gsm:
+            if not gsm.connected:
+                return False
 
-        result = gsm.delete_sms_message(message_id)
-
-        gsm.destroy()
-        return result
+            return gsm.delete_sms_message(message_id)
 
     @staticmethod
     def make_test_call():
         logger.debug("Doing test call")
-        gsm_config = GSMConfig.load_config()
-        gsm = GSM(
-            pin_code=gsm_config.pin_code,
-            port=os.environ["GSM_PORT"],
-            baud=os.environ["GSM_PORT_BAUD"],
-        )
+        gsm_config = GSMProvider.get_config()
 
         messages = {}
-        if not gsm.setup():
-            messages["connection"] = False
-            return False, messages
+        with GSMProvider.session() as gsm:
+            if not gsm.connected:
+                messages["connection"] = False
+                return False, messages
 
-        if gsm_config.phone_number_1:
-            call_result = gsm.call(gsm_config.phone_number_1, CallType.TEST)
-            logger.info("Test call to phone 1 result: %s", call_result)
-            messages["phone1"] = call_result == CallResult.ANSWERED
+            if gsm_config.phone_number_1:
+                call_result = gsm.call(gsm_config.phone_number_1, CallType.TEST)
+                logger.info("Test call to phone 1 result: %s", call_result)
+                messages["phone1"] = call_result == CallResult.ANSWERED
 
-        if gsm_config.phone_number_2:
-            call_result = gsm.call(gsm_config.phone_number_2, CallType.TEST)
-            logger.info("Test call to phone 2 result: %s", call_result)
-            messages["phone2"] = call_result == CallResult.ANSWERED
+            if gsm_config.phone_number_2:
+                call_result = gsm.call(gsm_config.phone_number_2, CallType.TEST)
+                logger.info("Test call to phone 2 result: %s", call_result)
+                messages["phone2"] = call_result == CallResult.ANSWERED
 
-        gsm.destroy()
         return True, messages
 
     def __init__(self, broadcaster: Broadcaster):
         super().__init__(name=THREAD_NOTIFIER)
         self._actions = Queue()
-        self._gsm = None
         self._smtp = None
-        self._gsm_config: GSMConfig = None
         self._smtp_config: SMTPConfig = None
         self._subscriptions: SubscriptionsConfig = None
 
@@ -326,21 +294,10 @@ class Notifier(Thread):
         logger.info("Notifier stopped")
 
     def setup_connections(self):
-        self._gsm_config = GSMConfig.load_config()
         self._smtp_config = SMTPConfig.load_config()
         self._subscriptions = SubscriptionsConfig.load_config()
 
-        self.destroy_gsm()
-        if self._gsm_config.enabled:
-            logger.debug("GSM enabled")
-            self._gsm = GSM(
-                pin_code=self._gsm_config.pin_code,
-                port=os.environ["GSM_PORT"],
-                baud=os.environ["GSM_PORT_BAUD"],
-            )
-        else:
-            logger.debug("GSM disabled")
-            self.destroy_gsm()
+        GSMProvider.load_config()
 
         # we will try to connect to verify the connection
         # but after a long time the connection is not available
@@ -357,11 +314,6 @@ class Notifier(Thread):
         else:
             logger.debug("SMTP disabled")
             self.destroy_smtp()
-
-    def destroy_gsm(self):
-        if self._gsm:
-            self._gsm.destroy()
-            self._gsm = None
 
     def destroy_smtp(self):
         if self._smtp:
@@ -453,25 +405,27 @@ class Notifier(Thread):
             notification.email2_sent = None
 
     def send_SMS_1(self, notification: Notification):
-        if self._gsm and getattr(self._subscriptions.sms1, notification.type, False):
+        if GSMProvider.is_enabled() and getattr(self._subscriptions.sms1, notification.type, False):
             if notification.sms_sent1 is False:
-                notification.sms_sent1 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_1, notification.get_sms_content()
-                )
+                with GSMProvider.session() as gsm:
+                    notification.sms_sent1 = gsm.send_SMS(
+                        GSMProvider.get_config().phone_number_1, notification.get_sms_content()
+                    )
         else:
             notification.sms_sent1 = None
 
     def send_SMS_2(self, notification: Notification):
-        if self._gsm and getattr(self._subscriptions.sms2, notification.type, False):
+        if GSMProvider.is_enabled() and getattr(self._subscriptions.sms2, notification.type, False):
             if notification.sms_sent2 is False:
-                notification.sms_sent2 = self._gsm.send_SMS(
-                    self._gsm_config.phone_number_2, notification.get_sms_content()
-                )
+                with GSMProvider.session() as gsm:
+                    notification.sms_sent2 = gsm.send_SMS(
+                        GSMProvider.get_config().phone_number_2, notification.get_sms_content()
+                    )
         else:
             notification.sms_sent2 = None
 
     def call_1(self, notification: Notification):
-        if not self._gsm:
+        if not GSMProvider.is_enabled():
             notification.call1_sent = None
             return
 
@@ -483,7 +437,9 @@ class Notifier(Thread):
 
         # check if the call was already sent
         if notification.call1_sent is False:
-            call_status, _ = self._gsm.call(self._gsm_config.phone_number_1, CallType.ALERT)
+            with GSMProvider.session() as gsm:
+                call_status = gsm.call(GSMProvider.get_config().phone_number_1, CallType.ALERT)
+
             # if the user acknowledged the call then we don't need to call the second number
             if call_status == CallResult.ACKNOWLEDGED:
                 logger.info("Phone 1 acknowledged the alert")
@@ -495,7 +451,7 @@ class Notifier(Thread):
                 )
 
     def call_2(self, notification: Notification):
-        if not self._gsm:
+        if not GSMProvider.is_enabled():
             notification.call2_sent = None
             return
 
@@ -506,7 +462,8 @@ class Notifier(Thread):
             return
 
         if notification.call2_sent is False:
-            call_status, _ = self._gsm.call(self._gsm_config.phone_number_2, CallType.ALERT)
+            with GSMProvider.session() as gsm:
+                call_status = gsm.call(GSMProvider.get_config().phone_number_2, CallType.ALERT)
 
             # if the user acknowledged the call then we don't need to call the first number
             if call_status == CallResult.ACKNOWLEDGED:
