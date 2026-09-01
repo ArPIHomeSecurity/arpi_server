@@ -1,8 +1,10 @@
 import logging
 from datetime import datetime
+from threading import Thread
 from time import sleep
 
 from monitor.adapters.gsm import CallResult, CallType
+from monitor.adapters.mock.utils import get_sms_messages
 from utils.constants import LOG_ADGSM
 
 logger = logging.getLogger(LOG_ADGSM)
@@ -55,17 +57,23 @@ class GSM:
     def set_sms_received_callback(self, callback):
         self._sms_received_callback = callback
 
-    def inject_message(self, number, text):
+    def inject_message(self):
         """Simulate an incoming SMS for testing the receiving path."""
-        message = Sms(
-            idx=max((msg.index for msg in MESSAGES), default=0) + 1,
-            number=number,
-            text=text,
-            time=datetime.now(),
-        )
-        logger.info('Message received from %s: "%s"', number, text)
-        if self._sms_received_callback:
-            self._sms_received_callback(message)
+
+        while True:
+            messages = get_sms_messages()  # Ensure messages are loaded
+
+            for message in messages:
+                logger.info('Message received from %s: "%s"', message["number"], message["text"])
+                if self._sms_received_callback:
+                    self._sms_received_callback(
+                        Sms(
+                            idx=message["idx"],
+                            number=message["number"],
+                            text=message["text"],
+                            time=message["time"],
+                        )
+                    )
 
     def setup(self):
         if not self._enabled:
@@ -88,6 +96,8 @@ class GSM:
         )
 
         self._connected = True
+        sms_actions_thread = Thread(target=self.inject_message)
+        sms_actions_thread.start()
         return True
 
     def send_SMS(self, phone_number, message):

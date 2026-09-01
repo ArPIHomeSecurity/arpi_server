@@ -99,7 +99,15 @@ class BackgroundService(Thread):
         ipc_server = IPCServer(self._stop_event, self._broadcaster)
         ipc_server.start()
 
-        self._threads = [monitor, ipc_server, notifier, sms_handler, output_handler, keypad, network_handler]
+        self._threads = [
+            monitor,
+            ipc_server,
+            notifier,
+            sms_handler,
+            output_handler,
+            keypad,
+            network_handler,
+        ]
 
     def _stop_threads(self):
         logger.info("Stopping threads...")

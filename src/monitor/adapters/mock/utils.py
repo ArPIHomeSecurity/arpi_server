@@ -192,6 +192,33 @@ def set_keypad_state(pending_bits, data):
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
 
 
+def get_sms_messages():
+    """
+    Get the list of SMS messages from the mock GSM adapter.
+    """
+    default_data = []
+    return protected_transfer("simulator_gsm.json", default_data)
+
+
+def append_sms_message(number, text, time):
+    """
+    Append a new SMS message to the mock GSM adapter's message list.
+    """
+    default_data = []
+
+    def merge_sms_data(base, new):
+        next_index = max((message.get("idx", 0) for message in base), default=0) + 1
+        return base + [{"idx": next_index, **new}]
+
+    new_message = {"number": number, "text": text, "time": time.isoformat()}
+    protected_update(
+        "simulator_gsm.json",
+        new_message,
+        default_data,
+        merge_sms_data,
+    )
+
+
 def load_channel_configs(input_number: int) -> dict:
     """
     Load channel configurations from the database.

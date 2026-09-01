@@ -3,7 +3,9 @@
 import logging
 from contextlib import suppress
 from copy import deepcopy
+from datetime import datetime
 from os import environ
+from random import randint
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -11,7 +13,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.logging import TextualHandler
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Select, Static
+from textual.widgets import Button, Checkbox, Input, Select, Static
 
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
@@ -21,7 +23,10 @@ from monitor.adapters.mock.utils import (
     load_channel_configs,
     set_input_states,
     set_keypad_state,
+    append_sms_message,
 )
+from monitor.config.models import GSMConfig
+from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 
 # use the wiring configuration of the application
@@ -330,6 +335,55 @@ class Keypad(Widget):
             yield Button("Card 3", id="card-3")
 
 
+class GSM(Widget):
+    """Widget for GSM controls"""
+
+    can_focus = False
+
+    DEFAULT_CSS = """
+    GSM {
+        width: 100%;
+        background: black 100%;
+    }
+
+    #gsm {
+        layout: vertical;
+        grid-gutter: 1 1;
+        width: 100%;
+        height: auto;
+        background: black 100%;
+        overflow: auto;
+    }
+
+    #gsm Input {
+        height: 3;
+        width: 100%;
+        margin: 0 0 1 0;
+    }
+
+    #gsm Button {
+        background: green 60%;
+        color: white 100%;
+        height: 3;
+        width: 100%;
+        border: none;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Container(id="gsm"):
+            yield Input(
+                placeholder="Source number",
+                id="gsm-source-number",
+            )
+            yield Input(
+                value=f"Test message {randint(1000, 9999)}",
+                placeholder="Message",
+                id="gsm-message",
+            )
+            yield Button("Add SMS", id="gsm-add")
+
+
 class SimulatorApp(App):
     """Simulate status of sensors and power for argus"""
 
@@ -340,8 +394,8 @@ class SimulatorApp(App):
 
     #main-grid {
         layout: grid;
-        grid-size: 2 3;
-        grid-rows: 3 29 4;
+        grid-size: 2;
+        grid-rows: 3 31 4;
         grid-columns: 92 38;
         overflow: auto;
     }
@@ -350,10 +404,18 @@ class SimulatorApp(App):
         column-span: 2;
     }
     
-    #channels-pane {
+    #left-pane {
+    }
+
+    #right-pane {
     }
 
     #keypad-pane {
+        height: 20;
+    }
+
+    #gsm-pane {
+        height: 12;
     }
 
     #outputs-pane {
@@ -419,16 +481,24 @@ class SimulatorApp(App):
                     value=self.show_voltage,
                 )
                 yield Button(
-                    "Update channels from DB", id="refresh-channels", classes="refresh-button"
+                    "Update from database",
+                    id="refresh-channels",
+                    classes="refresh-button",
                 )
-            yield Channels(
-                id="channels-pane",
-                default_states=list(self.channel_values.values()),
-                channel_configs=self.channel_configs,
-                is_advanced_mode=self.is_advanced_mode,
-                show_voltage=self.show_voltage,
-            )
-            yield Keypad(id="keypad-pane")
+
+            with Vertical(id="left-pane"):
+                yield Channels(
+                    id="channels-pane",
+                    default_states=list(self.channel_values.values()),
+                    channel_configs=self.channel_configs,
+                    is_advanced_mode=self.is_advanced_mode,
+                    show_voltage=self.show_voltage,
+                )
+
+            with Vertical(id="right-pane"):
+                yield Keypad(id="keypad-pane")
+                yield GSM(id="gsm-pane")
+
             yield Outputs(id="outputs-pane")
 
     def read_output_states(self):
@@ -623,11 +693,16 @@ class SimulatorApp(App):
         await self.recompose()
 
     @on(Button.Pressed, "#refresh-channels")
-    async def refresh_channels_pressed(self, event: Button.Pressed) -> None:
-        """Reload channel settings from the database and update the UI."""
+    async def refresh_channels_pressed(self, _event: Button.Pressed) -> None:
+        """Reload channel settings and the GSM source number from the database."""
         input_number = int(environ.get("INPUT_NUMBER", 15))
         self.load_configuration(input_number)
         self.save_input_states()
+
+        with create_database_session() as session:
+            config = GSMConfig.load_config(session=session) or GSMConfig()
+        self.query_one("#gsm-source-number", Input).value = config.phone_number_1 or ""
+
         await self.recompose()
 
     @on(Button.Pressed, "#power")
@@ -662,6 +737,13 @@ class SimulatorApp(App):
             self.keypad["pending_bits"] = len(self.keypad["data"]) * 8
 
         self.save_keypad_states()
+
+    @on(Button.Pressed, "#gsm-add")
+    def gsm_add_pressed(self, _event: Button.Pressed) -> None:
+        """Add an incoming SMS to the mock GSM message queue."""
+        source_number = self.query_one("#gsm-source-number", Input).value
+        message = self.query_one("#gsm-message", Input).value
+        append_sms_message(source_number, message, datetime.now())
 
 
 logging.basicConfig(

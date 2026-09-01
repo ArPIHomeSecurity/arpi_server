@@ -5,7 +5,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from mcp_server.errors import ToolChangesNotAllowed
-from monitor.config.models import GSMConfig
+from monitor.config.models import GSMConfig, SMSActionConfig, SMSCommandConfig
 from monitor.database import get_database_session
 from server.services.base import ConfigChangesNotAllowed, TestingNotAllowed
 from server.services.option import GSMService
@@ -38,6 +38,74 @@ def set_config(config: GSMConfig) -> str:
     try:
         gsm_service = GSMService(get_database_session())
         response = gsm_service.set_gsm_config(config)
+
+        if response is not None:
+            _, success = evaluate_ipc_response(response)
+            return "Success" if success else "Failed"
+
+        return "Success"
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
+
+
+@gsm_option_mcp.tool(
+    name="get_sms_action_config",
+    description="Get the current SMS action configuration",
+)
+def get_sms_action_config() -> dict:
+    """
+    Get the current SMS action configuration
+    """
+    gsm_service = GSMService(get_database_session())
+    config = gsm_service.get_sms_action_config()
+    return asdict(config)
+
+
+@gsm_option_mcp.tool(
+    name="set_sms_action_config",
+    description="Set the SMS action configuration",
+)
+def set_sms_action_config(config: SMSActionConfig) -> str:
+    """
+    Set the SMS action configuration
+    """
+    try:
+        gsm_service = GSMService(get_database_session())
+        response = gsm_service.set_sms_action_config(config)
+
+        if response is not None:
+            _, success = evaluate_ipc_response(response)
+            return "Success" if success else "Failed"
+
+        return "Success"
+    except ConfigChangesNotAllowed:
+        raise ToolChangesNotAllowed()
+
+
+@gsm_option_mcp.tool(
+    name="get_sms_command_config",
+    description="Get the SMS command configuration",
+)
+def get_sms_command_config() -> dict:
+    """
+    Get the SMS command configuration
+    """
+    gsm_service = GSMService(get_database_session())
+    config = gsm_service.get_sms_command_config()
+    return asdict(config)
+
+
+@gsm_option_mcp.tool(
+    name="set_sms_command_config",
+    description="Set the SMS command configuration",
+)
+def set_sms_command_config(config: SMSCommandConfig) -> str:
+    """
+    Set the SMS command configuration
+    """
+    try:
+        gsm_service = GSMService(get_database_session())
+        response = gsm_service.set_sms_command_config(config)
 
         if response is not None:
             _, success = evaluate_ipc_response(response)

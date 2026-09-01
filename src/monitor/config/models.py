@@ -114,6 +114,27 @@ class GSMConfig(BaseConfig):
 
 
 @dataclass
+class SMSActionConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "sms_action"
+
+    enabled: bool = False
+    check_phone_number: bool = True
+    access_code_required: bool = True
+
+
+@dataclass
+class SMSCommandConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "sms_command"
+
+    case_sensitive: bool = False
+    arm_away_command: str = "away"
+    arm_stay_command: str = "stay"
+    disarm_command: str = "disarm"
+
+
+@dataclass
 class DyndnsConfig(BaseConfig):
     OPTION_NAME = "network"
     SECTION_NAME = "dyndns"

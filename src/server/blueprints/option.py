@@ -16,6 +16,8 @@ from monitor.config.models import (
     MQTTConfigInternalPublish,
     MQTTConfigInternalRead,
     MQTTConnection,
+    SMSActionConfig,
+    SMSCommandConfig,
     SMTPConfig,
     SSHConfig,
     SubscriptionsConfig,
@@ -64,6 +66,10 @@ def option_get(option_name, section) -> Response:
         value = asdict(SubscriptionsService(db.session).get_subscriptions_config())
     elif option_name == GSMConfig.OPTION_NAME and section == GSMConfig.SECTION_NAME:
         value = asdict(GSMService(db.session).get_gsm_config())
+    elif option_name == SMSActionConfig.OPTION_NAME and section == SMSActionConfig.SECTION_NAME:
+        value = asdict(GSMService(db.session).get_sms_action_config())
+    elif option_name == SMSCommandConfig.OPTION_NAME and section == SMSCommandConfig.SECTION_NAME:
+        value = asdict(GSMService(db.session).get_sms_command_config())
     elif option_name == SSHConfig.OPTION_NAME and section == SSHConfig.SECTION_NAME:
         value = asdict(SSHService(db.session).get_ssh_config())
     elif option_name == MQTTConnection.OPTION_NAME and section == MQTTConnection.SECTION_NAME:
@@ -189,7 +195,10 @@ def test_email():
         smtp_service = SMTPService(db.session)
         return process_ipc_response(smtp_service.test_email())
     except TestingNotAllowed:
-        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
+        return (
+            jsonify({"result": False, "message": "Testing is not allowed currently."}),
+            403,
+        )
 
 
 @config_blueprint.route("/api/config/test_sms", methods=["GET"])
@@ -200,7 +209,10 @@ def test_sms():
         gsm_service = GSMService(db.session)
         return process_ipc_response(gsm_service.test_sms())
     except TestingNotAllowed:
-        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
+        return (
+            jsonify({"result": False, "message": "Testing is not allowed currently."}),
+            403,
+        )
 
 
 @config_blueprint.route("/api/config/test_call", methods=["GET"])
@@ -211,7 +223,10 @@ def test_call():
         gsm_service = GSMService(db.session)
         return process_ipc_response(gsm_service.test_call())
     except TestingNotAllowed:
-        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
+        return (
+            jsonify({"result": False, "message": "Testing is not allowed currently."}),
+            403,
+        )
 
 
 @config_blueprint.route("/api/config/test_syren", methods=["GET"])
@@ -222,7 +237,10 @@ def test_syren():
         option_service = SyrenService(db.session)
         return process_ipc_response(option_service.test_syren(duration=5))
     except TestingNotAllowed:
-        return jsonify({"result": False, "message": "Testing is not allowed currently."}), 403
+        return (
+            jsonify({"result": False, "message": "Testing is not allowed currently."}),
+            403,
+        )
 
 
 @config_blueprint.route("/api/config/sms", methods=["GET"])
