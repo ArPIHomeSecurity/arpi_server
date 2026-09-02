@@ -339,6 +339,11 @@ class Monitor(Thread, ActionHandler):
         """
         logger.info("Arming to %s %s", arm_type, "with delay" if use_delay else "without delay")
 
+        # check already armed or arming is in progress
+        if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
+            logger.info("System already armed or arming in progress")
+            return
+
         arm_changed = False
         if area_id is None:
             # arm the system and all the areas

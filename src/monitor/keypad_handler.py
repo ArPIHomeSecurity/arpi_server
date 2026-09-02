@@ -29,6 +29,8 @@ from utils.constants import (
     ARM_AWAY,
     ARM_STAY,
     LOG_ADKEYPAD,
+    MONITORING_ARM_DELAY,
+    MONITORING_ARMED,
     MONITORING_READY,
     THREAD_KEYPAD,
 )
@@ -158,6 +160,12 @@ class KeypadHandler(Thread):
                     logger.error("Unknown keypad action: %s", action)
 
     def arm_keypad(self, arm_type, use_delay):
+
+        # check already armed or arming is in progress
+        if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
+            logger.info("System already armed or arming in progress")
+            return
+
         with create_database_session() as session:
             arm_delay = get_arm_delay(session, arm_type) if use_delay else 0
             logger.info("Arm with delay: %s / %s", arm_delay, arm_type)
