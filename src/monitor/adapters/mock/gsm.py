@@ -17,6 +17,7 @@ class Sms:
     text: str
     time: str
 
+
 message_lock = Lock()
 MESSAGES: dict[str, Sms] = {}
 

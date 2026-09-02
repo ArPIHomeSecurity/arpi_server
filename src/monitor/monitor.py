@@ -344,6 +344,11 @@ class Monitor(Thread, ActionHandler):
             logger.info("System already armed or arming in progress")
             return
 
+        # check if any sensor is active
+        if self._sensor_handler.has_active_sensor():
+            logger.warning("Cannot arm: active sensors present")
+            return
+
         arm_changed = False
         if area_id is None:
             # arm the system and all the areas
