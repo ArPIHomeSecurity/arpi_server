@@ -22,6 +22,8 @@ def initialize_logging():
             "[%(threadName)11s|%(name)9s] %(levelname)5s: %(message)s", ["threadName"], 11
         )
 
+    # override levelname
+    logging.addLevelName(logging.WARNING, "WARN")
     logging.addLevelName(TRACE, "TRACE")
 
     console_handler = logging.StreamHandler(sys.stdout)

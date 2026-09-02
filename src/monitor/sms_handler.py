@@ -156,6 +156,7 @@ class SmsHandler(Thread):
     def _dispatch_command(self, command: str, user: User | None):
         """Dispatch SMS command to appropriate handler (stub implementations)."""
 
+        logger.debug("Handling message: %s from user %s", command, user.id if user else None)
         command_config = SMSCommandConfig.load_config()
 
         def compare(a: str, b: str, case_sensitive: bool) -> bool:
@@ -172,3 +173,5 @@ class SmsHandler(Thread):
         elif compare(command, command_config.disarm_command, command_config.case_sensitive):
             logger.info("SMS: disarm command from user %s", user.id if user else None)
             self._broadcaster.send_message(MonitorDisarmCommand(user_id=user.id if user else None))
+        else:
+            logger.warning("Invalid message '%s' from user %s", command, user.id if user else None)

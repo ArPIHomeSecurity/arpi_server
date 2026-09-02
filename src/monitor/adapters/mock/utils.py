@@ -8,6 +8,7 @@ import json
 import os
 from dataclasses import dataclass
 from enum import Enum
+from random import randint
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
@@ -207,8 +208,7 @@ def append_sms_message(number, text, time):
     default_data = []
 
     def merge_sms_data(base, new):
-        next_index = max((message.get("idx", 0) for message in base), default=0) + 1
-        return base + [{"idx": next_index, **new}]
+        return base + [{"idx": randint(1_000_000, 10_000_000), **new}]
 
     new_message = {"number": number, "text": text, "time": time.isoformat()}
     protected_update(

@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime
-from threading import Thread
+from dataclasses import dataclass
+from threading import Thread, Lock
 from time import sleep
 
 from monitor.adapters.gsm import CallResult, CallType
@@ -10,25 +10,15 @@ from utils.constants import LOG_ADGSM
 logger = logging.getLogger(LOG_ADGSM)
 
 
+@dataclass
 class Sms:
-    def __init__(self, idx, number, text, time):
-        self.index = idx
-        self.number = number
-        self.text = text
-        self.time = time
+    idx: int
+    number: str
+    text: str
+    time: str
 
-
-MESSAGES = [
-    Sms(
-        idx=1, number="06201234567", text="Test message 1111", time=datetime(2024, 7, 22, 12, 0, 0)
-    ),
-    Sms(
-        idx=2,
-        number="0036309876543",
-        text="Test message 2222",
-        time=datetime(2024, 6, 21, 11, 0, 0),
-    ),
-]
+message_lock = Lock()
+MESSAGES: dict[str, Sms] = {}
 
 
 class GSM:
@@ -64,16 +54,25 @@ class GSM:
             messages = get_sms_messages()  # Ensure messages are loaded
 
             for message in messages:
-                logger.info('Message received from %s: "%s"', message["number"], message["text"])
+                logger.info(
+                    'Message(%s) received from %s: "%s"',
+                    message["idx"],
+                    message["number"],
+                    message["text"],
+                )
+                sms = Sms(
+                    idx=message["idx"],
+                    number=message["number"],
+                    text=message["text"],
+                    time=message["time"],
+                )
+                with message_lock:
+                    MESSAGES[sms.idx] = sms
+
                 if self._sms_received_callback:
-                    self._sms_received_callback(
-                        Sms(
-                            idx=message["idx"],
-                            number=message["number"],
-                            text=message["text"],
-                            time=message["time"],
-                        )
-                    )
+                    self._sms_received_callback(sms)
+
+            sleep(1)
 
     def setup(self):
         if not self._enabled:
@@ -101,7 +100,7 @@ class GSM:
         return True
 
     def send_SMS(self, phone_number, message):
-        if not self._connect():
+        if not self._connected:
             return False
 
         sleep(7)
@@ -109,24 +108,26 @@ class GSM:
         return True
 
     def get_sms_messages(self):
-        if not self._connect():
+        if not self._connected:
             return []
 
         sleep(3)
-        return MESSAGES
+        return list(MESSAGES.values())
 
     def delete_sms_message(self, message_id):
-        if not self._connect():
+        if not self._connected:
             return False
 
         sleep(2)
         logger.info("Message deleted: %s", message_id)
-        global MESSAGES
-        MESSAGES = [msg for msg in MESSAGES if msg.index != message_id]
+        with message_lock:
+            if message_id in MESSAGES:
+                MESSAGES.pop(message_id)
+
         return True
 
     def call(self, phone_number, call_type: CallType):
-        if not self._connect():
+        if not self._connected:
             return CallResult.FAILED
 
         sleep(3)

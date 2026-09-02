@@ -213,9 +213,9 @@ class Notifier(Thread):
             for sms in gsm.get_sms_messages() or []:
                 messages.append(
                     {
-                        "idx": sms.index,
+                        "idx": sms.idx,
                         "number": sms.number,
-                        "time": sms.time.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                        "time": sms.time,
                         "text": sms.text,
                     }
                 )
