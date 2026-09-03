@@ -163,7 +163,7 @@ class KeypadHandler(Thread):
 
         # check already armed or arming is in progress
         if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
-            logger.info("System already armed or arming in progress")
+            logger.warning("System already armed or arming in progress")
             return
 
         with create_database_session() as session:

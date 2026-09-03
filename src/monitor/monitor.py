@@ -59,7 +59,7 @@ from utils.constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
-from utils.models import Alert, Arm, ArmSensor, ArmStates, Disarm, Sensor, User
+from utils.models import Alert, Area, Arm, ArmSensor, ArmStates, Disarm, Sensor, User
 from utils.queries import get_arm_delay, get_arm_state
 
 # 2000.01.01 00:00:00
@@ -339,27 +339,43 @@ class Monitor(Thread, ActionHandler):
         """
         logger.info("Arming to %s %s", arm_type, "with delay" if use_delay else "without delay")
 
-        # check already armed or arming is in progress
-        if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
-            logger.info("System already armed or arming in progress")
-            return
-
-        # check if any sensor is active
-        if self._sensor_handler.has_active_sensor():
-            logger.warning("Cannot arm: active sensors present")
-            return
-
         arm_changed = False
         if area_id is None:
+            # check already armed or arming is in progress
+            if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
+                logger.warning("System already armed or arming in progress")
+                return
+
+            # check if any sensor is active
+            if self._sensor_handler.has_active_sensor():
+                logger.warning("Cannot arm: active sensors present")
+                return
+
             # arm the system and all the areas
             arm_changed = self._area_handler.change_areas_arm(arm_type)
             self.arm_system(arm_type, use_delay)
         else:
+            area = self._db_session.get(Area, area_id)
+            if area is None:
+                logger.warning("Area '%s' not found", area_id)
+                return
+
+            # check if the area is already armed
+            if area.arm_state == arm_type:
+                logger.warning("Area '%s' already armed to %s", area_id, area.arm_state)
+                return
+
+            # check if any sensor is active in the area
+            if self._sensor_handler.has_active_sensor(area_id):
+                logger.warning("Cannot arm area %s: active sensors present", area_id)
+                return
+
             arm_state_before = get_arm_state(self._db_session)
             arm_changed = self._area_handler.change_area_arm(arm_type, area_id)
             arm_state_after = get_arm_state(self._db_session)
 
             if arm_state_before != arm_state_after:
+                logger.info("Arm state changed from %s to %s", arm_state_before, arm_state_after)
                 # arming an area that arms the whole system gets the exit delay too,
                 # otherwise leaving the building would trip the sensors right away
                 self.arm_system(arm_type, use_delay)

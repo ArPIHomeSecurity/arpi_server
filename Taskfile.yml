@@ -158,7 +158,6 @@ tasks:
     cmd: |
       uv run pytest \
         -vv \
-        -s \
         --setup-show \
         --maxfail=1 \
         {{.CLI_ARGS}}

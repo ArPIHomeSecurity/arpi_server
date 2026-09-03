@@ -95,14 +95,17 @@ class SensorHandler:
         logger.warning("MQTT topic '%s / %s' does not match any current sensor", item_name, item_id)
         return False
 
-    def has_active_sensor(self) -> bool:
+    def has_active_sensor(self, area_id: int | None = None) -> bool:
         """
         Check if there is any active sensor.
         Returns True if any sensor is active, False otherwise.
         """
 
         # check active sensors without sensitivity
-        return any(sensor.alert for sensor in self._sensors)
+        if area_id is None:
+            return any(sensor.alert for sensor in self._sensors)
+
+        return any(sensor.alert and sensor.area_id == area_id for sensor in self._sensors)
 
     def calibrate_sensors(self):
         """
