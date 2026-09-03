@@ -339,7 +339,7 @@ class SensorHandler:
 
         # save current state to avoid concurrency
         current_monitoring = States.get(State.MONITORING)
-        now = dt.now()
+        now = dt.now().astimezone()
         logger.trace("Checking sensors in %s", current_monitoring)
 
         arm: Arm = None
@@ -393,15 +393,12 @@ class SensorHandler:
                 if (
                     current_monitoring != MONITORING_ALERT_DELAY
                     and delay is not None
-                    and (
-                        arm is not None
-                        and arm.time.replace(tzinfo=None) + timedelta(seconds=delay) > now
-                    )
+                    and (arm is not None and arm.time + timedelta(seconds=delay) > now)
                 ):
                     logger.debug(
                         "Ignore alert on sensor(%s): %s + %s < %s",
                         sensor.id,
-                        arm.time.replace(tzinfo=None),
+                        arm.time,
                         timedelta(seconds=delay),
                         now,
                     )
@@ -444,7 +441,7 @@ class SensorHandler:
                     .first()
                 )
                 if alert_sensor is not None:
-                    alert_sensor.end_time = dt.now()
+                    alert_sensor.end_time = dt.now().astimezone()
                     logger.debug(
                         "Cleared sensor alert: alert id=%s, sensor id=%s",
                         alert_sensor.alert_id,

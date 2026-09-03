@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from threading import Thread, Lock
+from threading import Lock, Thread
 from time import sleep
 
 from monitor.adapters.gsm import CallResult, CallType

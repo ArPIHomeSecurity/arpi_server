@@ -72,7 +72,7 @@ class Clock:
             # parse the uptime to float from iso datetime string
             uptime = dt.fromisoformat(" ".join(uptime)).timestamp()
             # get elapsed time in seconds
-            uptime = dt.now().timestamp() - uptime
+            uptime = dt.now().astimezone().timestamp() - uptime
             return int(float(uptime))
         except Exception:  # pylint: disable=broad-except
             return None

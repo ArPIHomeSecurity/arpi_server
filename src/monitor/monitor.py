@@ -476,7 +476,10 @@ class Monitor(Thread, ActionHandler):
 
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         disarm = Disarm(
-            arm_id=arm.id if arm else None, time=dt.now(), user_id=user_id, keypad_id=keypad_id
+            arm_id=arm.id if arm else None,
+            time=dt.now().astimezone(),
+            user_id=user_id,
+            keypad_id=keypad_id,
         )
         self._db_session.add(disarm)
         self._db_session.commit()
@@ -507,7 +510,7 @@ class Monitor(Thread, ActionHandler):
         Update the arm in the database.
         """
         # arm the system
-        now = dt.now()
+        now = dt.now().astimezone()
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         if arm is None:
             user = self._db_session.get(User, user_id) if user_id else None
@@ -540,11 +543,11 @@ class Monitor(Thread, ActionHandler):
 
         if new_power_source == SOURCE_BATTERY and self._power_source == SOURCE_NETWORK:
             send_power_state(POWER_SOURCE_BATTERY)
-            Notifier.notify_power_outage_started(dt.now())
+            Notifier.notify_power_outage_started(dt.now().astimezone())
             logger.info("Power outage started!")
         elif new_power_source == SOURCE_NETWORK and self._power_source == SOURCE_BATTERY:
             send_power_state(POWER_SOURCE_NETWORK)
-            Notifier.notify_power_outage_stopped(dt.now())
+            Notifier.notify_power_outage_stopped(dt.now().astimezone())
             logger.info("Power outage ended!")
 
         self._power_source = new_power_source
@@ -557,7 +560,7 @@ class Monitor(Thread, ActionHandler):
         alert_states = [MONITORING_ALERT, MONITORING_ALERT_DELAY]
         alert = self._db_session.query(Alert).filter_by(end_time=None).first()
         if alert and States.get(State.MONITORING) not in alert_states:
-            alert.end_time = dt.now()
+            alert.end_time = dt.now().astimezone()
             logger.info("Close invalid alert: %s", alert)
             send_alert_state(None)
 

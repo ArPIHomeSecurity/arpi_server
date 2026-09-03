@@ -19,11 +19,11 @@ from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
     ChannelConfig,
     WiringStrategies,
+    append_sms_message,
     get_output_states,
     load_channel_configs,
     set_input_states,
     set_keypad_state,
-    append_sms_message,
 )
 from monitor.config.models import GSMConfig
 from monitor.database import create_database_session
@@ -743,7 +743,7 @@ class SimulatorApp(App):
         """Add an incoming SMS to the mock GSM message queue."""
         source_number = self.query_one("#gsm-source-number", Input).value
         message = self.query_one("#gsm-message", Input).value
-        append_sms_message(source_number, message, datetime.now())
+        append_sms_message(source_number, message, datetime.now().astimezone())
 
 
 logging.basicConfig(

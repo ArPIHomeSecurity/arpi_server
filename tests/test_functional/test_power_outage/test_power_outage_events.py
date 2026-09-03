@@ -1,4 +1,6 @@
 import pytest
+
+from monitor.adapters.mock.utils import set_input_state
 from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import (
     MonitorEvent,
@@ -7,8 +9,6 @@ from tests.test_functional.helpers import (
     check_api_response,
     wait_for_monitoring_ready,
 )
-
-from monitor.adapters.mock.utils import set_input_state
 from utils.constants import POWER_SOURCE_BATTERY, POWER_SOURCE_NETWORK
 
 

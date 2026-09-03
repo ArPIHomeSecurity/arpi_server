@@ -96,7 +96,7 @@ class NetworkHandler(Thread):
         if status == previous:
             return
 
-        now = datetime.now()
+        now = datetime.now().astimezone()
         if previous == ConnectivityStatus.NO_LOCAL_NETWORK and status != previous:
             Notifier.notify_local_network_issue_stopped(now)
         if previous == ConnectivityStatus.NO_INTERNET and status != previous:

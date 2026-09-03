@@ -4,6 +4,7 @@ import os
 
 import pytest
 from dotenv import load_dotenv
+
 from tests.test_functional.helpers.services import monitor_service
 
 load_dotenv(".env.pytest", override=True)

@@ -64,7 +64,7 @@ class SensorAlert(Thread):
             alert = db_session.query(Alert).filter_by(end_time=None).first()
             disarm = db_session.query(Disarm).get(disarm_id)
             if alert:
-                alert.end_time = datetime.now()
+                alert.end_time = datetime.now().astimezone()
                 alert.disarm = disarm
                 db_session.commit()
                 Notifier.notify_alert_stopped(alert.id, alert.end_time)
@@ -94,8 +94,7 @@ class SensorAlert(Thread):
         self._broadcaster = broadcaster
 
     def run(self):
-
-        start_time = datetime.now()
+        start_time = datetime.now().astimezone()
         logger.debug("Alert prepared in arm state: %s", self._alert_type)
         logger.info(
             "Alert prepared on sensor (id:%s) with %s seconds delay",
@@ -172,7 +171,7 @@ class SensorAlert(Thread):
         The alert is then added to the database and returned.
         """
         arm = session.query(Arm).filter_by(disarm=None).first()
-        start_time = datetime.now()
+        start_time = datetime.now().astimezone()
         alert = Alert(arm=arm, start_time=start_time, sensors=[])
         session.add(alert)
         session.commit()

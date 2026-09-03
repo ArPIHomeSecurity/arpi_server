@@ -153,7 +153,7 @@ class Notifier(Thread):
             type=NotificationType.TEST_NOTIFICATION,
             id=None,
             location=location,
-            time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
+            time=datetime.now().astimezone().strftime(Notifier.DATETIME_FORMAT),
         )
         if smtp_config.email_address_1:
             messages["email1"] = smtp.send_email(
@@ -187,7 +187,7 @@ class Notifier(Thread):
                 type=NotificationType.TEST_NOTIFICATION,
                 id=None,
                 sensors=None,
-                time=datetime.now().strftime(Notifier.DATETIME_FORMAT),
+                time=datetime.now().astimezone().strftime(Notifier.DATETIME_FORMAT),
             )
             if gsm_config.phone_number_1:
                 messages["phone1"] = gsm.send_SMS(

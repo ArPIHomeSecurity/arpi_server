@@ -2,8 +2,11 @@ import logging
 import time
 
 import pytest
-from tests.test_functional.data import create_test_no_delay_v2
 from dotenv import load_dotenv
+
+from monitor.adapters.mock.utils import set_input_state
+from monitor.sensor.detector import wiring_config
+from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import (
     MonitorEvent,
     MonitorEventsClient,
@@ -11,9 +14,6 @@ from tests.test_functional.helpers import (
     check_api_response,
     wait_for_monitoring_ready,
 )
-
-from monitor.adapters.mock.utils import set_input_state
-from monitor.sensor.detector import wiring_config
 from utils.models import SensorContactTypes
 
 load_dotenv(".env.pytest")

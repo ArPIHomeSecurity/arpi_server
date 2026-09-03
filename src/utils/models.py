@@ -810,7 +810,7 @@ class User(BaseModel):
     def set_card_registration(self):
         self.update_record(
             ("card_registration_expiry"),
-            {"card_registration_expiry": dt.now() + timedelta(seconds=60)},
+            {"card_registration_expiry": dt.now().astimezone() + timedelta(seconds=60)},
         )
 
     def add_registration_code(self, registration_code=None, expiry=None):
@@ -905,7 +905,7 @@ class Card(BaseModel):
     @staticmethod
     def generate_card_description():
         """Example: 2021-10-30_08:15_284"""
-        return f"{dt.now().isoformat().replace('T', ' ')[:16]} ({str(uuid.uuid1(1000).int)[:3]})"
+        return f"{dt.now().astimezone().isoformat().replace('T', ' ')[:16]} ({str(uuid.uuid1(1000).int)[:3]})"
 
     def update(self, data):
         fields = ("enabled", "description")

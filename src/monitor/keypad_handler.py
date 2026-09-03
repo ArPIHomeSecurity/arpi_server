@@ -197,7 +197,7 @@ class KeypadHandler(Thread):
             # TODO: for now we don't have a reference time as for delayed arm
             # we need to add the alerts to the database
             if alert_delay and alert_delay > 0:
-                self._keypad.start_delay(dt.now(), alert_delay)
+                self._keypad.start_delay(dt.now().astimezone(), alert_delay)
 
     def handle_access_code(self, presses):
         user = get_user_with_access_code(get_database_session(), presses)

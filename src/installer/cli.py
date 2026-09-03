@@ -149,12 +149,12 @@ def bootstrap(ctx, component):
     Install the full environment for the server or a specific component
     """
     ctx.ensure_object(dict)
-    start_time = datetime.now()
+    start_time = datetime.now().astimezone()
     click.echo("🚀 Starting ArPI bootstrap...")
     click.echo(f"Bootstrap started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
+    click.echo(f"Configurations: \n{json.dumps(orchestrator.config, indent=4, cls=JsonEncoder)}")
     for comp in components:
         installer = orchestrator.get_installer(comp)
         if not installer:
@@ -170,7 +170,7 @@ def bootstrap(ctx, component):
             click.echo(traceback.format_exc())
             installer.warnings.append(f"Installation failed: {type(e).__name__}: {e!s}")
 
-    click.echo(f"Bootstrap completed in {datetime.now() - start_time}")
+    click.echo(f"Bootstrap completed in {datetime.now().astimezone() - start_time}")
 
     if any(
         orchestrator.get_installer(comp).warnings
@@ -205,12 +205,12 @@ def post_install(ctx, component):
     Run post-installation tasks such as database migrations
     """
     ctx.ensure_object(dict)
-    start_time = datetime.now()
+    start_time = datetime.now().astimezone()
     click.echo("🚀 Starting ArPI post-installation...")
     click.echo(f"Post-installation started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     components = get_selected_installers(component)
     orchestrator: ArpiOrchestrator = ctx.obj["orchestrator"]
-    click.echo("Configurations: \n%s" % json.dumps(orchestrator.config, indent=4, cls=JsonEncoder))
+    click.echo(f"Configurations: \n{json.dumps(orchestrator.config, indent=4, cls=JsonEncoder)}")
     for comp in components:
         installer = orchestrator.get_installer(comp)
         if not installer:
@@ -229,7 +229,7 @@ def post_install(ctx, component):
             click.echo(traceback.format_exc())
             installer.warnings.append(f"Installation failed: {type(e).__name__}: {e!s}")
 
-    click.echo(f"Post-installation completed in {datetime.now() - start_time}")
+    click.echo(f"Post-installation completed in {datetime.now().astimezone() - start_time}")
 
     if any(
         orchestrator.get_installer(comp).warnings

@@ -4,7 +4,6 @@ Handles SMS messages received from GSM modem.
 
 import contextlib
 import logging
-from enum import Enum
 from queue import Empty, Queue
 from threading import Thread
 

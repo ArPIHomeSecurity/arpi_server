@@ -23,9 +23,9 @@ class Handler:
 
     def do(self) -> bool:
         logger.debug("Start: %s delay: %s step: %s", self._start, self._delay, self._step)
-        now = dt.now()
-        if self._start.replace(tzinfo=None) + timedelta(seconds=self._delay) > now:
-            if (now - self._start.replace(tzinfo=None)).total_seconds() > self._step:
+        now = dt.now().astimezone()
+        if self._start + timedelta(seconds=self._delay) > now:
+            if (now - self._start).total_seconds() > self._step:
                 self._step += 1
                 if self._delay - 5 < self._step:
                     return DelayPhase.LAST_5_SECS

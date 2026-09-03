@@ -473,7 +473,7 @@ def create_test_no_delay_v2_armed():
             session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
 
-        arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now(), user=users["admin"])
+        arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now().astimezone(), user=users["admin"])
         session.add(arm)
 
         session.commit()
