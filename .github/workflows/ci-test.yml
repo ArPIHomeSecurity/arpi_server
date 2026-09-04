@@ -8,10 +8,12 @@ on:
   pull_request:
     paths:
       - '**.py'
+      - 'Taskfile.yml'
       - '.github/workflows/ci-test.yml'
   push:
     paths:
       - '**.py'
+      - 'Taskfile.yml'
       - '.github/workflows/ci-test.yml'
     branches:
       - 'main'
@@ -23,13 +25,35 @@ concurrency:
 
 jobs:
   Test:
-    name: Run tests
+    name: Run ${{ matrix.name }} tests
     if: >-
       ${{
         (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dev_')) ||
         (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
       }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: unit
+            task: test-unit
+          - name: functional-arm
+            task: test-functional-arm
+          # - name: functional-installer
+          #   task: test-functional-installer
+          - name: functional-options
+            task: test-functional-options
+          # - name: functional-output
+          #   task: test-functional-output
+          - name: functional-power-outage
+            task: test-functional-power-outage
+          - name: functional-sensitivity
+            task: test-functional-sensitivity
+          - name: functional-silent-alert
+            task: test-functional-silent-alert
+          - name: functional-startup
+            task: test-functional-startup
 
     steps:
       - name: Checkout repository 🛎️
@@ -61,24 +85,64 @@ jobs:
         run: |
           task create-environment
           if [ "$RUNNER_DEBUG" = "1" ]; then
-            task test-debug
+            PYTEST_ADDOPTS="-vv --setup-show --maxfail=1" task ${{ matrix.task }}
           else
-            task test
+            task ${{ matrix.task }}
           fi
 
-      - name: Publish test results📄
+      - name: Upload test reports
         if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-${{ matrix.name }}
+          overwrite: true
+          path: |
+            junit.xml
+            coverage.xml
+          if-no-files-found: warn
+
+  Publish:
+    name: Publish test reports
+    if: >-
+      ${{
+        always() &&
+        (
+          (github.event_name == 'pull_request' && !startsWith(github.head_ref, 'dev_')) ||
+          (github.event_name == 'push' && !contains(github.event.head_commit.message, 'GitHub Actions: bump version'))
+        )
+      }}
+    needs: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Checkout repository 🛎️
+        uses: actions/checkout@v6
+        
+      - name: Download test reports
+        uses: actions/download-artifact@v8
+        with:
+          path: test-reports
+          
+      - name: Merge and deduplicate reports
+        run: |
+          reportgenerator \
+            -reports:"test-reports/test-reports-*/coverage.xml" \
+            -targetdir:"coverage-merged" \
+            -reporttypes:"Cobertura"
+
+      - name: Publish test results
         uses: dorny/test-reporter@v3
         with:
           name: pytest
           reporter: python-xunit
-          path: junit.xml
+          path: test-reports/**/junit.xml
 
-      - name: Code Coverage Report
-        if: always()
+      - name: Generate coverage report
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
-          filename: coverage.xml
+          filename: coverage-merged/Cobertura.xml
           badge: true
           fail_below_min: false
           format: markdown
@@ -86,7 +150,10 @@ jobs:
           output: file
 
       - name: Report Code Coverage Summary
-        if: always()
         run: |
           echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
           cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail when tests failed
+        if: needs.Test.result != 'success'
+        run: exit 1

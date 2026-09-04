@@ -184,6 +184,67 @@ tasks:
         --cov-report=term \
         {{.CLI_ARGS}}
 
+  test-functional-folder:
+    internal: true
+    requires:
+      vars: [FOLDER]
+    cmd: |
+      uv run pytest tests/test_functional/{{.FOLDER}} \
+        -v \
+        --junitxml=junit.xml \
+        --cov=src \
+        --cov-report=xml \
+        --cov-report=term \
+        {{.CLI_ARGS}}
+
+  test-functional-arm:
+    desc: Run arm functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_arm }
+
+  # test-functional-installer:
+  #   desc: Run installer functional tests
+  #   cmds:
+  #     - task: test-functional-folder
+  #       vars: { FOLDER: test_installer }
+
+  test-functional-options:
+    desc: Run options functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_options }
+
+  # test-functional-output:
+  #   desc: Run output functional tests
+  #   cmds:
+  #     - task: test-functional-folder
+  #       vars: { FOLDER: test_output }
+
+  test-functional-power-outage:
+    desc: Run power outage functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_power_outage }
+
+  test-functional-sensitivity:
+    desc: Run sensitivity functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_sensitivity }
+
+  test-functional-silent-alert:
+    desc: Run silent alert functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_silent_alert }
+
+  test-functional-startup:
+    desc: Run startup functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_startup }
+
   list-outdated-dependencies:
     desc: List outdated dependencies
     cmds:
