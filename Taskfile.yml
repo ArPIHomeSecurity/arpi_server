@@ -197,11 +197,23 @@ tasks:
         --cov-report=term \
         {{.CLI_ARGS}}
 
-  test-functional-arm:
+  test-functional-arm-api:
     desc: Run arm functional tests
     cmds:
       - task: test-functional-folder
-        vars: { FOLDER: test_arm }
+        vars: { FOLDER: test_arm/api }
+
+  test-functional-arm-mqtt:
+    desc: Run arm functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_arm/mqtt }
+
+  test-functional-arm-gsm:
+    desc: Run arm functional tests
+    cmds:
+      - task: test-functional-folder
+        vars: { FOLDER: test_arm/gsm }
 
   # test-functional-installer:
   #   desc: Run installer functional tests

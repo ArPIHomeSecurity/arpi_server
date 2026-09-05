@@ -41,10 +41,6 @@ class SmsHandler(Thread):
         self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
 
-        # Register callback with GSMProvider for incoming SMS
-        with GSMProvider.session() as gsm:
-            gsm.set_sms_received_callback(self._on_sms_received)
-
     def run(self):
         try:
             self.communicate()
@@ -55,20 +51,24 @@ class SmsHandler(Thread):
 
     def communicate(self):
         """Main event loop for SMS handler."""
-        while True:
-            # Check for control messages (stop, config update)
-            with contextlib.suppress(Empty):
-                message = self._actions.get(timeout=POLL_TIMEOUT)
-                match message:
-                    case MonitorStopCommand():
-                        break
-                    case MonitorUpdateConfigCommand():
-                        GSMProvider.load_config()
+        # Register callback with GSMProvider for incoming SMS
+        with GSMProvider.session() as gsm:
+            gsm.set_sms_received_callback(self._on_sms_received)
 
-            # Process any queued SMS messages
-            with contextlib.suppress(Empty):
-                sms = self._inbox.get_nowait()
-                self.handle_message(sms.number, sms.text)
+            while True:
+                # Check for control messages (stop, config update)
+                with contextlib.suppress(Empty):
+                    message = self._actions.get(timeout=POLL_TIMEOUT)
+                    match message:
+                        case MonitorStopCommand():
+                            break
+                        case MonitorUpdateConfigCommand():
+                            GSMProvider.load_config()
+
+                # Process any queued SMS messages
+                with contextlib.suppress(Empty):
+                    sms = self._inbox.get_nowait()
+                    self.handle_message(sms.number, sms.text)
 
         logger.info("SMS handler communication stopped")
 

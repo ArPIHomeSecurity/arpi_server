@@ -31,11 +31,7 @@ class GSM:
         self._baud = baud
         self._sms_received_callback = sms_received_callback
         self._enabled = enabled
-        self._connected = False
-
-    @property
-    def connected(self) -> bool:
-        return self._connected
+        self.connected = False
 
     def set_enabled(self, enabled):
         if self._enabled == enabled:
@@ -51,7 +47,7 @@ class GSM:
     def inject_message(self):
         """Simulate an incoming SMS for testing the receiving path."""
 
-        while True:
+        while self.connected:
             messages = get_sms_messages()  # Ensure messages are loaded
 
             for message in messages:
@@ -95,13 +91,13 @@ class GSM:
             self._pin_code or "-",
         )
 
-        self._connected = True
+        self.connected = True
         sms_actions_thread = Thread(target=self.inject_message)
         sms_actions_thread.start()
         return True
 
     def send_SMS(self, phone_number, message):
-        if not self._connected:
+        if not self.connected:
             return False
 
         sleep(7)
@@ -109,14 +105,14 @@ class GSM:
         return True
 
     def get_sms_messages(self):
-        if not self._connected:
+        if not self.connected:
             return []
 
         sleep(3)
         return list(MESSAGES.values())
 
     def delete_sms_message(self, message_id):
-        if not self._connected:
+        if not self.connected:
             return False
 
         sleep(2)
@@ -128,7 +124,7 @@ class GSM:
         return True
 
     def call(self, phone_number, call_type: CallType):
-        if not self._connected:
+        if not self.connected:
             return CallResult.FAILED
 
         sleep(3)
@@ -136,9 +132,9 @@ class GSM:
         return CallResult.ANSWERED
 
     def destroy(self):
-        if self._connected:
+        if self.connected:
             GSM.CONNECTS -= 1
-            self._connected = False
+            self.connected = False
 
     def _connect(self) -> bool:
-        return self._connected or self.setup()
+        return self.connected or self.setup()

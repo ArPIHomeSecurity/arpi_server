@@ -15,6 +15,7 @@ VERSION_FILE = "src/server/version.json"
 
 logger = logging.getLogger(__name__)
 
+
 def load_version() -> dict:
     """Load the current version from the version file"""
     with open(VERSION_FILE, "r", encoding="utf-8") as f:

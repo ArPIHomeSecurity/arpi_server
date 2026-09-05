@@ -6,7 +6,12 @@ from datetime import datetime
 from psycopg2 import ProgrammingError
 from sqlalchemy import Integer, text
 
-from monitor.config.models import MQTTConfigInternalPublish
+from monitor.config.models import (
+    GSMConfig,
+    MQTTConfigInternalPublish,
+    SMSActionConfig,
+    SMSCommandConfig,
+)
 from monitor.database import create_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
@@ -110,6 +115,52 @@ def _create_options(session):
         )
     )
     logger.info(" - Created MQTT config option")
+
+    session.add(
+        Option(
+            name=GSMConfig.OPTION_NAME,
+            section=GSMConfig.SECTION_NAME,
+            value=json.dumps(
+                asdict(GSMConfig(enabled=True, pin_code="1234", phone_number_1="+1234567890"))
+            ),
+        )
+    )
+    logger.info(" - Created GSM config option")
+
+    session.add(
+        Option(
+            name=SMSActionConfig.OPTION_NAME,
+            section=SMSActionConfig.SECTION_NAME,
+            value=json.dumps(
+                asdict(
+                    SMSActionConfig(
+                        enabled=True,
+                        check_phone_number=True,
+                        access_code_required=True,
+                    )
+                )
+            ),
+        )
+    )
+    logger.info(" - Created SMS action config option")
+
+    session.add(
+        Option(
+            name=SMSCommandConfig.OPTION_NAME,
+            section=SMSCommandConfig.SECTION_NAME,
+            value=json.dumps(
+                asdict(
+                    SMSCommandConfig(
+                        case_sensitive=False,
+                        arm_away_command="away",
+                        arm_stay_command="stay",
+                        disarm_command="disarm",
+                    )
+                )
+            ),
+        )
+    )
+    logger.info(" - Created SMS command config option")
 
 
 def _create_users(session) -> dict:

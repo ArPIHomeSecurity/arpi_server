@@ -38,8 +38,12 @@ jobs:
         include:
           - name: unit
             task: test-unit
-          - name: functional-arm
-            task: test-functional-arm
+          - name: functional-arm-api
+            task: test-functional-arm-api
+          - name: functional-arm-mqtt
+            task: test-functional-arm-mqtt
+          - name: functional-arm-gsm
+            task: test-functional-arm-gsm
           # - name: functional-installer
           #   task: test-functional-installer
           - name: functional-options

@@ -79,6 +79,8 @@ class GSMProvider:
 
             yield gsm
 
+            gsm.destroy()
+
     @classmethod
     def destroy(cls):
         with cls._lock:
