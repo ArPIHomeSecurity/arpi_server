@@ -92,6 +92,10 @@ class SmsHandler(Thread):
 
         action_config = SMSActionConfig.load_config()
 
+        if not action_config.enabled:
+            logger.info("SMS action config is disabled, ignoring message from %s", number)
+            return
+
         # Validate sender against configured phone numbers if required
         if action_config.check_phone_number:
             config = GSMProvider.get_config()
