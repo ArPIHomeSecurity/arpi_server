@@ -62,7 +62,7 @@ jobs:
 
       - name: Check all CI workflows passed for this SHA 🔎
         if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const sha = context.payload.workflow_run.head_sha;
@@ -248,7 +248,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release 📦
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.get_version.outputs.simple_version }}
           name: ${{ steps.get_version.outputs.simple_version }}
