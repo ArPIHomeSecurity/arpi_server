@@ -5,6 +5,7 @@ import logging
 from argparse import ArgumentParser, ArgumentTypeError, RawTextHelpFormatter
 from datetime import datetime as dt
 from time import sleep
+import uuid
 
 import sqlalchemy
 from dateutil.tz.tz import tzlocal
@@ -45,7 +46,7 @@ def wait(seconds=5):
         print("Overwriting! Press CTRL+C if you want to stop!           ")
 
 
-def new_registration_code(user_id, code, expiry):
+def new_registration_code(user_id, code: str | None, expiry: int | None):
     """
     Generate a new registration code for the user.
     """
@@ -73,10 +74,9 @@ def new_registration_code(user_id, code, expiry):
     registration_code = user.add_registration_code(registration_code=code, expiry=expiry)
 
     logger.info("\n------------------------------")
-    logger.info("Code generated for user (id: %s): %s", user.id, user.name)
-
-    if code is None or code != registration_code:
-        logger.info("New registration code: %s", registration_code)
+    logger.info(
+        "Code generated for user (id: %s, name: %s): %s", user.id, user.name, registration_code
+    )
 
     if expiry is None:
         logger.info("The code never expires")
@@ -86,7 +86,7 @@ def new_registration_code(user_id, code, expiry):
     session.commit()
 
 
-def new_access_code(user_id, code):
+def new_access_code(user_id, code: str | None):
     """
     Generate a new access code for the user.
     """
@@ -98,13 +98,14 @@ def new_access_code(user_id, code):
     else:
         logger.info("User doesn't have access code")
 
-    access_code = user.update({"accessCode": code})
+    if code is None:
+        # generate a random access code if none is provided
+        code = str(uuid.uuid4().int)[:8]
+
+    user.add_access_code(access_code=code)
 
     logger.info("\n------------------------------")
-    logger.info("Code generated for user (id: %s): %s", user.id, user.name)
-
-    if code is None or code != access_code:
-        logger.info("New access code: %s", access_code)
+    logger.info("Code generated for user (id: %s, name: %s): %s", user.id, user.name, code)
 
     session.commit()
 
@@ -122,8 +123,24 @@ def main():
 
     parser = ArgumentParser(description=description, formatter_class=RawTextHelpFormatter)
     parser.add_argument("-l", "--list", action="store_true", help="List all users")
-    parser.add_argument("-r", "--registration-code", required=False, help="New registration code")
-    parser.add_argument("-a", "--access-code", required=False, help="New access code")
+    parser.add_argument(
+        "-r",
+        "--registration-code",
+        nargs="?",
+        required=False,
+        const="None",
+        default=None,
+        help="New registration code",
+    )
+    parser.add_argument(
+        "-a",
+        "--access-code",
+        nargs="?",
+        required=False,
+        const="None",
+        default=None,
+        help="New access code",
+    )
     parser.add_argument("-u", "--user", required=False, help="The id of the user")
     parser.add_argument(
         "-e",
@@ -139,12 +156,14 @@ def main():
         parser.error("If user is defined, either registration-code or access-code is required.")
 
     if args.user and args.registration_code:
-        new_registration_code(user_id=args.user, code=args.registration_code, expiry=args.expiry)
+        code = args.registration_code if args.registration_code != "None" else None
+        new_registration_code(user_id=args.user, code=code, expiry=args.expiry)
 
     if args.user and args.access_code:
         if args.expiry:
             parser.error("Expiry is not allowed with access-code")
-        new_access_code(user_id=args.user, code=args.access_code)
+        code = args.access_code if args.access_code != "None" else None
+        new_access_code(user_id=args.user, code=code)
 
     if args.list:
         get_users()
