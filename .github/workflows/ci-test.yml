@@ -87,7 +87,7 @@ jobs:
 
       - name: Run tests 🔍
         run: |
-          task create-environment
+          task create:environment
           if [ "$RUNNER_DEBUG" = "1" ]; then
             PYTEST_ADDOPTS="-vv --setup-show --maxfail=1" task ${{ matrix.task }}
           else

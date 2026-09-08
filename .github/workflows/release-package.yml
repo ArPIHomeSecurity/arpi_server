@@ -123,7 +123,7 @@ jobs:
           curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash
           sudo apt update && sudo apt install -y jq task
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          task create-environment
+          task create:environment
 
       - name: Determine release mode 🏷️
         id: release_mode
