@@ -59,7 +59,7 @@ from utils.constants import (
     POWER_SOURCE_NETWORK,
     THREAD_MONITOR,
 )
-from utils.models import Alert, Arm, ArmSensor, ArmStates, Disarm, Sensor, User
+from utils.models import Alert, Area, Arm, ArmSensor, ArmStates, Disarm, Sensor, User
 from utils.queries import get_arm_delay, get_arm_state
 
 # 2000.01.01 00:00:00
@@ -341,15 +341,41 @@ class Monitor(Thread, ActionHandler):
 
         arm_changed = False
         if area_id is None:
+            # check already armed or arming is in progress
+            if States.get(State.MONITORING) in (MONITORING_ARMED, MONITORING_ARM_DELAY):
+                logger.warning("System already armed or arming in progress")
+                return
+
+            # check if any sensor is active
+            if self._sensor_handler.has_active_sensor():
+                logger.warning("Cannot arm: active sensors present")
+                return
+
             # arm the system and all the areas
             arm_changed = self._area_handler.change_areas_arm(arm_type)
             self.arm_system(arm_type, use_delay)
         else:
+            area = self._db_session.get(Area, area_id)
+            if area is None:
+                logger.warning("Area '%s' not found", area_id)
+                return
+
+            # check if the area is already armed
+            if area.arm_state == arm_type:
+                logger.warning("Area '%s' already armed to %s", area_id, area.arm_state)
+                return
+
+            # check if any sensor is active in the area
+            if self._sensor_handler.has_active_sensor(area_id):
+                logger.warning("Cannot arm area %s: active sensors present", area_id)
+                return
+
             arm_state_before = get_arm_state(self._db_session)
             arm_changed = self._area_handler.change_area_arm(arm_type, area_id)
             arm_state_after = get_arm_state(self._db_session)
 
             if arm_state_before != arm_state_after:
+                logger.info("Arm state changed from %s to %s", arm_state_before, arm_state_after)
                 # arming an area that arms the whole system gets the exit delay too,
                 # otherwise leaving the building would trip the sensors right away
                 self.arm_system(arm_type, use_delay)
@@ -450,7 +476,10 @@ class Monitor(Thread, ActionHandler):
 
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         disarm = Disarm(
-            arm_id=arm.id if arm else None, time=dt.now(), user_id=user_id, keypad_id=keypad_id
+            arm_id=arm.id if arm else None,
+            time=dt.now().astimezone(),
+            user_id=user_id,
+            keypad_id=keypad_id,
         )
         self._db_session.add(disarm)
         self._db_session.commit()
@@ -481,7 +510,7 @@ class Monitor(Thread, ActionHandler):
         Update the arm in the database.
         """
         # arm the system
-        now = dt.now()
+        now = dt.now().astimezone()
         arm = self._db_session.query(Arm).filter_by(disarm=None).first()
         if arm is None:
             user = self._db_session.get(User, user_id) if user_id else None
@@ -514,11 +543,11 @@ class Monitor(Thread, ActionHandler):
 
         if new_power_source == SOURCE_BATTERY and self._power_source == SOURCE_NETWORK:
             send_power_state(POWER_SOURCE_BATTERY)
-            Notifier.notify_power_outage_started(dt.now())
+            Notifier.notify_power_outage_started(dt.now().astimezone())
             logger.info("Power outage started!")
         elif new_power_source == SOURCE_NETWORK and self._power_source == SOURCE_BATTERY:
             send_power_state(POWER_SOURCE_NETWORK)
-            Notifier.notify_power_outage_stopped(dt.now())
+            Notifier.notify_power_outage_stopped(dt.now().astimezone())
             logger.info("Power outage ended!")
 
         self._power_source = new_power_source
@@ -531,7 +560,7 @@ class Monitor(Thread, ActionHandler):
         alert_states = [MONITORING_ALERT, MONITORING_ALERT_DELAY]
         alert = self._db_session.query(Alert).filter_by(end_time=None).first()
         if alert and States.get(State.MONITORING) not in alert_states:
-            alert.end_time = dt.now()
+            alert.end_time = dt.now().astimezone()
             logger.info("Close invalid alert: %s", alert)
             send_alert_state(None)
 

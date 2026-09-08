@@ -284,7 +284,7 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_datetime(self):
-        timestamp = datetime.now()
+        timestamp = datetime.now().astimezone()
         logger.debug("DATETIME 0x%0X => %s" % (self.DATETIME_STATUS, timestamp.isoformat()))
 
         b1 = int((timestamp.year - 2000) / 10) << 4

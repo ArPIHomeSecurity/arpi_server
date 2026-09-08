@@ -46,7 +46,7 @@ class SystemHelper:
         try:
             if not suppress_output:
                 click.echo(
-                    f"   ⚡Starting command at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"   ⚡Starting command at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
                 click.echo(f"    > Running: {command}")
 
@@ -96,7 +96,7 @@ class SystemHelper:
 
             if not suppress_output:
                 click.echo(
-                    f"   ⚡Finished command at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"   ⚡Finished command at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
 
             return result
@@ -268,7 +268,7 @@ class PackageHelper:
         if missing_packages:
             packages_str = " ".join(missing_packages)
             click.echo(
-                f"   ⚡Starting installation at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                f"   ⚡Starting installation at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}"
             )
             if description:
                 click.echo(f"    > Installing {description}...")

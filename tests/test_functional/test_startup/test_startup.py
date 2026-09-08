@@ -1,6 +1,11 @@
 import os
 
 import pytest
+from sqlalchemy import select
+
+from monitor.adapters.mock.utils import set_input_state, set_input_states
+from monitor.database import get_database_session
+from monitor.sensor.detector import wiring_config
 from tests.test_functional.data import create_test_no_delay_v2, create_test_no_delay_v2_armed
 from tests.test_functional.helpers import (
     MonitorEvent,
@@ -10,11 +15,6 @@ from tests.test_functional.helpers import (
     wait_for_monitoring_ready,
     wait_for_monitoring_state,
 )
-from sqlalchemy import select
-
-from monitor.adapters.mock.utils import set_input_state, set_input_states
-from monitor.database import get_database_session
-from monitor.sensor.detector import wiring_config
 from utils.constants import MONITORING_ALERT, MONITORING_ARMED
 from utils.models import ChannelTypes, Sensor, SensorContactTypes
 

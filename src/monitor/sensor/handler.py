@@ -95,6 +95,18 @@ class SensorHandler:
         logger.warning("MQTT topic '%s / %s' does not match any current sensor", item_name, item_id)
         return False
 
+    def has_active_sensor(self, area_id: int | None = None) -> bool:
+        """
+        Check if there is any active sensor.
+        Returns True if any sensor is active, False otherwise.
+        """
+
+        # check active sensors without sensitivity
+        if area_id is None:
+            return any(sensor.alert for sensor in self._sensors)
+
+        return any(sensor.alert and sensor.area_id == area_id for sensor in self._sensors)
+
     def calibrate_sensors(self):
         """
         Calibrate the sensors: update the reference value of the sensors.
@@ -327,7 +339,7 @@ class SensorHandler:
 
         # save current state to avoid concurrency
         current_monitoring = States.get(State.MONITORING)
-        now = dt.now()
+        now = dt.now().astimezone()
         logger.trace("Checking sensors in %s", current_monitoring)
 
         arm: Arm = None
@@ -381,15 +393,12 @@ class SensorHandler:
                 if (
                     current_monitoring != MONITORING_ALERT_DELAY
                     and delay is not None
-                    and (
-                        arm is not None
-                        and arm.time.replace(tzinfo=None) + timedelta(seconds=delay) > now
-                    )
+                    and (arm is not None and arm.time + timedelta(seconds=delay) > now)
                 ):
                     logger.debug(
                         "Ignore alert on sensor(%s): %s + %s < %s",
                         sensor.id,
-                        arm.time.replace(tzinfo=None),
+                        arm.time,
                         timedelta(seconds=delay),
                         now,
                     )
@@ -432,7 +441,7 @@ class SensorHandler:
                     .first()
                 )
                 if alert_sensor is not None:
-                    alert_sensor.end_time = dt.now()
+                    alert_sensor.end_time = dt.now().astimezone()
                     logger.debug(
                         "Cleared sensor alert: alert id=%s, sensor id=%s",
                         alert_sensor.alert_id,

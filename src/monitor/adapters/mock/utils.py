@@ -8,6 +8,7 @@ import json
 import os
 from dataclasses import dataclass
 from enum import Enum
+from random import randint
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
@@ -190,6 +191,32 @@ def set_keypad_state(pending_bits, data):
     new_data = {"pending_bits": pending_bits, "data": data}
 
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
+
+
+def get_sms_messages():
+    """
+    Get the list of SMS messages from the mock GSM adapter.
+    """
+    default_data = []
+    return protected_transfer("simulator_gsm.json", default_data)
+
+
+def append_sms_message(number, text, time):
+    """
+    Append a new SMS message to the mock GSM adapter's message list.
+    """
+    default_data = []
+
+    def merge_sms_data(base, new):
+        return base + [{"idx": randint(1_000_000, 10_000_000), **new}]
+
+    new_message = {"number": number, "text": text, "time": time.isoformat()}
+    protected_update(
+        "simulator_gsm.json",
+        new_message,
+        default_data,
+        merge_sms_data,
+    )
 
 
 def load_channel_configs(input_number: int) -> dict:

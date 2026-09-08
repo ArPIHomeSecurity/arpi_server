@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_time_string():
-    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    return datetime.now().astimezone().strftime("%H:%M:%S.%f")[:-3]
 
 
 @dataclass
@@ -116,15 +116,15 @@ class MonitorEventsClient:
             _get_time_string(),
         )
 
-        start = datetime.now()
-        while (datetime.now() - start).total_seconds() < delay:
+        start = datetime.now().astimezone()
+        while (datetime.now().astimezone() - start).total_seconds() < delay:
             assert not self._find_event(event), (
                 f"Socket.IO event '{event.name}' received before delay period at {_get_time_string()}"
             )
             sleep(0.1)
 
-        start = datetime.now()
-        while (datetime.now() - start).total_seconds() < timeout:
+        start = datetime.now().astimezone()
+        while (datetime.now().astimezone() - start).total_seconds() < timeout:
             if self._find_event(event):
                 return
 
@@ -153,17 +153,17 @@ class MonitorEventsClient:
             _get_time_string(),
         )
 
-        start = datetime.now()
-        while (datetime.now() - start).total_seconds() < delay:
+        start = datetime.now().astimezone()
+        while (datetime.now().astimezone() - start).total_seconds() < delay:
             for event in events:
                 assert not self._find_event(event), (
                     f"Socket.IO event '{event.name}' received before delay period ({delay} seconds) at {_get_time_string()}"
                 )
             sleep(0.1)
 
-        start = datetime.now()
+        start = datetime.now().astimezone()
         matched_events = []
-        while (datetime.now() - start).total_seconds() < timeout:
+        while (datetime.now().astimezone() - start).total_seconds() < timeout:
             for event in events:
                 if event not in matched_events and self._find_event(event):
                     matched_events.append(event)
@@ -233,7 +233,7 @@ def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
             logger.debug(
                 "Monitoring is in state '%s' at %s",
                 state,
-                datetime.now().strftime("%H:%M:%S"),
+                datetime.now().astimezone().strftime("%H:%M:%S"),
             )
             break
         else:
@@ -241,7 +241,7 @@ def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
                 "Monitoring state is '%s', waiting for '%s' at %s",
                 response.json()["state"],
                 state,
-                datetime.now().strftime("%H:%M:%S"),
+                datetime.now().astimezone().strftime("%H:%M:%S"),
             )
 
         sleep(0.5)

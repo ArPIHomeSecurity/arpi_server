@@ -3,6 +3,7 @@ import logging
 import os
 
 import pytest
+
 from tests.test_functional.helpers.services import monitor_service
 
 logger = logging.getLogger(__name__)

@@ -18,20 +18,20 @@ Prerequisites: Python 3.11, uv, Task, Docker.
 1. Install dependencies:
    uv sync --group=dev --extra=simulator
 2. Start local infra:
-   task start-database
-   task start-mqtt
+   task start:database
+   task start:mqtt
 3. Start services as needed:
-   task start-server
-   task start-monitor
-   task start-mcp
+   task start:server
+   task start:monitor
+   task start:mcp
 
 ## Execute The Tests
 Run all tests:
 uv run pytest -v
 
 Useful variants:
-- task test
-- task test-debug
-- task test -- -k <test-filter>
-- task test-debug -- -k <test-filter>
+- task test:all
+- task test:debug
+- task test:all -- -k <test-filter>
+- task test:debug -- -k <test-filter>
 

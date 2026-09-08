@@ -14,6 +14,10 @@ class Subscription:
     alert_stopped: bool = False
     power_outage_started: bool = False
     power_outage_stopped: bool = False
+    local_network_issue_started: bool = False
+    local_network_issue_stopped: bool = False
+    internet_issue_started: bool = False
+    internet_issue_stopped: bool = False
 
 
 @dataclass
@@ -107,6 +111,27 @@ class GSMConfig(BaseConfig):
     pin_code: str = None
     phone_number_1: str = None
     phone_number_2: str = None
+
+
+@dataclass
+class SMSActionConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "sms_action"
+
+    enabled: bool = False
+    check_phone_number: bool = True
+    access_code_required: bool = True
+
+
+@dataclass
+class SMSCommandConfig(BaseConfig):
+    OPTION_NAME = "notifications"
+    SECTION_NAME = "sms_command"
+
+    case_sensitive: bool = False
+    arm_away_command: str = "away"
+    arm_stay_command: str = "stay"
+    disarm_command: str = "disarm"
 
 
 @dataclass

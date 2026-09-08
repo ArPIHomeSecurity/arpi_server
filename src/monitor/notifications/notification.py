@@ -7,6 +7,14 @@ from monitor.notifications.templates import (
     ALERT_STARTED_SMS,
     ALERT_STOPPED_EMAIL,
     ALERT_STOPPED_SMS,
+    INTERNET_ISSUE_STARTED_EMAIL,
+    INTERNET_ISSUE_STARTED_SMS,
+    INTERNET_ISSUE_STOPPED_EMAIL,
+    INTERNET_ISSUE_STOPPED_SMS,
+    LOCAL_NETWORK_ISSUE_STARTED_EMAIL,
+    LOCAL_NETWORK_ISSUE_STARTED_SMS,
+    LOCAL_NETWORK_ISSUE_STOPPED_EMAIL,
+    LOCAL_NETWORK_ISSUE_STOPPED_SMS,
     POWER_OUTAGE_STARTED_EMAIL,
     POWER_OUTAGE_STARTED_SMS,
     POWER_OUTAGE_STOPPED_EMAIL,
@@ -25,6 +33,10 @@ class NotificationType:
     ALERT_STOPPED = "alert_stopped"
     POWER_OUTAGE_STARTED = "power_outage_started"
     POWER_OUTAGE_STOPPED = "power_outage_stopped"
+    LOCAL_NETWORK_ISSUE_STARTED = "local_network_issue_started"
+    LOCAL_NETWORK_ISSUE_STOPPED = "local_network_issue_stopped"
+    INTERNET_ISSUE_STARTED = "internet_issue_started"
+    INTERNET_ISSUE_STOPPED = "internet_issue_stopped"
 
 
 SEVERITY_MAPPING = {
@@ -33,6 +45,10 @@ SEVERITY_MAPPING = {
     NotificationType.ALERT_STOPPED: "Alert",
     NotificationType.POWER_OUTAGE_STARTED: "Alert",
     NotificationType.POWER_OUTAGE_STOPPED: "Alert",
+    NotificationType.LOCAL_NETWORK_ISSUE_STARTED: "Alert",
+    NotificationType.LOCAL_NETWORK_ISSUE_STOPPED: "Alert",
+    NotificationType.INTERNET_ISSUE_STARTED: "Alert",
+    NotificationType.INTERNET_ISSUE_STOPPED: "Alert",
 }
 
 
@@ -53,6 +69,10 @@ def _get_email_subject(notification_type: str) -> str | None:
         NotificationType.ALERT_STOPPED: f"[{system}] [{severity}] Alert stopped",
         NotificationType.POWER_OUTAGE_STARTED: f"[{system}] [{severity}] Power outage started",
         NotificationType.POWER_OUTAGE_STOPPED: f"[{system}] [{severity}] Power outage stopped",
+        NotificationType.LOCAL_NETWORK_ISSUE_STARTED: f"[{system}] [{severity}] Local network issue started",
+        NotificationType.LOCAL_NETWORK_ISSUE_STOPPED: f"[{system}] [{severity}] Local network issue stopped",
+        NotificationType.INTERNET_ISSUE_STARTED: f"[{system}] [{severity}] Internet issue started",
+        NotificationType.INTERNET_ISSUE_STOPPED: f"[{system}] [{severity}] Internet issue stopped",
     }
 
     try:
@@ -73,6 +93,10 @@ def _get_email_template(notification_type: str) -> str | None:
         NotificationType.ALERT_STOPPED: ALERT_STOPPED_EMAIL,
         NotificationType.POWER_OUTAGE_STARTED: POWER_OUTAGE_STARTED_EMAIL,
         NotificationType.POWER_OUTAGE_STOPPED: POWER_OUTAGE_STOPPED_EMAIL,
+        NotificationType.LOCAL_NETWORK_ISSUE_STARTED: LOCAL_NETWORK_ISSUE_STARTED_EMAIL,
+        NotificationType.LOCAL_NETWORK_ISSUE_STOPPED: LOCAL_NETWORK_ISSUE_STOPPED_EMAIL,
+        NotificationType.INTERNET_ISSUE_STARTED: INTERNET_ISSUE_STARTED_EMAIL,
+        NotificationType.INTERNET_ISSUE_STOPPED: INTERNET_ISSUE_STOPPED_EMAIL,
     }
 
     try:
@@ -93,6 +117,10 @@ def _get_sms_template(notification_type: str) -> str | None:
         NotificationType.ALERT_STOPPED: ALERT_STOPPED_SMS,
         NotificationType.POWER_OUTAGE_STARTED: POWER_OUTAGE_STARTED_SMS,
         NotificationType.POWER_OUTAGE_STOPPED: POWER_OUTAGE_STOPPED_SMS,
+        NotificationType.LOCAL_NETWORK_ISSUE_STARTED: LOCAL_NETWORK_ISSUE_STARTED_SMS,
+        NotificationType.LOCAL_NETWORK_ISSUE_STOPPED: LOCAL_NETWORK_ISSUE_STOPPED_SMS,
+        NotificationType.INTERNET_ISSUE_STARTED: INTERNET_ISSUE_STARTED_SMS,
+        NotificationType.INTERNET_ISSUE_STOPPED: INTERNET_ISSUE_STOPPED_SMS,
     }
 
     try:

@@ -12,10 +12,10 @@ from time import sleep
 
 import pytest
 import requests
-from tests.test_functional.data import cleanup_database, clear_database
-from tests.test_functional.helpers.services import server_service
 
 from monitor.adapters.mock.utils import set_input_states
+from tests.test_functional.data import cleanup_database, clear_database
+from tests.test_functional.helpers.services import server_service
 
 logger = logging.getLogger(__name__)
 

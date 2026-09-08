@@ -746,26 +746,35 @@ class User(BaseModel):
         # !!! incoming data has camelCase key/field name format
         fields = ("name", "email", "role", "comment")
         access_code = data.get("accessCode", "")
+        changed = False
         if access_code:
-            assert len(access_code) >= 4 and len(access_code) <= 12, (
-                "Access code length (>=4, <=12)"
-            )
-            assert access_code.isdigit(), "Access code only number"
+            changed = self.add_access_code(access_code, data.get("fourkeyCode", None))
 
-            data["accessCode"] = hash_code_2(access_code)
-            if not data.get("fourkeyCode", None):
-                data["fourkeyCode"] = hash_code_2(access_code[:4])
-            else:
-                assert len(data["fourkeyCode"]) == 4, "Fourkey code length (=4)"
-                assert data["fourkeyCode"].isdigit(), "Fourkey code only number"
-                data["fourkeyCode"] = hash_code_2(data["fourkeyCode"])
+        return changed or self.update_record(fields, data)
 
-            fields += (
-                "access_code",
-                "fourkey_code",
-            )
+    def add_access_code(self, access_code: str, fourkey_code: str | None = None):
+        """
+        Add access code and fourkey code to the user.
 
-        return self.update_record(fields, data)
+        We do the checks here, because the access code is not stored in plain text.
+        """
+        assert len(access_code) >= 4 and len(access_code) <= 12, "Access code length (>=4, <=12)"
+        assert access_code.isdigit(), "Access code only number"
+
+        if fourkey_code is None:
+            fourkey_code = hash_code_2(access_code[:4])
+        else:
+            assert len(fourkey_code) == 4, "Fourkey code length (=4)"
+            assert fourkey_code.isdigit(), "Fourkey code only number"
+            fourkey_code = hash_code_2(fourkey_code)
+
+        return self.update_record(
+            ("access_code", "fourkey_code"),
+            {
+                "access_code": hash_code_2(access_code),
+                "fourkey_code": hash_code_2(fourkey_code),
+            },
+        )
 
     @staticmethod
     def sanitize_registration_code(registration_code: str) -> str:
@@ -810,7 +819,7 @@ class User(BaseModel):
     def set_card_registration(self):
         self.update_record(
             ("card_registration_expiry"),
-            {"card_registration_expiry": dt.now() + timedelta(seconds=60)},
+            {"card_registration_expiry": dt.now().astimezone() + timedelta(seconds=60)},
         )
 
     def add_registration_code(self, registration_code=None, expiry=None):
@@ -905,7 +914,7 @@ class Card(BaseModel):
     @staticmethod
     def generate_card_description():
         """Example: 2021-10-30_08:15_284"""
-        return f"{dt.now().isoformat().replace('T', ' ')[:16]} ({str(uuid.uuid1(1000).int)[:3]})"
+        return f"{dt.now().astimezone().isoformat().replace('T', ' ')[:16]} ({str(uuid.uuid1(1000).int)[:3]})"
 
     def update(self, data):
         fields = ("enabled", "description")
