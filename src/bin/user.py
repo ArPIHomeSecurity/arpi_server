@@ -2,10 +2,10 @@
 # pylint: disable=wrong-import-position,wrong-import-order
 import contextlib
 import logging
+import uuid
 from argparse import ArgumentParser, ArgumentTypeError, RawTextHelpFormatter
 from datetime import datetime as dt
 from time import sleep
-import uuid
 
 import sqlalchemy
 from dateutil.tz.tz import tzlocal

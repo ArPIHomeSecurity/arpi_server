@@ -1,7 +1,6 @@
 import re
 from dataclasses import dataclass
 
-
 VERSION_PARSER = re.compile(
     r"v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
     r"(?:(?:[_-])?(?P<pre_release>[a-zA-Z]+)(?P<pre_release_num>\d+))?"

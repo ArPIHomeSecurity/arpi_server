@@ -4,8 +4,7 @@ from datetime import datetime
 import pytest
 from dotenv import load_dotenv
 
-from monitor.adapters.mock.utils import append_sms_message, set_input_state
-from monitor.sensor.detector import wiring_config
+from monitor.adapters.mock.utils import append_sms_message
 from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import (
     MonitorEvent,
@@ -14,7 +13,6 @@ from tests.test_functional.helpers import (
     check_api_response,
     wait_for_monitoring_ready,
 )
-from utils.models import SensorContactTypes
 
 load_dotenv(".env.pytest")
 

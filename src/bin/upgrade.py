@@ -27,6 +27,7 @@ from utils.versioning import VersionInfo
 GITHUB_API_SERVER = "https://api.github.com/repos/ArPIHomeSecurity/arpi_server/releases"
 GITHUB_API_WEBAPP = "https://api.github.com/repos/ArPIHomeSecurity/arpi_webapplication/releases"
 
+
 class AssetNotFoundError(Exception):
     pass
 

@@ -4,7 +4,6 @@
 import argparse
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 UPGRADE_SOURCE = PROJECT_ROOT / "src/bin/upgrade.py"
 VERSIONING_SOURCE = PROJECT_ROOT / "src/utils/versioning.py"
@@ -21,7 +20,9 @@ def create_upgrade_script(destination: Path) -> Path:
         raise ValueError(f"Expected exactly one shared versioning import in {UPGRADE_SOURCE}")
 
     output_path = destination / "install.py"
-    output_path.write_text(upgrade_source.replace(IMPORT_LINE, versioning_source + "\n", 1), encoding="utf-8")
+    output_path.write_text(
+        upgrade_source.replace(IMPORT_LINE, versioning_source + "\n", 1), encoding="utf-8"
+    )
     output_path.chmod(UPGRADE_SOURCE.stat().st_mode)
     return output_path
 
