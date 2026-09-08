@@ -1,9 +1,9 @@
 {
-  "version": "v2.8.0_RC04:d767bb7",
+  "version": "v2.8.0:6cb437d",
   "major": 2,
   "minor": 8,
   "patch": 0,
-  "prerelease": "RC",
-  "prerelease_num": "04",
-  "commit_id": "d767bb7"
+  "prerelease": null,
+  "prerelease_num": null,
+  "commit_id": "6cb437d"
 }
