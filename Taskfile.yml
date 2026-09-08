@@ -191,6 +191,7 @@ tasks:
     cmd: |
       uv run pytest tests/test_functional/{{.FOLDER}} \
         -v \
+        -o junit_suite_name="{{.FOLDER}}" \
         --junitxml=junit.xml \
         --cov=src \
         --cov-report=xml \
