@@ -1,3 +1,7 @@
+"""
+This module provides utilities for parsing and comparing version strings.
+"""
+
 import re
 from dataclasses import dataclass
 
