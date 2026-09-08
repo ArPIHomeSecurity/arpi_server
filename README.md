@@ -45,7 +45,7 @@ with PostgreSQL-backed persistence and support for MQTT-connected components.
 Install the Python dependencies and create the local environment file:
 
 ```bash
-task create-environment
+task create:environment
 ```
 
 Review `.env` and update the hardware, database, and MQTT settings for your
@@ -55,21 +55,21 @@ Start the development dependencies in one terminal:
 
 ```bash
 # starting docker containers
-task start-database
-task start-mqtt
-task start-nginx
+task start:database
+task start:mqtt
+task start:nginx
 ```
 
 Start the REST API and monitor service in separate terminals:
 
 ```bash
 # REST API: http://localhost:8080
-task start-server
+task start:server
 ```
 
 ```bash
 # Monitor service: http://localhost:8081
-task start-monitor
+task start:monitor
 ```
 
 The nginx reverse proxy exposes the API and the websocket of the monitro at `https://localhost:8000`.
@@ -79,18 +79,18 @@ Optionally start the MCP interface in another terminal:
 
 ```bash
 # MCP server: http://localhost:7000
-task start-mcp
+task start:mcp
 ```
 
 Run the test suite with:
 
 ```bash
-task test
+task test:all
 ```
 
 Format the code:
 ```bash
-task format
+task format:run
 ```
 
 ---

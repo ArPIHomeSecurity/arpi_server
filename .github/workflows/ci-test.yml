@@ -37,27 +37,27 @@ jobs:
       matrix:
         include:
           - name: unit
-            task: test-unit
+            task: test:unit
           - name: functional-arm-api
-            task: test-functional-arm-api
+            task: test:functional:arm:api
           - name: functional-arm-mqtt
-            task: test-functional-arm-mqtt
+            task: test:functional:arm:mqtt
           - name: functional-arm-gsm
-            task: test-functional-arm-gsm
+            task: test:functional:arm:gsm
           # - name: functional-installer
-          #   task: test-functional-installer
+          #   task: test:functional:installer
           - name: functional-options
-            task: test-functional-options
+            task: test:functional:options
           # - name: functional-output
-          #   task: test-functional-output
+          #   task: test:functional:output
           - name: functional-power-outage
-            task: test-functional-power-outage
+            task: test:functional:power-outage
           - name: functional-sensitivity
-            task: test-functional-sensitivity
+            task: test:functional:sensitivity
           - name: functional-silent-alert
-            task: test-functional-silent-alert
+            task: test:functional:silent-alert
           - name: functional-startup
-            task: test-functional-startup
+            task: test:functional:startup
 
     steps:
       - name: Checkout repository 🛎️

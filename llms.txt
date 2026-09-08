@@ -28,30 +28,30 @@ Technology
 - uv and Task
 
 Safe commands
-- task create-environment
-- task format-check
-- task lint
-- task test
-- task test-debug
-- task start-server
-- task start-monitor
-- task start-mcp
+- task create:environment
+- task format:check
+- task lint:run
+- task test:all
+- task test:debug
+- task start:server
+- task start:monitor
+- task start:mcp
 
 Important tasks
-- task create-environment: create the uv-managed development environment with dev and simulator dependencies.
-- task format: format Python code with Ruff.
-- task format-check: verify formatting.
-- task lint: run Ruff checks.
+- task create:environment: create the uv-managed development environment with dev and simulator dependencies.
+- task format:run: format Python code with Ruff.
+- task format:check: verify formatting.
+- task lint:run: run Ruff checks.
 - task lint:fix: auto-fix Ruff issues where possible.
-- task test: run the pytest suite.
-- task test-debug: run pytest with verbose debug output.
-- task start-database: start the local PostgreSQL container.
-- task start-mqtt: start the local Mosquitto container.
-- task start-server: start the Flask API on port 8080.
-- task start-monitor: start the monitor service on port 8081.
-- task start-mcp: start the MCP server on port 7000.
-- task start-simulator: start the textual simulator.
-- task start-simulator-web: serve the simulator over the web on port 8888.
+- task test:all: run the pytest suite.
+- task test:debug: run pytest with verbose debug output.
+- task start:database: start the local PostgreSQL container.
+- task start:mqtt: start the local Mosquitto container.
+- task start:server: start the Flask API on port 8080.
+- task start:monitor: start the monitor service on port 8081.
+- task start:mcp: start the MCP server on port 7000.
+- task start:simulator: start the textual simulator.
+- task start:simulator:web: serve the simulator over the web on port 8888.
 
 Python entrypoints
 - Flask API: src/server/__init__.py exports the `server` Flask app used by `flask --app server run`.

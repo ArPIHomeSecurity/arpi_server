@@ -5,29 +5,29 @@ version: '3'
 vars:
 
 tasks:
-  release-upgrade-script:
+  release:upgrade-script:
     desc: Create standalone install.py in an existing destination directory
     requires:
       vars: [DESTINATION]
     cmds:
       - uv run python {{.TASKFILE_DIR}}/scripts/create_upgrade_script.py {{.DESTINATION}}
 
-  create-environment:
+  create:environment:
     desc: Create a python virtual environment with uv
     cmds:
       - uv sync --group=dev --extra=simulator
 
-  format:
+  format:run:
     desc: Format python code using ruff
     cmds:
       - uvx ruff format
-  
-  format-check:
+
+  format:check:
     desc: Check if python code is formatted using ruff
     cmds:
       - uvx ruff format --check
 
-  lint:
+  lint:run:
     desc: Lint python code using ruff
     cmds:
       - cmd: uvx ruff check . ${{.CLI_ARGS}}
@@ -46,7 +46,7 @@ tasks:
     cmds:
       - uvx ruff check --fix
 
-  start-database:
+  start:database:
     desc: Start the database
     cmds:
       - docker volume create argus-database
@@ -61,7 +61,7 @@ tasks:
             -e POSTGRES_DB=argus \
             postgres:15
 
-  start-mqtt:
+  start:mqtt:
     desc: Start the MQTT broker
     cmds:
       - docker volume create argus-mqtt
@@ -74,24 +74,24 @@ tasks:
             -v argus-mqtt:/mosquitto/data/ \
             eclipse-mosquitto
 
-  start-server:
+  start:server:
     desc: Start the server
     cmds:
       - uv run flask --debug --app server run --host=0.0.0.0 --port=8080
 
-  start-mcp:
+  start:mcp:
     desc: Start the MCP server
     cmds:
       # flask loads .env automatically
       - uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
 
-  start-monitor:
+  start:monitor:
     desc: Start the monitor
     cmds:
       # flask loads .env automatically
       - uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
 
-  start-simulator:
+  start:simulator:
     desc: Start the simulator
     cmds:
       # loads .env before running the simulator
@@ -99,12 +99,12 @@ tasks:
         export $(grep -v '^#' .env | xargs)
         uv run textual run --dev ./src/bin/simulator.py
 
-  start-simulator-web:
+  start:simulator:web:
     desc: Start the simulator web interface
     cmds:
       - uv run textual serve --dev -p 8888 ./src/bin/simulator.py
 
-  start-mcpinspector:
+  start:mcp-inspector:
     desc: Start the MCP Inspector
     cmds:
       - cmd: |
@@ -118,7 +118,7 @@ tasks:
             --name arpi_mcp_inspector \
             ghcr.io/modelcontextprotocol/inspector:latest
 
-  create-ssl-certificate:
+  create:ssl-certificate:
     desc: Create self-signed SSL certificate for development
     status:
       - test -f {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key
@@ -132,16 +132,16 @@ tasks:
             -out {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.crt \
             -addext "subjectAltName=DNS:arpi.local,DNS:*.arpi.local"
 
-  create-dhparams:
+  create:dhparams:
     desc: Create DH parameters file for nginx
     status:
       - test -f {{.TASKFILE_DIR}}/scripts/nginx/arpi_dhparams.pem
     cmds:
       - openssl dhparam -out {{.TASKFILE_DIR}}/scripts/nginx/arpi_dhparams.pem 1024
 
-  start-nginx:
+  start:nginx:
     desc: Start the nginx reverse proxy
-    deps: [create-ssl-certificate, create-dhparams]
+    deps: [create:ssl-certificate, create:dhparams]
     vars:
       HOST_IP:
         sh: hostname -I | awk '{print $1}'
@@ -157,10 +157,10 @@ tasks:
             -v {{.TASKFILE_DIR}}/scripts/nginx/arpi_dev.key:/etc/nginx/arpi_dev.key:ro \
             nginx
 
-  test:
-    deps: [test-unit, test-functional]
+  test:all:
+    deps: [test:unit, test:functional]
 
-  test-debug:
+  test:debug:
     desc: Run tests in debug mode
     cmd: |
       uv run pytest \
@@ -169,7 +169,7 @@ tasks:
         --maxfail=1 \
         {{.CLI_ARGS}}
 
-  test-unit:
+  test:unit:
     desc: Run unit tests
     cmd: |
       uv run pytest tests/test_unit \
@@ -180,7 +180,7 @@ tasks:
         --cov-report=term \
         {{.CLI_ARGS}}
 
-  test-functional:
+  test:functional:
     desc: Run functional tests
     cmd: |
       uv run pytest tests/test_functional \
@@ -191,7 +191,7 @@ tasks:
         --cov-report=term \
         {{.CLI_ARGS}}
 
-  test-functional-folder:
+  test:functional:folder:
     internal: true
     requires:
       vars: [FOLDER]
@@ -205,72 +205,72 @@ tasks:
         --cov-report=term \
         {{.CLI_ARGS}}
 
-  test-functional-arm-api:
+  test:functional:arm:api:
     desc: Run arm functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_arm/api }
 
-  test-functional-arm-mqtt:
+  test:functional:arm:mqtt:
     desc: Run arm functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_arm/mqtt }
 
-  test-functional-arm-gsm:
+  test:functional:arm:gsm:
     desc: Run arm functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_arm/gsm }
 
-  # test-functional-installer:
+  # test:functional:installer:
   #   desc: Run installer functional tests
   #   cmds:
-  #     - task: test-functional-folder
+  #     - task: test:functional:folder
   #       vars: { FOLDER: test_installer }
 
-  test-functional-options:
+  test:functional:options:
     desc: Run options functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_options }
 
-  # test-functional-output:
+  # test:functional:output:
   #   desc: Run output functional tests
   #   cmds:
-  #     - task: test-functional-folder
+  #     - task: test:functional:folder
   #       vars: { FOLDER: test_output }
 
-  test-functional-power-outage:
+  test:functional:power-outage:
     desc: Run power outage functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_power_outage }
 
-  test-functional-sensitivity:
+  test:functional:sensitivity:
     desc: Run sensitivity functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_sensitivity }
 
-  test-functional-silent-alert:
+  test:functional:silent-alert:
     desc: Run silent alert functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_silent_alert }
 
-  test-functional-startup:
+  test:functional:startup:
     desc: Run startup functional tests
     cmds:
-      - task: test-functional-folder
+      - task: test:functional:folder
         vars: { FOLDER: test_startup }
 
-  list-outdated-dependencies:
+  deps:list-outdated:
     desc: List outdated dependencies
     cmds:
       - uv pip list --outdated
 
-  upgrade-dependency:
+  deps:upgrade:
     desc: Upgrade specified dependency
     requires:
       vars:
