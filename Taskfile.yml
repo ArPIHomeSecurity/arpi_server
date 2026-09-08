@@ -5,6 +5,13 @@ version: '3'
 vars:
 
 tasks:
+  release-upgrade-script:
+    desc: Create standalone install.py in an existing destination directory
+    requires:
+      vars: [DESTINATION]
+    cmds:
+      - uv run python {{.TASKFILE_DIR}}/scripts/create_upgrade_script.py {{.DESTINATION}}
+
   create-environment:
     desc: Create a python virtual environment with uv
     cmds:

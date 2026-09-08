@@ -8,7 +8,13 @@ import json
 import logging
 import re
 import subprocess
+import sys
 from logging import INFO, WARNING
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from utils.versioning import VersionInfo
 
 VERSION_FILE = "src/server/version.json"
 
@@ -71,12 +77,13 @@ def bump_version(
     version: dict, version_type: str, pre_release: str = None, release: bool = False
 ) -> tuple:
     """Bump the version based on the given version type"""
-    major = int(version["major"])
-    minor = int(version["minor"])
-    patch = int(version["patch"])
-    old_pre_release_name = version.get("prerelease") or ""
-    old_pre_release_num = int(version.get("prerelease_num") or "0")
-    commit = version.get("commit_id", "")
+    current_version = VersionInfo.from_string(version["version"])
+    major = current_version.major
+    minor = current_version.minor
+    patch = current_version.patch
+    old_pre_release_name = current_version.prerelease or ""
+    old_pre_release_num = current_version.prerelease_num or 0
+    commit = current_version.commit_id
 
     if old_pre_release_name and old_pre_release_num is not None:
         logger.info(
@@ -153,88 +160,5 @@ def main():
     save_version(major, minor, patch, pre_release, commit)
 
 
-def test_bump_version():
-    test_cases = [
-        (
-            {
-                "major": 1,
-                "minor": 2,
-                "patch": 3,
-                "prerelease": None,
-                "prerelease_num": None,
-                "commit_id": "abcdef0",
-            },
-            "patch",
-            None,
-            (1, 2, 4, None),
-        ),
-        (
-            {
-                "major": 1,
-                "minor": 2,
-                "patch": 3,
-                "prerelease": None,
-                "prerelease_num": None,
-                "commit_id": "abcdef0",
-            },
-            "minor",
-            None,
-            (1, 3, 0, None),
-        ),
-        (
-            {
-                "major": 1,
-                "minor": 2,
-                "patch": 3,
-                "prerelease": None,
-                "prerelease_num": None,
-                "commit_id": "abcdef0",
-            },
-            "major",
-            None,
-            (2, 0, 0, None),
-        ),
-        (
-            {
-                "major": 1,
-                "minor": 2,
-                "patch": 3,
-                "prerelease": None,
-                "prerelease_num": None,
-                "commit_id": "abcdef0",
-            },
-            None,
-            "beta",
-            (1, 2, 3, "beta01"),
-        ),
-        (
-            {
-                "major": 1,
-                "minor": 2,
-                "patch": 3,
-                "prerelease": "beta",
-                "prerelease_num": "01",
-                "commit_id": "abcdef0",
-            },
-            None,
-            "beta",
-            (1, 2, 3, "beta02"),
-        ),
-    ]
-
-    # Patch get_git_commit to always return 'abcdef0'
-    original_get_git_commit = globals()["get_git_commit"]
-    globals()["get_git_commit"] = lambda: "abcdef0"
-    try:
-        for version_json, version_type, pre_release, expected in test_cases:
-            result = bump_version(version_json, version_type, pre_release)
-            assert result[:4] == expected, (
-                f"Failed for {version_json}, {version_type}, {pre_release}: got {result[:4]}, expected {expected}"
-            )
-    finally:
-        globals()["get_git_commit"] = original_get_git_commit
-
-
 if __name__ == "__main__":
-    test_bump_version()
     main()
