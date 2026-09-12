@@ -101,12 +101,15 @@ tasks:
       # loads .env before running the simulator
       - |
         export $(grep -v '^#' .env | xargs)
-        uv run textual run --dev ./src/bin/simulator.py
+        PYTHONPATH=src uv run textual run --dev ./src/bin/simulator.py
 
   start:simulator:web:
     desc: Start the simulator web interface
     cmds:
-      - uv run textual serve --dev -p 8888 ./src/bin/simulator.py
+     # loads .env before running the simulator 
+      - |
+        export $(grep -v '^#' .env | xargs)
+        PYTHONPATH=src uv run textual serve --dev -p 8888 ./src/bin/simulator.py
 
   start:mcp-inspector:
     desc: Start the MCP Inspector

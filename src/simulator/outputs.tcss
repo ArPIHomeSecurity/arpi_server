@@ -1,0 +1,11 @@
+#outputs {
+    background: black 100%;
+    overflow: scroll;
+    height: auto;
+}
+
+#outputs Checkbox {
+    width: 12;
+    height: 3;
+    margin: 0 1;
+}

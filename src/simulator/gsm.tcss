@@ -1,0 +1,27 @@
+GSM {
+    width: 100%;
+    background: black 100%;
+}
+
+#gsm {
+    layout: vertical;
+    grid-gutter: 1 1;
+    width: 100%;
+    height: auto;
+    background: black 100%;
+    overflow: auto;
+}
+
+#gsm Input {
+    height: 3;
+    width: 100%;
+    margin: 0 0 1 0;
+}
+
+#gsm Button {
+    background: green 60%;
+    color: white 100%;
+    height: 3;
+    width: 100%;
+    border: none;
+}

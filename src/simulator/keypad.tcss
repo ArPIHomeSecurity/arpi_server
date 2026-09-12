@@ -1,0 +1,17 @@
+#keypad {
+    layout: grid;
+    grid-size: 3 5;
+    grid-gutter: 1 1;
+    grid-rows: 3 3 3 3 3;
+    grid-columns: 10 10 10;
+    background: black 100%;
+    overflow: scroll;
+}
+
+#keypad Button {
+    background: blue 60%;
+    color: white 100%;
+    width: 5;
+    height: 5;
+    border: none;
+}

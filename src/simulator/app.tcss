@@ -1,0 +1,42 @@
+Screen {
+    overflow: auto;
+}
+
+#main-grid {
+    layout: vertical;
+    height: 100%;
+    overflow: auto;
+}
+
+#top-bar {
+    width: 100%;
+    height: auto;
+    padding: 0 0 1 0;
+}
+
+#simulator-tabs {
+    height: 1fr;
+}
+
+#simulator-tabs TabPane {
+    padding: 1 0 0 0;
+    height: 1fr;
+}
+
+#channels-pane {
+    overflow-y: auto;
+}
+
+#keypad-pane {
+    height: auto;
+    width: 100%;
+}
+
+#gsm-pane {
+    height: auto;
+    width: 100%;
+}
+
+#outputs-pane {
+    width: 100%;
+}

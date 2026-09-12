@@ -1,0 +1,79 @@
+#channels {
+    height: 25;
+    overflow: auto;
+}
+
+.channel-column {
+    width: 1fr;
+    min-width: 24;
+}
+
+.channel-row {
+    height: 3;
+    background: black 100%;
+}
+
+.channel-label {
+    width: 9;
+    height: 3;
+    content-align: center middle;
+    color: white;
+    padding: 0 1;
+}
+
+.channel-label.default {
+    background: green 90%;
+    color: white;
+}
+
+.channel-label.active-low {
+    background: red 50%;
+    color: white;
+}
+
+.channel-label.active {
+    background: red 80%;
+    color: white;
+}
+
+.channel-label.shortage {
+    background: yellow 100%;
+    color: white;
+}
+
+.channel-label.cut {
+    background: orange 100%;
+    color: white;
+}
+
+.wiring-strategy-select {
+    width: 20;
+    min-width: 16;
+    margin: 0;
+}
+
+.contact-type-select {
+    width: 10;
+    min-width: 7;
+    margin: 0;
+}
+
+.sensor-button {
+    min-width: 5;
+    height: 3;
+}
+
+.sensor-active {
+    background: red 80%;
+    color: white;
+}
+
+#power {
+    height: 3;
+    width: 100%;
+    background: green 90%;
+}
+
+#power.channel-active {
+    background: red 80%;
+}
