@@ -102,4 +102,51 @@ get_zigbee_adapter() -> Zigbee adapter when enabled
 SensorHandler.adapters = [legacy_adapter, zigbee_adapter]
 ```
 
-The Zigbee adapter must not replace the current factory. Both adapters can operate simultaneously on a V2 or V3 installation.
+The Zigbee adapter must not replace the current factory.
+Zigbee adapter can operate simultaneously with legacy adapters on a V2 or V3 installation.
+
+## Simulator Integration
+
+Simulator mode keeps the existing wired channel protocol and adds a separate
+Zigbee protocol. The Textual simulator continues to write wired values to
+`simulator_input.json`; simulated Zigbee device state is written to
+`simulator_zigbee.json`. Namespacing Zigbee state separately prevents device
+identity and capability data from being confused with legacy `CH01`-style input.
+
+The simulator must use the normal device-registration service or API contract when
+creating a simulated device. The resulting device and logical sensor records are
+real database records, so registration, sensor configuration, and monitor lookup
+are exercised exactly as they are for a physical device. The simulator JSON file
+contains only mutable runtime state such as capability values, availability,
+battery level, signal quality, and last-seen timestamps.
+
+The mock adapter reads `simulator_zigbee.json`, resolves entries by IEEE address,
+endpoint, and capability, and exposes normalized readings through the same
+adapter boundary as the hardware Zigbee adapter. The mock must not bypass
+`SensorHandler` or write `Sensor.alert` directly.
+
+Both mock adapters run together when `USE_SIMULATOR` is enabled:
+
+```text
+get_sensor_adapter()       -> mock legacy V2/V3 channel adapter
+get_zigbee_adapter()       -> mock Zigbee adapter when Zigbee is enabled
+SensorHandler.adapters     -> [legacy_adapter, zigbee_adapter]
+```
+
+The simulator UI should expose these Zigbee controls:
+
+- create/register a simulated device;
+- set boolean or numeric capability values;
+- toggle availability;
+- set battery level and signal quality; and
+- display the device's last-seen timestamp.
+
+Changing a capability value updates `last_seen`. Availability changes do not
+change the alarm value. If a device is unavailable, the adapter returns the
+unavailable status and the last cached value; the handler reports sensor error
+state and does not create a new alarm from stale data.
+
+Simulator-specific automated tests are intentionally out of scope for the first
+implementation. The adapter and handler contracts should remain testable without
+the Textual UI, so coverage can be added later without changing the simulator
+state format.

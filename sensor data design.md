@@ -142,3 +142,60 @@ The Zigbee adapter owns device identity and latest-value updates. `SensorHandler
 - A wired sensor requires `channel` and has no Zigbee device link.
 - `channel` remains nullable because Zigbee sensors do not use hardware channels.
 - `last_seen` and `availability` are separate from the alarm `alert` state.
+
+## Simulator Design
+
+The simulator must exercise the same device registration and sensor configuration
+flow as a real Zigbee installation. It must not maintain a second device registry
+that can diverge from the database.
+
+The simulator UI can create a simulated Zigbee device by calling the existing
+device-registration service or API contract. Registration persists the device and
+its logical sensors in the database, including:
+
+- IEEE address, network address, manufacturer, model, and device name;
+- discovered endpoints and capabilities; and
+- the normal sensor records used by the server and monitor.
+
+The simulator's live state is separate from registration data and is stored in
+`simulator_zigbee.json`. Only state represented in that file is persisted by the
+simulator. A restart therefore preserves simulated readings and availability, but
+the registered device remains a normal database record rather than simulator-only
+data.
+
+Example simulator state:
+
+```json
+{
+    "devices": {
+        "00:11:22:33:44:55:66:77": {
+            "available": true,
+            "battery_level": 87,
+            "signal_quality": 72,
+            "last_seen": "2026-09-13T10:15:00+00:00",
+            "capabilities": {
+                "1/contact": true,
+                "1/tamper": false,
+                "1/temperature": 21.5
+            }
+        }
+    }
+}
+```
+
+The UI should provide controls for:
+
+- creating and registering a simulated device;
+- changing boolean and numeric capability values;
+- toggling availability independently from alarm state; and
+- changing battery level and signal quality.
+
+Changing a capability value represents device activity and updates `last_seen`.
+The simulator does not write alarm `alert` state directly. The monitor resolves
+the registered device, endpoint, and capability, then evaluates the value through
+the normal alert path.
+
+When a device is unavailable, availability remains separate from the last value.
+The monitor must expose the unavailable condition as sensor error state and must
+not treat the stale value as a new alarm event. This keeps communication failure
+distinct from a valid contact, tamper, or numeric sensor reading.
