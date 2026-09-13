@@ -41,7 +41,7 @@ class PowerAdapter:
         self._cleanup()
 
     @property
-    def source_type(self):
+    def source_type(self) -> str:
         """
         Get the source type of the power adapter.
         Uses a threshold to determine if the value indicates network or battery.
