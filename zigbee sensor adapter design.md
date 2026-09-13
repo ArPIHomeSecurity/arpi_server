@@ -79,7 +79,7 @@ The Zigbee adapter receives device events internally, updates a thread-safe cach
 SensorReading(
     sensor_id=123,
     value=True,
-    timestamp=..., 
+    timestamp=...,
     available=True,
     battery_level=87,
 )

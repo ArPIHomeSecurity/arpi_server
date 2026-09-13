@@ -18,8 +18,10 @@ from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCoun
 INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
 OUTPUT_FILE = os.environ.get("MOCK_OUTPUT_FILE", "simulator_output.json")
 KEYPAD_FILE = os.environ.get("MOCK_KEYPAD_FILE", "simulator_keypad.json")
+ZIGBEE_FILE = os.environ.get("MOCK_ZIGBEE_FILE", "simulator_zigbee.json")
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
+DEFAULT_ZIGBEE_DATA = {"devices": {}}
 
 DEFAULT_INPUT_DATA = {
     f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
@@ -175,6 +177,20 @@ def get_keypad_state():
     """
     defaults = DEFAULT_KEYPAD.copy()
     return protected_transfer(KEYPAD_FILE, defaults)
+
+
+def get_zigbee_state():
+    """
+    Get the current Zigbee simulator state.
+    """
+    return protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+
+
+def set_zigbee_state(data):
+    """
+    Replace the entire Zigbee simulator state payload.
+    """
+    protected_write(ZIGBEE_FILE, data)
 
 
 def set_keypad_state(pending_bits, data):

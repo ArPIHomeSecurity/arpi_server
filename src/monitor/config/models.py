@@ -288,3 +288,16 @@ class MQTTConfigExternalPublish(BaseConfig):
     tls_insecure: bool = True
     # no explicit CA means the system certificate store is used
     ca_certs: str | None = None
+
+
+class ZigbeeCoordinatorConfig(BaseConfig):
+    """
+    Configuration for the Zigbee coordinator.
+    """
+
+    OPTION_NAME = "zigbee"
+    SECTION_NAME = "coordinator"
+
+    enable: bool = False
+    serial_port_path: str = None
+    baudrate: int = 115200

@@ -11,6 +11,7 @@ from time import sleep
 from sqlalchemy import select
 
 from monitor.adapters.sensor import get_sensor_adapter
+from monitor.adapters.zigbee import get_zigbee_adapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
@@ -64,6 +65,7 @@ class SensorHandler:
         self._db_session = None
         self._broadcaster = broadcaster
         self._sensor_adapter = None
+        self._zigbee_adapter = None
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
@@ -76,6 +78,8 @@ class SensorHandler:
         self._mqtt_client.subscribe_sensors()
         self._db_session = get_database_session()
         self._sensor_adapter = get_sensor_adapter()
+        self._zigbee_adapter = get_zigbee_adapter()
+        self._zigbee_adapter.start()
 
     def update_mqtt_config(self):
         """
@@ -470,6 +474,8 @@ class SensorHandler:
         self._alerting_sensors.clear()
         self._mqtt_client.close()
         self._db_session.close()
+        self._sensor_adapter.close()
+        self._zigbee_adapter.stop()
 
     @staticmethod
     def get_alert_type(sensor, monitoring_state):

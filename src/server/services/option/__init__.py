@@ -7,6 +7,7 @@ from .smtp import SMTPService
 from .ssh import SSHService
 from .subscriptions import SubscriptionsService
 from .syren import SyrenService
+from .zigbee import ZigbeeService
 
 __all__ = [
     "AlertSensitivityService",
@@ -18,4 +19,5 @@ __all__ = [
     "SSHService",
     "SubscriptionsService",
     "SyrenService",
+    "ZigbeeService",
 ]

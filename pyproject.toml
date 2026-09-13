@@ -42,6 +42,7 @@ dependencies = [
     "stringcase~=1.2.0",
     "uvicorn~=0.42",
     "dotenv>=0.9.9",
+    "bellows~=1.0",
 ]
 
 [project.optional-dependencies]
@@ -66,7 +67,7 @@ argus-data = "bin.data:cli_main"
 argus-dyndns = "bin.dyndns:cli_main"
 argus-hash = "bin.hash:cli_main"
 argus-secret = "bin.secret:cli_main"
-argus-simulator = "bin.simulator:main"
+argus-simulator = "bin.simulator_cli:main"
 argus-ssh-keymanager = "bin.ssh_keymanager:cli_main"
 argus-ssh-service = "bin.ssh_service:cli_main"
 argus-tester = "bin.tester:cli_main"

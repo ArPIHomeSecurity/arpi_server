@@ -22,6 +22,7 @@ from monitor.config.models import (
     SSHConfig,
     SubscriptionsConfig,
     SyrenConfig,
+    ZigbeeCoordinatorConfig,
 )
 from server.database import db
 from server.decorators import authenticated, restrict_host
@@ -37,6 +38,7 @@ from server.services.option import (
     SSHService,
     SubscriptionsService,
     SyrenService,
+    ZigbeeService,
 )
 from server.tools import process_ipc_response
 from tools.certbot import Certbot
@@ -49,6 +51,10 @@ config_blueprint = Blueprint("configuration", __name__)
 @authenticated()
 @restrict_host
 def option_get(option_name, section) -> Response:
+    """
+    Get the configuration option by name and section.
+    If the option is not found, return 404.
+    """
     value = None
     if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
         value = asdict(SyrenService(db.session).get_syren_config())
@@ -98,6 +104,11 @@ def option_get(option_name, section) -> Response:
         value = asdict(DyndnsService(db.session).get_dyndns_config())
     elif option_name == LocationConfig.OPTION_NAME and section == LocationConfig.SECTION_NAME:
         value = asdict(LocationConfigService(db.session).get_location_config())
+    elif (
+        option_name == ZigbeeCoordinatorConfig.OPTION_NAME
+        and section == ZigbeeCoordinatorConfig.SECTION_NAME
+    ):
+        value = asdict(ZigbeeService(db.session).get_zigbee_coordinator_config())
 
     if value is not None:
         return jsonify(
@@ -116,6 +127,10 @@ def option_get(option_name, section) -> Response:
 @authenticated()
 @restrict_host
 def option_put(option_name, section) -> Response:
+    """
+    Update the configuration option by name and section.
+    If the option is not found, create a new one.
+    """
     # handle syren configuration separately
     # we will move all the other options to services later
     if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
@@ -168,6 +183,13 @@ def option_put(option_name, section) -> Response:
     elif option_name == LocationConfig.OPTION_NAME and section == LocationConfig.SECTION_NAME:
         location_service = LocationConfigService(db.session)
         location_service.set_location_config(LocationConfig(**request.json))
+        return ""
+    elif (
+        option_name == ZigbeeCoordinatorConfig.OPTION_NAME
+        and section == ZigbeeCoordinatorConfig.SECTION_NAME
+    ):
+        zigbee_service = ZigbeeService(db.session)
+        zigbee_service.set_zigbee_coordinator_config(ZigbeeCoordinatorConfig(**request.json))
         return ""
 
     # handle other options
