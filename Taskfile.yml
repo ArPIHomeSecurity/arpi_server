@@ -275,10 +275,6 @@ tasks:
       - uv pip list --outdated
 
   deps:upgrade:
-    desc: Upgrade specified dependency
-    requires:
-      vars:
-        - name: PACKAGE
+    desc: Upgrade dependencies
     cmds:
-      - uv lock --upgrade-package {{.PACKAGE}}
-      - uv sync --group=dev --extra=simulator
+      - uv lock --upgrade
