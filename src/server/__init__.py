@@ -18,6 +18,7 @@ from server.blueprints.power import power_blueprint
 from server.blueprints.sensor import sensor_blueprint
 from server.blueprints.user import user_blueprint
 from server.blueprints.zone import zone_blueprint
+from server.blueprints.zigbee import zigbee_blueprint
 from server.database import db
 
 app = Flask(__name__)
@@ -61,6 +62,7 @@ app.register_blueprint(power_blueprint)
 app.register_blueprint(sensor_blueprint)
 app.register_blueprint(user_blueprint)
 app.register_blueprint(zone_blueprint)
+app.register_blueprint(zigbee_blueprint)
 
 
 @app.errorhandler(AssertionError)

@@ -17,6 +17,7 @@ from utils.constants import (
     MONITOR_SYNC_CLOCK,
     MONITOR_UPDATE_CONFIG,
     MONITOR_UPDATE_KEYPAD,
+    MONITOR_ZIGBEE_PAIRING,
     MONITORING_ALERT,
     MONITORING_ALERT_DELAY,
     MONITORING_SABOTAGE,
@@ -37,6 +38,11 @@ class MonitorStopCommand:
 @dataclass(frozen=True)
 class MonitorUpdateConfigCommand:
     action: str = MONITOR_UPDATE_CONFIG
+
+
+@dataclass(frozen=True)
+class MonitorZigbeePairingCommand:
+    action: str = MONITOR_ZIGBEE_PAIRING
 
 
 @dataclass(frozen=True)

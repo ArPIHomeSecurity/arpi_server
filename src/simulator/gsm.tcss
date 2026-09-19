@@ -9,6 +9,9 @@ GSM {
     width: 100%;
     height: auto;
     background: black 100%;
+}
+
+#gsm-tab {
     overflow: auto;
 }
 

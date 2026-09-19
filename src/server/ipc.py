@@ -20,6 +20,7 @@ from monitor.actions import (
     MonitorSyncClockCommand,
     MonitorUpdateConfigCommand,
     MonitorUpdateKeypadCommand,
+    MonitorZigbeePairingCommand,
     PowerGetStateCommand,
     SendTestEmailCommand,
     SendTestSMSCommand,
@@ -85,6 +86,9 @@ class IPCClient:
 
     def update_configuration(self):
         return self._send_message(MonitorUpdateConfigCommand())
+
+    def zigbee_pairing(self):
+        return self._send_message(MonitorZigbeePairingCommand())
 
     def update_keypad(self):
         return self._send_message(MonitorUpdateKeypadCommand())

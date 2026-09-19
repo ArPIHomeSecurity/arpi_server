@@ -11,7 +11,7 @@ from re import search
 
 import bcrypt
 from dateutil.tz.tz import tzlocal
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, JSON, MetaData, String
 from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey
@@ -333,6 +333,113 @@ class Sensor(BaseModel):
             assert 0 <= monitor_threshold <= 100, "Incorrect 'monitor_threshold' (0..100)"
 
         return monitor_threshold
+
+
+class ZigbeeDevice(BaseModel):
+    """Model for a registered Zigbee device."""
+
+    __tablename__ = "zigbee_device"
+
+    NAME_LENGTH = 64
+    IEEE_ADDRESS_LENGTH = 23
+
+    id = Column(Integer, primary_key=True)
+    ieee_address = Column(String(IEEE_ADDRESS_LENGTH), nullable=False, unique=True)
+    network_address = Column(Integer, nullable=True)
+    manufacturer = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    name = Column(String(NAME_LENGTH), nullable=True)
+    availability = Column(String(16), nullable=False, default="unknown")
+    last_seen = Column(DateTime(timezone=True), nullable=True)
+    battery_level = Column(Integer, nullable=True)
+    signal_quality = Column(Integer, nullable=True)
+    device_metadata = Column("metadata", JSON, nullable=True)
+
+    def __init__(
+        self,
+        ieee_address,
+        network_address=None,
+        manufacturer=None,
+        model=None,
+        name=None,
+        availability="unknown",
+        last_seen=None,
+        battery_level=None,
+        signal_quality=None,
+        metadata=None,
+    ):
+        self.ieee_address = ieee_address
+        self.network_address = network_address
+        self.manufacturer = manufacturer
+        self.model = model
+        self.name = name
+        self.availability = availability
+        self.last_seen = last_seen
+        self.battery_level = battery_level
+        self.signal_quality = signal_quality
+        self.device_metadata = metadata
+
+    def update(self, data):
+        if "metadata" in data:
+            data = {**data, "device_metadata": data["metadata"]}
+            del data["metadata"]
+
+        return self.update_record(
+            (
+                "ieee_address",
+                "network_address",
+                "manufacturer",
+                "model",
+                "name",
+                "availability",
+                "last_seen",
+                "battery_level",
+                "signal_quality",
+                "device_metadata",
+            ),
+            data,
+        )
+
+    @property
+    def serialized(self):
+        serialized = self.serialize_attributes(
+            (
+                "id",
+                "ieee_address",
+                "network_address",
+                "manufacturer",
+                "model",
+                "name",
+                "availability",
+                "last_seen",
+                "battery_level",
+                "signal_quality",
+                "device_metadata",
+            )
+        )
+        serialized["metadata"] = serialized.pop("device_metadata")
+        return convert2camel(serialized)
+
+    @validates("ieee_address")
+    def validates_ieee_address(self, key, ieee_address):
+        assert 1 <= len(ieee_address) <= self.IEEE_ADDRESS_LENGTH, (
+            f"Incorrect 'ieee_address' field length ({len(ieee_address)})"
+        )
+        return ieee_address
+
+    @validates("name")
+    def validates_name(self, key, name):
+        if name is not None:
+            assert 0 <= len(name) <= self.NAME_LENGTH, (
+                f"Incorrect 'name' field length ({len(name)})"
+            )
+        return name
+
+    @validates("battery_level", "signal_quality")
+    def validates_quality(self, key, value):
+        if value is not None:
+            assert 0 <= value <= 100, f"Incorrect '{key}' (0..100)"
+        return value
 
 
 class Alert(BaseModel):

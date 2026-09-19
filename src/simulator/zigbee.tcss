@@ -4,6 +4,10 @@ ZigbeeDevices {
     background: black 100%;
 }
 
+#zigbee-tab {
+    overflow: auto;
+}
+
 #zigbee {
     layout: vertical;
     width: 100%;

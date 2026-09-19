@@ -38,6 +38,8 @@ from monitor.output import OUTPUT_NAMES
 from monitor.sensor.detector import wiring_config
 from utils.models import SensorContactTypes
 
+logger = logging.getLogger("simulator")
+
 # Wiring strategies for control
 WIRING_STRATEGIES = [
     ("Single/EOL", WiringStrategies.SINGLE_WITH_EOL.value),
@@ -469,7 +471,7 @@ class SimulatorApp(App):
         sensor_a_active = config.sensor_a_active
         sensor_b_active = config.sensor_b_active
 
-        logging.debug(
+        logger.debug(
             "Calculating value channel: %s, strategy: %s, contact: %s, A active: %s, B active: %s",
             channel,
             wiring_strategy,

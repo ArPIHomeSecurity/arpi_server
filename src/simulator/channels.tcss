@@ -1,6 +1,9 @@
+#channels-tab, #channels-container {
+    overflow: auto;
+}
+
 #channels {
     height: 25;
-    overflow: auto;
 }
 
 .channel-column {
