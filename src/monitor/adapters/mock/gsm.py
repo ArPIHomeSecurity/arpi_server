@@ -12,7 +12,7 @@ logger = logging.getLogger(LOG_ADGSM)
 
 @dataclass
 class Sms:
-    idx: int
+    index: int
     number: str
     text: str
     time: str
@@ -53,18 +53,18 @@ class GSM:
             for message in messages:
                 logger.info(
                     'Message(%s) received from %s: "%s"',
-                    message["idx"],
+                    message["index"],
                     message["number"],
                     message["text"],
                 )
                 sms = Sms(
-                    idx=message["idx"],
+                    index=message["index"],
                     number=message["number"],
                     text=message["text"],
                     time=message["time"],
                 )
                 with message_lock:
-                    MESSAGES[sms.idx] = sms
+                    MESSAGES[sms.index] = sms
 
                 if self._sms_received_callback:
                     self._sms_received_callback(sms)
@@ -92,7 +92,8 @@ class GSM:
         )
 
         self.connected = True
-        sms_actions_thread = Thread(target=self.inject_message)
+        # daemon so a still-connected mock modem never blocks interpreter/test shutdown
+        sms_actions_thread = Thread(target=self.inject_message, daemon=True)
         sms_actions_thread.start()
         return True
 

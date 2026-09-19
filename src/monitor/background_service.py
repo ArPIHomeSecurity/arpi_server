@@ -4,6 +4,7 @@ from threading import Event, Thread
 from time import sleep, time
 
 from monitor.actions import MonitorStopCommand
+from monitor.adapters.gsm_provider import GSMProvider
 from monitor.broadcast import Broadcaster
 from monitor.ipc import IPCServer
 from monitor.keypad_handler import KeypadHandler
@@ -121,5 +122,8 @@ class BackgroundService(Thread):
                 thread.join()
             logger.info("Stopped thread: %s", thread.name)
             thread = None
+
+        # release the shared modem connection now that no thread is using it
+        GSMProvider.destroy()
 
         self._threads = None

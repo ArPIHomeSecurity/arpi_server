@@ -55,27 +55,29 @@ class SmsHandler(Thread):
         with GSMProvider.session() as gsm:
             gsm.set_sms_received_callback(self._on_sms_received)
 
-            while True:
-                # Check for control messages (stop, config update)
-                with contextlib.suppress(Empty):
-                    message = self._actions.get(timeout=POLL_TIMEOUT)
-                    match message:
-                        case MonitorStopCommand():
-                            break
-                        case MonitorUpdateConfigCommand():
-                            GSMProvider.load_config()
+        # Loop runs without holding the session, so other GSM users (e.g. Notifier) can share it
+        while True:
+            # Check for control messages (stop, config update)
+            with contextlib.suppress(Empty):
+                message = self._actions.get(timeout=POLL_TIMEOUT)
+                match message:
+                    case MonitorStopCommand():
+                        break
+                    case MonitorUpdateConfigCommand():
+                        GSMProvider.load_config()
+                        with GSMProvider.session() as gsm:
+                            gsm.set_sms_received_callback(self._on_sms_received)
 
-                # Process any queued SMS messages
-                with contextlib.suppress(Empty):
-                    sms = self._inbox.get_nowait()
-                    self.handle_message(sms.number, sms.text)
+            # Process any queued SMS messages
+            with contextlib.suppress(Empty):
+                sms = self._inbox.get_nowait()
+                self.handle_message(sms.number, sms.text)
 
         logger.info("SMS handler communication stopped")
 
     def _on_sms_received(self, sms: ReceivedSms):
         """
         Callback invoked when a new SMS is received.
-        Must never raise (raising suppresses gsmmodem's auto-delete).
         Only enqueues the message; actual processing happens on handler thread.
         """
         try:

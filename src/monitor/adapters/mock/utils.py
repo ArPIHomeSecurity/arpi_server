@@ -208,7 +208,7 @@ def append_sms_message(number, text, time):
     default_data = []
 
     def merge_sms_data(base, new):
-        return base + [{"idx": randint(1_000_000, 10_000_000), **new}]
+        return base + [{"index": randint(1_000_000, 10_000_000), **new}]
 
     new_message = {"number": number, "text": text, "time": time.isoformat()}
     protected_update(

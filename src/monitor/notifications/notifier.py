@@ -213,12 +213,14 @@ class Notifier(Thread):
             for sms in gsm.get_sms_messages() or []:
                 messages.append(
                     {
-                        "idx": sms.idx,
+                        "idx": sms.index,
                         "number": sms.number,
                         "time": sms.time,
                         "text": sms.text,
                     }
                 )
+
+            messages.sort(key=lambda x: x["idx"])
 
         return True, messages
 
