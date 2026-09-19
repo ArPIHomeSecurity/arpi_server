@@ -77,19 +77,23 @@ tasks:
   start:server:
     desc: Start the server
     cmds:
-      - uv run flask --debug --app server run --host=0.0.0.0 --port=8080
+      - |
+        export $(grep -v '^#' .env | xargs)
+        uv run flask --debug --app server run --host=0.0.0.0 --port=8080
 
   start:mcp:
     desc: Start the MCP server
     cmds:
-      # flask loads .env automatically
-      - uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
+      - |
+        export $(grep -v '^#' .env | xargs)
+        uv run fastmcp run src/mcp_server/__init__.py:main_mcp --transport sse --port 7000 --no-reload
 
   start:monitor:
     desc: Start the monitor
     cmds:
-      # flask loads .env automatically
-      - uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
+      - |
+        export $(grep -v '^#' .env | xargs)
+        uv run flask --app monitor.service:create_app run --no-reload --host=0.0.0.0 --port=8081
 
   start:simulator:
     desc: Start the simulator
