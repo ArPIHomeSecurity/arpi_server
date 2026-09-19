@@ -39,6 +39,34 @@ class CallResult(Enum):
 CALL_ACKNOWLEDGED = "1"
 
 
+class RetainingGsmModem(GsmModem):
+    """
+    Receive SMS notifications without deleting the stored messages.
+
+    This class overrides the default SMS handling behavior to ensure that
+    received SMS messages are not deleted from the modem's storage, allowing
+    multiple components to access the same messages without loss.
+    """
+
+    def _handleSmsReceived(self, notificationLine):
+        """Handle a notification while preserving the modem-stored SMS."""
+        self.log.debug("SMS message received")
+        if self.smsReceivedCallback is None:
+            return
+
+        cmti_match = self.CMTI_REGEX.match(notificationLine)
+        if not cmti_match:
+            return
+
+        msg_memory = cmti_match.group(1)
+        msg_index = cmti_match.group(2)
+        sms = self.readStoredSms(msg_index, msg_memory)
+        try:
+            self.smsReceivedCallback(sms)
+        except Exception:  # pylint: disable=broad-except
+            self.log.exception("error in smsReceivedCallback")
+
+
 class GSM:
     CONNECTS = 0
     RETRY_GAP_SECONDS = 5
@@ -95,7 +123,7 @@ class GSM:
             logger.error("Invalid GSM options: %s %s", self._port, self._baud)
             return False
 
-        self._modem = GsmModem(
+        self._modem = RetainingGsmModem(
             self._port,
             int(self._baud),
             smsReceivedCallbackFunc=self._sms_received_callback,
@@ -118,8 +146,8 @@ class GSM:
                     r'^\+CLCC:\s+(\d+),(\d),(\d),(\d),([^,]),"([^,]*)",(\d+)'
                 )
 
-                # set once here to keep the message parsing mode consistent for all users
-                self._modem.smsTextMode = True
+                # PDU mode lets gsmmodem decode GSM 7-bit and UCS-2 message text.
+                self._modem.smsTextMode = False
 
                 logger.info("GSM modem connected")
                 return True

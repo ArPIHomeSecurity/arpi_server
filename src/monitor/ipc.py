@@ -3,6 +3,7 @@ import json
 import logging
 import socket
 from dataclasses import asdict, dataclass
+from datetime import date, datetime, time
 from grp import getgrnam
 from os import chmod, chown, environ, makedirs, path, remove
 from pwd import getpwnam
@@ -44,6 +45,13 @@ from utils.constants import (
 
 logger = logging.getLogger(LOG_IPC)
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
+
+
+def _json_default(value):
+    """Serialize datetime/date/time objects that json.dumps can't handle natively."""
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 @dataclass()
@@ -179,7 +187,7 @@ class IPCServer(Thread):
         else:
             response = self.handle_actions(message)
         try:
-            connection.send(json.dumps(asdict(response)).encode())
+            connection.send(json.dumps(asdict(response), default=_json_default).encode())
         except BrokenPipeError:
             self._sockets.remove(connection)
             connection.close()
