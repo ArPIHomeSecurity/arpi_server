@@ -69,8 +69,10 @@ class GSMProvider:
     @contextmanager
     def session(cls):
         """
-        Exclusive access to the modem, connecting it on demand. A disabled or
+        Access to the shared modem, connecting it on demand. A disabled or
         unreachable modem is not connected but still accepts the calls.
+        The connection is kept alive after the session so long-lived users
+        (e.g. SMS receiving) and short one-off users can share the same modem.
         """
         with cls._lock:
             gsm = cls._get_instance()
@@ -78,8 +80,6 @@ class GSMProvider:
                 gsm.setup()
 
             yield gsm
-
-            gsm.destroy()
 
     @classmethod
     def destroy(cls):
