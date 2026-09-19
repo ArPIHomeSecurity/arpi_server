@@ -92,7 +92,8 @@ class GSM:
         )
 
         self.connected = True
-        sms_actions_thread = Thread(target=self.inject_message)
+        # daemon so a still-connected mock modem never blocks interpreter/test shutdown
+        sms_actions_thread = Thread(target=self.inject_message, daemon=True)
         sms_actions_thread.start()
         return True
 
