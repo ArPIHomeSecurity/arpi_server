@@ -2,13 +2,7 @@ Screen {
     overflow: auto;
 }
 
-#main-grid {
-    layout: vertical;
-    height: 100%;
-    overflow: auto;
-}
-
-#top-bar {
+.action-bar {
     width: 100%;
     height: auto;
     padding: 0 0 1 0;
