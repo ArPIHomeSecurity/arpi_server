@@ -159,9 +159,10 @@ class ChannelTypes(str, enum.Enum):
 
 class Sensor(BaseModel):
     """
-    Model for the sensor table
+    Model for the sensor table.
 
-    The disconnected channel value is "-1".
+    Wired sensors use the legacy channel field, while Zigbee sensors resolve their
+    state from a device endpoint/capability tuple. Exactly one source must be used.
     """
 
     NAME_LENGTH = 16
@@ -172,6 +173,9 @@ class Sensor(BaseModel):
     name = Column(String(NAME_LENGTH), nullable=False)
     description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
+    zigbee_device_id = Column(Integer, ForeignKey("zigbee_device.id"), nullable=True)
+    zigbee_endpoint = Column(String(16), nullable=True)
+    zigbee_capability = Column(String(32), nullable=True)
     channel_type = Column(
         Enum(
             ChannelTypes.BASIC.value,
@@ -221,16 +225,17 @@ class Sensor(BaseModel):
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
     type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
     alerts = relationship("AlertSensor", back_populates="sensor")
+    zigbee_device = relationship("ZigbeeDevice", back_populates="sensors")
 
     ui_order = Column(Integer, nullable=True)
     ui_hidden = Column(Boolean, nullable=False, default=False)
 
     def __init__(
         self,
-        channel: int,
-        sensor_type: SensorType,
-        area: "Area",
-        name: str,
+        channel: int | None = None,
+        sensor_type: SensorType = None,
+        area: "Area" = None,
+        name: str = "",
         zone: "Zone" = None,
         description: str | None = None,
         enabled: bool = True,
@@ -240,6 +245,9 @@ class Sensor(BaseModel):
         channel_type: ChannelTypes = ChannelTypes.BASIC,
         sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
+        zigbee_device_id: int | None = None,
+        zigbee_endpoint: str | None = None,
+        zigbee_capability: str | None = None,
     ):
         self.channel = channel
         self.zone = zone
@@ -254,14 +262,30 @@ class Sensor(BaseModel):
         self.channel_type = channel_type
         self.sensor_contact_type = sensor_contact_type
         self.sensor_eol_count = sensor_eol_count
+        self.zigbee_device_id = zigbee_device_id
+        self.zigbee_endpoint = zigbee_endpoint
+        self.zigbee_capability = zigbee_capability
         self.deleted = False
+        self._validate_source()
+
+    def _validate_source(self):
+        wired = self.channel is not None
+        zigbee = (
+            self.zigbee_device_id is not None
+            and self.zigbee_endpoint is not None
+            and self.zigbee_capability is not None
+        )
+        if wired == zigbee:
+            raise AssertionError("A sensor must use exactly one source: wired channel or Zigbee mapping")
 
     def update(self, data):
-        # reset reference value if channel changed
         if "channel" in data and data["channel"] != self.channel:
             self.reference_value = None
 
-        return self.update_record(
+        if "channel" in data and data.get("channel") is None:
+            data = {**data, "zigbee_device_id": data.get("zigbee_device_id", self.zigbee_device_id)}
+
+        updated = self.update_record(
             (
                 "channel",
                 "channel_type",
@@ -277,9 +301,14 @@ class Sensor(BaseModel):
                 "monitor_period",
                 "monitor_threshold",
                 "silent_alert",
+                "zigbee_device_id",
+                "zigbee_endpoint",
+                "zigbee_capability",
             ),
             data,
         )
+        self._validate_source()
+        return updated
 
     @property
     def serialized(self):
@@ -290,6 +319,9 @@ class Sensor(BaseModel):
                     "name",
                     "description",
                     "channel",
+                    "zigbee_device_id",
+                    "zigbee_endpoint",
+                    "zigbee_capability",
                     "channel_type",
                     "sensor_contact_type",
                     "sensor_eol_count",
@@ -354,6 +386,7 @@ class ZigbeeDevice(BaseModel):
     battery_level = Column(Integer, nullable=True)
     signal_quality = Column(Integer, nullable=True)
     device_metadata = Column("metadata", JSON, nullable=True)
+    sensors = relationship("Sensor", back_populates="zigbee_device")
 
     def __init__(
         self,
@@ -418,6 +451,7 @@ class ZigbeeDevice(BaseModel):
             )
         )
         serialized["metadata"] = serialized.pop("device_metadata")
+        serialized["sensor_count"] = len(self.sensors) if self.sensors else 0
         return convert2camel(serialized)
 
     @validates("ieee_address")
@@ -628,7 +662,7 @@ class ArmSensor(BaseModel):
     id = Column(Integer, primary_key=True)
     arm_id = Column(Integer, ForeignKey("arm.id"))
     sensor_id = Column(Integer, ForeignKey("sensor.id"))
-    channel = Column(Integer, nullable=False)
+    channel = Column(Integer, nullable=True)
     type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
     name = Column(String(16), nullable=False)
     description = Column(String, nullable=False)

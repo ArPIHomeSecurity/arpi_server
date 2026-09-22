@@ -89,6 +89,17 @@ def send_card_not_registered():
     send_message("card_registered", False)
 
 
+def send_zigbee_pairing_state(state, remain_seconds: int, progress: float):
+    send_message(
+        "zigbee_pairing_state_change",
+        {
+            "state": state,
+            "remain_seconds": remain_seconds,
+            "progress": progress,
+        },
+    )
+
+
 def send_card_registration_expired():
     send_message("card_registration_expired", None)
 

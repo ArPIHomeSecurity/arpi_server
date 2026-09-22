@@ -53,6 +53,7 @@ class ZigbeeService(BaseService):
             )
             if duplicate:
                 raise ObjectNotChanged("A Zigbee device with this IEEE address already exists")
+
         if not device.update(data):
             raise ObjectNotChanged("Zigbee device not changed")
 
@@ -64,7 +65,11 @@ class ZigbeeService(BaseService):
     def delete_device(self, device_id: int) -> None:
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
+
         device = self.get_device(device_id)
+        if device.sensors and len(device.sensors) > 0:
+            raise ObjectNotChanged("Zigbee device is connected to one or more sensors")
+
         self._db_session.delete(device)
         self._db_session.commit()
         IPCClient().update_configuration()

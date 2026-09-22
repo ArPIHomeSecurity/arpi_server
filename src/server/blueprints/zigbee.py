@@ -3,10 +3,19 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, restrict_host
+from server.ipc import IPCClient
 from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
 from server.services.zigbee import ZigbeeService
+from server.tools import process_ipc_response
 
 zigbee_blueprint = Blueprint("zigbee", __name__)
+
+
+@zigbee_blueprint.route("/api/zigbee/pairing", methods=["PUT", "POST"])
+@authenticated()
+@restrict_host
+def zigbee_pairing():
+    return process_ipc_response(IPCClient().zigbee_pairing())
 
 
 @zigbee_blueprint.route("/api/zigbee-devices/", methods=["GET"])

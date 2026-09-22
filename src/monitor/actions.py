@@ -202,6 +202,7 @@ MonitorCommand = (
     | MonitoringSabotageCommand
     | UpdateSecureConnectionCommand
     | MonitorGetStateCommand
+    | MonitorZigbeePairingCommand
     | PowerGetStateCommand
     | UpdateSSHCommand
     | SendTestEmailCommand
@@ -245,6 +246,7 @@ _ACTION_TO_CLASS = {
     SEND_TEST_SYREN: SendTestSyrenCommand,
     MONITOR_SYNC_CLOCK: MonitorSyncClockCommand,
     MONITOR_SET_CLOCK: MonitorSetClockCommand,
+    MONITOR_ZIGBEE_PAIRING: MonitorZigbeePairingCommand,
 }
 
 

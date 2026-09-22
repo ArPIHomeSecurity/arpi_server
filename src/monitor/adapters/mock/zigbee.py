@@ -9,9 +9,14 @@ consume without bypassing the normal sensor/alert path.
 import logging
 import threading
 from datetime import datetime, timezone
-from os import environ
 
-from monitor.adapters.mock.utils import DEFAULT_ZIGBEE_DATA, ZIGBEE_FILE, protected_read
+from monitor.adapters.mock.utils import (
+    DEFAULT_ZIGBEE_DATA,
+    ZIGBEE_FILE,
+    protected_read,
+    protected_write,
+)
+from monitor.adapters.zigbee import DiscoveredDevice, ZigbeeReading
 from utils.constants import LOG_ADZIGBEE
 
 logger = logging.getLogger(LOG_ADZIGBEE)
@@ -26,8 +31,10 @@ class ZigbeeAdapter:
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._cache: dict[tuple[str, str, str], dict] = {}
+        self._cache: dict[tuple[str, str, str], ZigbeeReading] = {}
         self._running = False
+        self._pairing = False
+        self._pairing_duration = 0
 
     def start(self):
         """Initializes the simulator adapter and refreshes the cache."""
@@ -45,30 +52,13 @@ class ZigbeeAdapter:
     def is_running(self) -> bool:
         return self._running
 
-    def _load_state(self) -> dict:
-        data = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
-        if not isinstance(data, dict):
-            return {"devices": {}}
-
-        devices = data.get("devices", {})
-        if not isinstance(devices, dict):
-            devices = {}
-
-        return {"devices": devices}
-
     def _refresh_cache(self):
         """Rebuild the normalized in-memory cache from the simulator state file."""
-        state = self._load_state()
-        cache: dict[tuple[str, str, str], dict] = {}
+        state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+        cache: dict[tuple[str, str, str], ZigbeeReading] = {}
 
         for ieee_address, device in state.get("devices", {}).items():
-            if not isinstance(device, dict):
-                continue
-
             capabilities = device.get("capabilities", {})
-            if not isinstance(capabilities, dict):
-                continue
-
             for capability_key, raw_value in capabilities.items():
                 if "/" not in capability_key:
                     endpoint = "1"
@@ -76,19 +66,49 @@ class ZigbeeAdapter:
                 else:
                     endpoint, capability = capability_key.split("/", 1)
 
-                cache[(str(ieee_address), str(endpoint), str(capability))] = {
-                    "ieee_address": str(ieee_address),
-                    "endpoint": str(endpoint),
-                    "capability": str(capability),
-                    "value": raw_value,
-                    "timestamp": device.get("last_seen") or _utc_now_iso(),
-                    "available": bool(device.get("available", True)),
-                    "battery_level": device.get("battery_level", 100),
-                    "signal_quality": device.get("signal_quality", 100),
-                }
+                cache[(str(ieee_address), str(endpoint), str(capability))] = ZigbeeReading(
+                    ieee_address=str(ieee_address),
+                    endpoint=str(endpoint),
+                    capability=str(capability),
+                    value=raw_value,
+                    timestamp=device.get("last_seen") or _utc_now_iso(),
+                    available=bool(device.get("available", True)),
+                    battery_level=device.get("battery_level", 100),
+                    signal_quality=device.get("signal_quality", 100),
+                )
 
         with self._lock:
             self._cache = cache
+
+    def get_joined_devices(self) -> list[DiscoveredDevice]:
+        """Return the devices offered for pairing while joining is permitted."""
+        if not self._pairing or self._pairing_duration <= 0:
+            return []
+
+        state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+        devices = []
+        for ieee_address, device in state.get("devices", {}).items():
+            if not device.get("pairing"):
+                continue
+
+            devices.append(
+                DiscoveredDevice(
+                    ieee_address=str(ieee_address),
+                    network_address=device.get("network_address"),
+                    name=device.get("name"),
+                    manufacturer=device.get("manufacturer"),
+                    model=device.get("model"),
+                    metadata={
+                        "available": device.get("available", True),
+                        "battery_level": device.get("battery_level", 100),
+                        "signal_quality": device.get("signal_quality", 100),
+                        "last_seen": device.get("last_seen"),
+                    },
+                    capabilities=dict(device.get("capabilities", {})),
+                )
+            )
+
+        return devices
 
     def get_values(self):
         """Return the latest normalized readings from the simulator cache."""
@@ -102,12 +122,36 @@ class ZigbeeAdapter:
         with self._lock:
             return self._cache.get((str(ieee_address), str(endpoint), str(capability)))
 
+    def permit_joining(self, duration_seconds) -> bool:
+        """Open or close the pairing window, clearing pairing flags when closing."""
+        if duration_seconds <= 0:
+            self._pairing = False
+            self._pairing_duration = 0
+            self._clear_pairing_flags()
+            logger.info("Zigbee joining closed")
+            return True
+
+        if not self._running:
+            return False
+
+        self._pairing = True
+        self._pairing_duration = duration_seconds
+        logger.info("Permitting Zigbee joining for %s seconds", duration_seconds)
+        return True
+
+    def _clear_pairing_flags(self):
+        """Clear the pairing flags of simulated devices."""
+        state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+        devices = state.get("devices", {})
+        for device in devices.values():
+            device["pairing"] = False
+
+        protected_write(ZIGBEE_FILE, state)
+
     def get_device_state(self, ieee_address: str):
         """Return the raw runtime state for one simulated device."""
-        state = self._load_state().get("devices", {}).get(str(ieee_address), {})
-        if not isinstance(state, dict):
-            return {}
-        return dict(state)
+        state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+        return dict(state.get("devices", {}).get(str(ieee_address), {}))
 
     def close(self):
         self.stop()

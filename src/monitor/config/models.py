@@ -290,6 +290,7 @@ class MQTTConfigExternalPublish(BaseConfig):
     ca_certs: str | None = None
 
 
+@dataclass
 class ZigbeeCoordinatorConfig(BaseConfig):
     """
     Configuration for the Zigbee coordinator.
@@ -298,6 +299,8 @@ class ZigbeeCoordinatorConfig(BaseConfig):
     OPTION_NAME = "zigbee"
     SECTION_NAME = "coordinator"
 
-    enable: bool = False
-    serial_port_path: str = None
+    enabled: bool = False
+    serial_port: str | None = None
     baudrate: int = 115200
+    adapter: str = "bellows"
+    permit_join: bool = False

@@ -11,7 +11,6 @@ from time import sleep
 from sqlalchemy import select
 
 from monitor.adapters.sensor import get_sensor_adapter
-from monitor.adapters.zigbee import get_zigbee_adapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
@@ -20,6 +19,7 @@ from monitor.sensor.detector import detect_alert, detect_error
 from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_error, send_sensors_state
 from monitor.storage import State, States
+from monitor.zigbee_handler import ZigbeeDeviceStore
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -65,12 +65,20 @@ class SensorHandler:
         self._db_session = None
         self._broadcaster = broadcaster
         self._sensor_adapter = None
-        self._zigbee_adapter = None
         self._alerting_sensors = set()
         self._sensors_history = None
         self._sensors = None
         self._mqtt_client: MQTTClient | None = None
         self._published_topics: set[tuple[int | None, str]] = set()
+
+    @staticmethod
+    def is_zigbee_sensor(sensor: Sensor) -> bool:
+        return (
+            sensor is not None
+            and sensor.zigbee_device_id is not None
+            and sensor.zigbee_endpoint is not None
+            and sensor.zigbee_capability is not None
+        )
 
     def initialize(self):
         self._mqtt_client = MQTTClient(topic_validator=self.is_sensorname_valid)
@@ -78,8 +86,6 @@ class SensorHandler:
         self._mqtt_client.subscribe_sensors()
         self._db_session = get_database_session()
         self._sensor_adapter = get_sensor_adapter()
-        self._zigbee_adapter = get_zigbee_adapter()
-        self._zigbee_adapter.start()
 
     def update_mqtt_config(self):
         """
@@ -125,9 +131,11 @@ class SensorHandler:
 
     def has_uncalibrated_sensor(self):
         """
-        Check if there is any sensor without reference value.
+        Check if there is any wired sensor without reference value.
         """
         for sensor in self._sensors:
+            if self.is_zigbee_sensor(sensor):
+                continue
             if sensor.reference_value is None and sensor.channel != -1:
                 logger.info("Found uncalibrated sensor: %s => %s", sensor.id, sensor.name)
                 return True
@@ -190,11 +198,13 @@ class SensorHandler:
         # keep config update state
         sleep(2)
 
+        wired_sensor_count = sum(1 for sensor in self._sensors if not self.is_zigbee_sensor(sensor))
+
         # verify the sensor configuration
-        if len(self._sensors) > self._sensor_adapter.channel_count:
+        if wired_sensor_count > self._sensor_adapter.channel_count:
             logger.info(
-                "Invalid number of sensors to monitor (Found=%s > Max=%s)",
-                len(self._sensors),
+                "Invalid number of wired sensors to monitor (Found=%s > Max=%s)",
+                wired_sensor_count,
                 self._sensor_adapter.channel_count,
             )
             self._sensors = []
@@ -236,17 +246,20 @@ class SensorHandler:
     def validate_sensor_config(self):
         """
         Validate the sensor configuration.
-        * check if there is any sensor with the same channel
+        Wired sensors must remain unique by channel; Zigbee sensors are mapped by device and capability.
         """
         logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
+            if self.is_zigbee_sensor(sensor):
+                continue
+            if sensor.channel is None:
+                continue
             if sensor.channel in channels and BOARD_VERSION == 2:
                 logger.debug("Channel already in use: %s", sensor.channel)
                 return False
-            else:
-                channels.add(sensor.channel)
-                logger.debug("Channel added: %s", sensor.channel)
+            channels.add(sensor.channel)
+            logger.debug("Channel added: %s", sensor.channel)
 
         logger.debug("Channels: %s", channels)
         return True
@@ -274,6 +287,8 @@ class SensorHandler:
         Save the reference values to the database.
         """
         for sensor in self._sensors:
+            if self.is_zigbee_sensor(sensor):
+                continue
             # skip sensors without a channel or already calibrated
             if sensor.channel == -1 or sensor.reference_value is not None:
                 continue
@@ -290,36 +305,57 @@ class SensorHandler:
         found_alert = False
         found_error = False
         for sensor in self._sensors:
-            # skip sensor without a channel
-            if sensor.channel == -1:
-                continue
+            if self.is_zigbee_sensor(sensor):
+                reading = None
+                device = getattr(sensor, "zigbee_device", None)
+                if device is not None:
+                    reading = ZigbeeDeviceStore.get_reading(
+                        device.ieee_address,
+                        sensor.zigbee_endpoint,
+                        sensor.zigbee_capability,
+                    )
+                is_alert = bool(reading.value) if reading is not None and reading.value is not None else False
+                is_error = reading is None or not reading.available
+                logger.trace(
+                    "Sensor %s (zigbee/%s/%s) value: %s => alert: %s, error: %s",
+                    sensor.name,
+                    sensor.zigbee_endpoint,
+                    sensor.zigbee_capability,
+                    getattr(reading, "value", None),
+                    is_alert,
+                    is_error,
+                )
+            else:
+                # skip sensor without a channel
+                if sensor.channel == -1:
+                    continue
 
-            value = self._sensor_adapter.get_value(sensor.channel)
+                value = self._sensor_adapter.get_value(sensor.channel)
 
-            is_alert = detect_alert(sensor, value)
-            logger.trace(
-                "Sensor %s (CH%02d) value: %s => alert: %s",
-                sensor.name,
-                sensor.channel,
-                float(f"{value:.3f}"),
-                is_alert,
-            )
+                is_alert = detect_alert(sensor, value)
+                logger.trace(
+                    "Sensor %s (CH%02d) value: %s => alert: %s",
+                    sensor.name,
+                    sensor.channel,
+                    float(f"{value:.3f}"),
+                    is_alert,
+                )
+                is_error = detect_error(sensor, value)
+                logger.trace(
+                    "Sensor %s (CH%02d) value: %s => error: %s",
+                    sensor.name,
+                    sensor.channel,
+                    float(f"{value:.3f}"),
+                    is_error,
+                )
+
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
                 self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.alert)
                 changes = True
 
-            is_error = detect_error(sensor, value)
-            logger.trace(
-                "Sensor %s (CH%02d) value: %s => error: %s",
-                sensor.name,
-                sensor.channel,
-                float(f"{value:.3f}"),
-                is_error,
-            )
             if is_error != sensor.error:
                 sensor.error = is_error
-                # self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.error)
                 changes = True
 
             if sensor.alert and sensor.enabled:
@@ -472,10 +508,12 @@ class SensorHandler:
         """
         logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
-        self._mqtt_client.close()
-        self._db_session.close()
-        self._sensor_adapter.close()
-        self._zigbee_adapter.stop()
+        if self._mqtt_client is not None:
+            self._mqtt_client.close()
+        if self._db_session is not None:
+            self._db_session.close()
+        if self._sensor_adapter is not None:
+            self._sensor_adapter.close()
 
     @staticmethod
     def get_alert_type(sensor, monitoring_state):

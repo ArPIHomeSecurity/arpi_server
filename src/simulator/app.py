@@ -16,7 +16,7 @@ from textual.css.query import NoMatches
 from textual.logging import TextualHandler
 from textual.types import CSSPathType
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, Select, Static, TabbedContent, TabPane
+from textual.widgets import Button, Checkbox, Input, Label, Select, Static, TabbedContent, TabPane
 
 from monitor.adapters.mock.utils import (
     DEFAULT_KEYPAD,
@@ -24,11 +24,12 @@ from monitor.adapters.mock.utils import (
     WiringStrategies,
     append_sms_message,
     get_output_states,
-    get_zigbee_state,
+    get_zigbee_devices,
     load_channel_configs,
     set_input_states,
     set_keypad_state,
-    set_zigbee_state,
+    set_zigbee_capability,
+    set_zigbee_devices,
 )
 from monitor.config.models import GSMConfig
 from monitor.database import create_database_session
@@ -36,7 +37,7 @@ from monitor.output import OUTPUT_NAMES
 
 # use the wiring configuration of the application
 from monitor.sensor.detector import wiring_config
-from utils.models import SensorContactTypes
+from utils.models import SensorContactTypes, ZigbeeDevice
 
 logger = logging.getLogger("simulator")
 
@@ -66,6 +67,11 @@ POWER_HIGH = 1
 CARD_1 = "550021576706:34"
 CARD_2 = "550021576707:34"
 CARD_3 = "550021576708:34"
+
+
+def random_ieee_address() -> str:
+    """Generate a random IEEE 802.15.4 address for a new simulated device."""
+    return ":".join(f"{randint(0, 255):02X}" for _ in range(8))
 
 
 class Channels(Widget):
@@ -257,27 +263,39 @@ class ZigbeeDevices(Widget):
 
     def compose(self) -> ComposeResult:
         with Container(id="zigbee"):
-            yield Input(placeholder="Device name", id="zigbee-name")
-            yield Input(placeholder="IEEE address", id="zigbee-ieee")
-            yield Input(placeholder="Model", value="Zigbee Sim Device", id="zigbee-model")
-            with Horizontal(id="zigbee-pairing-row"):
-                yield Input(placeholder="Endpoint", value="1", id="zigbee-endpoint")
-                yield Input(placeholder="Capability", value="contact", id="zigbee-capability")
-            with Horizontal(id="zigbee-telemetry-row"):
-                yield Input(placeholder="Battery %", value="87", id="zigbee-battery")
-                yield Input(placeholder="Signal %", value="72", id="zigbee-signal")
-            yield Checkbox("Available", id="zigbee-available", value=True)
-            yield Checkbox("Paired", id="zigbee-paired", value=False)
-            yield Select(
-                [("Select a device", "")],
-                id="zigbee-device-select",
-                allow_blank=True,
-            )
-            yield Static("No devices paired yet.", id="zigbee-summary")
+            with Horizontal(classes="zigbee-row"):
+                with Horizontal():
+                    yield Label("Device name", classes="zigbee-label")
+                    yield Input(placeholder="Device name", id="zigbee-name")
+                with Horizontal():
+                    yield Label("IEEE address", classes="zigbee-label")
+                    yield Input(
+                        placeholder="IEEE address",
+                        value=random_ieee_address(),
+                        id="zigbee-ieee",
+                    )
+                with Horizontal():
+                    yield Label("Model", classes="zigbee-label")
+                    yield Input(placeholder="Model", value="Zigbee Sim Device", id="zigbee-model")
+            with Horizontal(classes="zigbee-row"):
+                with Horizontal():
+                    yield Label("Endpoint", classes="zigbee-label")
+                    yield Input(placeholder="Endpoint", value="1", id="zigbee-endpoint")
+                with Horizontal():
+                    yield Label("Capability", classes="zigbee-label")
+                    yield Input(placeholder="Capability", value="contact", id="zigbee-capability")
+                with Horizontal():
+                    yield Label("Battery %", classes="zigbee-label")
+                    yield Input(placeholder="Battery %", value="87", id="zigbee-battery")
+                with Horizontal():
+                    yield Label("Signal %", classes="zigbee-label")
+                    yield Input(placeholder="Signal %", value="72", id="zigbee-signal")
+
             with Horizontal(id="zigbee-actions"):
                 yield Button("Add Device", id="zigbee-add-device")
-                yield Button("Pair Selected", id="zigbee-pair-device")
-                yield Button("Save Preferences", id="zigbee-save-device")
+
+            yield Label("Devices", classes="zigbee-label")
+            yield Vertical(id="zigbee-devices")
 
 
 class SimulatorApp(App):
@@ -300,6 +318,10 @@ class SimulatorApp(App):
         self.is_advanced_mode = False
         self.show_voltage = False
         self.is_v3_board = environ.get("BOARD_VERSION") == "3"
+        # widget id => (ieee address, "endpoint/capability")
+        self.zigbee_properties = {}
+        # the property widgets are removed asynchronously, so their ids must stay unique
+        self.zigbee_property_generation = 0
 
     def load_configuration(self, input_number: int) -> None:
         """
@@ -393,73 +415,108 @@ class SimulatorApp(App):
         # reset keypad state
         self.keypad = deepcopy(DEFAULT_KEYPAD)
 
-    def refresh_zigbee_devices(self):
-        """Refresh the Zigbee device selector and summary using the simulator state file."""
-        zigbee_state = get_zigbee_state()
-        devices = zigbee_state.get("devices", {})
-        device_options = [
-            (f"{device.get('name', ieee)} ({ieee})", ieee) for ieee, device in devices.items()
-        ]
-        if not device_options:
-            device_options = [("Select a device", "")]
+    def load_zigbee_devices(self) -> dict:
+        """
+        Load the Zigbee devices registered by the monitor from the database.
+        Returns a dict mapping IEEE addresses to device attributes.
+        """
+        with create_database_session() as session:
+            devices = session.query(ZigbeeDevice).order_by(ZigbeeDevice.ieee_address).all()
 
-        select = self.query_one("#zigbee-device-select", Select)
-        select.set_options(device_options)
-        if device_options[0][1]:
-            select.value = device_options[0][1]
+            return {
+                device.ieee_address: {
+                    "name": device.name,
+                    "manufacturer": device.manufacturer,
+                    "model": device.model,
+                    "available": device.availability == "online",
+                    "battery_level": device.battery_level,
+                    "signal_quality": device.signal_quality,
+                    "last_seen": device.last_seen.isoformat() if device.last_seen else None,
+                    "capabilities": (device.device_metadata or {}).get("capabilities", {}),
+                }
+                for device in devices
+            }
 
-        summary = self.query_one("#zigbee-summary", Static)
+    def refresh_zigbee_devices(self, update_state=False):
+        """Rebuild the device list with a property checkbox row for every known device."""
+        container = self.query_one("#zigbee-devices", Vertical)
+        container.remove_children()
+
+        # load the Zigbee devices from the database
+        devices = self.load_zigbee_devices()
+
+        # update the simulator state with the loaded devices if requested
+        if update_state:
+            set_zigbee_devices(devices)
+
         if not devices:
-            summary.update("No devices paired yet.")
+            container.mount(Static("No devices added yet.", classes="zigbee-no-device"))
             return
 
-        selected_ieee = select.value or next(iter(devices))
-        device = devices.get(selected_ieee, {})
-        name = device.get("name", selected_ieee)
-        model = device.get("model", "Simulator Device")
-        paired = device.get("paired", False)
-        available = device.get("available", True)
-        battery = device.get("battery_level", 100)
-        signal = device.get("signal_quality", 100)
-        summary.update(
-            f"{name} | {model} | paired={paired} | available={available} | battery={battery}% | signal={signal}%"
-        )
+        self.zigbee_properties = {}
+        self.zigbee_property_generation += 1
+        generation = self.zigbee_property_generation
+        for index, (ieee, device) in enumerate(sorted(devices.items())):
+            name = device.get("name") or ieee
+            registered = "registered" if device.get("registered") else "pairing"
+            row = [
+                Static(
+                    f"{name} ({ieee}) | {registered}"
+                    f" | battery={device.get('battery_level', 100)}%"
+                    f" | signal={device.get('signal_quality', 100)}%",
+                    classes="zigbee-device-label",
+                )
+            ]
 
-    def save_zigbee_device(self):
-        """Persist the selected Zigbee device configuration to the simulator state file."""
-        state = get_zigbee_state()
-        devices = state.setdefault("devices", {})
+            capabilities = device.get("capabilities") or {}
+            properties = {
+                key: value for key, value in capabilities.items() if isinstance(value, bool)
+            }
+            for property_index, (capability_key, value) in enumerate(sorted(properties.items())):
+                widget_id = f"zigbee-property-{generation}-{index}-{property_index}"
+                self.zigbee_properties[widget_id] = (ieee, capability_key)
+                row.append(
+                    Checkbox(capability_key, id=widget_id, value=value, classes="zigbee-property")
+                )
+
+            container.mount(Horizontal(*row, classes="zigbee-device-row"))
+
+    def add_zigbee_device(self):
+        """Register a new simulated device with a pending pairing request."""
+        devices = get_zigbee_devices()
+        devices.setdefault("devices", {})
 
         ieee_field = self.query_one("#zigbee-ieee", Input).value.strip()
         name_field = self.query_one("#zigbee-name", Input).value.strip()
         if not ieee_field:
             return
 
-        device = devices.setdefault(ieee_field, {})
-        device["name"] = name_field or device.get("name", "Simulator Device")
-        device["manufacturer"] = "Simulator"
-        device["model"] = self.query_one("#zigbee-model", Input).value.strip() or "Simulator Device"
-        device["available"] = self.query_one("#zigbee-available", Checkbox).value
-        device["paired"] = self.query_one("#zigbee-paired", Checkbox).value
-        device["battery_level"] = int(self.query_one("#zigbee-battery", Input).value or 100)
-        device["signal_quality"] = int(self.query_one("#zigbee-signal", Input).value or 100)
-        if device.get("paired") or device.get("available"):
-            device["last_seen"] = datetime.now().astimezone().isoformat()
-
         endpoint = self.query_one("#zigbee-endpoint", Input).value.strip() or "1"
         capability = self.query_one("#zigbee-capability", Input).value.strip() or "contact"
         capability_key = f"{endpoint}/{capability}"
-        capabilities = device.setdefault("capabilities", {})
-        if capability_key not in capabilities:
-            capabilities[capability_key] = True
+        model = self.query_one("#zigbee-model", Input).value.strip() or "Simulator Device"
 
-        set_zigbee_state(state)
+        device = devices["devices"].setdefault(ieee_field, {})
+        device["name"] = name_field or device.get("name", "Simulator Device")
+        device["manufacturer"] = "Simulator"
+        device["model"] = model
+        device["available"] = True
+        device["pairing"] = True
+        device["battery_level"] = int(self.query_one("#zigbee-battery", Input).value or 100)
+        device["signal_quality"] = int(self.query_one("#zigbee-signal", Input).value or 100)
+
+        device.setdefault("capabilities", {})
+        device["capabilities"].setdefault(capability_key, False)
+        device["last_seen"] = datetime.now().astimezone().isoformat()
+
+        set_zigbee_devices(devices)
+        self.query_one("#zigbee-ieee", Input).value = random_ieee_address()
         self.refresh_zigbee_devices()
 
     def on_mount(self) -> None:
         """Start background tasks when the app mounts"""
         self.set_interval(0.5, self.read_output_states)
-        self.refresh_zigbee_devices()
+        self.refresh_zigbee_devices(update_state=True)
 
     def calculate_channel_value(self, channel: str) -> float:
         """
@@ -645,6 +702,9 @@ class SimulatorApp(App):
 
         await self.recompose()
 
+        self.refresh_zigbee_devices(update_state=True)
+
+
     @on(Button.Pressed, "#power")
     def power_button_pressed(self, event: Button.Pressed) -> None:
         """
@@ -688,61 +748,23 @@ class SimulatorApp(App):
     @on(Button.Pressed, "#zigbee-add-device")
     def zigbee_add_device_pressed(self, _event: Button.Pressed) -> None:
         """Create a new simulated Zigbee device."""
-        self.save_zigbee_device()
+        self.add_zigbee_device()
 
-    @on(Button.Pressed, "#zigbee-pair-device")
-    def zigbee_pair_device_pressed(self, _event: Button.Pressed) -> None:
-        """Pair the selected device and mark it available."""
-        select = self.query_one("#zigbee-device-select", Select)
-        ieee = select.value
-        if not ieee:
+    @on(Checkbox.Changed, "#zigbee-devices Checkbox")
+    def zigbee_property_changed(self, event: Checkbox.Changed) -> None:
+        """Write the new value of a boolean device property to the simulator state."""
+        entry = self.zigbee_properties.get(event.checkbox.id)
+        if not entry:
             return
 
-        state = get_zigbee_state()
-        device = state.setdefault("devices", {}).setdefault(ieee, {})
-        device["paired"] = True
-        device["available"] = True
-        device["last_seen"] = datetime.now().astimezone().isoformat()
-        set_zigbee_state(state)
-        self.query_one("#zigbee-paired", Checkbox).value = True
-        self.query_one("#zigbee-available", Checkbox).value = True
-        self.refresh_zigbee_devices()
-
-    @on(Button.Pressed, "#zigbee-save-device")
-    def zigbee_save_device_pressed(self, _event: Button.Pressed) -> None:
-        """Persist preferences for the currently selected Zigbee device."""
-        select = self.query_one("#zigbee-device-select", Select)
-        ieee = select.value
-        if ieee:
-            self.query_one("#zigbee-ieee", Input).value = ieee
-        self.save_zigbee_device()
-
-    @on(Select.Changed, "#zigbee-device-select")
-    def zigbee_device_selected(self, event: Select.Changed) -> None:
-        """Populate the form when a Zigbee device is selected."""
-        ieee = event.value
-        if not ieee:
+        ieee, capability_key = entry
+        value = bool(event.value)
+        capabilities = get_zigbee_devices().get("devices", {}).get(ieee, {}).get("capabilities", {})
+        # the checkbox also reports the value set while building the widget
+        if capabilities.get(capability_key) == value:
             return
 
-        state = get_zigbee_state()
-        device = state.get("devices", {}).get(ieee, {})
-        if not device:
-            return
-
-        self.query_one("#zigbee-name", Input).value = device.get("name", "")
-        self.query_one("#zigbee-ieee", Input).value = ieee
-        self.query_one("#zigbee-model", Input).value = device.get("model", "Simulator Device")
-        self.query_one("#zigbee-battery", Input).value = str(device.get("battery_level", 87))
-        self.query_one("#zigbee-signal", Input).value = str(device.get("signal_quality", 72))
-        self.query_one("#zigbee-available", Checkbox).value = bool(device.get("available", True))
-        self.query_one("#zigbee-paired", Checkbox).value = bool(device.get("paired", False))
-
-        capabilities = device.get("capabilities", {})
-        if capabilities:
-            first_key = next(iter(capabilities))
-            endpoint, capability = first_key.split("/", 1) if "/" in first_key else ("1", first_key)
-            self.query_one("#zigbee-endpoint", Input).value = endpoint
-            self.query_one("#zigbee-capability", Input).value = capability
+        set_zigbee_capability(ieee, capability_key, value)
 
 
 logging.basicConfig(

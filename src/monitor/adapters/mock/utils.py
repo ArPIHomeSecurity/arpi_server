@@ -6,18 +6,21 @@ import contextlib
 import fcntl
 import json
 import os
+from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from random import randint
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
-from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
+from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount, ZigbeeDevice
 
 # buffer files between the simulator and the mock adapters
 INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
 OUTPUT_FILE = os.environ.get("MOCK_OUTPUT_FILE", "simulator_output.json")
 KEYPAD_FILE = os.environ.get("MOCK_KEYPAD_FILE", "simulator_keypad.json")
+GSM_FILE = os.environ.get("MOCK_GSM_FILE", "simulator_gsm.json")
 ZIGBEE_FILE = os.environ.get("MOCK_ZIGBEE_FILE", "simulator_zigbee.json")
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
@@ -179,20 +182,6 @@ def get_keypad_state():
     return protected_transfer(KEYPAD_FILE, defaults)
 
 
-def get_zigbee_state():
-    """
-    Get the current Zigbee simulator state.
-    """
-    return protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
-
-
-def set_zigbee_state(data):
-    """
-    Replace the entire Zigbee simulator state payload.
-    """
-    protected_write(ZIGBEE_FILE, data)
-
-
 def set_keypad_state(pending_bits, data):
     """
     Set the state of the keypad.
@@ -209,12 +198,54 @@ def set_keypad_state(pending_bits, data):
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
 
 
+def get_zigbee_devices():
+    """
+    Get the current Zigbee simulator state.
+    """
+    return protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+
+
+def set_zigbee_devices(data):
+    """
+    Replace the entire Zigbee simulator state payload.
+    """
+    protected_write(ZIGBEE_FILE, data)
+
+
+def set_zigbee_capability(ieee_address, capability_key, value):
+    """
+    Update the value of a single capability (endpoint/capability) of a simulated device.
+    """
+
+    def merge_capability(base, new):
+        if not isinstance(base, dict):
+            base = deepcopy(DEFAULT_ZIGBEE_DATA)
+
+        devices = base.setdefault("devices", {})
+        device = devices.setdefault(new["ieee_address"], {})
+        capabilities = device.setdefault("capabilities", {})
+        capabilities[new["capability_key"]] = new["value"]
+        device["last_seen"] = datetime.now().astimezone().isoformat()
+        return base
+
+    protected_update(
+        ZIGBEE_FILE,
+        {
+            "ieee_address": str(ieee_address),
+            "capability_key": str(capability_key),
+            "value": value,
+        },
+        deepcopy(DEFAULT_ZIGBEE_DATA),
+        merge_capability,
+    )
+
+
 def get_sms_messages():
     """
     Get the list of SMS messages from the mock GSM adapter.
     """
     default_data = []
-    return protected_transfer("simulator_gsm.json", default_data)
+    return protected_transfer(GSM_FILE, default_data)
 
 
 def append_sms_message(number, text, time):
@@ -228,7 +259,7 @@ def append_sms_message(number, text, time):
 
     new_message = {"number": number, "text": text, "time": time.isoformat()}
     protected_update(
-        "simulator_gsm.json",
+        GSM_FILE,
         new_message,
         default_data,
         merge_sms_data,

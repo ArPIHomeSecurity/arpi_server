@@ -15,6 +15,7 @@ from monitor.notifications.notifier import Notifier
 # from monitor.logging import print_logging
 from monitor.output.handler import OutputHandler
 from monitor.sms_handler import SmsHandler
+from monitor.zigbee_handler import ZigbeeHandler
 from utils.constants import LOG_SERVICE
 
 logger = logging.getLogger(LOG_SERVICE)
@@ -97,6 +98,9 @@ class BackgroundService(Thread):
         network_handler = NetworkHandler(self._broadcaster)
         network_handler.start()
 
+        zigbee_handler = ZigbeeHandler(self._broadcaster)
+        zigbee_handler.start()
+
         ipc_server = IPCServer(self._stop_event, self._broadcaster)
         ipc_server.start()
 
@@ -108,6 +112,7 @@ class BackgroundService(Thread):
             output_handler,
             keypad,
             network_handler,
+            zigbee_handler,
         ]
 
     def _stop_threads(self):
