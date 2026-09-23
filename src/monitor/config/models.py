@@ -300,7 +300,7 @@ class ZigbeeCoordinatorConfig(BaseConfig):
     SECTION_NAME = "coordinator"
 
     enabled: bool = False
-    serial_port: str | None = None
+    serial_port: str | None = "/dev/ttyUSB0"
     baudrate: int = 115200
     adapter: str = "bellows"
     permit_join: bool = False

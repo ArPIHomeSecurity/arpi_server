@@ -472,7 +472,7 @@ class ZigbeeDevice(BaseModel):
     @validates("battery_level", "signal_quality")
     def validates_quality(self, key, value):
         if value is not None:
-            assert 0 <= value <= 100, f"Incorrect '{key}' (0..100)"
+            assert 0 <= value <= 255, f"Incorrect '{key}' must be between 0 and 255, got {value}"
         return value
 
 
