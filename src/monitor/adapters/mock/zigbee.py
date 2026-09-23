@@ -110,6 +110,9 @@ class ZigbeeAdapter:
 
         return devices
 
+    def get_capability_changes(self) -> list[DiscoveredDevice]:
+        return []
+
     def get_values(self):
         """Return the latest normalized readings from the simulator cache."""
         self._refresh_cache()

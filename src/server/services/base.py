@@ -38,6 +38,14 @@ class ChannelConflictError(Exception):
     """Raised when there is a channel conflict with existing outputs."""
 
 
+class ZigbeeBindingConflictError(Exception):
+    """Raised when a Zigbee device endpoint/capability is already bound to another sensor."""
+
+
+class InvalidSensorSource(Exception):
+    """Raised when a sensor does not use exactly one source (wired channel or Zigbee mapping)."""
+
+
 class BaseService:
     """
     Base service class providing common functionality for all services.

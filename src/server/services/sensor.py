@@ -7,8 +7,10 @@ from server.services.base import (
     BaseService,
     ChannelConflictError,
     ConfigChangesNotAllowed,
+    InvalidSensorSource,
     ObjectNotChanged,
     ObjectNotFound,
+    ZigbeeBindingConflictError,
 )
 from utils.models import (
     Area,
@@ -55,11 +57,11 @@ class SensorService(BaseService):
 
     def create_sensor(
         self,
-        channel: int,
         sensor_type_id: int,
         area_id: int,
         name: str,
         zone_id: int,
+        channel: int | None = None,
         description: str | None = None,
         enabled: bool = True,
         silent_alert: bool | None = None,
@@ -68,6 +70,9 @@ class SensorService(BaseService):
         channel_type: ChannelTypes = ChannelTypes.BASIC,
         sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
+        zigbee_device_id: int | None = None,
+        zigbee_endpoint: str | None = None,
+        zigbee_capability: str | None = None,
     ) -> Sensor:
         """
         Create a new sensor in the database.
@@ -79,24 +84,32 @@ class SensorService(BaseService):
         zone = self._db_session.query(Zone).get(zone_id)
         sensor_type = self._db_session.query(SensorType).get(sensor_type_id)
 
-        new_sensor = Sensor(
-            channel=channel,
-            sensor_type=sensor_type,
-            area=area,
-            name=name,
-            zone=zone,
-            description=description,
-            enabled=enabled,
-            silent_alert=silent_alert,
-            monitor_period=monitor_period,
-            monitor_threshold=monitor_threshold,
-            channel_type=channel_type,
-            sensor_contact_type=sensor_contact_type,
-            sensor_eol_count=sensor_eol_count,
-        )
+        try:
+            new_sensor = Sensor(
+                channel=channel,
+                sensor_type=sensor_type,
+                area=area,
+                name=name,
+                zone=zone,
+                description=description,
+                enabled=enabled,
+                silent_alert=silent_alert,
+                monitor_period=monitor_period,
+                monitor_threshold=monitor_threshold,
+                channel_type=channel_type,
+                sensor_contact_type=sensor_contact_type,
+                sensor_eol_count=sensor_eol_count,
+                zigbee_device_id=zigbee_device_id,
+                zigbee_endpoint=zigbee_endpoint,
+                zigbee_capability=zigbee_capability,
+            )
+        except AssertionError as error:
+            raise InvalidSensorSource(str(error)) from error
 
-        if not self.validate_channel(new_sensor):
-            raise ChannelConflictError("Channel conflict with existing sensors.")
+        if not self.validate_binding(new_sensor):
+            if new_sensor.channel is not None:
+                raise ChannelConflictError("Channel conflict with existing sensors.")
+            raise ZigbeeBindingConflictError("Zigbee capability already bound to another sensor.")
 
         self._db_session.add(new_sensor)
         self._db_session.commit()
@@ -117,11 +130,18 @@ class SensorService(BaseService):
         if not sensor:
             raise ObjectNotFound("Sensor not found")
 
-        if not sensor.update(kwargs):
+        try:
+            changed = sensor.update(kwargs)
+        except AssertionError as error:
+            raise InvalidSensorSource(str(error)) from error
+
+        if not changed:
             raise ObjectNotChanged("Sensor not changed")
 
-        if not self.validate_channel(sensor):
-            raise ChannelConflictError("Channel conflict with existing sensors.")
+        if not self.validate_binding(sensor):
+            if sensor.channel is not None:
+                raise ChannelConflictError("Channel conflict with existing sensors.")
+            raise ZigbeeBindingConflictError("Zigbee capability already bound to another sensor.")
 
         self._db_session.commit()
         self._db_session.refresh(sensor)
@@ -155,6 +175,14 @@ class SensorService(BaseService):
         """
         return self._db_session.query(SensorType).all()
 
+    def validate_binding(self, sensor: Sensor) -> bool:
+        """
+        Validate the sensor's source (wired channel or Zigbee mapping) does not conflict.
+        """
+        if sensor.channel is None:
+            return self.validate_zigbee_binding(sensor)
+        return self.validate_channel(sensor)
+
     def validate_channel(self, sensor: Sensor = None) -> bool:
         """
         Validate that the sensor's channel does not conflict with existing sensors.
@@ -187,6 +215,23 @@ class SensorService(BaseService):
                     return False
 
         return True
+
+    def validate_zigbee_binding(self, sensor: Sensor) -> bool:
+        """
+        Validate that the sensor's Zigbee endpoint/capability is not already bound elsewhere.
+        """
+        duplicate = (
+            self._db_session.query(Sensor)
+            .filter(
+                Sensor.id != sensor.id,
+                Sensor.zigbee_device_id == sensor.zigbee_device_id,
+                Sensor.zigbee_endpoint == sensor.zigbee_endpoint,
+                Sensor.zigbee_capability == sensor.zigbee_capability,
+                Sensor.deleted == False,
+            )
+            .first()
+        )
+        return duplicate is None
 
     def reset_references(self, sensor_id: int = None) -> None:
         """

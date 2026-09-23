@@ -69,6 +69,17 @@ class ZigbeeDeviceStore:
             cls._devices = new_devices
 
     @classmethod
+    def update_device(cls, device: DiscoveredDevice):
+        """Merge a single device's updated info (e.g. after a capability change) into the store."""
+        with cls._lock:
+            cls._devices[str(device.ieee_address)] = device
+
+    @classmethod
+    def get_device(cls, ieee_address) -> DiscoveredDevice | None:
+        with cls._lock:
+            return cls._devices.get(str(ieee_address))
+
+    @classmethod
     def get_devices(cls) -> list[DiscoveredDevice]:
         with cls._lock:
             return list(cls._devices.values())
@@ -118,6 +129,7 @@ class ZigbeeHandler(Thread):
                         break
 
             self.update_device_states()
+            self.update_device_capabilities()
             if self._pairing_start:
                 self.poll_pairing()
                 send_zigbee_pairing_state(
@@ -187,6 +199,31 @@ class ZigbeeHandler(Thread):
         """
         Store the newly discovered devices in the database, updating the already known ones.
         """
+        self._persist_devices(devices, log_new=True)
+
+    def update_device_capabilities(self):
+        """
+        Persist capability changes reported by the adapter for already known devices
+        (e.g. after a re-interview) so the REST API and bound sensors stay in sync.
+        """
+        try:
+            changes = self._adapter.get_capability_changes()
+        except Exception:
+            logger.exception("Failed to get the Zigbee capability changes")
+            return
+
+        if not changes:
+            return
+
+        for device in changes:
+            ZigbeeDeviceStore.update_device(device)
+
+        self._persist_devices(changes, log_new=False)
+
+    def _persist_devices(self, devices: list[DiscoveredDevice], log_new: bool):
+        """
+        Insert newly discovered devices and refresh already registered ones in the database.
+        """
         try:
             with create_database_session() as session:
                 for device in devices:
@@ -212,13 +249,14 @@ class ZigbeeHandler(Thread):
                     )
                     if registered is None:
                         session.add(ZigbeeDevice(ieee_address=device.ieee_address, **values))
-                        logger.info("Registered new Zigbee device: %s", device.ieee_address)
+                        if log_new:
+                            logger.info("Registered new Zigbee device: %s", device.ieee_address)
                     else:
                         registered.update(values)
 
                 session.commit()
         except Exception:
-            logger.exception("Failed to register the Zigbee devices")
+            logger.exception("Failed to persist the Zigbee devices")
 
     @staticmethod
     def _parse_last_seen(last_seen):

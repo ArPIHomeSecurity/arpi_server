@@ -347,8 +347,8 @@ class Sensor(BaseModel):
 
     @validates("channel")
     def validates_channel(self, key, channel):
-        assert -1 <= channel <= int(os.environ["INPUT_NUMBER"]), (
-            f"Incorrect 'channel' (0..{os.environ['INPUT_NUMBER']})"
+        assert channel is None or -1 <= channel <= int(os.environ["INPUT_NUMBER"]), (
+            f"Incorrect 'channel' (-1..{os.environ['INPUT_NUMBER']}) or None"
         )
         return channel
 
@@ -451,7 +451,7 @@ class ZigbeeDevice(BaseModel):
             )
         )
         serialized["metadata"] = serialized.pop("device_metadata")
-        serialized["sensor_count"] = len(self.sensors) if self.sensors else 0
+        serialized["sensor_count"] = len([s for s in self.sensors if not s.deleted]) if self.sensors else 0
         return convert2camel(serialized)
 
     @validates("ieee_address")

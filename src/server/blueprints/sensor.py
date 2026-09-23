@@ -3,7 +3,13 @@ from flask.blueprints import Blueprint
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
-from server.services.base import ConfigChangesNotAllowed, ObjectNotChanged, ObjectNotFound
+from server.services.base import (
+    ConfigChangesNotAllowed,
+    InvalidSensorSource,
+    ObjectNotChanged,
+    ObjectNotFound,
+    ZigbeeBindingConflictError,
+)
 from server.services.sensor import ChannelConflictError, SensorService
 from server.tools import process_ipc_response
 from utils.constants import ROLE_USER
@@ -40,7 +46,7 @@ def create_sensor():
             description=sensor_data.get("description"),
             area_id=sensor_data["areaId"],
             zone_id=sensor_data["zoneId"],
-            channel=sensor_data["channel"],
+            channel=sensor_data.get("channel"),
             channel_type=sensor_data.get("channelType"),
             enabled=sensor_data["enabled"],
             monitor_period=sensor_data.get("monitorPeriod"),
@@ -49,10 +55,19 @@ def create_sensor():
             sensor_contact_type=sensor_data.get("sensorContactType"),
             sensor_eol_count=sensor_data.get("sensorEolCount"),
             sensor_type_id=sensor_data["typeId"],
+            zigbee_device_id=sensor_data.get("zigbeeDeviceId"),
+            zigbee_endpoint=sensor_data.get("zigbeeEndpoint"),
+            zigbee_capability=sensor_data.get("zigbeeCapability"),
         )
         return jsonify(new_sensor.serialized), 201
     except ConfigChangesNotAllowed:
         return jsonify({"error": "Configuration changes are not allowed currently"}), 409
+    except ChannelConflictError:
+        return jsonify({"error": "Channel conflict with existing sensors"}), 409
+    except ZigbeeBindingConflictError as error:
+        return jsonify({"error": str(error)}), 409
+    except InvalidSensorSource as error:
+        return jsonify({"error": str(error)}), 400
 
 
 @sensor_blueprint.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
@@ -79,6 +94,10 @@ def manage_sensor(sensor_id):
         return jsonify({"error": "Configuration changes are not allowed currently"}), 409
     except ChannelConflictError:
         return jsonify({"error": "Channel conflict with existing sensors"}), 409
+    except ZigbeeBindingConflictError as error:
+        return jsonify({"error": str(error)}), 409
+    except InvalidSensorSource as error:
+        return jsonify({"error": str(error)}), 400
     except ObjectNotChanged:
         return jsonify({"info": "No changes made"}), 204
     except ObjectNotFound:

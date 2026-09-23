@@ -307,6 +307,7 @@ class SensorHandler:
         for sensor in self._sensors:
             if self.is_zigbee_sensor(sensor):
                 reading = None
+                capability_missing = False
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
                     reading = ZigbeeDeviceStore.get_reading(
@@ -314,8 +315,13 @@ class SensorHandler:
                         sensor.zigbee_endpoint,
                         sensor.zigbee_capability,
                     )
+                    live_device = ZigbeeDeviceStore.get_device(device.ieee_address)
+                    capability_key = f"{sensor.zigbee_endpoint}/{sensor.zigbee_capability}"
+                    capability_missing = (
+                        live_device is not None and capability_key not in live_device.capabilities
+                    )
                 is_alert = bool(reading.value) if reading is not None and reading.value is not None else False
-                is_error = reading is None or not reading.available
+                is_error = reading is None or not reading.available or capability_missing
                 logger.trace(
                     "Sensor %s (zigbee/%s/%s) value: %s => alert: %s, error: %s",
                     sensor.name,

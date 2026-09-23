@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from os import environ
 
 from bellows.zigbee.application import ControllerApplication
+from zigpy.zcl import foundation
 
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
@@ -131,8 +132,8 @@ class ZigbeeAdapter:
             raise RuntimeError("Controller is not running.")
 
         with self._pairing_lock:
-        self._pairing_baseline = {str(device.ieee) for device in self.app.devices.values()}
-        self._reported_devices.clear()
+            self._pairing_baseline = {str(device.ieee) for device in self.app.devices.values()}
+            self._reported_devices.clear()
             self._discovered.clear()
         future = asyncio.run_coroutine_threadsafe(self.app.permit(duration_seconds), self._loop)
         future.result(timeout=10.0)
@@ -162,30 +163,71 @@ class ZigbeeAdapter:
                 cluster.add_context_listener(self)
 
     def _build_discovered_device(self, device) -> DiscoveredDevice:
-            capabilities = {}
-            for endpoint_id, endpoint in device.endpoints.items():
-                if endpoint_id == 0:
-                    continue
-                for cluster in endpoint.clusters:
-                    capability = cluster.ep_attribute or type(cluster).__name__
-                    capabilities[f"{endpoint_id}/{capability}"] = {}
+        capabilities = {}
+        for endpoint_id, endpoint in device.endpoints.items():
+            if endpoint_id == 0:
+                continue
+            for cluster in endpoint.clusters:
+                cluster_name = cluster.ep_attribute or type(cluster).__name__
+                command_sources = self._get_command_attribute_sources(cluster)
+                for attribute in cluster.attributes.values():
+                    if not self._is_sensor_attribute(attribute):
+                        continue
+                    is_reportable = bool(attribute.access & foundation.ZCLAttributeAccess.Report)
+                    sources = command_sources.get(attribute.name, [])
+                    if not is_reportable and not sources:
+                        continue
+
+                    capability = self._attribute_capability(cluster.cluster_id, attribute.id)
+                    capabilities[f"{endpoint_id}/{capability}"] = {
+                        "cluster": cluster_name,
+                        "clusterId": int(cluster.cluster_id),
+                        "attribute": attribute.name,
+                        "attributeId": int(attribute.id),
+                        "valueType": getattr(attribute.type, "__name__", str(attribute.type)),
+                        "sources": (["attribute"] if is_reportable else []) + sources,
+                    }
 
         return DiscoveredDevice(
             ieee_address=str(device.ieee),
-                    network_address=int(device.nwk),
-                    manufacturer=device.manufacturer,
-                    model=device.model,
-                    metadata={
-                        "available": True,
-                        "signal_quality": device.lqi,
-                        "last_seen": (
-                            datetime.fromtimestamp(device.last_seen, UTC).isoformat()
-                            if device.last_seen
-                            else None
-                        ),
-                    },
-                    capabilities=capabilities,
-                )
+            network_address=int(device.nwk),
+            manufacturer=device.manufacturer,
+            model=device.model,
+            metadata={
+                "available": True,
+                "signal_quality": device.lqi,
+                "last_seen": (
+                    datetime.fromtimestamp(device.last_seen, UTC).isoformat()
+                    if device.last_seen
+                    else None
+                ),
+            },
+            capabilities=capabilities,
+        )
+
+    @staticmethod
+    def _attribute_capability(cluster_id, attribute_id) -> str:
+        return f"a:{int(cluster_id):04x}:{int(attribute_id):04x}"
+
+    @staticmethod
+    def _get_command_attribute_sources(cluster) -> dict[str, list[str]]:
+        attributes = {
+            attribute.name: attribute
+            for attribute in cluster.attributes.values()
+            if ZigbeeAdapter._is_sensor_attribute(attribute)
+        }
+        sources: dict[str, list[str]] = {}
+        commands = list(cluster.server_commands.values()) + list(cluster.client_commands.values())
+        for command in commands:
+            for field in command.schema.fields:
+                attribute = attributes.get(field.name)
+                if attribute is not None and field.type is attribute.type:
+                    sources.setdefault(field.name, []).append(f"command:{command.name}")
+        return sources
+
+    @staticmethod
+    def _is_sensor_attribute(attribute) -> bool:
+        return attribute.zcl_type.name == "bool_" or attribute.zcl_type.name.startswith("map")
 
     def device_initialized(self, device):
         """Subscribe to attribute reports and, if newly joined, queue for pairing UI."""
@@ -195,6 +237,7 @@ class ZigbeeAdapter:
         discovered = self._build_discovered_device(device)
         with self._capability_lock:
             self._device_info[ieee_address] = discovered
+            self._capability_changes.append(discovered)
 
         with self._pairing_lock:
             if ieee_address in self._pairing_baseline or ieee_address in self._reported_devices:
@@ -227,18 +270,19 @@ class ZigbeeAdapter:
     def attribute_updated(self, cluster, attrid, value, timestamp):
         """Cluster-level callback fired by zigpy whenever a device reports a value."""
         try:
-            attr_name = cluster.find_attribute(attrid).name
+            attribute = cluster.find_attribute(attrid)
+            attr_name = attribute.name
         except KeyError:
             attr_name = str(attrid)
 
         ieee_address = str(cluster.endpoint.device.ieee)
         endpoint_id = cluster.endpoint.endpoint_id
-        capability = f"{cluster.ep_attribute or type(cluster).__name__}/{attr_name}"
+        capability = self._attribute_capability(cluster.cluster_id, attrid)
         reading = ZigbeeReading(
             ieee_address=ieee_address,
             endpoint=str(endpoint_id),
             capability=capability,
-            value=value,
+            value=self._normalize_attribute_value(cluster.cluster_id, attr_name, value),
             timestamp=timestamp.isoformat(),
             signal_quality=cluster.endpoint.device.lqi,
         )
@@ -255,30 +299,55 @@ class ZigbeeAdapter:
 
     def cluster_command(self, cluster, tsn, command_id, args):
         """Fired for incoming ZCL commands, e.g. IAS Zone status change notifications."""
-        command = {**cluster.server_commands, **cluster.client_commands}.get(command_id)
+        command = getattr(args, "command", None)
+        if command is None:
+            command = {**cluster.server_commands, **cluster.client_commands}.get(command_id)
         command_name = command.name if command else str(command_id)
 
         ieee_address = str(cluster.endpoint.device.ieee)
         endpoint_id = cluster.endpoint.endpoint_id
-        capability = f"{cluster.ep_attribute or type(cluster).__name__}/{command_name}"
-        reading = ZigbeeReading(
-            ieee_address=ieee_address,
-            endpoint=str(endpoint_id),
-            capability=capability,
-            value=args,
-            timestamp=datetime.now(UTC).isoformat(),
-            signal_quality=cluster.endpoint.device.lqi,
-        )
-
         logger.debug(
-            "Command received for device %s, endpoint %s, capability %s: %s",
+            "Command received for device %s, endpoint %s, command %s: %s",
             ieee_address,
             endpoint_id,
-            capability,
+            command_name,
             args,
         )
+
+        if command is None:
+            return
+
+        attributes = {
+            attribute.name: attribute
+            for attribute in cluster.attributes.values()
+            if self._is_sensor_attribute(attribute)
+        }
         with self._readings_lock:
-            self._readings[(ieee_address, endpoint_id, capability)] = reading
+            for field in type(args).fields:
+                attribute = attributes.get(field.name)
+                if attribute is None or field.type is not attribute.type:
+                    continue
+
+                capability = self._attribute_capability(cluster.cluster_id, attribute.id)
+                value = self._normalize_attribute_value(
+                    cluster.cluster_id,
+                    attribute.name,
+                    getattr(args, field.name),
+                )
+                self._readings[(ieee_address, endpoint_id, capability)] = ZigbeeReading(
+                    ieee_address=ieee_address,
+                    endpoint=str(endpoint_id),
+                    capability=capability,
+                    value=value,
+                    timestamp=datetime.now(UTC).isoformat(),
+                    signal_quality=cluster.endpoint.device.lqi,
+                )
+
+    @staticmethod
+    def _normalize_attribute_value(cluster_id, attribute_name: str, value):
+        if int(cluster_id) == 0x0500 and attribute_name == "zone_status":
+            return bool(int(value) & 0x0003)
+        return value
 
     def _mark_unavailable(self, ieee_address: str):
         with self._readings_lock:
