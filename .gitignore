@@ -23,6 +23,7 @@ status.json
 arpi_dhparam.pem
 config.env
 .coverage
+zigbee.db*
 
 *_input.json
 *_output.json

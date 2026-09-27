@@ -14,18 +14,23 @@ from threading import RLock, Thread
 from time import time
 from typing import ClassVar
 
-from monitor.actions import MonitorStopCommand, MonitorZigbeePairingCommand
-from monitor.adapters.zigbee import DiscoveredDevice, ZigbeeReading, get_zigbee_adapter
+from monitor.actions import (
+    MonitorStopCommand,
+    MonitorUnpairZigbeeDeviceCommand,
+    MonitorZigbeePairingCommand,
+)
+from monitor.adapters.zigbee import ZigbeeDevice, ZigbeeSensorData, get_zigbee_adapter
 from monitor.broadcast import Broadcaster
 from monitor.database import create_database_session
 from monitor.socket_io import send_zigbee_pairing_state
 from utils.constants import LOG_ZIGBEE, THREAD_ZIGBEE
-from utils.models import ZigbeeDevice
+from utils.models import ZigbeeDevice as ZigbeeDeviceModel
 
 logger = logging.getLogger(LOG_ZIGBEE)
 
 COMMUNICATION_PERIOD = 0.5  # sec
 PAIRING_DURATION = 60  # sec
+DEVICE_STATE_UPDATE_PERIOD = 30  # sec
 
 
 class ZigbeeDeviceStore:
@@ -36,59 +41,64 @@ class ZigbeeDeviceStore:
     """
 
     _lock = RLock()
-    _readings: ClassVar[dict[tuple[str, str, str], ZigbeeReading]] = {}
-    _devices: ClassVar[dict[str, DiscoveredDevice]] = {}
+    _sensor_data: ClassVar[dict[tuple[str, str, str], ZigbeeSensorData]] = {}
 
     @classmethod
-    def update_readings(cls, readings: list[ZigbeeReading]):
-        new_readings = {
+    def is_initialized(cls) -> bool:
+        with cls._lock:
+            return bool(cls._sensor_data)
+
+    @classmethod
+    def update_sensor_data(cls, sensor_datas: list[ZigbeeSensorData]):
+        new_sensor_data = {
             (
-                str(reading.ieee_address),
-                str(reading.endpoint),
-                str(reading.capability),
-            ): reading
-            for reading in readings
+                str(sensor_data.ieee_address),
+                str(sensor_data.endpoint),
+                str(sensor_data.capability),
+            ): sensor_data
+            for sensor_data in sensor_datas
         }
         with cls._lock:
-            cls._readings = new_readings
+            cls._sensor_data = new_sensor_data
 
     @classmethod
-    def get_reading(cls, ieee_address, endpoint, capability) -> ZigbeeReading | None:
+    def get_sensor_data(cls, ieee_address, endpoint, capability) -> ZigbeeSensorData | None:
         with cls._lock:
-            return cls._readings.get((str(ieee_address), str(endpoint), str(capability)))
+            return cls._sensor_data.get((str(ieee_address), str(endpoint), str(capability)))
 
     @classmethod
-    def get_readings(cls) -> list[ZigbeeReading]:
+    def get_sensor_datas(cls) -> list[ZigbeeSensorData]:
         with cls._lock:
-            return list(cls._readings.values())
-
-    @classmethod
-    def update_devices(cls, devices: list[DiscoveredDevice]):
-        new_devices = {str(device.ieee_address): device for device in devices}
-        with cls._lock:
-            cls._devices = new_devices
-
-    @classmethod
-    def update_device(cls, device: DiscoveredDevice):
-        """Merge a single device's updated info (e.g. after a capability change) into the store."""
-        with cls._lock:
-            cls._devices[str(device.ieee_address)] = device
-
-    @classmethod
-    def get_device(cls, ieee_address) -> DiscoveredDevice | None:
-        with cls._lock:
-            return cls._devices.get(str(ieee_address))
-
-    @classmethod
-    def get_devices(cls) -> list[DiscoveredDevice]:
-        with cls._lock:
-            return list(cls._devices.values())
+            return list(cls._sensor_data.values())
 
     @classmethod
     def clear(cls):
         with cls._lock:
-            cls._readings = {}
-            cls._devices = {}
+            cls._sensor_data = {}
+
+
+def extract_attributes(device: ZigbeeDevice, include_identity: bool = False):
+    last_seen = None
+    with contextlib.suppress(TypeError, ValueError):
+        last_seen = datetime.fromisoformat(device.last_seen)
+
+    values = {
+        "availability": "online" if device.available else "offline",
+        "last_seen": last_seen,
+        "battery_level": device.battery_level,
+        "signal_quality": device.signal_quality,
+    }
+    if include_identity:
+        values.update(
+            {
+                "network_address": device.network_address,
+                "manufacturer": device.manufacturer,
+                "model": device.model,
+                "name": device.name or device.ieee_address,
+                "metadata": {"capabilities": device.capabilities},
+            }
+        )
+    return values
 
 
 class ZigbeeHandler(Thread):
@@ -101,6 +111,7 @@ class ZigbeeHandler(Thread):
         self._actions = Queue()
         self._adapter = None
         self._pairing_start = None
+        self._device_state_update = 0
 
         self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
@@ -125,11 +136,13 @@ class ZigbeeHandler(Thread):
                 match message:
                     case MonitorZigbeePairingCommand():
                         self.start_pairing()
+                    case MonitorUnpairZigbeeDeviceCommand():
+                        self._adapter.unpair_device(message.ieee_address)
                     case MonitorStopCommand():
                         break
 
             self.update_device_states()
-            self.update_device_capabilities()
+            self.update_registered_devices()
             if self._pairing_start:
                 self.poll_pairing()
                 send_zigbee_pairing_state(
@@ -191,64 +204,34 @@ class ZigbeeHandler(Thread):
         if not devices:
             return
 
-        ZigbeeDeviceStore.update_devices(devices)
         self.register_devices(devices)
         self._pairing_start = -1
 
-    def register_devices(self, devices: list[DiscoveredDevice]):
+    def register_devices(self, devices: list[ZigbeeDevice]):
         """
         Store the newly discovered devices in the database, updating the already known ones.
         """
         self._persist_devices(devices, log_new=True)
 
-    def update_device_capabilities(self):
-        """
-        Persist capability changes reported by the adapter for already known devices
-        (e.g. after a re-interview) so the REST API and bound sensors stay in sync.
-        """
-        try:
-            changes = self._adapter.get_capability_changes()
-        except Exception:
-            logger.exception("Failed to get the Zigbee capability changes")
-            return
-
-        if not changes:
-            return
-
-        for device in changes:
-            ZigbeeDeviceStore.update_device(device)
-
-        self._persist_devices(changes, log_new=False)
-
-    def _persist_devices(self, devices: list[DiscoveredDevice], log_new: bool):
+    def _persist_devices(self, devices: list[ZigbeeDevice], log_new: bool):
         """
         Insert newly discovered devices and refresh already registered ones in the database.
         """
         try:
             with create_database_session() as session:
                 for device in devices:
-                    metadata = device.metadata or {}
-                    values = {
-                        "network_address": device.network_address,
-                        "manufacturer": device.manufacturer,
-                        "model": device.model,
-                        "name": device.name or device.ieee_address,
-                        "availability": (
-                            "online" if metadata.get("available", True) else "offline"
-                        ),
-                        "last_seen": self._parse_last_seen(metadata.get("last_seen")),
-                        "battery_level": metadata.get("battery_level"),
-                        "signal_quality": metadata.get("signal_quality"),
-                        "metadata": {"capabilities": device.capabilities},
-                    }
+                    values = extract_attributes(device, include_identity=True)
 
                     registered = (
-                        session.query(ZigbeeDevice)
-                        .filter_by(ieee_address=device.ieee_address)
+                        session.query(ZigbeeDeviceModel)
+                        .filter_by(
+                            ieee_address=device.ieee_address,
+                            deleted=False,
+                        )
                         .first()
                     )
                     if registered is None:
-                        session.add(ZigbeeDevice(ieee_address=device.ieee_address, **values))
+                        session.add(ZigbeeDeviceModel(ieee_address=device.ieee_address, **values))
                         if log_new:
                             logger.info("Registered new Zigbee device: %s", device.ieee_address)
                     else:
@@ -258,22 +241,44 @@ class ZigbeeHandler(Thread):
         except Exception:
             logger.exception("Failed to persist the Zigbee devices")
 
-    @staticmethod
-    def _parse_last_seen(last_seen):
-        if not last_seen:
-            return None
-        with contextlib.suppress(TypeError, ValueError):
-            return datetime.fromisoformat(last_seen)
-        return None
-
     def update_device_states(self):
         """
         Refresh the shared store with the latest coordinator state.
         """
         try:
-            ZigbeeDeviceStore.update_readings(self._adapter.get_values())
+            ZigbeeDeviceStore.update_sensor_data(self._adapter.get_values())
         except Exception:
             logger.exception("Failed to update the Zigbee device states")
+
+    def update_registered_devices(self):
+        """
+        Persist the availability and health attributes reported by the coordinator.
+        """
+        if time() - self._device_state_update < DEVICE_STATE_UPDATE_PERIOD:
+            return
+
+        self._device_state_update = time()
+        devices = self._adapter.get_device_states()
+
+        if not devices:
+            return
+
+        with create_database_session() as session:
+            for device in devices:
+                registered = (
+                    session.query(ZigbeeDeviceModel)
+                    .filter_by(ieee_address=device.ieee_address, deleted=False)
+                    .first()
+                )
+                if registered is None:
+                    continue
+
+                values = extract_attributes(device)
+                registered.update(
+                    {key: value for key, value in values.items() if value is not None}
+                )
+
+            session.commit()
 
     def close(self):
         ZigbeeDeviceStore.clear()

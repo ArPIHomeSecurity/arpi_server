@@ -376,7 +376,7 @@ class ZigbeeDevice(BaseModel):
     IEEE_ADDRESS_LENGTH = 23
 
     id = Column(Integer, primary_key=True)
-    ieee_address = Column(String(IEEE_ADDRESS_LENGTH), nullable=False, unique=True)
+    ieee_address = Column(String(IEEE_ADDRESS_LENGTH), nullable=False)
     network_address = Column(Integer, nullable=True)
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
@@ -387,6 +387,7 @@ class ZigbeeDevice(BaseModel):
     signal_quality = Column(Integer, nullable=True)
     device_metadata = Column("metadata", JSON, nullable=True)
     sensors = relationship("Sensor", back_populates="zigbee_device")
+    deleted = Column(Boolean, nullable=False, default=False)
 
     def __init__(
         self,

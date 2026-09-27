@@ -16,7 +16,7 @@ from monitor.adapters.mock.utils import (
     protected_read,
     protected_write,
 )
-from monitor.adapters.zigbee import DiscoveredDevice, ZigbeeReading
+from monitor.adapters.zigbee import ZigbeeDevice, ZigbeeSensorData
 from utils.constants import LOG_ADZIGBEE
 
 logger = logging.getLogger(LOG_ADZIGBEE)
@@ -31,7 +31,7 @@ class ZigbeeAdapter:
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._cache: dict[tuple[str, str, str], ZigbeeReading] = {}
+        self._cache: dict[tuple[str, str, str], ZigbeeSensorData] = {}
         self._running = False
         self._pairing = False
         self._pairing_duration = 0
@@ -55,7 +55,7 @@ class ZigbeeAdapter:
     def _refresh_cache(self):
         """Rebuild the normalized in-memory cache from the simulator state file."""
         state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
-        cache: dict[tuple[str, str, str], ZigbeeReading] = {}
+        cache: dict[tuple[str, str, str], ZigbeeSensorData] = {}
 
         for ieee_address, device in state.get("devices", {}).items():
             capabilities = device.get("capabilities", {})
@@ -66,21 +66,18 @@ class ZigbeeAdapter:
                 else:
                     endpoint, capability = capability_key.split("/", 1)
 
-                cache[(str(ieee_address), str(endpoint), str(capability))] = ZigbeeReading(
+                cache[(str(ieee_address), str(endpoint), str(capability))] = ZigbeeSensorData(
                     ieee_address=str(ieee_address),
                     endpoint=str(endpoint),
                     capability=str(capability),
                     value=raw_value,
                     timestamp=device.get("last_seen") or _utc_now_iso(),
-                    available=bool(device.get("available", True)),
-                    battery_level=device.get("battery_level", 100),
-                    signal_quality=device.get("signal_quality", 100),
                 )
 
         with self._lock:
             self._cache = cache
 
-    def get_joined_devices(self) -> list[DiscoveredDevice]:
+    def get_joined_devices(self) -> list[ZigbeeDevice]:
         """Return the devices offered for pairing while joining is permitted."""
         if not self._pairing or self._pairing_duration <= 0:
             return []
@@ -92,26 +89,39 @@ class ZigbeeAdapter:
                 continue
 
             devices.append(
-                DiscoveredDevice(
+                ZigbeeDevice(
                     ieee_address=str(ieee_address),
                     network_address=device.get("network_address"),
                     name=device.get("name"),
                     manufacturer=device.get("manufacturer"),
                     model=device.get("model"),
-                    metadata={
-                        "available": device.get("available", True),
-                        "battery_level": device.get("battery_level", 100),
-                        "signal_quality": device.get("signal_quality", 100),
-                        "last_seen": device.get("last_seen"),
-                    },
+                    available=bool(device.get("available", True)),
+                    last_seen=device.get("last_seen"),
+                    battery_level=device.get("battery_level", 100),
+                    signal_quality=device.get("signal_quality", 100),
                     capabilities=dict(device.get("capabilities", {})),
                 )
             )
 
         return devices
 
-    def get_capability_changes(self) -> list[DiscoveredDevice]:
-        return []
+    def get_device_states(self) -> list[ZigbeeDevice]:
+        """Return the simulated coordinator view of every known device."""
+        state = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+        return [
+            ZigbeeDevice(
+                ieee_address=str(ieee_address),
+                network_address=device.get("network_address"),
+                name=device.get("name"),
+                manufacturer=device.get("manufacturer"),
+                model=device.get("model"),
+                available=bool(device.get("available", True)),
+                last_seen=device.get("last_seen"),
+                battery_level=device.get("battery_level"),
+                signal_quality=device.get("signal_quality"),
+            )
+            for ieee_address, device in state.get("devices", {}).items()
+        ]
 
     def get_values(self):
         """Return the latest normalized readings from the simulator cache."""

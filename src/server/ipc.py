@@ -18,6 +18,7 @@ from monitor.actions import (
     MonitorRegisterCardCommand,
     MonitorSetClockCommand,
     MonitorSyncClockCommand,
+    MonitorUnpairZigbeeDeviceCommand,
     MonitorUpdateConfigCommand,
     MonitorUpdateKeypadCommand,
     MonitorZigbeePairingCommand,
@@ -89,6 +90,9 @@ class IPCClient:
 
     def zigbee_pairing(self):
         return self._send_message(MonitorZigbeePairingCommand())
+
+    def zigbee_unpair_device(self, ieee_address: str | None = None):
+        return self._send_message(MonitorUnpairZigbeeDeviceCommand(ieee_address=ieee_address))
 
     def update_keypad(self):
         return self._send_message(MonitorUpdateKeypadCommand())

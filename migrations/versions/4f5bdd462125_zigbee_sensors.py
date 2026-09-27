@@ -1,8 +1,8 @@
 """Zigbee sensors
 
-Revision ID: 36a04cabbe30
+Revision ID: 4f5bdd462125
 Revises: 4df9df54d928
-Create Date: 2026-09-20 13:55:45.153219
+Create Date: 2026-09-27 12:54:09.551777
 
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "36a04cabbe30"
+revision = "4f5bdd462125"
 down_revision = "4df9df54d928"
 branch_labels = None
 depends_on = None
@@ -32,8 +32,8 @@ def upgrade():
         sa.Column("battery_level", sa.Integer(), nullable=True),
         sa.Column("signal_quality", sa.Integer(), nullable=True),
         sa.Column("metadata", sa.JSON(), nullable=True),
+        sa.Column("deleted", sa.Boolean(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("ieee_address"),
     )
     with op.batch_alter_table("arm_sensor", schema=None) as batch_op:
         batch_op.alter_column("channel", existing_type=sa.INTEGER(), nullable=True)

@@ -86,13 +86,13 @@ Front door device
    adapter.stop() -> None
    adapter.permit_joining(duration_seconds: int) -> bool
    adapter.get_joined_devices() -> list[DiscoveredDevice]
-   adapter.get_values() -> list[ZigbeeReading]
-   adapter.get_value(ieee_address, endpoint, capability) -> ZigbeeReading | None
+   adapter.get_values() -> list[ZigbeeSensorData]
+   adapter.get_value(ieee_address, endpoint, capability) -> ZigbeeSensorData | None
    ```
 
-   A `ZigbeeReading` contains IEEE address, endpoint, capability, value, timestamp,
+   A `ZigbeeSensorData` contains IEEE address, endpoint, capability, value, timestamp,
    availability, battery level, signal quality, and an optional error reason.
-   A `DiscoveredDevice` contains device identity, network address, metadata, and
+   A `ZigbeeDevice` contains device identity, network address, metadata, and
    discovered endpoint/capability information.
 4. Define startup failure, pairing timeout, reconnect, and shutdown behavior. Real
    adapter initialization must not leave `start()` waiting forever if Bellows fails.
