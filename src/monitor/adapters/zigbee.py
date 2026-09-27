@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -57,6 +58,7 @@ def get_zigbee_adapter():
 
 class ZigbeeAdapter:
     def __init__(self):
+        self._enabled = False
         self._serial_port: str | None = None
         self._baudrate: int = 115200
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -84,8 +86,23 @@ class ZigbeeAdapter:
 
         with create_database_session() as db_session:
             config = ZigbeeCoordinatorConfig.load_config(session=db_session)
+            self._enabled = config.enabled
             self._serial_port = config.serial_port
             self._baudrate = config.baudrate
+
+        if not self._enabled:
+            logger.info("Zigbee coordinator is disabled")
+            return
+
+        if not self._serial_port:
+            logger.warning("Zigbee serial port is not configured, coordinator not started")
+            self._enabled = False
+            return
+
+        if not os.path.exists(self._serial_port):
+            logger.warning("Zigbee serial port %s does not exist, coordinator not started", self._serial_port)
+            self._enabled = False
+            return
 
         self._thread = threading.Thread(
             target=self._run_event_loop, name="BellowsLoop", daemon=True
@@ -110,9 +127,6 @@ class ZigbeeAdapter:
 
     async def _async_init(self):
         """Asynchronous initialization of the bellows radio."""
-        if not self._serial_port:
-            raise RuntimeError("Zigbee serial port is not configured")
-
         config = {
             "device": {
                 "path": self._serial_port,
@@ -406,6 +420,10 @@ class ZigbeeAdapter:
     # --- Poll-facing API, safe to call from any thread ---
     def permit_joining(self, duration_seconds) -> bool:
         """Start the permit joining process for a specified duration."""
+        if not self._enabled:
+            logger.warning("Zigbee coordinator is disabled, joining not permitted")
+            return False
+
         if not self._loop or not self.app:
             raise RuntimeError("Controller is not running.")
 
@@ -427,6 +445,10 @@ class ZigbeeAdapter:
     def unpair_device(self, ieee_address: str) -> bool:
         """Unpair the specified Zigbee device."""
         logger.info("Unpairing Zigbee device: %s", ieee_address)
+        if not self._enabled:
+            logger.warning("Zigbee coordinator is disabled, unpairing not possible")
+            return False
+
         if not self._loop or not self.app:
             raise RuntimeError("Controller is not running.")
 

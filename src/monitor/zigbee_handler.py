@@ -174,9 +174,12 @@ class ZigbeeHandler(Thread):
         """
         logger.info("Starting Zigbee pairing for %s seconds", duration_seconds)
         try:
-            self._adapter.permit_joining(duration_seconds)
+            started = self._adapter.permit_joining(duration_seconds)
         except Exception:
             logger.exception("Failed to start Zigbee pairing")
+            started = False
+
+        if not started:
             send_zigbee_pairing_state(
                 state=False,
                 remain_seconds=0,
