@@ -40,9 +40,7 @@ class ZigbeeDevices(Widget):
     def compose(self) -> ComposeResult:
         with Container(id="zigbee-pane"):
             with Horizontal(id="zigbee-action-bar", classes="action-bar"):
-                yield Button(
-                    "Update from database", id="zigbee-refresh", classes="refresh-button"
-                )
+                yield Button("Update from database", id="zigbee-refresh", classes="refresh-button")
             with Horizontal(classes="zigbee-row"):
                 with Horizontal():
                     yield Label("Device name", classes="zigbee-label")
@@ -198,9 +196,7 @@ class ZigbeeDevices(Widget):
 
         ieee, capability_key = entry
         value = bool(event.value)
-        capabilities = (
-            get_zigbee_devices().get("devices", {}).get(ieee, {}).get("capabilities", {})
-        )
+        capabilities = get_zigbee_devices().get("devices", {}).get(ieee, {}).get("capabilities", {})
         # the checkbox also reports the value set while building the widget
         if capabilities.get(capability_key) == value:
             return

@@ -119,7 +119,6 @@ class ZigbeeAdapter:
                 "path": self._serial_port,
                 "baudrate": self._baudrate,
             },
-            #"database_path": f"{os.getenv('ZIGBEE_DATABASE_PATH', '.')}"
         }
         self.app = await ControllerApplication.new(config, auto_form=False)
         self.app.add_listener(self)

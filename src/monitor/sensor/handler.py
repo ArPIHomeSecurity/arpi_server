@@ -314,7 +314,11 @@ class SensorHandler:
                         sensor.zigbee_endpoint,
                         sensor.zigbee_capability,
                     )
-                is_alert = bool(zigbee_data.value) if zigbee_data is not None and zigbee_data.value is not None else False
+                is_alert = (
+                    bool(zigbee_data.value)
+                    if zigbee_data is not None and zigbee_data.value is not None
+                    else False
+                )
                 is_error = zigbee_data is None
                 logger.trace(
                     "Sensor %s (zigbee/%s/%s) value: %s => alert: %s, error: %s",

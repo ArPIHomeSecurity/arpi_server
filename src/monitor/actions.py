@@ -51,6 +51,7 @@ class MonitorUnpairZigbeeDeviceCommand:
     action: str = MONITOR_ZIGBEE_UNPAIR
     ieee_address: str | None = None
 
+
 @dataclass(frozen=True)
 class MonitorUpdateKeypadCommand:
     action: str = MONITOR_UPDATE_KEYPAD

@@ -276,7 +276,9 @@ class Sensor(BaseModel):
             and self.zigbee_capability is not None
         )
         if wired == zigbee:
-            raise AssertionError("A sensor must use exactly one source: wired channel or Zigbee mapping")
+            raise AssertionError(
+                "A sensor must use exactly one source: wired channel or Zigbee mapping"
+            )
 
     def update(self, data):
         if "channel" in data and data["channel"] != self.channel:
@@ -452,7 +454,9 @@ class ZigbeeDevice(BaseModel):
             )
         )
         serialized["metadata"] = serialized.pop("device_metadata")
-        serialized["sensor_count"] = len([s for s in self.sensors if not s.deleted]) if self.sensors else 0
+        serialized["sensor_count"] = (
+            len([s for s in self.sensors if not s.deleted]) if self.sensors else 0
+        )
         return convert2camel(serialized)
 
     @validates("ieee_address")

@@ -10,7 +10,12 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Select, Static
 
-from monitor.adapters.mock.utils import ChannelConfig, WiringStrategies, load_channel_configs, set_input_states
+from monitor.adapters.mock.utils import (
+    ChannelConfig,
+    WiringStrategies,
+    load_channel_configs,
+    set_input_states,
+)
 from monitor.sensor.detector import wiring_config
 from utils.models import SensorContactTypes
 
@@ -82,8 +87,7 @@ class Channels(Widget):
             WiringStrategies.SINGLE_WITH_2EOL.value,
         ]
         return any(
-            self._channel_configs[ch].wiring_strategy in v3_features
-            for ch in self._channel_configs
+            self._channel_configs[ch].wiring_strategy in v3_features for ch in self._channel_configs
         )
 
     def on_mount(self) -> None:

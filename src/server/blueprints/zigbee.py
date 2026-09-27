@@ -37,7 +37,8 @@ def get_zigbee_device(device_id):
         return jsonify({"error": "Zigbee device not found"}), 404
     except ObjectNotChanged as error:
         return jsonify({"info": str(error)}), 204
-    
+
+
 @zigbee_blueprint.route("/api/zigbee-device/<int:device_id>", methods=["PUT"])
 @authenticated()
 @restrict_host
