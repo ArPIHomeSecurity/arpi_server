@@ -1,6 +1,5 @@
 from typing import Protocol
 
-
 SOURCE_NETWORK = "network"
 SOURCE_BATTERY = "battery"
 

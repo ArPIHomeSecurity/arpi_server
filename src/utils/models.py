@@ -11,7 +11,7 @@ from re import search
 
 import bcrypt
 from dateutil.tz.tz import tzlocal
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, Integer, JSON, MetaData, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
 from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey

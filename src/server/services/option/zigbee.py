@@ -1,7 +1,8 @@
 from attr import asdict
-from server.services.base import BaseService
+
 from monitor.config.helper import save_config
 from monitor.config.models import ZigbeeCoordinatorConfig
+from server.services.base import BaseService
 
 
 class ZigbeeService(BaseService):

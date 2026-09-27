@@ -14,7 +14,7 @@ from random import randint
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
-from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount, ZigbeeDevice
+from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
 
 # buffer files between the simulator and the mock adapters
 INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")

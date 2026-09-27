@@ -8,7 +8,7 @@ consume without bypassing the normal sensor/alert path.
 
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from monitor.adapters.mock.utils import (
     DEFAULT_ZIGBEE_DATA,
@@ -23,7 +23,7 @@ logger = logging.getLogger(LOG_ADZIGBEE)
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class ZigbeeAdapter:

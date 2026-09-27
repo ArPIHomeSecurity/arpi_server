@@ -17,8 +17,8 @@ from server.blueprints.output import output_blueprint
 from server.blueprints.power import power_blueprint
 from server.blueprints.sensor import sensor_blueprint
 from server.blueprints.user import user_blueprint
-from server.blueprints.zone import zone_blueprint
 from server.blueprints.zigbee import zigbee_blueprint
+from server.blueprints.zone import zone_blueprint
 from server.database import db
 
 app = Flask(__name__)

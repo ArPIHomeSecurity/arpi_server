@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import logging
-import os
 import threading
 import time
 from dataclasses import dataclass, field
