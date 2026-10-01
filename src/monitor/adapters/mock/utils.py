@@ -214,7 +214,7 @@ def set_zigbee_devices(data):
 
 def set_zigbee_capability(ieee_address, capability_key, value):
     """
-    Update the value of a single capability (endpoint/capability) of a simulated device.
+    Update a normalized capability reading for a simulated device.
     """
 
     def merge_capability(base, new):

@@ -60,11 +60,12 @@ class ZigbeeAdapter:
         for ieee_address, device in state.get("devices", {}).items():
             capabilities = device.get("capabilities", {})
             for capability_key, raw_value in capabilities.items():
-                if "/" not in capability_key:
-                    endpoint = "1"
-                    capability = capability_key
-                else:
-                    endpoint, capability = capability_key.split("/", 1)
+                if not isinstance(raw_value, bool):
+                    continue
+
+                endpoint, separator, capability = capability_key.partition("/")
+                if not separator:
+                    endpoint, capability = "1", capability_key
 
                 cache[(str(ieee_address), str(endpoint), str(capability))] = ZigbeeSensorData(
                     ieee_address=str(ieee_address),

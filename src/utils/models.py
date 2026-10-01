@@ -285,7 +285,8 @@ class Sensor(BaseModel):
             self.reference_value = None
 
         if "channel" in data and data.get("channel") is None:
-            data = {**data, "zigbee_device_id": data.get("zigbee_device_id", self.zigbee_device_id)}
+            # incoming data has camelCase key/field name format, but we need to use snake_case for the model
+            data = {**data, "zigbeeDeviceId": data.get("zigbeeDeviceId", self.zigbee_device_id)}
 
         updated = self.update_record(
             (

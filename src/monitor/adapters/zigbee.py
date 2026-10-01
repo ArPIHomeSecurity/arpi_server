@@ -48,10 +48,10 @@ class ZigbeeDevice:
 
 def get_zigbee_adapter():
     """Return the simulator or real Zigbee adapter based on the runtime mode."""
-    # if USE_SIMULATOR:
-    #     from monitor.adapters.mock.zigbee import ZigbeeAdapter as MockZigbeeAdapter
+    if USE_SIMULATOR:
+        from monitor.adapters.mock.zigbee import ZigbeeAdapter as MockZigbeeAdapter
 
-    #     return MockZigbeeAdapter()
+        return MockZigbeeAdapter()
 
     return ZigbeeAdapter()
 

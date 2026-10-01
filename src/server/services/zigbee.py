@@ -30,6 +30,7 @@ class ZigbeeService(BaseService):
     def update_device(self, device_id: int, **data) -> ZigbeeDevice:
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
+
         device = self.get_device(device_id)
         if "ieee_address" in data:
             duplicate = (

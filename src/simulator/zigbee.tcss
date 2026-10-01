@@ -75,18 +75,21 @@ ZigbeeDevices {
     width: 100%;
     height: auto;
     margin: 0 0 1 0;
+    padding: 0 0 1 0;
+    border-bottom: solid $surface;
 }
 
 .zigbee-device-label {
-    width: auto;
-    height: 3;
-    padding: 1 2 1 0;
+    width: 100%;
+    height: auto;
+    padding: 0 0 1 0;
     color: white 90%;
 }
 
 .zigbee-property {
-    width: auto;
-    margin: 0 1 0 0;
+    width: 100%;
+    height: auto;
+    margin: 0 0 1 0;
 }
 
 .zigbee-no-device {
