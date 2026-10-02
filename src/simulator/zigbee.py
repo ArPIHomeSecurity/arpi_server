@@ -10,6 +10,9 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Input, Label, Select, Static
+from zigpy.zcl.clusters.general import OnOff, PowerConfiguration
+from zigpy.zcl.clusters.measurement import OccupancySensing
+from zigpy.zcl.clusters.security import IasZone
 
 from monitor.adapters.mock.utils import (
     get_zigbee_devices,
@@ -18,83 +21,53 @@ from monitor.adapters.mock.utils import (
 )
 from monitor.database import create_database_session
 from utils.models import ZigbeeDevice
+from utils.zigbee import encode_capability
 
 DEFAULT_ZIGBEE_ENDPOINT = "1"
+
+
+def _capability_descriptor(cluster, attribute, sources=("attribute",)):
+    capability = encode_capability(cluster.cluster_id, attribute.id)
+    return {
+        f"{DEFAULT_ZIGBEE_ENDPOINT}/{capability}": {
+            "cluster": cluster.ep_attribute,
+            "clusterId": int(cluster.cluster_id),
+            "attribute": attribute.name,
+            "attributeId": int(attribute.id),
+            "valueType": attribute.type.__name__,
+            "sources": list(sources),
+        }
+    }
+
+
 OPEN_DETECTOR_CAPABILITIES = {
-    "1/a:0001:005e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_2_alarm_state",
-        "attributeId": 94,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0001:007e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_3_alarm_state",
-        "attributeId": 126,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0001:003e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_alarm_state",
-        "attributeId": 62,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0500:0002": {
-        "cluster": "ias_zone",
-        "clusterId": 1280,
-        "attribute": "zone_status",
-        "attributeId": 2,
-        "valueType": "ZoneStatus",
-        "sources": ["command:status_change_notification"],
-    },
-    "1/a:0006:0000": {
-        "cluster": "on_off",
-        "clusterId": 6,
-        "attribute": "on_off",
-        "attributeId": 0,
-        "valueType": "Bool",
-        "sources": ["attribute"],
-    },
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_2_alarm_state
+    ),
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_3_alarm_state
+    ),
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_alarm_state
+    ),
+    **_capability_descriptor(
+        IasZone,
+        IasZone.AttributeDefs.zone_status,
+        sources=(f"command:{IasZone.ClientCommandDefs.status_change_notification.name}",),
+    ),
+    **_capability_descriptor(OnOff, OnOff.AttributeDefs.on_off),
 }
 MOTION_SENSOR_CAPABILITIES = {
-    "1/a:0001:005e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_2_alarm_state",
-        "attributeId": 94,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0001:007e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_3_alarm_state",
-        "attributeId": 126,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0001:003e": {
-        "cluster": "power",
-        "clusterId": 1,
-        "attribute": "battery_alarm_state",
-        "attributeId": 62,
-        "valueType": "bitmap32",
-        "sources": ["attribute"],
-    },
-    "1/a:0406:0000": {
-        "cluster": "occupancy_sensing",
-        "clusterId": 1030,
-        "attribute": "occupancy",
-        "attributeId": 0,
-        "valueType": "Bool",
-        "sources": ["attribute"],
-    },
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_2_alarm_state
+    ),
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_3_alarm_state
+    ),
+    **_capability_descriptor(
+        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_alarm_state
+    ),
+    **_capability_descriptor(OccupancySensing, OccupancySensing.AttributeDefs.occupancy),
 }
 
 
@@ -195,13 +168,13 @@ class ZigbeeDevices(Widget):
     def _capability_label(capability_key: str, descriptor) -> str:
         endpoint, separator, attribute_key = capability_key.partition("/")
         if not separator:
-            endpoint, attribute_key = "1", capability_key
+            endpoint, attribute_key = DEFAULT_ZIGBEE_ENDPOINT, capability_key
 
         cluster = descriptor.get("cluster") if isinstance(descriptor, dict) else None
         attribute = descriptor.get("attribute") if isinstance(descriptor, dict) else None
         cluster_label = str(cluster or "").replace("_", " ").title()
-        if cluster == "ias_zone":
-            cluster_label = "IAS Zone"
+        if cluster == IasZone.ep_attribute:
+            cluster_label = IasZone.name
         attribute_label = str(attribute or attribute_key).replace("_", " ").title()
         label = f"{cluster_label}: {attribute_label}" if cluster_label else attribute_label
         return f"{label} (endpoint {endpoint})"

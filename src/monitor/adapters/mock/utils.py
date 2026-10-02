@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from functools import cache
 from random import randint
 
 from monitor.database import create_database_session
@@ -198,11 +199,35 @@ def set_keypad_state(pending_bits, data):
     protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
 
 
+@cache
+def load_zigbee_device_states() -> dict:
+    """Build inactive Zigbee simulator states from database sensor mappings."""
+    data = deepcopy(DEFAULT_ZIGBEE_DATA)
+    with create_database_session() as session:
+        sensors = session.query(Sensor).filter(Sensor.zigbee_device_id.isnot(None)).all()
+        for sensor in sensors:
+            device = sensor.zigbee_device
+            simulated_device = data["devices"].setdefault(
+                device.ieee_address,
+                {"name": device.name, "available": True, "capabilities": {}},
+            )
+            capability_key = f"{sensor.zigbee_endpoint}/{sensor.zigbee_capability}"
+            simulated_device["capabilities"][capability_key] = False
+    return data
+
+
 def get_zigbee_devices():
     """
-    Get the current Zigbee simulator state.
+    Get simulator state, loading database-backed defaults on the first call.
     """
-    return protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+    return protected_read(ZIGBEE_FILE, deepcopy(load_zigbee_device_states()))
+
+
+def reset_zigbee_devices():
+    """Discard simulator state and reload database defaults on the next read."""
+    load_zigbee_device_states.cache_clear()
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(ZIGBEE_FILE)
 
 
 def set_zigbee_devices(data):
@@ -216,10 +241,11 @@ def set_zigbee_capability(ieee_address, capability_key, value):
     """
     Update a normalized capability reading for a simulated device.
     """
+    default_data = get_zigbee_devices()
 
     def merge_capability(base, new):
         if not isinstance(base, dict):
-            base = deepcopy(DEFAULT_ZIGBEE_DATA)
+            base = deepcopy(default_data)
 
         devices = base.setdefault("devices", {})
         device = devices.setdefault(new["ieee_address"], {})
@@ -235,7 +261,7 @@ def set_zigbee_capability(ieee_address, capability_key, value):
             "capability_key": str(capability_key),
             "value": value,
         },
-        deepcopy(DEFAULT_ZIGBEE_DATA),
+        default_data,
         merge_capability,
     )
 

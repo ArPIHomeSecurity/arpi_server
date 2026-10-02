@@ -5,6 +5,7 @@ from datetime import datetime
 
 from psycopg2 import ProgrammingError
 from sqlalchemy import Integer, text
+from zigpy.zcl.clusters.security import IasZone
 
 from monitor.config.models import (
     GSMConfig,
@@ -31,9 +32,11 @@ from utils.models import (
     SensorEOLCount,
     SensorType,
     User,
+    ZigbeeDevice,
     Zone,
     metadata,
 )
+from utils.zigbee import encode_capability
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +269,34 @@ def create_sensors(session, sensor_types, area, zones):
     logger.info(" - Created sensors")
 
 
+def create_zigbee_sensor(session, sensor_types, area, zone):
+    endpoint = "1"
+    zone_status = IasZone.AttributeDefs.zone_status
+    capability = encode_capability(IasZone.cluster_id, zone_status.id)
+    device = ZigbeeDevice(
+        ieee_address="11:22:33:44:55:66:77:88",
+        name="Zigbee Contact Sensor",
+        metadata={"capabilities": {f"{endpoint}/{capability}": {"valueType": zone_status.type.__name__}}},
+    )
+    session.add(device)
+    session.flush()
+
+    session.add(
+        Sensor(
+            channel=None,
+            zigbee_device_id=device.id,
+            zigbee_endpoint=endpoint,
+            zigbee_capability=capability,
+            sensor_type=sensor_types["Open"],
+            area=area,
+            zone=zone,
+            name="Zigbee Door",
+            description="Test Zigbee contact sensor",
+        )
+    )
+    logger.info(" - Created Zigbee device and contact sensor")
+
+
 def clear_database():
     with create_database_session() as session:
         logger.info("Clean up database...")
@@ -303,6 +334,7 @@ def create_test_no_delay_v2():
         create_sensors(
             session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
+        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
 
         session.commit()
         engine = session.get_bind()
@@ -327,6 +359,7 @@ def create_test_outputs_v2():
         create_sensors(
             session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
         )
+        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
         session.commit()
 
         session.add_all(
@@ -411,6 +444,7 @@ def create_test_two_areas_v2():
             )
         )
         logger.info(" - Created garage sensor")
+        create_zigbee_sensor(session, sensor_types, house, zones["no_delay"])
 
         session.commit()
         engine = session.get_bind()
@@ -453,6 +487,7 @@ def create_test_two_areas_with_delay_v2():
             )
         )
         logger.info(" - Created garage sensor")
+        create_zigbee_sensor(session, sensor_types, house, zones["delayed"])
 
         session.commit()
         engine = session.get_bind()
@@ -497,6 +532,7 @@ def create_test_colliding_areas_v2():
                 description="Test movement sensor in the colliding area",
             )
         )
+        create_zigbee_sensor(session, sensor_types, backyard, zones["no_delay"])
 
         session.commit()
         engine = session.get_bind()
@@ -526,6 +562,7 @@ def create_test_no_delay_v2_armed():
 
         arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now().astimezone(), user=users["admin"])
         session.add(arm)
+        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
 
         session.commit()
         engine = session.get_bind()
@@ -551,6 +588,7 @@ def create_test_with_delay_v2():
         create_sensors(
             session, sensor_types, area, [zones["delayed"], zones["delayed"], zones["tamper"]]
         )
+        create_zigbee_sensor(session, sensor_types, area, zones["delayed"])
 
         session.commit()
         engine = session.get_bind()

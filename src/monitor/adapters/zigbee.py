@@ -12,10 +12,13 @@ from bellows.zigbee.application import ControllerApplication
 from zigpy.exceptions import ZigbeeException
 from zigpy.types import EUI64
 from zigpy.zcl import foundation
+from zigpy.zcl.clusters.general import PollControl, PowerConfiguration
+from zigpy.zcl.clusters.security import IasZone
 
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
 from utils.constants import LOG_ADZIGBEE
+from utils.zigbee import encode_capability, normalize_attribute_value
 
 USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
 
@@ -167,13 +170,20 @@ class ZigbeeAdapter:
                 cluster.add_context_listener(self)
                 cluster_name = cluster.ep_attribute or type(cluster).__name__
 
-                if cluster_name == "poll_control":
-                    await self._setup_reporting(cluster, "checkin_interval", 60, 600)
-                elif cluster_name == "ias_zone":
-                    await self._setup_reporting(cluster, "zone_status", 60, 600)
-                elif cluster_name == "power":
+                if cluster_name == PollControl.ep_attribute:
                     await self._setup_reporting(
-                        cluster, "battery_percentage_remaining", 3600, 21600
+                        cluster, PollControl.AttributeDefs.checkin_interval.name, 60, 600
+                    )
+                elif cluster_name == IasZone.ep_attribute:
+                    await self._setup_reporting(
+                        cluster, IasZone.AttributeDefs.zone_status.name, 60, 600
+                    )
+                elif cluster_name == PowerConfiguration.ep_attribute:
+                    await self._setup_reporting(
+                        cluster,
+                        PowerConfiguration.AttributeDefs.battery_percentage_remaining.name,
+                        3600,
+                        21600,
                     )
 
     async def _setup_reporting(
@@ -229,7 +239,7 @@ class ZigbeeAdapter:
                     if not is_reportable and not sources:
                         continue
 
-                    capability = self._attribute_capability(cluster.cluster_id, attribute.id)
+                    capability = encode_capability(cluster.cluster_id, attribute.id)
                     capabilities[f"{endpoint_id}/{capability}"] = {
                         "cluster": cluster_name,
                         "clusterId": int(cluster.cluster_id),
@@ -254,9 +264,6 @@ class ZigbeeAdapter:
             capabilities=capabilities,
         )
 
-    @staticmethod
-    def _attribute_capability(cluster_id, attribute_id) -> str:
-        return f"a:{int(cluster_id):04x}:{int(attribute_id):04x}"
 
     @staticmethod
     def _get_command_attribute_sources(cluster) -> dict[str, list[str]]:
@@ -328,7 +335,10 @@ class ZigbeeAdapter:
         ieee_address = str(cluster.endpoint.device.ieee)
         endpoint_id = cluster.endpoint.endpoint_id
         with self._state_lock:
-            if int(cluster.cluster_id) == 0x0001 and attr_name == "battery_percentage_remaining":
+            if (
+                int(cluster.cluster_id) == PowerConfiguration.cluster_id
+                and attr_name == PowerConfiguration.AttributeDefs.battery_percentage_remaining.name
+            ):
                 with contextlib.suppress(TypeError, ValueError):
                     # the ZCL attribute is reported in half percent steps
                     logger.debug(
@@ -338,12 +348,12 @@ class ZigbeeAdapter:
                     )
                     self._battery_levels[ieee_address] = min(100, int(value) // 2)
 
-        capability = self._attribute_capability(cluster.cluster_id, attrid)
+        capability = encode_capability(cluster.cluster_id, attrid)
         reading = ZigbeeSensorData(
             ieee_address=ieee_address,
             endpoint=str(endpoint_id),
             capability=capability,
-            value=self._normalize_attribute_value(cluster.cluster_id, attr_name, value),
+            value=normalize_attribute_value(cluster.cluster_id, attr_name, value),
             timestamp=timestamp.isoformat(),
         )
 
@@ -388,8 +398,8 @@ class ZigbeeAdapter:
                 if attribute is None or field.type is not attribute.type:
                     continue
 
-                capability = self._attribute_capability(cluster.cluster_id, attribute.id)
-                value = self._normalize_attribute_value(
+                capability = encode_capability(cluster.cluster_id, attribute.id)
+                value = normalize_attribute_value(
                     cluster.cluster_id,
                     attribute.name,
                     getattr(args, field.name),
@@ -401,12 +411,6 @@ class ZigbeeAdapter:
                     value=value,
                     timestamp=datetime.now(UTC).isoformat(),
                 )
-
-    @staticmethod
-    def _normalize_attribute_value(cluster_id, attribute_name: str, value):
-        if int(cluster_id) == 0x0500 and attribute_name == "zone_status":
-            return bool(int(value) & 0x0003)
-        return value
 
     def _mark_unavailable(self, ieee_address: str):
         with self._state_lock:

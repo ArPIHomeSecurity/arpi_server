@@ -146,6 +146,8 @@ class SensorAlert(Thread):
         if new_alert:
             sensor_descriptions = [
                 f"{item.sensor.description}(id:{item.sensor.id}/CH{(item.sensor.channel + 1):02d})"
+                if item.sensor.channel is not None
+                else f"{item.sensor.description}(id:{item.sensor.id})"
                 for item in alert.sensors
             ]
             Notifier.notify_alert_started(alert.id, sensor_descriptions, alert.start_time)
