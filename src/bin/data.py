@@ -34,6 +34,18 @@ SENSOR_TYPES = [
     SensorType(2, name="Tamper", description="Detect sabotage"),
     SensorType(3, name="Open", description="Detect opening"),
     SensorType(4, name="Break", description="Detect glass break"),
+    SensorType(5, name="Contact", description="IAS Zone contact switch"),
+    SensorType(6, name="Fire", description="IAS Zone fire sensor"),
+    SensorType(7, name="Water", description="IAS Zone water sensor"),
+    SensorType(8, name="CO", description="IAS Zone carbon monoxide sensor"),
+    SensorType(9, name="Emergency", description="IAS Zone emergency device"),
+    SensorType(10, name="Vibration", description="IAS Zone vibration sensor"),
+    SensorType(11, name="Remote", description="IAS Zone remote control"),
+    SensorType(12, name="Key fob", description="IAS Zone key fob"),
+    SensorType(13, name="Keypad", description="IAS Zone keypad"),
+    SensorType(14, name="Warning", description="IAS Zone warning device"),
+    SensorType(15, name="Glass", description="IAS Zone glass break sensor"),
+    SensorType(16, name="Repeater", description="IAS Zone security repeater"),
 ]
 
 

@@ -72,6 +72,7 @@ tasks:
             -p 127.0.0.1:9001:9001 \
             -v {{.TASKFILE_DIR}}/scripts/mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro \
             -v argus-mqtt:/mosquitto/data/ \
+            -v argus-mqtt:/mosquitto/log/ \
             eclipse-mosquitto
 
   start:server:
@@ -163,7 +164,7 @@ tasks:
   test:debug:
     desc: Run tests in debug mode
     cmd: |
-      uv run pytest \
+      uv run --env-file .env.pytest pytest \
         -vv \
         --setup-show \
         --maxfail=1 \
@@ -172,7 +173,7 @@ tasks:
   test:unit:
     desc: Run unit tests
     cmd: |
-      uv run pytest tests/test_unit \
+      uv run --env-file .env.pytest pytest tests/test_unit \
         -v \
         --junitxml=junit.xml \
         --cov=src \
@@ -183,7 +184,7 @@ tasks:
   test:functional:
     desc: Run functional tests
     cmd: |
-      uv run pytest tests/test_functional \
+      uv run --env-file .env.pytest pytest tests/test_functional \
         -v \
         --junitxml=junit.xml \
         --cov=src \
@@ -196,7 +197,7 @@ tasks:
     requires:
       vars: [FOLDER]
     cmd: |
-      uv run pytest tests/test_functional/{{.FOLDER}} \
+      uv run --env-file .env.pytest pytest tests/test_functional/{{.FOLDER}} \
         -v \
         -o junit_suite_name="{{.FOLDER}}" \
         --junitxml=junit.xml \

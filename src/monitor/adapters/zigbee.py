@@ -18,9 +18,15 @@ from zigpy.zcl.clusters.security import IasZone
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
 from utils.constants import LOG_ADZIGBEE
-from utils.zigbee import encode_capability, normalize_attribute_value
+from utils.zigbee import (
+    IAS_TAMPER_CAPABILITY,
+    IAS_ZONE_CAPABILITY,
+    decode_zone_status,
+    encode_capability,
+    normalize_attribute_value,
+)
 
-USE_SIMULATOR = environ.get("USE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
+USE_ZIGBEE_SIMULATOR = environ.get("USE_ZIGBEE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
 
 logger = logging.getLogger(LOG_ADZIGBEE)
 
@@ -47,13 +53,14 @@ class ZigbeeDevice:
     battery_level: int | None = None
     signal_quality: int | None = None
     capabilities: dict = field(default_factory=dict)
+    zone_type: int | None = None
 
 
 def get_zigbee_adapter():
     """Return the simulator or real Zigbee adapter based on the runtime mode."""
-    if USE_SIMULATOR:
+    if USE_ZIGBEE_SIMULATOR:
         from monitor.adapters.mock.zigbee import ZigbeeAdapter as MockZigbeeAdapter
-
+        logger.debug("Using mock Zigbee adapter")
         return MockZigbeeAdapter()
 
     return ZigbeeAdapter()
@@ -79,6 +86,7 @@ class ZigbeeAdapter:
         self._state_lock = threading.Lock()
         self._battery_levels: dict[str, int] = {}
         self._offline_devices: set[str] = set()
+        self._zone_types: dict[tuple[str, int], int] = {}
 
         self._tasks: set[asyncio.Task] = set()
 
@@ -175,6 +183,13 @@ class ZigbeeAdapter:
                         cluster, PollControl.AttributeDefs.checkin_interval.name, 60, 600
                     )
                 elif cluster_name == IasZone.ep_attribute:
+                    attribute = IasZone.AttributeDefs.zone_type
+                    cached_type = cluster.get(attribute.id)
+                    if cached_type is not None:
+                        self._store_reading(
+                            cluster, attribute.id, attribute.name, cached_type, datetime.now(UTC)
+                        )
+                    await self._read_attribute(cluster, attribute.name)
                     await self._setup_reporting(
                         cluster, IasZone.AttributeDefs.zone_status.name, 60, 600
                     )
@@ -208,6 +223,10 @@ class ZigbeeAdapter:
                 "Failed to configure reporting of %s for device %s", attribute, ieee_address
             )
 
+        await self._read_attribute(cluster, attribute)
+
+    async def _read_attribute(self, cluster, attribute: str):
+        ieee_address = str(cluster.endpoint.device.ieee)
         try:
             success, _ = await cluster.read_attributes([attribute])
         except (ZigbeeException, TimeoutError):
@@ -248,6 +267,20 @@ class ZigbeeAdapter:
                         "valueType": getattr(attribute.type, "__name__", str(attribute.type)),
                         "sources": (["attribute"] if is_reportable else []) + sources,
                     }
+                    if capability == IAS_ZONE_CAPABILITY:
+                        descriptor = capabilities[f"{endpoint_id}/{capability}"]
+                        descriptor["field"] = "alarm"
+                        capabilities[f"{endpoint_id}/{IAS_TAMPER_CAPABILITY}"] = {
+                            **descriptor,
+                            "field": "tamper",
+                        }
+
+        with self._state_lock:
+            zone_types = sorted(
+                (endpoint_id, zone_type)
+                for (ieee, endpoint_id), zone_type in self._zone_types.items()
+                if ieee == str(device.ieee)
+            )
 
         return ZigbeeDevice(
             ieee_address=str(device.ieee),
@@ -262,6 +295,7 @@ class ZigbeeAdapter:
             ),
             signal_quality=device.lqi,
             capabilities=capabilities,
+            zone_type=zone_types[0][1] if zone_types else None,
         )
 
 
@@ -275,10 +309,10 @@ class ZigbeeAdapter:
         sources: dict[str, list[str]] = {}
         commands = list(cluster.server_commands.values()) + list(cluster.client_commands.values())
         for command in commands:
-            for field in command.schema.fields:
-                attribute = attributes.get(field.name)
-                if attribute is not None and field.type is attribute.type:
-                    sources.setdefault(field.name, []).append(f"command:{command.name}")
+            for command_field in command.schema.fields:
+                attribute = attributes.get(command_field.name)
+                if attribute is not None and command_field.type is attribute.type:
+                    sources.setdefault(command_field.name, []).append(f"command:{command.name}")
 
         return sources
 
@@ -336,6 +370,13 @@ class ZigbeeAdapter:
         endpoint_id = cluster.endpoint.endpoint_id
         with self._state_lock:
             if (
+                int(cluster.cluster_id) == IasZone.cluster_id
+                and attr_name == IasZone.AttributeDefs.zone_type.name
+            ):
+                if value is not None:
+                    self._zone_types[(ieee_address, endpoint_id)] = int(value)
+                return
+            if (
                 int(cluster.cluster_id) == PowerConfiguration.cluster_id
                 and attr_name == PowerConfiguration.AttributeDefs.battery_percentage_remaining.name
             ):
@@ -349,16 +390,22 @@ class ZigbeeAdapter:
                     self._battery_levels[ieee_address] = min(100, int(value) // 2)
 
         capability = encode_capability(cluster.cluster_id, attrid)
-        reading = ZigbeeSensorData(
-            ieee_address=ieee_address,
-            endpoint=str(endpoint_id),
-            capability=capability,
-            value=normalize_attribute_value(cluster.cluster_id, attr_name, value),
-            timestamp=timestamp.isoformat(),
-        )
+        values = {capability: normalize_attribute_value(cluster.cluster_id, attr_name, value)}
+        error_reason = None
+        if capability == IAS_ZONE_CAPABILITY:
+            alarm, tamper, error_reason = decode_zone_status(value)
+            values = {IAS_ZONE_CAPABILITY: alarm, IAS_TAMPER_CAPABILITY: tamper}
 
         with self._readings_lock:
-            self._readings[(ieee_address, endpoint_id, capability)] = reading
+            for reading_capability, reading_value in values.items():
+                self._readings[(ieee_address, endpoint_id, reading_capability)] = ZigbeeSensorData(
+                    ieee_address=ieee_address,
+                    endpoint=str(endpoint_id),
+                    capability=reading_capability,
+                    value=reading_value,
+                    timestamp=timestamp.isoformat(),
+                    error_reason=error_reason,
+                )
             logger.debug(
                 "Attribute updated for device %s, endpoint %s, capability %s: %s",
                 ieee_address,
@@ -392,25 +439,15 @@ class ZigbeeAdapter:
             for attribute in cluster.attributes.values()
             if self._is_sensor_attribute(attribute)
         }
-        with self._readings_lock:
-            for field in type(args).fields:
-                attribute = attributes.get(field.name)
-                if attribute is None or field.type is not attribute.type:
-                    continue
+        timestamp = datetime.now(UTC)
+        for command_field in type(args).fields:
+            attribute = attributes.get(command_field.name)
+            if attribute is None or command_field.type is not attribute.type:
+                continue
 
-                capability = encode_capability(cluster.cluster_id, attribute.id)
-                value = normalize_attribute_value(
-                    cluster.cluster_id,
-                    attribute.name,
-                    getattr(args, field.name),
-                )
-                self._readings[(ieee_address, endpoint_id, capability)] = ZigbeeSensorData(
-                    ieee_address=ieee_address,
-                    endpoint=str(endpoint_id),
-                    capability=capability,
-                    value=value,
-                    timestamp=datetime.now(UTC).isoformat(),
-                )
+            self._store_reading(
+                cluster, attribute.id, attribute.name, getattr(args, command_field.name), timestamp
+            )
 
     def _mark_unavailable(self, ieee_address: str):
         with self._state_lock:
@@ -478,22 +515,10 @@ class ZigbeeAdapter:
                 available = ieee_address not in self._offline_devices
                 battery_level = self._battery_levels.get(ieee_address)
 
-            devices.append(
-                ZigbeeDevice(
-                    ieee_address=ieee_address,
-                    network_address=int(device.nwk),
-                    manufacturer=device.manufacturer,
-                    model=device.model,
-                    available=available,
-                    last_seen=(
-                        datetime.fromtimestamp(device.last_seen, UTC).isoformat()
-                        if device.last_seen
-                        else None
-                    ),
-                    battery_level=battery_level,
-                    signal_quality=device.lqi,
-                )
-            )
+            discovered = self._build_discovered_device(device)
+            discovered.available = available
+            discovered.battery_level = battery_level
+            devices.append(discovered)
 
         return devices
 

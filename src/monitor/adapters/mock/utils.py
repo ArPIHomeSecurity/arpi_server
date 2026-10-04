@@ -13,9 +13,12 @@ from enum import Enum
 from functools import cache
 from random import randint
 
+from zigpy.zcl.clusters.security import ZoneStatus
+
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
+from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, decode_zone_status
 
 # buffer files between the simulator and the mock adapters
 INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
@@ -209,7 +212,11 @@ def load_zigbee_device_states() -> dict:
             device = sensor.zigbee_device
             simulated_device = data["devices"].setdefault(
                 device.ieee_address,
-                {"name": device.name, "available": True, "capabilities": {}},
+                {
+                    "name": device.name, "available": True, "capabilities": {},
+                    "zone_type": device.zone_type,
+                    "capability_metadata": (device.device_metadata or {}).get("capabilities", {}),
+                },
             )
             capability_key = f"{sensor.zigbee_endpoint}/{sensor.zigbee_capability}"
             simulated_device["capabilities"][capability_key] = False
@@ -251,6 +258,19 @@ def set_zigbee_capability(ieee_address, capability_key, value):
         device = devices.setdefault(new["ieee_address"], {})
         capabilities = device.setdefault("capabilities", {})
         capabilities[new["capability_key"]] = new["value"]
+        endpoint, separator, capability = new["capability_key"].partition("/")
+        statuses = device.get("ias_zone_status", {})
+        if separator and endpoint in statuses and capability in (
+            IAS_ZONE_CAPABILITY, IAS_TAMPER_CAPABILITY
+        ):
+            flag = (
+                ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2
+                if capability == IAS_ZONE_CAPABILITY else ZoneStatus.Tamper
+            )
+            status = int(statuses[endpoint]) & ~int(flag)
+            if new["value"]:
+                status |= int(ZoneStatus.Alarm_1 if capability == IAS_ZONE_CAPABILITY else flag)
+            _update_ias_status(device, endpoint, status)
         device["last_seen"] = datetime.now().astimezone().isoformat()
         return base
 
@@ -263,6 +283,59 @@ def set_zigbee_capability(ieee_address, capability_key, value):
         },
         default_data,
         merge_capability,
+    )
+
+
+def _update_ias_status(device, endpoint, status):
+    device.setdefault("ias_zone_status", {})[endpoint] = int(status)
+    alarm, tamper, _ = decode_zone_status(status)
+    capabilities = device.setdefault("capabilities", {})
+    capabilities[f"{endpoint}/{IAS_ZONE_CAPABILITY}"] = alarm
+    capabilities[f"{endpoint}/{IAS_TAMPER_CAPABILITY}"] = tamper
+    device["last_seen"] = datetime.now().astimezone().isoformat()
+
+
+def set_zigbee_zone_status(ieee_address, endpoint, status):
+    default_data = get_zigbee_devices()
+
+    def merge_status(base, new):
+        device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
+        _update_ias_status(device, new["endpoint"], new["status"])
+        return base
+
+    protected_update(
+        ZIGBEE_FILE,
+        {"ieee_address": str(ieee_address), "endpoint": str(endpoint), "status": int(status)},
+        default_data,
+        merge_status,
+    )
+
+
+def set_zigbee_trouble(ieee_address, endpoint, enabled):
+    default_data = get_zigbee_devices()
+
+    def merge_trouble(base, new):
+        device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
+        capabilities = device.get("capabilities", {})
+        endpoint = new["endpoint"]
+        status = device.get("ias_zone_status", {}).get(endpoint)
+        if status is None:
+            status = 0
+            if capabilities.get(f"{endpoint}/{IAS_ZONE_CAPABILITY}") is True:
+                status |= int(ZoneStatus.Alarm_1)
+            if capabilities.get(f"{endpoint}/{IAS_TAMPER_CAPABILITY}") is True:
+                status |= int(ZoneStatus.Tamper)
+        status = int(status) & ~int(ZoneStatus.Trouble)
+        if new["enabled"]:
+            status |= int(ZoneStatus.Trouble)
+        _update_ias_status(device, endpoint, status)
+        return base
+
+    protected_update(
+        ZIGBEE_FILE,
+        {"ieee_address": str(ieee_address), "endpoint": str(endpoint), "enabled": bool(enabled)},
+        default_data,
+        merge_trouble,
     )
 
 

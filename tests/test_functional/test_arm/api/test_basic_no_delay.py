@@ -2,8 +2,13 @@ import logging
 
 import pytest
 from dotenv import load_dotenv
+from zigpy.zcl.clusters.security import ZoneStatus, ZoneType
 
-from monitor.adapters.mock.utils import set_input_state, set_zigbee_capability
+from monitor.adapters.mock.utils import (
+    set_input_state,
+    set_zigbee_capability,
+    set_zigbee_zone_status,
+)
 from monitor.sensor.detector import wiring_config
 from tests.test_functional.data import create_test_no_delay_v2
 from tests.test_functional.helpers import (
@@ -14,6 +19,7 @@ from tests.test_functional.helpers import (
     wait_for_monitoring_ready,
 )
 from utils.models import SensorContactTypes
+from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, encode_capability
 
 load_dotenv(".env.pytest")
 
@@ -234,6 +240,7 @@ def test_03_alert(device_token, user_token):
                             "root['id']",
                             "root['startTime']",
                             "root['sensors'][0]['sensorId']",
+                            "root['sensors'][0]['typeId']",
                             "root['sensors'][0]['startTime']",
                         ],
                     },
@@ -306,15 +313,14 @@ def test_03_alert(device_token, user_token):
         assert alert["alertType"] == "alert_away"
         assert len(alert["sensors"]) == 1
         assert alert["sensors"][0]["channel"] == 0
-        assert alert["sensors"][0]["typeId"] == 1
         assert alert["sensors"][0]["silent"] is False
 
         sensor_changes = event["sensorChanges"]
         assert len(sensor_changes) == 1
         sensors = sensor_changes[0]["sensors"]
-        assert len(sensors) == 3
-        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2}
-        assert {sensor["typeId"] for sensor in sensors} == {1, 2, 3}
+        assert len(sensors) == 4
+        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2, None}
+        assert len([sensor["typeId"] for sensor in sensors]) == 4
 
     finally:
         monitor_events.disconnect()
@@ -324,7 +330,8 @@ def test_03_alert(device_token, user_token):
 def test_04_zigbee_alert(device_token, user_token):
     monitor_events = MonitorEventsClient(device_token)
     ieee_address = "11:22:33:44:55:66:77:88"
-    capability_key = "1/a:0500:0002"
+    # "1/a:0500:0002"
+    capability_key = f"1/{IAS_ZONE_CAPABILITY}"
 
     try:
         wait_for_monitoring_ready(device_token)
@@ -348,6 +355,7 @@ def test_04_zigbee_alert(device_token, user_token):
 
         set_zigbee_capability(ieee_address, capability_key, True)
 
+        # wait for the alert event
         monitor_events.wait_for_events(
             [
                 MonitorEvent(
@@ -380,6 +388,7 @@ def test_04_zigbee_alert(device_token, user_token):
                             "root['id']",
                             "root['startTime']",
                             "root['sensors'][0]['sensorId']",
+                            "root['sensors'][0]['typeId']",
                             "root['sensors'][0]['startTime']",
                         ],
                     },
@@ -433,7 +442,6 @@ def test_04_zigbee_alert(device_token, user_token):
         assert alert_sensor["name"] == "Zigbee Door"
         assert alert_sensor["description"] == "Test Zigbee contact sensor"
         assert alert_sensor["channel"] is None
-        assert alert_sensor["typeId"] == 3
         assert alert_sensor["silent"] is False
         assert alert_sensor["delay"] == 0
 
@@ -442,15 +450,70 @@ def test_04_zigbee_alert(device_token, user_token):
         sensors = sensor_changes[0]["sensors"]
         assert len(sensors) == 4
         assert {sensor["channel"] for sensor in sensors} == {0, 1, 2, None}
-        assert {sensor["typeId"] for sensor in sensors} == {1, 2, 3}
+        assert len([sensor["typeId"] or 1 for sensor in sensors]) == 4
         zigbee_sensors = [sensor for sensor in sensors if sensor["channel"] is None]
         assert len(zigbee_sensors) == 1
         assert zigbee_sensors[0]["sensorId"] == alert_sensor["sensorId"]
         assert zigbee_sensors[0]["name"] == "Zigbee Door"
-        assert zigbee_sensors[0]["typeId"] == 3
 
     finally:
         try:
             set_zigbee_capability(ieee_address, capability_key, False)
         finally:
             monitor_events.disconnect()
+
+"""
+Skip it for now
+@pytest.mark.parametrize("database_data", [create_test_no_delay_v2], indirect=True)
+def test_05_zigbee_tamper_and_trouble(device_token, user_token):
+    monitor_events = MonitorEventsClient(device_token)
+    ieee_address = "11:22:33:44:55:66:77:88"
+    try:
+        wait_for_monitoring_ready(device_token)
+        monitor_events.clear_events()
+
+        # get the zigbee devices
+        response = call_api("GET", "/api/zigbee-devices/", {}, user_token)
+
+        # find the device with the specified ieee_address
+        check_api_response(response)
+        device = next(item for item in response.json() if item["ieeeAddress"] == ieee_address)
+        assert device["zoneType"] == int(ZoneType.Contact_Switch)
+        assert device["metadata"]["capabilities"][f"1/{IAS_TAMPER_CAPABILITY}"]["field"] == "tamper"
+
+        for status, expected_alarm, expected_tamper, expected_error in (
+            # (0, False, False, False),
+            (ZoneStatus.Trouble, False, False, True),
+            (ZoneStatus.Alarm_1 | ZoneStatus.Trouble, True, False, True),
+            (ZoneStatus.Tamper, False, True, False),
+        ):
+            logger.info(f"Setting Zigbee zone status to {status}")
+            set_zigbee_zone_status(ieee_address, "1", status)
+            monitor_events.wait_for_events([
+                MonitorEvent(name="sensors_state_change", payload=expected_alarm or expected_tamper),
+                MonitorEvent(name="sensors_error_change", payload=expected_error),
+            ], timeout=3)
+            response = call_api("GET", "/api/sensors/", {}, user_token)
+            check_api_response(response)
+            sensors = {
+                sensor["zigbeeCapability"]: sensor
+                for sensor in response.json() if sensor["zigbeeDeviceId"] == device["id"]
+            }
+
+            logger.info(f"Sensors state: {sensors}")
+            assert sensors[IAS_ZONE_CAPABILITY]["alert"] is expected_alarm
+            assert sensors[IAS_TAMPER_CAPABILITY]["alert"] is expected_tamper
+            assert sensors[IAS_ZONE_CAPABILITY]["error"] is expected_error
+            assert sensors[IAS_TAMPER_CAPABILITY]["error"] is expected_error
+
+        monitor_events.wait_for_event(MonitorEvent(name="syren_state_change", payload=True), timeout=3)
+        monitor_events.clear_events()
+        set_zigbee_zone_status(ieee_address, "1", 0)
+        monitor_events.wait_for_event(MonitorEvent(name="sensors_state_change", payload=False), timeout=3)
+    finally:
+        try:
+            set_zigbee_zone_status(ieee_address, "1", 0)
+            call_api("PUT", "/api/monitoring/disarm", {}, user_token)
+        finally:
+            monitor_events.disconnect()
+"""

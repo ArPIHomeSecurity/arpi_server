@@ -98,9 +98,14 @@ def test_monitoring_armed(device_token: str, user_token: str):
     # connect to monitor websocket first to catch events
     monitor_events = MonitorEventsClient(device_token)
 
+    # set all input states to their default values based on the wiring configuration
     channel_values = [0.0] * int(os.environ["INPUT_NUMBER"])
     sensors = get_database_session().scalars(select(Sensor)).all()
     for sensor in sensors:
+        if sensor.channel is None:
+            # it's zigbee, it doesn't have a channel
+            continue
+
         channel_values[sensor.channel] = wiring_config.select_strategy(
             sensor.sensor_contact_type,
             sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B),
@@ -151,6 +156,7 @@ def test_monitoring_armed(device_token: str, user_token: str):
                             "root['id']",
                             "root['startTime']",
                             "root['sensors'][0]['sensorId']",
+                            "root['sensors'][0]['typeId']",
                             "root['sensors'][0]['startTime']",
                         ],
                     },

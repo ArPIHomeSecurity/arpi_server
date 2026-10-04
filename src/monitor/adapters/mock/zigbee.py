@@ -16,6 +16,7 @@ from monitor.adapters.mock.utils import (
 )
 from monitor.adapters.zigbee import ZigbeeDevice, ZigbeeSensorData
 from utils.constants import LOG_ADZIGBEE
+from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, decode_zone_status
 
 logger = logging.getLogger(LOG_ADZIGBEE)
 
@@ -56,6 +57,7 @@ class ZigbeeAdapter:
         cache: dict[tuple[str, str, str], ZigbeeSensorData] = {}
 
         for ieee_address, device in state.get("devices", {}).items():
+            timestamp = device.get("last_seen") or _utc_now_iso()
             capabilities = device.get("capabilities", {})
             for capability_key, raw_value in capabilities.items():
                 if not isinstance(raw_value, bool):
@@ -70,8 +72,22 @@ class ZigbeeAdapter:
                     endpoint=str(endpoint),
                     capability=str(capability),
                     value=raw_value,
-                    timestamp=device.get("last_seen") or _utc_now_iso(),
+                    timestamp=timestamp,
                 )
+
+            for endpoint, status in device.get("ias_zone_status", {}).items():
+                alarm, tamper, error_reason = decode_zone_status(status)
+                for capability, value in (
+                    (IAS_ZONE_CAPABILITY, alarm), (IAS_TAMPER_CAPABILITY, tamper)
+                ):
+                    cache[(str(ieee_address), str(endpoint), capability)] = ZigbeeSensorData(
+                        ieee_address=str(ieee_address),
+                        endpoint=str(endpoint),
+                        capability=capability,
+                        value=value,
+                        timestamp=timestamp,
+                        error_reason=error_reason,
+                    )
 
         with self._lock:
             self._cache = cache
@@ -98,7 +114,8 @@ class ZigbeeAdapter:
                     last_seen=device.get("last_seen"),
                     battery_level=device.get("battery_level", 100),
                     signal_quality=device.get("signal_quality", 100),
-                    capabilities=dict(device.get("capabilities", {})),
+                    capabilities=self._capability_metadata(device),
+                    zone_type=device.get("zone_type"),
                 )
             )
 
@@ -118,9 +135,28 @@ class ZigbeeAdapter:
                 last_seen=device.get("last_seen"),
                 battery_level=device.get("battery_level"),
                 signal_quality=device.get("signal_quality"),
+                capabilities=self._capability_metadata(device),
+                zone_type=device.get("zone_type"),
             )
             for ieee_address, device in state.get("devices", {}).items()
         ]
+
+    @staticmethod
+    def _capability_metadata(device):
+        descriptors = device.get("capability_metadata", device.get("capabilities", {}))
+        capabilities = {
+            key: dict(descriptor)
+            for key, descriptor in descriptors.items()
+            if isinstance(descriptor, dict)
+        }
+        for key, descriptor in list(capabilities.items()):
+            endpoint, separator, capability = key.partition("/")
+            if separator and capability == IAS_ZONE_CAPABILITY:
+                descriptor["field"] = "alarm"
+                capabilities[f"{endpoint}/{IAS_TAMPER_CAPABILITY}"] = {
+                    **descriptor, "field": "tamper"
+                }
+        return capabilities
 
     def get_values(self):
         """Return the latest normalized readings from the simulator cache."""

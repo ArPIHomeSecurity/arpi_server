@@ -9,7 +9,7 @@ from werkzeug.serving import make_server
 from monitor.service import create_app, stop_background_service
 from server import app as server_app
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("test_helpers")
 
 
 @contextmanager

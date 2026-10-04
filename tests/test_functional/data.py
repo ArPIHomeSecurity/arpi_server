@@ -5,7 +5,7 @@ from datetime import datetime
 
 from psycopg2 import ProgrammingError
 from sqlalchemy import Integer, text
-from zigpy.zcl.clusters.security import IasZone
+from zigpy.zcl.clusters.security import IasZone, ZoneType
 
 from monitor.config.models import (
     GSMConfig,
@@ -36,7 +36,7 @@ from utils.models import (
     Zone,
     metadata,
 )
-from utils.zigbee import encode_capability
+from utils.zigbee import IAS_TAMPER_CAPABILITY, encode_capability
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +88,22 @@ def cleanup_database():
 
 def _create_sensor_types(session):
     sensor_types = {
-        "Motion": SensorType(1, name="Motion", description="Detect motion"),
-        "Tamper": SensorType(2, name="Tamper", description="Detect sabotage"),
-        "Open": SensorType(3, name="Open", description="Detect opening"),
-        "Break": SensorType(4, name="Break", description="Detect glass break"),
+        "Motion": SensorType(name="Motion", description="Detect motion"),
+        "Tamper": SensorType(name="Tamper", description="Detect sabotage"),
+        "Open": SensorType(name="Open", description="Detect opening"),
+        "Break": SensorType(name="Break", description="Detect glass break"),
+        "Contact": SensorType(name="Contact", description="IAS Zone contact switch"),
+        "Fire": SensorType(name="Fire", description="IAS Zone fire sensor"),
+        "Water": SensorType(name="Water", description="IAS Zone water sensor"),
+        "CO": SensorType(name="CO", description="IAS Zone carbon monoxide sensor"),
+        "Emergency": SensorType(name="Emergency", description="IAS Zone emergency device"),
+        "Vibration": SensorType(name="Vibration", description="IAS Zone vibration sensor"),
+        "Remote": SensorType(name="Remote", description="IAS Zone remote control"),
+        "Key fob": SensorType(name="Key fob", description="IAS Zone key fob"),
+        "Keypad": SensorType(name="Keypad", description="IAS Zone keypad"),
+        "Warning": SensorType(name="Warning", description="IAS Zone warning device"),
+        "Glass": SensorType(name="Glass", description="IAS Zone glass break sensor"),
+        "Repeater": SensorType(name="Repeater", description="IAS Zone security repeater"),
     }
     session.add_all(sensor_types.values())
     logger.info(" - Created sensor types")
@@ -176,125 +188,153 @@ def _create_users(session) -> dict:
     return {"admin": admin_user, "user": user}
 
 
-def create_zones(session, delay: int = 3) -> dict:
-    tamper = Zone(
-        name="Tamper",
-        disarmed_delay=0,
-        away_alert_delay=0,
-        stay_alert_delay=0,
-        description="Sabotage alert",
-    )
-    no_delay = Zone(
-        name="Away/stay",
-        away_arm_delay=0,
-        stay_arm_delay=0,
-        away_alert_delay=0,
-        stay_alert_delay=0,
-        description="Alert when armed AWAY or STAY",
-    )
-    delayed = Zone(
-        name="Away/stay delayed",
-        away_arm_delay=delay,
-        stay_arm_delay=delay,
-        away_alert_delay=delay,
-        stay_alert_delay=delay,
-        description="Alert delayed when armed AWAY or STAY",
-    )
-    away_delayed = Zone(
-        name="Away delayed",
-        away_arm_delay=delay,
-        away_alert_delay=delay,
-        description="Alert delayed when armed AWAY",
-    )
-    stay_delayed = Zone(
-        name="Stay delayed",
-        stay_arm_delay=delay,
-        stay_alert_delay=delay,
-        description="Alert delayed when armed STAY",
-    )
-    stay = Zone(
-        name="Stay",
-        stay_arm_delay=None,
-        stay_alert_delay=None,
-        description="No alert when armed STAY",
-    )
-    session.add_all([tamper, no_delay, no_delay, delayed, away_delayed, stay_delayed, stay])
-    logger.info(" - Created zones")
-    return {
-        "tamper": tamper,
-        "no_delay": no_delay,
-        "delayed": delayed,
-        "away_delayed": away_delayed,
-        "stay_delayed": stay_delayed,
-        "stay": stay,
+def _create_zones(session, delay: int = 3) -> dict[str, Zone]:
+    zones = {
+        "tamper": Zone(
+            name="Tamper",
+            disarmed_delay=0,
+            away_alert_delay=0,
+            stay_alert_delay=0,
+            description="Sabotage alert",
+        ),
+        "no_delay": Zone(
+            name="Away/stay",
+            away_arm_delay=0,
+            stay_arm_delay=0,
+            away_alert_delay=0,
+            stay_alert_delay=0,
+            description="Alert when armed AWAY or STAY",
+        ),
+        "delayed": Zone(
+            name="Away/stay delayed",
+            away_arm_delay=delay,
+            stay_arm_delay=delay,
+            away_alert_delay=delay,
+            stay_alert_delay=delay,
+            description="Alert delayed when armed AWAY or STAY",
+        ),
+        "away_delayed": Zone(
+            name="Away delayed",
+            away_arm_delay=delay,
+            away_alert_delay=delay,
+            description="Alert delayed when armed AWAY",
+        ),
+        "stay_delayed": Zone(
+            name="Stay delayed",
+            stay_arm_delay=delay,
+            stay_alert_delay=delay,
+            description="Alert delayed when armed STAY",
+        ),
+        "stay": Zone(
+            name="Stay",
+            stay_arm_delay=None,
+            stay_alert_delay=None,
+            description="No alert when armed STAY",
+        ),
     }
+    session.add_all(zones.values())
+    logger.info(" - Created zones")
+    return zones
 
 
-def create_sensors(session, sensor_types, area, zones):
-    s1 = Sensor(
-        channel=0,
-        channel_type=ChannelTypes.NORMAL,
-        sensor_contact_type=SensorContactTypes.NC,
-        sensor_eol_count=SensorEOLCount.SINGLE,
-        sensor_type=sensor_types["Motion"],
-        area=area,
-        zone=zones[0],
-        name="Room 1",
-        description="Test room 1 movement sensor",
-        silent_alert=True,
-    )
-    s2 = Sensor(
-        channel=1,
-        channel_type=ChannelTypes.NORMAL,
-        sensor_contact_type=SensorContactTypes.NC,
-        sensor_eol_count=SensorEOLCount.SINGLE,
-        sensor_type=sensor_types["Open"],
-        area=area,
-        zone=zones[1],
-        name="Room 2",
-        description="Test room 2 door sensor",
-    )
-    s3 = Sensor(
-        channel=2,
-        channel_type=ChannelTypes.NORMAL,
-        sensor_type=sensor_types["Tamper"],
-        sensor_contact_type=SensorContactTypes.NC,
-        sensor_eol_count=SensorEOLCount.SINGLE,
-        area=area,
-        zone=zones[2],
-        name="Tamper",
-        description="Sabotage wire",
-    )
-    session.add_all([s1, s2, s3])
+def _create_sensors(session, sensor_types, area, zone_1, zone_2, zone_tamper) -> dict[str, Sensor]:
+    sensors = {
+        "Room 1": Sensor(
+            channel=0, # CH01
+            channel_type=ChannelTypes.NORMAL,
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            sensor_type=sensor_types["Motion"],
+            area=area,
+            zone=zone_1,
+            name="Room 1",
+            description="Test room 1 movement sensor",
+            silent_alert=True,
+        ),
+        "Room 2": Sensor(
+            channel=1, # CH02
+            channel_type=ChannelTypes.NORMAL,
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            sensor_type=sensor_types["Open"],
+            area=area,
+            zone=zone_2,
+            name="Room 2",
+            description="Test room 2 door sensor",
+        ),
+        "Tamper": Sensor(
+            channel=2, # CH03
+            channel_type=ChannelTypes.NORMAL,
+            sensor_type=sensor_types["Tamper"],
+            sensor_contact_type=SensorContactTypes.NC,
+            sensor_eol_count=SensorEOLCount.SINGLE,
+            area=area,
+            zone=zone_tamper,
+            name="Tamper",
+            description="Sabotage wire",
+        ),
+    }
+    session.add_all(sensors.values())
     logger.info(" - Created sensors")
+    return sensors
 
 
-def create_zigbee_sensor(session, sensor_types, area, zone):
+def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
     endpoint = "1"
     zone_status = IasZone.AttributeDefs.zone_status
     capability = encode_capability(IasZone.cluster_id, zone_status.id)
-    device = ZigbeeDevice(
-        ieee_address="11:22:33:44:55:66:77:88",
-        name="Zigbee Contact Sensor",
-        metadata={"capabilities": {f"{endpoint}/{capability}": {"valueType": zone_status.type.__name__}}},
-    )
-    session.add(device)
-    session.flush()
-
-    session.add(
-        Sensor(
-            channel=None,
-            zigbee_device_id=device.id,
-            zigbee_endpoint=endpoint,
-            zigbee_capability=capability,
-            sensor_type=sensor_types["Open"],
-            area=area,
-            zone=zone,
-            name="Zigbee Door",
-            description="Test Zigbee contact sensor",
+    devices = {
+        "X001": ZigbeeDevice(
+            ieee_address="11:22:33:44:55:66:77:88",
+            name="Zigbee Contact Sensor",
+            zone_type=int(ZoneType.Contact_Switch),
+            metadata={
+                "capabilities": {
+                    f"{endpoint}/{capability}": {
+                        "cluster": IasZone.ep_attribute,
+                        "clusterId": int(IasZone.cluster_id),
+                        "attribute": zone_status.name,
+                        "attributeId": int(zone_status.id),
+                        "valueType": zone_status.type.__name__,
+                        "field": "alarm",
+                        "sources": ["command:status_change_notification"],
+                    },
+                    f"{endpoint}/{IAS_TAMPER_CAPABILITY}": {
+                        "cluster": IasZone.ep_attribute,
+                        "clusterId": int(IasZone.cluster_id),
+                        "attribute": zone_status.name,
+                        "attributeId": int(zone_status.id),
+                        "valueType": zone_status.type.__name__,
+                        "field": "tamper",
+                        "sources": ["command:status_change_notification"],
+                    },
+                }
+            },
         )
+    }
+    session.add_all(devices.values())
+    session.flush()
+    logger.info(" - Created Zigbee devices")
+    return devices
+
+
+def _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones) -> Sensor:
+    zigbee_sensor =Sensor(
+        channel=None,
+        zigbee_device_id=zigbee_devices["X001"].id,
+        zigbee_endpoint="1",
+        zigbee_capability=encode_capability(
+            IasZone.cluster_id, IasZone.AttributeDefs.zone_status.id
+        ),
+        sensor_type=sensor_types["Open"],
+        area=area,
+        zone=zones["no_delay"],
+        name="Zigbee Door",
+        description="Test Zigbee contact sensor",
     )
+    session.add(zigbee_sensor)
     logger.info(" - Created Zigbee device and contact sensor")
+    return zigbee_sensor
 
 
 def clear_database():
@@ -330,16 +370,13 @@ def create_test_no_delay_v2():
         session.add(area)
         logger.info(" - Created area")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-        )
-        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, area, zones["no_delay"], zones["no_delay"], zones["tamper"])
+
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)
 
         session.commit()
-        engine = session.get_bind()
-        session.close()
-        engine.dispose()
         logger.info("Database setup is complete")
 
 
@@ -355,11 +392,10 @@ def create_test_outputs_v2():
         area = Area(name="House")
         session.add(area)
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-        )
-        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, area, zones["no_delay"], zones["no_delay"], zones["tamper"])
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)
         session.commit()
 
         session.add_all(
@@ -425,10 +461,8 @@ def create_test_two_areas_v2():
         session.add_all([house, garage])
         logger.info(" - Created areas")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, house, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-        )
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, house, zones["no_delay"], zones["no_delay"], zones["tamper"])
 
         session.add(
             Sensor(
@@ -444,7 +478,8 @@ def create_test_two_areas_v2():
             )
         )
         logger.info(" - Created garage sensor")
-        create_zigbee_sensor(session, sensor_types, house, zones["no_delay"])
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, house, zones)
 
         session.commit()
         engine = session.get_bind()
@@ -468,10 +503,8 @@ def create_test_two_areas_with_delay_v2():
         session.add_all([house, garage])
         logger.info(" - Created areas")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, house, [zones["delayed"], zones["delayed"], zones["tamper"]]
-        )
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, house, zones["delayed"], zones["delayed"], zones["tamper"])
 
         session.add(
             Sensor(
@@ -487,7 +520,8 @@ def create_test_two_areas_with_delay_v2():
             )
         )
         logger.info(" - Created garage sensor")
-        create_zigbee_sensor(session, sensor_types, house, zones["delayed"])
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, house, zones)
 
         session.commit()
         engine = session.get_bind()
@@ -513,10 +547,8 @@ def create_test_colliding_areas_v2():
         session.add_all([backyard, Area(name="A B"), Area(name="A.B"), system])
         logger.info(" - Created areas")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, backyard, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-        )
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, backyard, zones["no_delay"], zones["no_delay"], zones["tamper"])
 
         # the colliding area needs a sensor as well, an area without sensors cannot be armed
         session.add(
@@ -532,7 +564,9 @@ def create_test_colliding_areas_v2():
                 description="Test movement sensor in the colliding area",
             )
         )
-        create_zigbee_sensor(session, sensor_types, backyard, zones["no_delay"])
+
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, backyard, zones)
 
         session.commit()
         engine = session.get_bind()
@@ -555,14 +589,13 @@ def create_test_no_delay_v2_armed():
         session.add(area)
         logger.info(" - Created area")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, area, [zones["no_delay"], zones["no_delay"], zones["tamper"]]
-        )
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, area, zones["no_delay"], zones["no_delay"], zones["tamper"])
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)
 
         arm = Arm(arm_type=ArmStates.AWAY, time=datetime.now().astimezone(), user=users["admin"])
         session.add(arm)
-        create_zigbee_sensor(session, sensor_types, area, zones["no_delay"])
 
         session.commit()
         engine = session.get_bind()
@@ -584,11 +617,11 @@ def create_test_with_delay_v2():
         session.add(area)
         logger.info(" - Created area")
 
-        zones = create_zones(session)
-        create_sensors(
-            session, sensor_types, area, [zones["delayed"], zones["delayed"], zones["tamper"]]
-        )
-        create_zigbee_sensor(session, sensor_types, area, zones["delayed"])
+        zones = _create_zones(session)
+        _create_sensors(session, sensor_types, area, zones["delayed"], zones["delayed"], zones["tamper"])
+
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)
 
         session.commit()
         engine = session.get_bind()

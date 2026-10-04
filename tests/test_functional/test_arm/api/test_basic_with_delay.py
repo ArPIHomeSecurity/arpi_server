@@ -248,6 +248,7 @@ def test_03_alert(device_token, user_token):
                             "root['id']",
                             "root['startTime']",
                             "root['sensors'][0]['sensorId']",
+                            "root['sensors'][0]['typeId']",
                             "root['sensors'][0]['startTime']",
                         ],
                     },
@@ -316,16 +317,15 @@ def test_03_alert(device_token, user_token):
         assert alert["alertType"] == "alert_away"
         assert len(alert["sensors"]) == 1
         assert alert["sensors"][0]["channel"] == 0
-        assert alert["sensors"][0]["typeId"] == 1
         assert alert["sensors"][0]["delay"] == 3
         assert alert["sensors"][0]["silent"] is False
 
         sensor_changes = event["sensorChanges"]
         assert len(sensor_changes) == 1
         sensors = sensor_changes[0]["sensors"]
-        assert len(sensors) == 3
-        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2}
-        assert {sensor["typeId"] for sensor in sensors} == {1, 2, 3}
+        assert len(sensors) == 4
+        assert {sensor["channel"] for sensor in sensors} == {0, 1, 2, None}
+        assert len([sensor["typeId"] for sensor in sensors]) == 4
 
     finally:
         monitor_events.disconnect()

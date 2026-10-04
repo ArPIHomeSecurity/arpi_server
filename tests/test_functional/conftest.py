@@ -27,6 +27,14 @@ from tests.test_functional.helpers.services import server_service
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(autouse=True)
+def setup_logging():
+    logging.getLogger("bellows").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("serialx").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("zigpy").setLevel(logging.WARNING)
+
 @pytest.fixture(scope="session")
 def database_host():
     logger.debug("Starting database...")
@@ -73,15 +81,15 @@ def database_host():
     else:
         raise RuntimeError("Database did not become ready in time")
 
-    yield
-
-    subprocess.run(["docker", "rm", "-fv", "argus-test-database"], check=True)
-
-    subprocess.run(["docker", "volume", "rm", "argus-test-database"], check=True)
+    try:
+        yield
+    finally:
+        subprocess.run(["docker", "rm", "-fv", "argus-test-database"], check=True)
+        subprocess.run(["docker", "volume", "rm", "argus-test-database"], check=True)
 
 
 @pytest.fixture(scope="module")
-def database_data(request, database_host, zigbee_state):
+def database_data(request, database_host):
     logger.debug("Running database initialization and data population")
     subprocess.run(["uv", "run", "flask", "--app", "server:app", "db", "upgrade"], check=True)
 
@@ -97,7 +105,7 @@ def database_data(request, database_host, zigbee_state):
 
 
 @pytest.fixture(scope="module")
-def zigbee_state():
+def zigbee_state(database_data):
     zigbee_path = Path(ZIGBEE_FILE)
     zigbee_file_exists = zigbee_path.exists()
     original_zigbee_data = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
@@ -142,9 +150,11 @@ def mqtt():
         logger.error("Failed to start MQTT broker: %s", result.stderr)
         raise RuntimeError("Failed to start MQTT broker")
 
-    yield
-
-    subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=True)
+    try:
+        yield
+    finally:
+        subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=True)
+        subprocess.run(["docker", "volume", "rm", "argus-mqtt-test"], check=True)
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -77,7 +77,7 @@ class ZigbeeDeviceStore:
             cls._sensor_data = {}
 
 
-def extract_attributes(device: ZigbeeDevice, include_identity: bool = False):
+def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, metadata=None):
     last_seen = None
     with contextlib.suppress(TypeError, ValueError):
         last_seen = datetime.fromisoformat(device.last_seen)
@@ -88,6 +88,14 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False):
         "battery_level": device.battery_level,
         "signal_quality": device.signal_quality,
     }
+    if device.zone_type is not None:
+        values["zone_type"] = device.zone_type
+    if device.capabilities or include_identity:
+        metadata = metadata or {}
+        values["metadata"] = {
+            **metadata,
+            "capabilities": {**metadata.get("capabilities", {}), **device.capabilities},
+        }
     if include_identity:
         values.update(
             {
@@ -95,7 +103,6 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False):
                 "manufacturer": device.manufacturer,
                 "model": device.model,
                 "name": device.name or device.ieee_address,
-                "metadata": {"capabilities": device.capabilities},
             }
         )
     return values
@@ -238,6 +245,11 @@ class ZigbeeHandler(Thread):
                         if log_new:
                             logger.info("Registered new Zigbee device: %s", device.ieee_address)
                     else:
+                        values = extract_attributes(
+                            device, include_identity=True, metadata=registered.device_metadata
+                        )
+                        if device.name is None:
+                            values.pop("name")
                         registered.update(values)
 
                 session.commit()
@@ -276,7 +288,7 @@ class ZigbeeHandler(Thread):
                 if registered is None:
                     continue
 
-                values = extract_attributes(device)
+                values = extract_attributes(device, metadata=registered.device_metadata)
                 registered.update(
                     {key: value for key, value in values.items() if value is not None}
                 )

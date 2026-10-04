@@ -46,6 +46,20 @@ SENSOR_DEVICE_MAPPING = {
     "Tamper": "tamper",
     "Open": "opening",
     "Break": "glass_break",
+
+    # Zigbee IAS zone types
+    "Contact": "contact",
+    "Fire": "smoke",
+    "Water": "moisture",
+    "CO": "gas",
+    "Emergency": "safety",
+    "Vibration": "vibration",
+    "Remote": "remote",
+    "Key fob": "key_fob",
+    "Keypad": "keypad",
+    "Warning": "warning",
+    "Glass": "glass_break",
+    "Repeater": "repeater",
 }
 
 CONFIG_SUFFIX = "config"
