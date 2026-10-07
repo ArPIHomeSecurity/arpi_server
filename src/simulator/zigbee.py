@@ -10,7 +10,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Input, Label, Select, Static
-from zigpy.zcl.clusters.general import OnOff, PowerConfiguration
+from zigpy.zcl.clusters.general import OnOff
 from zigpy.zcl.clusters.measurement import OccupancySensing
 from zigpy.zcl.clusters.security import IasZone, ZoneStatus, ZoneType
 
@@ -43,15 +43,6 @@ def _capability_descriptor(cluster, attribute, sources=("attribute",)):
 
 OPEN_DETECTOR_CAPABILITIES = {
     **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_2_alarm_state
-    ),
-    **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_3_alarm_state
-    ),
-    **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_alarm_state
-    ),
-    **_capability_descriptor(
         IasZone,
         IasZone.AttributeDefs.zone_status,
         sources=(f"command:{IasZone.ClientCommandDefs.status_change_notification.name}",),
@@ -64,15 +55,6 @@ OPEN_DETECTOR_CAPABILITIES[f"{DEFAULT_ZIGBEE_ENDPOINT}/{IAS_TAMPER_CAPABILITY}"]
     "field": "tamper",
 }
 MOTION_SENSOR_CAPABILITIES = {
-    **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_2_alarm_state
-    ),
-    **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_3_alarm_state
-    ),
-    **_capability_descriptor(
-        PowerConfiguration, PowerConfiguration.AttributeDefs.battery_alarm_state
-    ),
     **_capability_descriptor(OccupancySensing, OccupancySensing.AttributeDefs.occupancy),
 }
 

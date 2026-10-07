@@ -3,10 +3,18 @@ from zigpy.zcl.clusters.security import IasZone, ZoneStatus
 
 def decode_zone_status(value) -> tuple[bool, bool, str | None]:
     status = ZoneStatus(int(value))
+    reasons = []
+    if status & ZoneStatus.Battery:
+        reasons.append("ias_zone_battery")
+    if status & ZoneStatus.Trouble:
+        reasons.append("ias_zone_trouble")
+    if status & ZoneStatus.Battery_Defect:
+        reasons.append("ias_zone_battery_defect")
+
     return (
         bool(status & (ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2)),
         bool(status & ZoneStatus.Tamper),
-        "ias_zone_trouble" if status & ZoneStatus.Trouble else None,
+        "|".join(reasons) if reasons else None,
     )
 
 

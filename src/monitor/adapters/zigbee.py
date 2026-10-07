@@ -12,7 +12,8 @@ from bellows.zigbee.application import ControllerApplication
 from zigpy.exceptions import ZigbeeException
 from zigpy.types import EUI64
 from zigpy.zcl import foundation
-from zigpy.zcl.clusters.general import PollControl, PowerConfiguration
+from zigpy.zcl.clusters.general import OnOff, PollControl, PowerConfiguration
+from zigpy.zcl.clusters.measurement import OccupancySensing
 from zigpy.zcl.clusters.security import IasZone
 
 from monitor.config.models import ZigbeeCoordinatorConfig
@@ -29,6 +30,19 @@ from utils.zigbee import (
 USE_ZIGBEE_SIMULATOR = environ.get("USE_ZIGBEE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
 
 logger = logging.getLogger(LOG_ADZIGBEE)
+
+SUPPORTED_CLUSTERS = {
+    int(IasZone.cluster_id),
+    int(OccupancySensing.cluster_id),
+    int(OnOff.cluster_id),
+    int(PollControl.cluster_id),
+    int(PowerConfiguration.cluster_id),
+}
+SUPPORTED_SENSOR_ATTRIBUTES = {
+    int(IasZone.cluster_id): IasZone.AttributeDefs.zone_status,
+    int(OccupancySensing.cluster_id): OccupancySensing.AttributeDefs.occupancy,
+    int(OnOff.cluster_id): OnOff.AttributeDefs.on_off,
+}
 
 
 @dataclass
@@ -168,21 +182,26 @@ class ZigbeeAdapter:
 
     # --- zigpy application listener callbacks, invoked from the loop thread ---
     async def _subscribe_clusters(self, device):
-        """Attach an attribute_updated listener to every cluster of a device."""
+        """Attach an attribute_updated listener to every supported cluster on the device,
+        and read/subscribe to its attributes.
+        """
         logger.debug("Subscribing to clusters for device %s", device.ieee)
         for endpoint_id, endpoint in device.endpoints.items():
             if endpoint_id == 0:
                 continue
 
             for cluster in endpoint.in_clusters.values():
-                cluster.add_context_listener(self)
-                cluster_name = cluster.ep_attribute or type(cluster).__name__
+                cluster_id = int(cluster.cluster_id)
+                if cluster_id not in SUPPORTED_CLUSTERS:
+                    continue
 
-                if cluster_name == PollControl.ep_attribute:
+                cluster.add_context_listener(self)
+
+                if cluster_id == PollControl.cluster_id:
                     await self._setup_reporting(
                         cluster, PollControl.AttributeDefs.checkin_interval.name, 60, 600
                     )
-                elif cluster_name == IasZone.ep_attribute:
+                elif cluster_id == IasZone.cluster_id:
                     attribute = IasZone.AttributeDefs.zone_type
                     cached_type = cluster.get(attribute.id)
                     if cached_type is not None:
@@ -193,7 +212,15 @@ class ZigbeeAdapter:
                     await self._setup_reporting(
                         cluster, IasZone.AttributeDefs.zone_status.name, 60, 600
                     )
-                elif cluster_name == PowerConfiguration.ep_attribute:
+                elif cluster_id == OccupancySensing.cluster_id:
+                    await self._setup_reporting(
+                        cluster, OccupancySensing.AttributeDefs.occupancy.name, 60, 600
+                    )
+                elif cluster_id == OnOff.cluster_id:
+                    await self._setup_reporting(
+                        cluster, OnOff.AttributeDefs.on_off.name, 60, 600
+                    )
+                elif cluster_id == PowerConfiguration.cluster_id:
                     await self._setup_reporting(
                         cluster,
                         PowerConfiguration.AttributeDefs.battery_percentage_remaining.name,
@@ -246,34 +273,39 @@ class ZigbeeAdapter:
             if endpoint_id == 0:
                 continue
 
-            for cluster in endpoint.clusters:
+            for cluster in endpoint.in_clusters.values():
+                cluster_id = int(cluster.cluster_id)
+                attribute_def = SUPPORTED_SENSOR_ATTRIBUTES.get(cluster_id)
+                if attribute_def is None:
+                    continue
+
                 cluster_name = cluster.ep_attribute or type(cluster).__name__
-                command_sources = self._get_command_attribute_sources(cluster)
-                for attribute in cluster.attributes.values():
-                    if not self._is_sensor_attribute(attribute):
-                        continue
+                attribute = cluster.find_attribute(attribute_def.id)
+                capability = encode_capability(cluster_id, attribute.id)
+                is_reportable = bool(attribute.access & foundation.ZCLAttributeAccess.Report)
+                sources = ["attribute"] if is_reportable else []
+                if cluster_id == IasZone.cluster_id:
+                    sources.append(
+                        f"command:{IasZone.ClientCommandDefs.status_change_notification.name}"
+                    )
+                if not sources:
+                    continue
 
-                    is_reportable = bool(attribute.access & foundation.ZCLAttributeAccess.Report)
-                    sources = command_sources.get(attribute.name, [])
-                    if not is_reportable and not sources:
-                        continue
-
-                    capability = encode_capability(cluster.cluster_id, attribute.id)
-                    capabilities[f"{endpoint_id}/{capability}"] = {
-                        "cluster": cluster_name,
-                        "clusterId": int(cluster.cluster_id),
-                        "attribute": attribute.name,
-                        "attributeId": int(attribute.id),
-                        "valueType": getattr(attribute.type, "__name__", str(attribute.type)),
-                        "sources": (["attribute"] if is_reportable else []) + sources,
+                capabilities[f"{endpoint_id}/{capability}"] = {
+                    "cluster": cluster_name,
+                    "clusterId": cluster_id,
+                    "attribute": attribute.name,
+                    "attributeId": int(attribute.id),
+                    "valueType": getattr(attribute.type, "__name__", str(attribute.type)),
+                    "sources": sources,
+                }
+                if capability == IAS_ZONE_CAPABILITY:
+                    descriptor = capabilities[f"{endpoint_id}/{capability}"]
+                    descriptor["field"] = "alarm"
+                    capabilities[f"{endpoint_id}/{IAS_TAMPER_CAPABILITY}"] = {
+                        **descriptor,
+                        "field": "tamper",
                     }
-                    if capability == IAS_ZONE_CAPABILITY:
-                        descriptor = capabilities[f"{endpoint_id}/{capability}"]
-                        descriptor["field"] = "alarm"
-                        capabilities[f"{endpoint_id}/{IAS_TAMPER_CAPABILITY}"] = {
-                            **descriptor,
-                            "field": "tamper",
-                        }
 
         with self._state_lock:
             zone_types = sorted(
@@ -298,27 +330,6 @@ class ZigbeeAdapter:
             zone_type=zone_types[0][1] if zone_types else None,
         )
 
-
-    @staticmethod
-    def _get_command_attribute_sources(cluster) -> dict[str, list[str]]:
-        attributes = {
-            attribute.name: attribute
-            for attribute in cluster.attributes.values()
-            if ZigbeeAdapter._is_sensor_attribute(attribute)
-        }
-        sources: dict[str, list[str]] = {}
-        commands = list(cluster.server_commands.values()) + list(cluster.client_commands.values())
-        for command in commands:
-            for command_field in command.schema.fields:
-                attribute = attributes.get(command_field.name)
-                if attribute is not None and command_field.type is attribute.type:
-                    sources.setdefault(command_field.name, []).append(f"command:{command.name}")
-
-        return sources
-
-    @staticmethod
-    def _is_sensor_attribute(attribute) -> bool:
-        return attribute.zcl_type.name == "bool_" or attribute.zcl_type.name.startswith("map")
 
     def _schedule_subscribe(self, device):
         # zigpy invokes listener callbacks synchronously on the loop thread, so async work must be scheduled
@@ -388,6 +399,11 @@ class ZigbeeAdapter:
                         value,
                     )
                     self._battery_levels[ieee_address] = min(100, int(value) // 2)
+                return
+
+        attribute_def = SUPPORTED_SENSOR_ATTRIBUTES.get(int(cluster.cluster_id))
+        if attribute_def is None or attr_name != attribute_def.name:
+            return
 
         capability = encode_capability(cluster.cluster_id, attrid)
         values = {capability: normalize_attribute_value(cluster.cluster_id, attr_name, value)}
@@ -416,38 +432,26 @@ class ZigbeeAdapter:
 
     def cluster_command(self, cluster, tsn, command_id, args):
         """Fired for incoming ZCL commands, e.g. IAS Zone status change notifications."""
-        command = getattr(args, "command", None)
-        if command is None:
-            command = {**cluster.server_commands, **cluster.client_commands}.get(command_id)
+        if (
+            int(cluster.cluster_id) != IasZone.cluster_id
+            or command_id != IasZone.ClientCommandDefs.status_change_notification.id
+        ):
+            return
 
-        command_name = command.name if command else str(command_id)
         ieee_address = str(cluster.endpoint.device.ieee)
         endpoint_id = cluster.endpoint.endpoint_id
         logger.debug(
-            "Command received for device %s, endpoint %s, command %s: %s",
+            "IAS Zone status notification received for device %s, endpoint %s: %s",
             ieee_address,
             endpoint_id,
-            command_name,
             args,
         )
 
-        if command is None:
-            return
-
-        attributes = {
-            attribute.name: attribute
-            for attribute in cluster.attributes.values()
-            if self._is_sensor_attribute(attribute)
-        }
         timestamp = datetime.now(UTC)
-        for command_field in type(args).fields:
-            attribute = attributes.get(command_field.name)
-            if attribute is None or command_field.type is not attribute.type:
-                continue
-
-            self._store_reading(
-                cluster, attribute.id, attribute.name, getattr(args, command_field.name), timestamp
-            )
+        attribute = IasZone.AttributeDefs.zone_status
+        self._store_reading(
+            cluster, attribute.id, attribute.name, args.zone_status, timestamp
+        )
 
     def _mark_unavailable(self, ieee_address: str):
         with self._state_lock:
