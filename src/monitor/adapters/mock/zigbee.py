@@ -2,7 +2,7 @@
 
 The mock follows the same runtime contract as the real Zigbee adapter: it reads
 mutable live state from simulator_zigbee.json, resolves values by IEEE address,
-endpoint, and capability, and exposes normalized readings that the monitor can
+endpoint, cluster, attribute, and signal field, and exposes normalized readings that the monitor can
 consume without bypassing the normal sensor/alert path.
 """
 
@@ -16,12 +16,7 @@ from monitor.adapters.mock.utils import (
 )
 from monitor.adapters.zigbee import ZigbeeDevice, ZigbeeSensorData
 from utils.constants import LOG_ADZIGBEE
-from utils.zigbee import (
-    IAS_ZONE_CAPABILITY,
-    IAS_ZONE_STATUS_ATTRIBUTE,
-    decode_zigbee_attribute,
-    describe_zigbee_attribute,
-)
+from utils.zigbee import IAS_ZONE_STATUS_ATTRIBUTE, decode_zigbee_attribute
 
 logger = logging.getLogger(LOG_ADZIGBEE)
 
@@ -35,7 +30,7 @@ class ZigbeeAdapter:
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._cache: dict[tuple[str, str, str], ZigbeeSensorData] = {}
+        self._cache: dict[tuple[str, str, int, int, str | None], ZigbeeSensorData] = {}
         self._running = False
         self._pairing = False
         self._pairing_duration = 0
@@ -59,23 +54,25 @@ class ZigbeeAdapter:
     def _refresh_cache(self):
         """Rebuild the normalized in-memory cache from the simulator state file."""
         state = get_zigbee_devices()
-        cache: dict[tuple[str, str, str], ZigbeeSensorData] = {}
+        cache: dict[tuple[str, str, int, int, str | None], ZigbeeSensorData] = {}
 
         for ieee_address, device in state.get("devices", {}).items():
             timestamp = device.get("last_seen") or _utc_now_iso()
-            capabilities = device.get("capabilities", {})
-            for capability_key, raw_value in capabilities.items():
+            for signal in device.get("signal_values", []):
+                raw_value = signal.get("value")
                 if not isinstance(raw_value, bool):
                     continue
 
-                endpoint, separator, capability = capability_key.partition("/")
-                if not separator:
-                    endpoint, capability = "1", capability_key
-
-                cache[(str(ieee_address), str(endpoint), str(capability))] = ZigbeeSensorData(
+                endpoint = str(signal["endpoint"])
+                cluster_id = int(signal["clusterId"])
+                attribute_id = int(signal["attributeId"])
+                field = signal.get("field")
+                cache[(str(ieee_address), endpoint, cluster_id, attribute_id, field)] = ZigbeeSensorData(
                     ieee_address=str(ieee_address),
-                    endpoint=str(endpoint),
-                    capability=str(capability),
+                    endpoint=endpoint,
+                    cluster_id=cluster_id,
+                    attribute_id=attribute_id,
+                    field=field,
                     value=raw_value,
                     timestamp=timestamp,
                 )
@@ -83,10 +80,14 @@ class ZigbeeAdapter:
             for endpoint, status in device.get("ias_zone_status", {}).items():
                 decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
                 for signal, value in decoded.signals:
-                    cache[(str(ieee_address), str(endpoint), signal.capability)] = ZigbeeSensorData(
+                    cluster_id = int(IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id)
+                    attribute_id = IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
+                    cache[(str(ieee_address), str(endpoint), cluster_id, attribute_id, signal.field)] = ZigbeeSensorData(
                         ieee_address=str(ieee_address),
                         endpoint=str(endpoint),
-                        capability=signal.capability,
+                        cluster_id=cluster_id,
+                        attribute_id=attribute_id,
+                        field=signal.field,
                         value=value,
                         timestamp=timestamp,
                     )
@@ -116,7 +117,7 @@ class ZigbeeAdapter:
                     last_seen=device.get("last_seen"),
                     battery_level=device.get("battery_level", 100),
                     signal_quality=device.get("signal_quality", 100),
-                    capabilities=self._capability_metadata(device),
+                    signals=self._signal_metadata(device),
                     zone_type=device.get("zone_type"),
                 )
             )
@@ -137,28 +138,19 @@ class ZigbeeAdapter:
                 last_seen=device.get("last_seen"),
                 battery_level=device.get("battery_level"),
                 signal_quality=device.get("signal_quality"),
-                capabilities=self._capability_metadata(device),
+                signals=self._signal_metadata(device),
                 zone_type=device.get("zone_type"),
             )
             for ieee_address, device in state.get("devices", {}).items()
         ]
 
     @staticmethod
-    def _capability_metadata(device):
-        descriptors = device.get("capability_metadata", device.get("capabilities", {}))
-        capabilities = {
-            key: dict(descriptor)
-            for key, descriptor in descriptors.items()
-            if isinstance(descriptor, dict)
-        }
-        for key, descriptor in list(capabilities.items()):
-            endpoint, separator, capability = key.partition("/")
-            if separator and capability == IAS_ZONE_CAPABILITY:
-                for signal_key, signal_descriptor in describe_zigbee_attribute(
-                    IAS_ZONE_STATUS_ATTRIBUTE, int(endpoint)
-                ).items():
-                    capabilities.setdefault(signal_key, signal_descriptor)
-        return capabilities
+    def _signal_metadata(device):
+        return [
+            dict(signal)
+            for signal in device.get("signal_metadata", [])
+            if isinstance(signal, dict)
+        ]
 
     def get_values(self):
         """Return the latest normalized readings from the simulator cache."""
@@ -166,11 +158,15 @@ class ZigbeeAdapter:
         with self._lock:
             return list(self._cache.values())
 
-    def get_value(self, ieee_address: str, endpoint: str, capability: str):
-        """Return the normalized reading for a specific device endpoint/capability."""
+    def get_value(
+        self, ieee_address: str, endpoint: str, cluster_id: int, attribute_id: int, field=None
+    ):
+        """Return the normalized reading for a specific endpoint attribute signal."""
         self._refresh_cache()
         with self._lock:
-            return self._cache.get((str(ieee_address), str(endpoint), str(capability)))
+            return self._cache.get(
+                (str(ieee_address), str(endpoint), int(cluster_id), int(attribute_id), field)
+            )
 
     def permit_joining(self, duration_seconds) -> bool:
         """Open or close the pairing window, clearing pairing flags when closing."""

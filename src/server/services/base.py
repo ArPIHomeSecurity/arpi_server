@@ -39,7 +39,7 @@ class ChannelConflictError(Exception):
 
 
 class ZigbeeBindingConflictError(Exception):
-    """Raised when a Zigbee device endpoint/capability is already bound to another sensor."""
+    """Raised when a Zigbee device endpoint/attribute/signal is already bound elsewhere."""
 
 
 class InvalidSensorSource(Exception):

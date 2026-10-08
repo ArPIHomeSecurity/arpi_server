@@ -30,7 +30,9 @@ logger = logging.getLogger(LOG_ADZIGBEE)
 class ZigbeeSensorData:
     ieee_address: str
     endpoint: str
-    capability: str
+    cluster_id: int
+    attribute_id: int
+    field: str | None
     value: object
     timestamp: str | None = None
 
@@ -46,7 +48,7 @@ class ZigbeeDevice:
     last_seen: str | None = None
     battery_level: int | None = None
     signal_quality: int | None = None
-    capabilities: dict = field(default_factory=dict)
+    signals: list[dict] = field(default_factory=list)
     zone_type: int | None = None
 
 
@@ -79,7 +81,7 @@ class ZigbeeAdapter:
         self._discovered: list[ZigbeeDevice] = []
 
         self._readings_lock = threading.Lock()
-        self._readings: dict[tuple[str, int, str], ZigbeeSensorData] = {}
+        self._readings: dict[tuple[str, str, int, int, str | None], ZigbeeSensorData] = {}
 
         self._state_lock = threading.Lock()
         self._battery_levels: dict[str, int] = {}
@@ -214,7 +216,7 @@ class ZigbeeAdapter:
         """
         self._store_reading(cluster, attrid, value, timestamp)
 
-    def cluster_command(self, cluster, tsn, command_id, args):
+    def cluster_command(self, cluster, _tsn, command_id, args):
         """
         Callback invoked by zigpy when a cluster command is received.
         This is used to handle IAS Zone status notifications, which are sent
@@ -326,13 +328,13 @@ class ZigbeeAdapter:
             self._store_reading(cluster, attribute_def.id, value, datetime.now(UTC))
 
     def _build_discovered_device(self, device) -> ZigbeeDevice:
-        capabilities = {}
+        signals = []
         for endpoint_id, endpoint in device.endpoints.items():
             if endpoint_id == 0:
                 continue
 
             for cluster in endpoint.in_clusters.values():
-                capabilities.update(describe_zigbee_signals(cluster, endpoint_id))
+                signals.extend(describe_zigbee_signals(cluster, endpoint_id))
 
         with self._state_lock:
             zone_types = sorted(
@@ -353,7 +355,7 @@ class ZigbeeAdapter:
                 else None
             ),
             signal_quality=device.lqi,
-            capabilities=capabilities,
+            signals=signals,
             zone_type=zone_types[0][1] if zone_types else None,
         )
 
@@ -397,18 +399,28 @@ class ZigbeeAdapter:
 
         with self._readings_lock:
             for signal, reading_value in decoded.signals:
-                self._readings[(ieee_address, endpoint_id, signal.capability)] = ZigbeeSensorData(
+                self._readings[
+                    (
+                        ieee_address,
+                        str(endpoint_id),
+                        int(cluster.cluster_id),
+                        int(attrid),
+                        signal.field,
+                    )
+                ] = ZigbeeSensorData(
                     ieee_address=ieee_address,
                     endpoint=str(endpoint_id),
-                    capability=signal.capability,
+                    cluster_id=int(cluster.cluster_id),
+                    attribute_id=int(attrid),
+                    field=signal.field,
                     value=reading_value,
                     timestamp=timestamp.isoformat(),
                 )
             logger.debug(
-                "Attribute updated for device %s, endpoint %s, capability %s: %s",
+                "Attribute updated for device %s, endpoint %s, signal %s: %s",
                 ieee_address,
                 endpoint_id,
-                decoded.signals[0][0].capability,
+                decoded.signals[0][0].field or "attribute",
                 value,
             )
 
@@ -502,6 +514,16 @@ class ZigbeeAdapter:
         with self._readings_lock:
             return list(self._readings.values())
 
-    def get_value(self, ieee_address, endpoint, capability):
+    def get_value(
+        self, ieee_address, endpoint, cluster_id, attribute_id, signal_field=None
+    ):
         with self._readings_lock:
-            return self._readings.get((ieee_address, int(endpoint), capability))
+            return self._readings.get(
+                (
+                    str(ieee_address),
+                    str(endpoint),
+                    int(cluster_id),
+                    int(attribute_id),
+                    signal_field,
+                )
+            )

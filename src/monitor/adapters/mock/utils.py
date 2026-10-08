@@ -19,8 +19,6 @@ from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
 from utils.zigbee import (
-    IAS_TAMPER_CAPABILITY,
-    IAS_ZONE_CAPABILITY,
     IAS_ZONE_STATUS_ATTRIBUTE,
     decode_zigbee_attribute,
 )
@@ -218,20 +216,24 @@ def load_zigbee_device_states() -> dict:
             simulated_device = data["devices"].setdefault(
                 device.ieee_address,
                 {
-                    "name": device.name, "available": True, "capabilities": {},
+                    "name": device.name, "available": True, "signal_values": [],
                     "zone_type": device.zone_type,
-                    "capability_metadata": (device.device_metadata or {}).get("capabilities", {}),
+                    "signal_metadata": (device.device_metadata or {}).get("signals", []),
                 },
             )
-            capability_key = f"{sensor.zigbee_endpoint}/{sensor.zigbee_capability}"
-            simulated_device["capabilities"][capability_key] = False
+            _set_signal_value(
+                simulated_device,
+                sensor.zigbee_endpoint,
+                sensor.zigbee_cluster_id,
+                sensor.zigbee_attribute_id,
+                sensor.zigbee_field,
+                False,
+            )
     return data
 
 
 def get_zigbee_devices():
-    """
-    Get simulator state, loading database-backed defaults on the first call.
-    """
+    """Get structured simulator state."""
     return protected_read(ZIGBEE_FILE, deepcopy(load_zigbee_device_states()))
 
 
@@ -249,33 +251,76 @@ def set_zigbee_devices(data):
     protected_write(ZIGBEE_FILE, data)
 
 
-def set_zigbee_capability(ieee_address, capability_key, value):
+def _signal_matches(signal, endpoint, cluster_id, attribute_id, field):
+    return (
+        str(signal.get("endpoint")) == str(endpoint)
+        and int(signal.get("clusterId", -1)) == int(cluster_id)
+        and int(signal.get("attributeId", -1)) == int(attribute_id)
+        and signal.get("field") == field
+    )
+
+
+def _set_signal_value(device, endpoint, cluster_id, attribute_id, field, value):
+    signal_values = device.setdefault("signal_values", [])
+    for signal in signal_values:
+        if _signal_matches(signal, endpoint, cluster_id, attribute_id, field):
+            signal["value"] = value
+            return
+    signal_values.append(
+        {
+            "endpoint": str(endpoint),
+            "clusterId": int(cluster_id),
+            "attributeId": int(attribute_id),
+            "field": field,
+            "value": value,
+        }
+    )
+
+
+def _get_signal_value(device, endpoint, cluster_id, attribute_id, field):
+    for signal in device.get("signal_values", []):
+        if _signal_matches(signal, endpoint, cluster_id, attribute_id, field):
+            return signal.get("value")
+    return None
+
+
+def set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, field, value):
     """
-    Update a normalized capability reading for a simulated device.
+    Update a normalized signal value for a simulated device.
     """
     default_data = get_zigbee_devices()
 
-    def merge_capability(base, new):
+    def merge_signal(base, new):
         if not isinstance(base, dict):
             base = deepcopy(default_data)
 
         devices = base.setdefault("devices", {})
         device = devices.setdefault(new["ieee_address"], {})
-        capabilities = device.setdefault("capabilities", {})
-        capabilities[new["capability_key"]] = new["value"]
-        endpoint, separator, capability = new["capability_key"].partition("/")
+        endpoint = new["endpoint"]
         statuses = device.get("ias_zone_status", {})
-        if separator and endpoint in statuses and capability in (
-            IAS_ZONE_CAPABILITY, IAS_TAMPER_CAPABILITY
-        ):
+        is_ias_signal = (
+            int(new["cluster_id"]) == int(IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id)
+            and int(new["attribute_id"]) == IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
+            and new["field"] in ("alarm", "tamper")
+        )
+        if is_ias_signal and endpoint in statuses:
             flag = (
                 ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2
-                if capability == IAS_ZONE_CAPABILITY else ZoneStatus.Tamper
+                if new["field"] == "alarm" else ZoneStatus.Tamper
             )
             status = int(statuses[endpoint]) & ~int(flag)
             if new["value"]:
-                status |= int(ZoneStatus.Alarm_1 if capability == IAS_ZONE_CAPABILITY else flag)
+                status |= int(ZoneStatus.Alarm_1 if new["field"] == "alarm" else flag)
             _update_ias_status(device, endpoint, status)
+        else:
+            _set_signal_value(
+                device,
+                endpoint,
+                new["cluster_id"],
+                new["attribute_id"],
+                new["field"],
+                new["value"],
+            )
         device["last_seen"] = datetime.now().astimezone().isoformat()
         return base
 
@@ -283,20 +328,29 @@ def set_zigbee_capability(ieee_address, capability_key, value):
         ZIGBEE_FILE,
         {
             "ieee_address": str(ieee_address),
-            "capability_key": str(capability_key),
+            "endpoint": str(endpoint),
+            "cluster_id": int(cluster_id),
+            "attribute_id": int(attribute_id),
+            "field": field,
             "value": value,
         },
         default_data,
-        merge_capability,
+        merge_signal,
     )
 
 
 def _update_ias_status(device, endpoint, status):
     device.setdefault("ias_zone_status", {})[endpoint] = int(status)
     decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
-    capabilities = device.setdefault("capabilities", {})
     for signal, value in decoded.signals:
-        capabilities[f"{endpoint}/{signal.capability}"] = value
+        _set_signal_value(
+            device,
+            endpoint,
+            IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id,
+            IAS_ZONE_STATUS_ATTRIBUTE.attribute_id,
+            signal.field,
+            value,
+        )
     device["last_seen"] = datetime.now().astimezone().isoformat()
 
 
@@ -321,14 +375,15 @@ def set_zigbee_trouble(ieee_address, endpoint, enabled):
 
     def merge_trouble(base, new):
         device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
-        capabilities = device.get("capabilities", {})
         endpoint = new["endpoint"]
+        alarm_cluster = IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id
+        alarm_attribute = IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
         status = device.get("ias_zone_status", {}).get(endpoint)
         if status is None:
             status = 0
-            if capabilities.get(f"{endpoint}/{IAS_ZONE_CAPABILITY}") is True:
+            if _get_signal_value(device, endpoint, alarm_cluster, alarm_attribute, "alarm") is True:
                 status |= int(ZoneStatus.Alarm_1)
-            if capabilities.get(f"{endpoint}/{IAS_TAMPER_CAPABILITY}") is True:
+            if _get_signal_value(device, endpoint, alarm_cluster, alarm_attribute, "tamper") is True:
                 status |= int(ZoneStatus.Tamper)
         status = int(status) & ~int(ZoneStatus.Trouble)
         if new["enabled"]:

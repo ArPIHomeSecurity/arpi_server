@@ -16,14 +16,13 @@ from zigpy.zcl.clusters.security import IasZone, ZoneStatus, ZoneType
 
 from monitor.adapters.mock.utils import (
     get_zigbee_devices,
-    set_zigbee_capability,
+    set_zigbee_signal,
     set_zigbee_devices,
     set_zigbee_trouble,
 )
 from monitor.database import create_database_session
 from utils.models import ZigbeeDevice
 from utils.zigbee import (
-    IAS_ZONE_CAPABILITY,
     ZIGBEE_ATTRIBUTE_REGISTRY,
     describe_zigbee_attribute,
 )
@@ -32,22 +31,15 @@ DEFAULT_ZIGBEE_ENDPOINT = "1"
 
 
 def _registered_signals(cluster):
-    return {
-        key: descriptor
+    return [
+        descriptor
         for definition in ZIGBEE_ATTRIBUTE_REGISTRY[int(cluster.cluster_id)]
-        for key, descriptor in describe_zigbee_attribute(
-            definition, int(DEFAULT_ZIGBEE_ENDPOINT)
-        ).items()
-    }
+        for descriptor in describe_zigbee_attribute(definition, int(DEFAULT_ZIGBEE_ENDPOINT))
+    ]
 
 
-OPEN_DETECTOR_CAPABILITIES = {
-    **_registered_signals(IasZone),
-    **_registered_signals(OnOff),
-}
-MOTION_SENSOR_CAPABILITIES = {
-    **_registered_signals(OccupancySensing),
-}
+OPEN_DETECTOR_SIGNALS = _registered_signals(IasZone) + _registered_signals(OnOff)
+MOTION_SENSOR_SIGNALS = _registered_signals(OccupancySensing)
 
 
 class ZigbeeDeviceType(str, Enum):
@@ -55,9 +47,9 @@ class ZigbeeDeviceType(str, Enum):
     MOTION_SENSOR = "Motion sensor"
 
 
-ZIGBEE_CAPABILITIES = {
-    ZigbeeDeviceType.OPEN_DETECTOR: OPEN_DETECTOR_CAPABILITIES,
-    ZigbeeDeviceType.MOTION_SENSOR: MOTION_SENSOR_CAPABILITIES,
+ZIGBEE_SIGNALS = {
+    ZigbeeDeviceType.OPEN_DETECTOR: OPEN_DETECTOR_SIGNALS,
+    ZigbeeDeviceType.MOTION_SENSOR: MOTION_SENSOR_SIGNALS,
 }
 
 ZIGBEE_TYPE_OPTIONS = [
@@ -71,6 +63,27 @@ def random_ieee_address() -> str:
     return ":".join(f"{randint(0, 255):02X}" for _ in range(8))
 
 
+def _signal_identity(signal):
+    return (
+        str(signal["endpoint"]),
+        int(signal["clusterId"]),
+        int(signal["attributeId"]),
+        signal.get("field"),
+    )
+
+
+def _find_signal_value(signal_values, descriptor):
+    identity = _signal_identity(descriptor)
+    for signal in signal_values:
+        if _signal_identity(signal) == identity:
+            return signal.get("value")
+    return False
+
+
+def _signal_value_record(descriptor, value):
+    return {**descriptor, "value": value}
+
+
 class ZigbeeDevices(Widget):
     """Widget for Zigbee device management."""
 
@@ -79,7 +92,7 @@ class ZigbeeDevices(Widget):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # widget id => (ieee address, "endpoint/capability")
+        # widget id => (IEEE address, structured signal descriptor)
         self.zigbee_properties = {}
         self.zigbee_trouble_properties = {}
         # the property widgets are removed asynchronously, so their ids must stay unique
@@ -140,28 +153,21 @@ class ZigbeeDevices(Widget):
                     "zone_type": device.zone_type,
                     "last_seen": device.last_seen.isoformat() if device.last_seen else None,
                     "registered": True,
-                    "capabilities": (device.device_metadata or {}).get("capabilities", {}),
+                    "signals": (device.device_metadata or {}).get("signals", []),
                 }
                 for device in devices
             }
 
     @staticmethod
-    def _capability_label(capability_key: str, descriptor) -> str:
-        endpoint, separator, attribute_key = capability_key.partition("/")
-        if not separator:
-            endpoint, attribute_key = DEFAULT_ZIGBEE_ENDPOINT, capability_key
-
-        cluster = descriptor.get("cluster") if isinstance(descriptor, dict) else None
-        attribute = (
-            descriptor.get("field") or descriptor.get("attribute")
-            if isinstance(descriptor, dict) else None
-        )
+    def _signal_label(signal) -> str:
+        cluster = signal.get("cluster")
+        attribute = signal.get("field") or signal.get("attribute")
         cluster_label = str(cluster or "").replace("_", " ").title()
         if cluster == IasZone.ep_attribute:
             cluster_label = IasZone.name
-        attribute_label = str(attribute or attribute_key).replace("_", " ").title()
+        attribute_label = str(attribute or signal.get("attributeId")).replace("_", " ").title()
         label = f"{cluster_label}: {attribute_label}" if cluster_label else attribute_label
-        return f"{label} (endpoint {endpoint})"
+        return f"{label} (endpoint {signal['endpoint']})"
 
     def refresh_zigbee_devices(self, update_state=False):
         """Rebuild the device list with a property checkbox row for every known device."""
@@ -189,20 +195,13 @@ class ZigbeeDevices(Widget):
                 if not isinstance(simulator_device, dict):
                     simulator_device = {}
                     simulator_devices[ieee] = simulator_device
-                current_capabilities = simulator_device.get("capabilities")
-                if not isinstance(current_capabilities, dict):
-                    current_capabilities = {}
-
-                capabilities = device.get("capabilities") or {}
-                simulator_device["capabilities"] = {
-                    capability_key: (
-                        current_capabilities[capability_key]
-                        if isinstance(current_capabilities.get(capability_key), bool)
-                        else False
-                    )
-                    for capability_key in capabilities
-                }
-                simulator_device["capability_metadata"] = capabilities
+                current_signals = simulator_device.get("signal_values", [])
+                signals = device.get("signals") or []
+                simulator_device["signal_values"] = [
+                    _signal_value_record(signal, _find_signal_value(current_signals, signal))
+                    for signal in signals
+                ]
+                simulator_device["signal_metadata"] = signals
                 for attribute in (
                     "name",
                     "manufacturer",
@@ -238,33 +237,25 @@ class ZigbeeDevices(Widget):
                 )
             ]
 
-            capabilities = device.get("capabilities") or {}
-            current_capabilities = simulator_devices.get(ieee, {}).get("capabilities", {})
-            if not isinstance(current_capabilities, dict):
-                current_capabilities = {}
-            properties = {
-                key: (
-                    current_capabilities[key]
-                    if isinstance(current_capabilities.get(key), bool)
-                    else False
-                )
-                for key in capabilities
-            }
-            for property_index, (capability_key, value) in enumerate(sorted(properties.items())):
+            signals = device.get("signals") or []
+            signal_values = simulator_devices.get(ieee, {}).get("signal_values", [])
+            for property_index, signal in enumerate(signals):
                 widget_id = f"zigbee-property-{generation}-{index}-{property_index}"
-                self.zigbee_properties[widget_id] = (ieee, capability_key)
+                self.zigbee_properties[widget_id] = (ieee, signal)
                 row.append(
                     Checkbox(
-                        self._capability_label(capability_key, capabilities[capability_key]),
+                        self._signal_label(signal),
                         id=widget_id,
-                        value=value,
+                        value=bool(_find_signal_value(signal_values, signal)),
                         classes="zigbee-property",
                     )
                 )
 
             ias_endpoints = {
-                key.partition("/")[0] for key in capabilities
-                if key.partition("/")[2] == IAS_ZONE_CAPABILITY
+                signal["endpoint"] for signal in signals
+                if signal["clusterId"] == int(IasZone.cluster_id)
+                and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
+                and signal.get("field") == "alarm"
             }
             for endpoint in sorted(ias_endpoints):
                 widget_id = f"zigbee-trouble-{generation}-{index}-{endpoint}"
@@ -287,7 +278,7 @@ class ZigbeeDevices(Widget):
             return
 
         selected_device_type = self.query_one("#zigbee-type", Select).value
-        capability_metadata = ZIGBEE_CAPABILITIES.get(selected_device_type, {})
+        signals = ZIGBEE_SIGNALS.get(selected_device_type, [])
 
         device = devices["devices"].setdefault(ieee_field, {})
         device["name"] = device.get("name", "Simulator Device")
@@ -298,8 +289,8 @@ class ZigbeeDevices(Widget):
         device["battery_level"] = 100
         device["signal_quality"] = 100
 
-        device["capabilities"] = {key: False for key in capability_metadata}
-        device["capability_metadata"] = capability_metadata
+        device["signal_values"] = [_signal_value_record(signal, False) for signal in signals]
+        device["signal_metadata"] = signals
         if selected_device_type == ZigbeeDeviceType.OPEN_DETECTOR:
             device["zone_type"] = int(ZoneType.Contact_Switch)
         device["last_seen"] = datetime.now().astimezone().isoformat()
@@ -333,12 +324,18 @@ class ZigbeeDevices(Widget):
         if not entry:
             return
 
-        ieee, capability_key = entry
+        ieee, signal = entry
         value = bool(event.value)
         device = get_zigbee_devices().get("devices", {}).get(ieee, {})
-        capabilities = device.get("capabilities", {})
         # the checkbox also reports the value set while building the widget
-        if capabilities.get(capability_key) == value:
+        if _find_signal_value(device.get("signal_values", []), signal) == value:
             return
 
-        set_zigbee_capability(ieee, capability_key, value)
+        set_zigbee_signal(
+            ieee,
+            signal["endpoint"],
+            signal["clusterId"],
+            signal["attributeId"],
+            signal.get("field"),
+            value,
+        )

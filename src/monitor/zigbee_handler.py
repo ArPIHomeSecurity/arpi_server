@@ -41,7 +41,9 @@ class ZigbeeDeviceStore:
     """
 
     _lock = RLock()
-    _sensor_data: ClassVar[dict[tuple[str, str, str], ZigbeeSensorData]] = {}
+    _sensor_data: ClassVar[
+        dict[tuple[str, str, int, int, str | None], ZigbeeSensorData]
+    ] = {}
 
     @classmethod
     def is_initialized(cls) -> bool:
@@ -54,7 +56,9 @@ class ZigbeeDeviceStore:
             (
                 str(sensor_data.ieee_address),
                 str(sensor_data.endpoint),
-                str(sensor_data.capability),
+                int(sensor_data.cluster_id),
+                int(sensor_data.attribute_id),
+                sensor_data.field,
             ): sensor_data
             for sensor_data in sensor_datas
         }
@@ -62,9 +66,13 @@ class ZigbeeDeviceStore:
             cls._sensor_data = new_sensor_data
 
     @classmethod
-    def get_sensor_data(cls, ieee_address, endpoint, capability) -> ZigbeeSensorData | None:
+    def get_sensor_data(
+        cls, ieee_address, endpoint, cluster_id, attribute_id, field=None
+    ) -> ZigbeeSensorData | None:
         with cls._lock:
-            return cls._sensor_data.get((str(ieee_address), str(endpoint), str(capability)))
+            return cls._sensor_data.get(
+                (str(ieee_address), str(endpoint), int(cluster_id), int(attribute_id), field)
+            )
 
     @classmethod
     def get_sensor_datas(cls) -> list[ZigbeeSensorData]:
@@ -90,11 +98,11 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, met
     }
     if device.zone_type is not None:
         values["zone_type"] = device.zone_type
-    if device.capabilities or include_identity or metadata is not None:
-        metadata = metadata or {}
+    if device.signals or include_identity or metadata is not None:
+        metadata = {key: value for key, value in (metadata or {}).items() if key != "capabilities"}
         values["metadata"] = {
             **metadata,
-            "capabilities": device.capabilities,
+            "signals": device.signals,
         }
     if include_identity:
         values.update(

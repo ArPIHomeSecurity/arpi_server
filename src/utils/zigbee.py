@@ -8,20 +8,6 @@ from zigpy.zcl.clusters.measurement import OccupancySensing
 from zigpy.zcl.clusters.security import IasZone, ZoneStatus
 
 
-def encode_capability(cluster_id: int, attribute_id: int) -> str:
-    """Encode Zigbee attribute IDs as an a:cccc:aaaa capability."""
-    if not (0 <= cluster_id <= 0xFFFF and 0 <= attribute_id <= 0xFFFF):
-        raise ValueError("Cluster and attribute IDs must be between 0 and 65535")
-
-    return f"a:{cluster_id:04x}:{attribute_id:04x}"
-
-
-IAS_ZONE_CAPABILITY = encode_capability(
-    IasZone.cluster_id, IasZone.AttributeDefs.zone_status.id
-)
-IAS_TAMPER_CAPABILITY = f"{IAS_ZONE_CAPABILITY}:tamper"
-
-
 class ZigbeeValueDecoder(StrEnum):
     IAS_ZONE_STATUS = "ias_zone_status"
     BATTERY_PERCENTAGE = "battery_percentage"
@@ -30,22 +16,34 @@ class ZigbeeValueDecoder(StrEnum):
 
 @dataclass(frozen=True)
 class ZigbeeSignalDefinition:
-    capability: str
     field: str | None = None
 
 
 @dataclass(frozen=True)
 class ZigbeeAttributeDefinition:
+    """
+    Defines the characteristics of a Zigbee attribute.
+    """
     cluster: Any
     attribute: Any
+    # the reporting interval in seconds as a tuple of (min, max) or None if not reportable
     reporting: tuple[int, int] | None = None
+    # the decoder to use for this attribute, or None if no decoding is needed
     decoder: ZigbeeValueDecoder | None = None
+    # the signals that this attribute can produce, or an empty tuple if none
     signals: tuple[ZigbeeSignalDefinition, ...] = ()
+    # the commands that this attribute can produce, or an empty tuple if none 
     commands: tuple[Any, ...] = ()
 
     @property
     def attribute_id(self) -> int:
         return int(self.attribute.id)
+
+    def signal_for(self, field: str) -> ZigbeeSignalDefinition:
+        for signal in self.signals:
+            if signal.field == field:
+                return signal
+        raise KeyError(f"No signal for field {field!r}")
 
 
 @dataclass(frozen=True)
@@ -60,8 +58,8 @@ IAS_ZONE_STATUS_ATTRIBUTE = ZigbeeAttributeDefinition(
     decoder=ZigbeeValueDecoder.IAS_ZONE_STATUS,
     reporting=(60, 600),
     signals=(
-        ZigbeeSignalDefinition(IAS_ZONE_CAPABILITY, "alarm"),
-        ZigbeeSignalDefinition(IAS_TAMPER_CAPABILITY, "tamper"),
+        ZigbeeSignalDefinition("alarm"),
+        ZigbeeSignalDefinition("tamper"),
     ),
     commands=(IasZone.ClientCommandDefs.status_change_notification,),
 )
@@ -80,14 +78,7 @@ ZIGBEE_ATTRIBUTE_REGISTRY = {
             cluster=OccupancySensing,
             attribute=OccupancySensing.AttributeDefs.occupancy,
             reporting=(60, 600),
-            signals=(
-                ZigbeeSignalDefinition(
-                    encode_capability(
-                        OccupancySensing.cluster_id,
-                        OccupancySensing.AttributeDefs.occupancy.id,
-                    )
-                ),
-            ),
+            signals=(ZigbeeSignalDefinition(),),
         ),
     ),
     int(OnOff.cluster_id): (
@@ -95,11 +86,7 @@ ZIGBEE_ATTRIBUTE_REGISTRY = {
             cluster=OnOff,
             attribute=OnOff.AttributeDefs.on_off,
             reporting=(60, 600),
-            signals=(
-                ZigbeeSignalDefinition(
-                    encode_capability(OnOff.cluster_id, OnOff.AttributeDefs.on_off.id)
-                ),
-            ),
+            signals=(ZigbeeSignalDefinition(),),
         ),
     ),
     int(PollControl.cluster_id): (
@@ -120,9 +107,7 @@ ZIGBEE_ATTRIBUTE_REGISTRY = {
 }
 
 
-def decode_zigbee_attribute(
-    definition: ZigbeeAttributeDefinition, value
-) -> ZigbeeDecodedValue:
+def decode_zigbee_attribute(definition: ZigbeeAttributeDefinition, value) -> ZigbeeDecodedValue:
     match definition.decoder:
         case None:
             return ZigbeeDecodedValue(
@@ -152,14 +137,14 @@ def decode_zigbee_attribute(
             return ZigbeeDecodedValue()
 
 
-def describe_zigbee_signals(cluster, endpoint_id: int) -> dict[str, dict]:
-    descriptors = {}
+def describe_zigbee_signals(cluster, endpoint_id: int) -> list[dict]:
+    descriptors = []
     for definition in ZIGBEE_ATTRIBUTE_REGISTRY.get(int(cluster.cluster_id), ()):
         if not definition.signals:
             continue
 
         attribute = cluster.find_attribute(definition.attribute_id)
-        descriptors.update(
+        descriptors.extend(
             _describe_attribute_signals(
                 definition,
                 endpoint_id,
@@ -172,7 +157,7 @@ def describe_zigbee_signals(cluster, endpoint_id: int) -> dict[str, dict]:
 
 def describe_zigbee_attribute(
     definition: ZigbeeAttributeDefinition, endpoint_id: int
-) -> dict[str, dict]:
+) -> list[dict]:
     return _describe_attribute_signals(
         definition,
         endpoint_id,
@@ -186,16 +171,13 @@ def _describe_attribute_signals(
     endpoint_id: int,
     attribute,
     cluster_name: str,
-) -> dict[str, dict]:
-    descriptors = {}
+) -> list[dict]:
+    descriptors = []
     if not definition.signals:
         return descriptors
 
     sources = []
-    if (
-        definition.reporting is not None
-        and attribute.access & foundation.ZCLAttributeAccess.Report
-    ):
+    if definition.reporting is not None and attribute.access & foundation.ZCLAttributeAccess.Report:
         sources.append("attribute")
     sources.extend(f"command:{command.name}" for command in definition.commands)
     if not sources:
@@ -203,6 +185,7 @@ def _describe_attribute_signals(
 
     for signal in definition.signals:
         descriptor = {
+            "endpoint": str(endpoint_id),
             "cluster": cluster_name,
             "clusterId": int(definition.cluster.cluster_id),
             "attribute": attribute.name,
@@ -212,7 +195,7 @@ def _describe_attribute_signals(
         }
         if signal.field is not None:
             descriptor["field"] = signal.field
-        descriptors[f"{endpoint_id}/{signal.capability}"] = descriptor
+        descriptors.append(descriptor)
     return descriptors
 
 
@@ -222,5 +205,3 @@ def decode_zone_status(value) -> tuple[bool, bool]:
         bool(status & (ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2)),
         bool(status & ZoneStatus.Tamper),
     )
-
-

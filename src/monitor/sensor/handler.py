@@ -77,7 +77,8 @@ class SensorHandler:
             sensor is not None
             and sensor.zigbee_device_id is not None
             and sensor.zigbee_endpoint is not None
-            and sensor.zigbee_capability is not None
+            and sensor.zigbee_cluster_id is not None
+            and sensor.zigbee_attribute_id is not None
         )
 
     def initialize(self):
@@ -246,7 +247,7 @@ class SensorHandler:
     def validate_sensor_config(self):
         """
         Validate the sensor configuration.
-        Wired sensors must remain unique by channel; Zigbee sensors are mapped by device and capability.
+        Wired sensors must remain unique by channel; Zigbee sensors are mapped by device and signal.
         """
         logger.debug("Validating sensor configuration...")
         channels = set()
@@ -312,7 +313,9 @@ class SensorHandler:
                     zigbee_data = ZigbeeDeviceStore.get_sensor_data(
                         device.ieee_address,
                         sensor.zigbee_endpoint,
-                        sensor.zigbee_capability,
+                        sensor.zigbee_cluster_id,
+                        sensor.zigbee_attribute_id,
+                        sensor.zigbee_field,
                     )
                 is_alert = (
                     bool(zigbee_data.value)
@@ -322,17 +325,21 @@ class SensorHandler:
                 is_error = zigbee_data is None or zigbee_data.value is None
                 if is_error:
                     logger.error(
-                        "Sensor %s (zigbee/%s/%s) encountered an error: %s",
+                        "Sensor %s (zigbee/%s/%04x/%04x/%s) encountered an error: %s",
                         sensor.name,
                         sensor.zigbee_endpoint,
-                        sensor.zigbee_capability,
+                        sensor.zigbee_cluster_id,
+                        sensor.zigbee_attribute_id,
+                        sensor.zigbee_field,
                         zigbee_data,
                     )
                 logger.trace(
-                    "Sensor %s (zigbee/%s/%s) value: %s => alert: %s, error: %s",
+                    "Sensor %s (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s",
                     sensor.name,
                     sensor.zigbee_endpoint,
-                    sensor.zigbee_capability,
+                    sensor.zigbee_cluster_id,
+                    sensor.zigbee_attribute_id,
+                    sensor.zigbee_field,
                     getattr(zigbee_data, "value", None),
                     is_alert,
                     is_error,

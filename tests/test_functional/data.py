@@ -36,7 +36,6 @@ from utils.models import (
     Zone,
     metadata,
 )
-from utils.zigbee import IAS_TAMPER_CAPABILITY, encode_capability
 
 logger = logging.getLogger(__name__)
 
@@ -282,15 +281,15 @@ def _create_sensors(session, sensor_types, area, zone_1, zone_2, zone_tamper) ->
 def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
     endpoint = "1"
     zone_status = IasZone.AttributeDefs.zone_status
-    capability = encode_capability(IasZone.cluster_id, zone_status.id)
     devices = {
         "X001": ZigbeeDevice(
             ieee_address="11:22:33:44:55:66:77:88",
             name="Zigbee Contact Sensor",
             zone_type=int(ZoneType.Contact_Switch),
             metadata={
-                "capabilities": {
-                    f"{endpoint}/{capability}": {
+                "signals": [
+                    {
+                        "endpoint": endpoint,
                         "cluster": IasZone.ep_attribute,
                         "clusterId": int(IasZone.cluster_id),
                         "attribute": zone_status.name,
@@ -299,7 +298,8 @@ def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
                         "field": "alarm",
                         "sources": ["command:status_change_notification"],
                     },
-                    f"{endpoint}/{IAS_TAMPER_CAPABILITY}": {
+                    {
+                        "endpoint": endpoint,
                         "cluster": IasZone.ep_attribute,
                         "clusterId": int(IasZone.cluster_id),
                         "attribute": zone_status.name,
@@ -308,7 +308,7 @@ def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
                         "field": "tamper",
                         "sources": ["command:status_change_notification"],
                     },
-                }
+                ]
             },
         )
     }
@@ -323,9 +323,9 @@ def _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones) ->
         channel=None,
         zigbee_device_id=zigbee_devices["X001"].id,
         zigbee_endpoint="1",
-        zigbee_capability=encode_capability(
-            IasZone.cluster_id, IasZone.AttributeDefs.zone_status.id
-        ),
+        zigbee_cluster_id=int(IasZone.cluster_id),
+        zigbee_attribute_id=int(IasZone.AttributeDefs.zone_status.id),
+        zigbee_field="alarm",
         sensor_type=sensor_types["Open"],
         area=area,
         zone=zones["no_delay"],

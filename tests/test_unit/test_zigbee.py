@@ -1,39 +1,7 @@
-from datetime import UTC, datetime
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
-
 import pytest
-from zigpy.zcl.clusters.security import IasZone, ZoneStatus, ZoneType
+from zigpy.zcl.clusters.security import ZoneStatus
 
-from monitor.adapters.zigbee import ZigbeeAdapter
-from utils.zigbee import (
-    IAS_TAMPER_CAPABILITY,
-    IAS_ZONE_CAPABILITY,
-    decode_zone_status,
-    encode_capability,
-)
-
-
-@pytest.mark.parametrize(
-    ("cluster_id", "attribute_id", "capability"),
-    [
-        (0x0500, 0x0002, "a:0500:0002"),
-        (0x0406, 0x0000, "a:0406:0000"),
-        (0x0000, 0x0000, "a:0000:0000"),
-        (0xFFFF, 0xFFFF, "a:ffff:ffff"),
-    ],
-)
-def test_encode_capability(cluster_id, attribute_id, capability):
-    assert encode_capability(cluster_id, attribute_id) == capability
-
-
-@pytest.mark.parametrize(
-    ("cluster_id", "attribute_id"),
-    [(-1, 0), (0, -1), (0x10000, 0), (0, 0x10000)],
-)
-def test_encode_out_of_range_ids(cluster_id, attribute_id):
-    with pytest.raises(ValueError, match="between 0 and 65535"):
-        encode_capability(cluster_id, attribute_id)
+from utils.zigbee import IAS_ZONE_STATUS_ATTRIBUTE, decode_zone_status
 
 
 @pytest.mark.parametrize(
@@ -54,5 +22,6 @@ def test_decode_zone_status(status, alarm, tamper):
     assert decode_zone_status(status) == (alarm, tamper)
 
 
-def test_tamper_capability():
-    assert IAS_TAMPER_CAPABILITY == "a:0500:0002:tamper"
+def test_ias_signals_are_distinguished_by_field():
+    assert IAS_ZONE_STATUS_ATTRIBUTE.signal_for("alarm").field == "alarm"
+    assert IAS_ZONE_STATUS_ATTRIBUTE.signal_for("tamper").field == "tamper"
