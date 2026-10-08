@@ -90,11 +90,11 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, met
     }
     if device.zone_type is not None:
         values["zone_type"] = device.zone_type
-    if device.capabilities or include_identity:
+    if device.capabilities or include_identity or metadata is not None:
         metadata = metadata or {}
         values["metadata"] = {
             **metadata,
-            "capabilities": {**metadata.get("capabilities", {}), **device.capabilities},
+            "capabilities": device.capabilities,
         }
     if include_identity:
         values.update(

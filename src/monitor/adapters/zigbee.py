@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import logging
 import os
 import threading
@@ -8,41 +7,23 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from os import environ
 
+from zigpy.application import ControllerApplication as ZigpyControllerApplication
 from bellows.zigbee.application import ControllerApplication
 from zigpy.exceptions import ZigbeeException
 from zigpy.types import EUI64
-from zigpy.zcl import foundation
-from zigpy.zcl.clusters.general import OnOff, PollControl, PowerConfiguration
-from zigpy.zcl.clusters.measurement import OccupancySensing
-from zigpy.zcl.clusters.security import IasZone
 
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
 from utils.constants import LOG_ADZIGBEE
 from utils.zigbee import (
-    IAS_TAMPER_CAPABILITY,
-    IAS_ZONE_CAPABILITY,
-    decode_zone_status,
-    encode_capability,
-    normalize_attribute_value,
+    ZIGBEE_ATTRIBUTE_REGISTRY,
+    decode_zigbee_attribute,
+    describe_zigbee_signals,
 )
 
 USE_ZIGBEE_SIMULATOR = environ.get("USE_ZIGBEE_SIMULATOR", "false").lower() in ["true", "1", "yes"]
 
 logger = logging.getLogger(LOG_ADZIGBEE)
-
-SUPPORTED_CLUSTERS = {
-    int(IasZone.cluster_id),
-    int(OccupancySensing.cluster_id),
-    int(OnOff.cluster_id),
-    int(PollControl.cluster_id),
-    int(PowerConfiguration.cluster_id),
-}
-SUPPORTED_SENSOR_ATTRIBUTES = {
-    int(IasZone.cluster_id): IasZone.AttributeDefs.zone_status,
-    int(OccupancySensing.cluster_id): OccupancySensing.AttributeDefs.occupancy,
-    int(OnOff.cluster_id): OnOff.AttributeDefs.on_off,
-}
 
 
 @dataclass
@@ -52,7 +33,6 @@ class ZigbeeSensorData:
     capability: str
     value: object
     timestamp: str | None = None
-    error_reason: str | None = None
 
 
 @dataclass
@@ -74,6 +54,7 @@ def get_zigbee_adapter():
     """Return the simulator or real Zigbee adapter based on the runtime mode."""
     if USE_ZIGBEE_SIMULATOR:
         from monitor.adapters.mock.zigbee import ZigbeeAdapter as MockZigbeeAdapter
+
         logger.debug("Using mock Zigbee adapter")
         return MockZigbeeAdapter()
 
@@ -81,13 +62,16 @@ def get_zigbee_adapter():
 
 
 class ZigbeeAdapter:
+    """
+    A class to manage the Zigbee coordinator for device communication.
+    """
     def __init__(self):
         self._enabled = False
         self._serial_port: str | None = None
         self._baudrate: int = 115200
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
-        self.app: ControllerApplication | None = None
+        self._app: ZigpyControllerApplication | None = None
         self._running = False
 
         self._pairing_lock = threading.Lock()
@@ -125,7 +109,9 @@ class ZigbeeAdapter:
             return
 
         if not os.path.exists(self._serial_port):
-            logger.warning("Zigbee serial port %s does not exist, coordinator not started", self._serial_port)
+            logger.warning(
+                "Zigbee serial port %s does not exist, coordinator not started", self._serial_port
+            )
             self._enabled = False
             return
 
@@ -134,7 +120,7 @@ class ZigbeeAdapter:
         )
         self._thread.start()
 
-        while self.app is None and self._running:
+        while self._app is None and self._running:
             time.sleep(0.05)
 
     def _run_event_loop(self):
@@ -158,32 +144,115 @@ class ZigbeeAdapter:
                 "baudrate": self._baudrate,
             },
         }
-        self.app = await ControllerApplication.new(config, auto_form=False)
-        self.app.add_listener(self)
+        self._app = await ControllerApplication.new(config, auto_form=False)
+        self._app.add_listener(self)
 
         # devices restored from the zigpy database do not emit device_initialized
-        for device in list(self.app.devices.values()):
-            if str(device.ieee) == str(self.app.state.node_info.ieee):
+        for device in list(self._app.devices.values()):
+            if str(device.ieee) == str(self._app.state.node_info.ieee):
                 continue
             await self._subscribe_clusters(device)
         logger.info("Bellows radio initialized")
 
     def stop(self):
         """Thread-safe shutdown sequence."""
-        if self.app is None or self._loop is None:
+        if self._app is None or self._loop is None:
             self._running = False
             return
 
         if self._loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self.app.shutdown(), self._loop)
+            future = asyncio.run_coroutine_threadsafe(self._app.shutdown(), self._loop)
             future.result(timeout=5.0)
             self._loop.call_soon_threadsafe(self._loop.stop)
         self._running = False
 
     # --- zigpy application listener callbacks, invoked from the loop thread ---
+    def device_initialized(self, device):
+        """
+        Callback invoked by zigpy when a new device is paired or restored from the database.
+        Schedule the subscription to attribute reports on the event loop thread.
+        """
+        self._schedule_subscribe(device)
+
+        ieee_address = str(device.ieee)
+        with self._state_lock:
+            self._offline_devices.discard(ieee_address)
+
+        discovered = self._build_discovered_device(device)
+
+        with self._pairing_lock:
+            if ieee_address in self._pairing_seen:
+                return
+
+            self._pairing_seen.add(ieee_address)
+            self._discovered.append(discovered)
+
+        logger.info("Discovered Zigbee device %s", ieee_address)
+
+    def device_reinterviewed(self, device):
+        """
+        Callback invoked by zigpy when a device has been re-interviewed after a reset or rejoin.
+        """
+        self._schedule_subscribe(device)
+
+    def device_left(self, device):
+        """
+        Callback invoked by zigpy when a device has been removed from the network.
+        """
+        self._mark_unavailable(str(device.ieee))
+
+    def device_removed(self, device):
+        """
+        Callback invoked by zigpy when a device has been removed from the network.
+        """
+        self._mark_unavailable(str(device.ieee))
+
+    def attribute_updated(self, cluster, attrid, value, timestamp):
+        """
+        Cluster-level callback fired by zigpy whenever a device reports a value.
+        This is the main entry point for receiving sensor readings from devices.
+        """
+        self._store_reading(cluster, attrid, value, timestamp)
+
+    def cluster_command(self, cluster, tsn, command_id, args):
+        """
+        Callback invoked by zigpy when a cluster command is received.
+        This is used to handle IAS Zone status notifications, which are sent
+        as commands rather than attribute reports.
+        """
+        definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(int(cluster.cluster_id), ())
+        definition = None
+        for d in definitions:
+            if any(command.id == int(command_id) for command in d.commands):
+                definition = d
+                break
+
+        if definition is None:
+            return
+
+        ieee_address = str(cluster.endpoint.device.ieee)
+        endpoint_id = cluster.endpoint.endpoint_id
+        logger.debug(
+            "IAS Zone status notification received for device %s, endpoint %s: %s",
+            ieee_address,
+            endpoint_id,
+            args,
+        )
+
+        timestamp = datetime.now(UTC)
+        attribute = cluster.find_attribute(definition.attribute_id)
+        self._store_reading(
+            cluster,
+            definition.attribute_id,
+            getattr(args, attribute.name),
+            timestamp,
+        )
+
+    # --- Zigbee cluster subscription and attribute handling ---
     async def _subscribe_clusters(self, device):
-        """Attach an attribute_updated listener to every supported cluster on the device,
-        and read/subscribe to its attributes.
+        """
+        Subscribe to attribute reports for all clusters on the device.
+        This is called when a device is first paired or restored from the zigpy database.
         """
         logger.debug("Subscribing to clusters for device %s", device.ieee)
         for endpoint_id, endpoint in device.endpoints.items():
@@ -191,42 +260,33 @@ class ZigbeeAdapter:
                 continue
 
             for cluster in endpoint.in_clusters.values():
+                # check for a registered attribute definition for this cluster
                 cluster_id = int(cluster.cluster_id)
-                if cluster_id not in SUPPORTED_CLUSTERS:
+                definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(cluster_id)
+                if definitions is None:
                     continue
 
+                # attach a listener to the cluster
+                # so that attribute updates are reported to this adapter
                 cluster.add_context_listener(self)
-
-                if cluster_id == PollControl.cluster_id:
-                    await self._setup_reporting(
-                        cluster, PollControl.AttributeDefs.checkin_interval.name, 60, 600
-                    )
-                elif cluster_id == IasZone.cluster_id:
-                    attribute = IasZone.AttributeDefs.zone_type
-                    cached_type = cluster.get(attribute.id)
-                    if cached_type is not None:
-                        self._store_reading(
-                            cluster, attribute.id, attribute.name, cached_type, datetime.now(UTC)
+                for definition in definitions:
+                    attribute = cluster.find_attribute(definition.attribute_id)
+                    if definition.reporting is not None:
+                        await self._setup_reporting(
+                            cluster,
+                            attribute.name,
+                            *definition.reporting,
                         )
-                    await self._read_attribute(cluster, attribute.name)
-                    await self._setup_reporting(
-                        cluster, IasZone.AttributeDefs.zone_status.name, 60, 600
-                    )
-                elif cluster_id == OccupancySensing.cluster_id:
-                    await self._setup_reporting(
-                        cluster, OccupancySensing.AttributeDefs.occupancy.name, 60, 600
-                    )
-                elif cluster_id == OnOff.cluster_id:
-                    await self._setup_reporting(
-                        cluster, OnOff.AttributeDefs.on_off.name, 60, 600
-                    )
-                elif cluster_id == PowerConfiguration.cluster_id:
-                    await self._setup_reporting(
-                        cluster,
-                        PowerConfiguration.AttributeDefs.battery_percentage_remaining.name,
-                        3600,
-                        21600,
-                    )
+                    else:
+                        cached_value = cluster.get(definition.attribute_id)
+                        if cached_value is not None:
+                            self._store_reading(
+                                cluster,
+                                definition.attribute_id,
+                                cached_value,
+                                datetime.now(UTC),
+                            )
+                        await self._read_attribute(cluster, attribute.name)
 
     async def _setup_reporting(
         self,
@@ -263,9 +323,7 @@ class ZigbeeAdapter:
         # zigpy suppresses the attribute_updated listener for read responses
         attribute_def = cluster.find_attribute(attribute)
         for value in success.values():
-            self._store_reading(
-                cluster, attribute_def.id, attribute_def.name, value, datetime.now(UTC)
-            )
+            self._store_reading(cluster, attribute_def.id, value, datetime.now(UTC))
 
     def _build_discovered_device(self, device) -> ZigbeeDevice:
         capabilities = {}
@@ -274,38 +332,7 @@ class ZigbeeAdapter:
                 continue
 
             for cluster in endpoint.in_clusters.values():
-                cluster_id = int(cluster.cluster_id)
-                attribute_def = SUPPORTED_SENSOR_ATTRIBUTES.get(cluster_id)
-                if attribute_def is None:
-                    continue
-
-                cluster_name = cluster.ep_attribute or type(cluster).__name__
-                attribute = cluster.find_attribute(attribute_def.id)
-                capability = encode_capability(cluster_id, attribute.id)
-                is_reportable = bool(attribute.access & foundation.ZCLAttributeAccess.Report)
-                sources = ["attribute"] if is_reportable else []
-                if cluster_id == IasZone.cluster_id:
-                    sources.append(
-                        f"command:{IasZone.ClientCommandDefs.status_change_notification.name}"
-                    )
-                if not sources:
-                    continue
-
-                capabilities[f"{endpoint_id}/{capability}"] = {
-                    "cluster": cluster_name,
-                    "clusterId": cluster_id,
-                    "attribute": attribute.name,
-                    "attributeId": int(attribute.id),
-                    "valueType": getattr(attribute.type, "__name__", str(attribute.type)),
-                    "sources": sources,
-                }
-                if capability == IAS_ZONE_CAPABILITY:
-                    descriptor = capabilities[f"{endpoint_id}/{capability}"]
-                    descriptor["field"] = "alarm"
-                    capabilities[f"{endpoint_id}/{IAS_TAMPER_CAPABILITY}"] = {
-                        **descriptor,
-                        "field": "tamper",
-                    }
+                capabilities.update(describe_zigbee_signals(cluster, endpoint_id))
 
         with self._state_lock:
             zone_types = sorted(
@@ -330,128 +357,60 @@ class ZigbeeAdapter:
             zone_type=zone_types[0][1] if zone_types else None,
         )
 
-
     def _schedule_subscribe(self, device):
-        # zigpy invokes listener callbacks synchronously on the loop thread, so async work must be scheduled
+        """
+        Schedule the subscription to attribute reports on the event loop thread.
+        This is necessary because zigpy invokes listener callbacks synchronously on the loop thread,
+        so any async work must be scheduled to run on the loop thread.
+        """
         task = asyncio.get_running_loop().create_task(self._subscribe_clusters(device))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    def device_initialized(self, device):
-        """Subscribe to attribute reports and, if newly joined, queue for pairing UI."""
-        self._schedule_subscribe(device)
-
-        ieee_address = str(device.ieee)
-        with self._state_lock:
-            self._offline_devices.discard(ieee_address)
-
-        discovered = self._build_discovered_device(device)
-
-        with self._pairing_lock:
-            if ieee_address in self._pairing_seen:
-                return
-
-            self._pairing_seen.add(ieee_address)
-            self._discovered.append(discovered)
-
-        logger.info("Discovered Zigbee device %s", ieee_address)
-
-    def device_reinterviewed(self, device):
-        """Re-attach cluster listeners after zigpy replaces the device on re-interview."""
-        self._schedule_subscribe(device)
-
-    def device_left(self, device):
-        self._mark_unavailable(str(device.ieee))
-
-    def device_removed(self, device):
-        self._mark_unavailable(str(device.ieee))
-
-    def attribute_updated(self, cluster, attrid, value, timestamp):
-        """Cluster-level callback fired by zigpy whenever a device reports a value."""
-        try:
-            attr_name = cluster.find_attribute(attrid).name
-        except KeyError:
-            attr_name = str(attrid)
-
-        self._store_reading(cluster, attrid, attr_name, value, timestamp)
-
-    def _store_reading(self, cluster, attrid, attr_name, value, timestamp):
+    def _store_reading(self, cluster, attrid, value, timestamp):
         """Normalize an attribute value and publish it as the latest reading."""
-        ieee_address = str(cluster.endpoint.device.ieee)
-        endpoint_id = cluster.endpoint.endpoint_id
-        with self._state_lock:
-            if (
-                int(cluster.cluster_id) == IasZone.cluster_id
-                and attr_name == IasZone.AttributeDefs.zone_type.name
-            ):
-                if value is not None:
-                    self._zone_types[(ieee_address, endpoint_id)] = int(value)
-                return
-            if (
-                int(cluster.cluster_id) == PowerConfiguration.cluster_id
-                and attr_name == PowerConfiguration.AttributeDefs.battery_percentage_remaining.name
-            ):
-                with contextlib.suppress(TypeError, ValueError):
-                    # the ZCL attribute is reported in half percent steps
-                    logger.debug(
-                        "Raw battery percentage remaining for device %s: %s",
-                        ieee_address,
-                        value,
-                    )
-                    self._battery_levels[ieee_address] = min(100, int(value) // 2)
-                return
+        definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(int(cluster.cluster_id), ())
+        definition = None
+        for d in definitions:
+            if d.attribute_id == attrid:
+                definition = d
+                break
 
-        attribute_def = SUPPORTED_SENSOR_ATTRIBUTES.get(int(cluster.cluster_id))
-        if attribute_def is None or attr_name != attribute_def.name:
+        if definition is None:
             return
 
-        capability = encode_capability(cluster.cluster_id, attrid)
-        values = {capability: normalize_attribute_value(cluster.cluster_id, attr_name, value)}
-        error_reason = None
-        if capability == IAS_ZONE_CAPABILITY:
-            alarm, tamper, error_reason = decode_zone_status(value)
-            values = {IAS_ZONE_CAPABILITY: alarm, IAS_TAMPER_CAPABILITY: tamper}
+        ieee_address = str(cluster.endpoint.device.ieee)
+        endpoint_id = cluster.endpoint.endpoint_id
+        decoded = decode_zigbee_attribute(definition, value)
+        if decoded.device_state is not None:
+            state_name, state_value = decoded.device_state
+            with self._state_lock:
+                if state_name == "zone_type":
+                    self._zone_types[(ieee_address, endpoint_id)] = state_value
+                elif state_name == "battery_level":
+                    self._battery_levels[ieee_address] = state_value
+            if not decoded.signals:
+                return
+
+        if not decoded.signals:
+            return
 
         with self._readings_lock:
-            for reading_capability, reading_value in values.items():
-                self._readings[(ieee_address, endpoint_id, reading_capability)] = ZigbeeSensorData(
+            for signal, reading_value in decoded.signals:
+                self._readings[(ieee_address, endpoint_id, signal.capability)] = ZigbeeSensorData(
                     ieee_address=ieee_address,
                     endpoint=str(endpoint_id),
-                    capability=reading_capability,
+                    capability=signal.capability,
                     value=reading_value,
                     timestamp=timestamp.isoformat(),
-                    error_reason=error_reason,
                 )
             logger.debug(
                 "Attribute updated for device %s, endpoint %s, capability %s: %s",
                 ieee_address,
                 endpoint_id,
-                capability,
+                decoded.signals[0][0].capability,
                 value,
             )
-
-    def cluster_command(self, cluster, tsn, command_id, args):
-        """Fired for incoming ZCL commands, e.g. IAS Zone status change notifications."""
-        if (
-            int(cluster.cluster_id) != IasZone.cluster_id
-            or command_id != IasZone.ClientCommandDefs.status_change_notification.id
-        ):
-            return
-
-        ieee_address = str(cluster.endpoint.device.ieee)
-        endpoint_id = cluster.endpoint.endpoint_id
-        logger.debug(
-            "IAS Zone status notification received for device %s, endpoint %s: %s",
-            ieee_address,
-            endpoint_id,
-            args,
-        )
-
-        timestamp = datetime.now(UTC)
-        attribute = IasZone.AttributeDefs.zone_status
-        self._store_reading(
-            cluster, attribute.id, attribute.name, args.zone_status, timestamp
-        )
 
     def _mark_unavailable(self, ieee_address: str):
         with self._state_lock:
@@ -464,53 +423,66 @@ class ZigbeeAdapter:
 
     # --- Poll-facing API, safe to call from any thread ---
     def permit_joining(self, duration_seconds) -> bool:
-        """Start the permit joining process for a specified duration."""
+        """
+        Start the permit joining process for a specified duration.
+        Returns True if joining was successfully enabled, False otherwise.
+        """
         if not self._enabled:
             logger.warning("Zigbee coordinator is disabled, joining not permitted")
             return False
 
-        if not self._loop or not self.app:
-            raise RuntimeError("Controller is not running.")
+        if not self._loop or not self._app:
+            logger.warning("Zigbee coordinator is not running, joining not permitted")
+            return False
 
         with self._pairing_lock:
-            self._pairing_seen = {str(device.ieee) for device in self.app.devices.values()}
+            self._pairing_seen = {str(device.ieee) for device in self._app.devices.values()}
             self._discovered.clear()
 
-        future = asyncio.run_coroutine_threadsafe(self.app.permit(duration_seconds), self._loop)
+        future = asyncio.run_coroutine_threadsafe(self._app.permit(duration_seconds), self._loop)
         future.result(timeout=10.0)
         logger.info("Zigbee joining enabled for %s seconds", duration_seconds)
         return True
 
     def get_joined_devices(self) -> list[ZigbeeDevice]:
-        """Drain devices queued by device_initialized() since the last poll."""
+        """
+        Drain devices queued by device_initialized() since the last poll.
+        """
         with self._pairing_lock:
             devices, self._discovered = self._discovered, []
         return devices
 
     def unpair_device(self, ieee_address: str) -> bool:
-        """Unpair the specified Zigbee device."""
+        """
+        Unpair the specified Zigbee device.
+        Returns True if unpairing was successful, False otherwise.
+        """
         logger.info("Unpairing Zigbee device: %s", ieee_address)
         if not self._enabled:
             logger.warning("Zigbee coordinator is disabled, unpairing not possible")
             return False
 
-        if not self._loop or not self.app:
-            raise RuntimeError("Controller is not running.")
+        if not self._loop or not self._app:
+            logger.warning("Zigbee coordinator is not running, unpairing not possible")
+            return False
 
         ieee = EUI64.convert(ieee_address)
-        future = asyncio.run_coroutine_threadsafe(self.app.remove(ieee), self._loop)
+        future = asyncio.run_coroutine_threadsafe(self._app.remove(ieee), self._loop)
         future.result(timeout=10.0)
         logger.info("Zigbee device unpaired: %s", ieee_address)
         return True
 
     def get_device_states(self) -> list[ZigbeeDevice]:
-        """Return the coordinator's current view of every known device."""
-        if not self.app:
+        """
+        Return the coordinator's current view of every known device.
+        This includes devices that are currently offline or unavailable.
+        """
+        if not self._app:
             return []
 
-        coordinator_ieee = str(self.app.state.node_info.ieee)
+        coordinator_ieee = str(self._app.state.node_info.ieee)
         devices = []
-        for device in list(self.app.devices.values()):
+        for device in list(self._app.devices.values()):
             ieee_address = str(device.ieee)
             if ieee_address == coordinator_ieee:
                 continue

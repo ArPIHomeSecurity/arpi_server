@@ -22,40 +22,31 @@ from monitor.adapters.mock.utils import (
 )
 from monitor.database import create_database_session
 from utils.models import ZigbeeDevice
-from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, encode_capability
+from utils.zigbee import (
+    IAS_ZONE_CAPABILITY,
+    ZIGBEE_ATTRIBUTE_REGISTRY,
+    describe_zigbee_attribute,
+)
 
 DEFAULT_ZIGBEE_ENDPOINT = "1"
 
 
-def _capability_descriptor(cluster, attribute, sources=("attribute",)):
-    capability = encode_capability(cluster.cluster_id, attribute.id)
+def _registered_signals(cluster):
     return {
-        f"{DEFAULT_ZIGBEE_ENDPOINT}/{capability}": {
-            "cluster": cluster.ep_attribute,
-            "clusterId": int(cluster.cluster_id),
-            "attribute": attribute.name,
-            "attributeId": int(attribute.id),
-            "valueType": attribute.type.__name__,
-            "sources": list(sources),
-        }
+        key: descriptor
+        for definition in ZIGBEE_ATTRIBUTE_REGISTRY[int(cluster.cluster_id)]
+        for key, descriptor in describe_zigbee_attribute(
+            definition, int(DEFAULT_ZIGBEE_ENDPOINT)
+        ).items()
     }
 
 
 OPEN_DETECTOR_CAPABILITIES = {
-    **_capability_descriptor(
-        IasZone,
-        IasZone.AttributeDefs.zone_status,
-        sources=(f"command:{IasZone.ClientCommandDefs.status_change_notification.name}",),
-    ),
-    **_capability_descriptor(OnOff, OnOff.AttributeDefs.on_off),
-}
-OPEN_DETECTOR_CAPABILITIES[f"{DEFAULT_ZIGBEE_ENDPOINT}/{IAS_ZONE_CAPABILITY}"]["field"] = "alarm"
-OPEN_DETECTOR_CAPABILITIES[f"{DEFAULT_ZIGBEE_ENDPOINT}/{IAS_TAMPER_CAPABILITY}"] = {
-    **OPEN_DETECTOR_CAPABILITIES[f"{DEFAULT_ZIGBEE_ENDPOINT}/{IAS_ZONE_CAPABILITY}"],
-    "field": "tamper",
+    **_registered_signals(IasZone),
+    **_registered_signals(OnOff),
 }
 MOTION_SENSOR_CAPABILITIES = {
-    **_capability_descriptor(OccupancySensing, OccupancySensing.AttributeDefs.occupancy),
+    **_registered_signals(OccupancySensing),
 }
 
 

@@ -18,7 +18,12 @@ from zigpy.zcl.clusters.security import ZoneStatus
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
-from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, decode_zone_status
+from utils.zigbee import (
+    IAS_TAMPER_CAPABILITY,
+    IAS_ZONE_CAPABILITY,
+    IAS_ZONE_STATUS_ATTRIBUTE,
+    decode_zigbee_attribute,
+)
 
 # buffer files between the simulator and the mock adapters
 INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
@@ -288,10 +293,10 @@ def set_zigbee_capability(ieee_address, capability_key, value):
 
 def _update_ias_status(device, endpoint, status):
     device.setdefault("ias_zone_status", {})[endpoint] = int(status)
-    alarm, tamper, _ = decode_zone_status(status)
+    decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
     capabilities = device.setdefault("capabilities", {})
-    capabilities[f"{endpoint}/{IAS_ZONE_CAPABILITY}"] = alarm
-    capabilities[f"{endpoint}/{IAS_TAMPER_CAPABILITY}"] = tamper
+    for signal, value in decoded.signals:
+        capabilities[f"{endpoint}/{signal.capability}"] = value
     device["last_seen"] = datetime.now().astimezone().isoformat()
 
 

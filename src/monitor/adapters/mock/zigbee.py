@@ -16,7 +16,12 @@ from monitor.adapters.mock.utils import (
 )
 from monitor.adapters.zigbee import ZigbeeDevice, ZigbeeSensorData
 from utils.constants import LOG_ADZIGBEE
-from utils.zigbee import IAS_TAMPER_CAPABILITY, IAS_ZONE_CAPABILITY, decode_zone_status
+from utils.zigbee import (
+    IAS_ZONE_CAPABILITY,
+    IAS_ZONE_STATUS_ATTRIBUTE,
+    decode_zigbee_attribute,
+    describe_zigbee_attribute,
+)
 
 logger = logging.getLogger(LOG_ADZIGBEE)
 
@@ -76,17 +81,14 @@ class ZigbeeAdapter:
                 )
 
             for endpoint, status in device.get("ias_zone_status", {}).items():
-                alarm, tamper, error_reason = decode_zone_status(status)
-                for capability, value in (
-                    (IAS_ZONE_CAPABILITY, alarm), (IAS_TAMPER_CAPABILITY, tamper)
-                ):
-                    cache[(str(ieee_address), str(endpoint), capability)] = ZigbeeSensorData(
+                decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
+                for signal, value in decoded.signals:
+                    cache[(str(ieee_address), str(endpoint), signal.capability)] = ZigbeeSensorData(
                         ieee_address=str(ieee_address),
                         endpoint=str(endpoint),
-                        capability=capability,
+                        capability=signal.capability,
                         value=value,
                         timestamp=timestamp,
-                        error_reason=error_reason,
                     )
 
         with self._lock:
@@ -152,10 +154,10 @@ class ZigbeeAdapter:
         for key, descriptor in list(capabilities.items()):
             endpoint, separator, capability = key.partition("/")
             if separator and capability == IAS_ZONE_CAPABILITY:
-                descriptor["field"] = "alarm"
-                capabilities[f"{endpoint}/{IAS_TAMPER_CAPABILITY}"] = {
-                    **descriptor, "field": "tamper"
-                }
+                for signal_key, signal_descriptor in describe_zigbee_attribute(
+                    IAS_ZONE_STATUS_ATTRIBUTE, int(endpoint)
+                ).items():
+                    capabilities.setdefault(signal_key, signal_descriptor)
         return capabilities
 
     def get_values(self):
