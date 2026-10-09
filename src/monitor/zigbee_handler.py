@@ -144,6 +144,9 @@ class ZigbeeHandler(Thread):
         logger.info("Zigbee handler stopped")
 
     def communicate(self):
+        # load devices from the database
+        self.load_devices_from_database()
+
         while True:
             with contextlib.suppress(Empty):
                 message = self._actions.get(timeout=COMMUNICATION_PERIOD)
@@ -182,6 +185,30 @@ class ZigbeeHandler(Thread):
                     remain_seconds=0,
                     progress=0.0,
                 )
+
+    def load_devices_from_database(self):
+        try:
+            with create_database_session() as session:
+                devices = session.query(ZigbeeDeviceModel).all()
+                zigbee_devices = []
+                for device in devices:
+                    zigbee_devices.append(
+                        ZigbeeDevice(
+                            name=device.name,
+                            model=device.model,
+                            ieee_address=device.ieee_address,
+                            network_address=device.network_address,
+                            manufacturer=device.manufacturer,
+                            zone_type=device.zone_type,
+                            available=False,  # default to False when loading from the database
+                            last_seen=device.last_seen,
+                            battery_level=device.battery_level,
+                            signal_quality=device.signal_quality,
+                        )
+                    )
+                self._persist_devices(zigbee_devices, log_new=False)
+        except Exception:
+            logger.exception("Failed to load Zigbee devices from the database")
 
     def start_pairing(self, duration_seconds: int = PAIRING_DURATION):
         """

@@ -87,6 +87,9 @@ class ZigbeeAdapter:
 
         self._state_lock = threading.Lock()
         self._battery_levels: dict[str, int] = {}
+        self._last_seen: dict[str, str] = {}
+        self._signal_qualities: dict[str, int] = {}
+        self._metadata_listeners: set[str] = set()
         self._offline_devices: set[str] = set()
         self._zone_types: dict[tuple[str, int], int] = {}
 
@@ -155,6 +158,7 @@ class ZigbeeAdapter:
         for device in list(self._app.devices.values()):
             if str(device.ieee) == str(self._app.state.node_info.ieee):
                 continue
+            self._register_device_metadata_listener(device)
             await self._subscribe_clusters(device)
         logger.info("Bellows radio initialized")
 
@@ -176,6 +180,7 @@ class ZigbeeAdapter:
         Callback invoked by zigpy when a new device is paired or restored from the database.
         Schedule the subscription to attribute reports on the event loop thread.
         """
+        self._register_device_metadata_listener(device)
         self._schedule_subscribe(device)
 
         ieee_address = str(device.ieee)
@@ -197,7 +202,36 @@ class ZigbeeAdapter:
         """
         Callback invoked by zigpy when a device has been re-interviewed after a reset or rejoin.
         """
+        self._register_device_metadata_listener(device)
         self._schedule_subscribe(device)
+
+    def _register_device_metadata_listener(self, device: Device):
+        ieee_address = str(device.ieee)
+        with self._state_lock:
+            if ieee_address in self._metadata_listeners:
+                return
+
+            self._metadata_listeners.add(ieee_address)
+            if device.last_seen:
+                self._last_seen[ieee_address] = datetime.fromtimestamp(
+                    device.last_seen, UTC
+                ).isoformat()
+            if device.lqi is not None:
+                self._signal_qualities[ieee_address] = device.lqi
+
+        device.add_context_listener(self)
+
+    def device_last_seen_updated(self, device: Device, last_seen: datetime | None):
+        """Refresh packet metadata after zigpy has updated the device's LQI."""
+        asyncio.get_running_loop().call_soon(self._update_device_metadata, device, last_seen)
+
+    def _update_device_metadata(self, device: Device, last_seen: datetime | None):
+        ieee_address = str(device.ieee)
+        with self._state_lock:
+            if last_seen is not None:
+                self._last_seen[ieee_address] = last_seen.isoformat()
+            if device.lqi is not None:
+                self._signal_qualities[ieee_address] = device.lqi
 
     def device_left(self, device: Device):
         """
@@ -339,12 +373,15 @@ class ZigbeeAdapter:
             for cluster in endpoint.in_clusters.values():
                 signals.extend(describe_zigbee_signals(cluster, endpoint_id))
 
+        ieee_address = str(device.ieee)
         with self._state_lock:
             zone_types = sorted(
                 (endpoint_id, zone_type)
                 for (ieee, endpoint_id), zone_type in self._zone_types.items()
-                if ieee == str(device.ieee)
+                if ieee == ieee_address
             )
+            last_seen = self._last_seen.get(ieee_address)
+            signal_quality = self._signal_qualities.get(ieee_address)
 
         return ZigbeeDevice(
             ieee_address=str(device.ieee),
@@ -352,12 +389,8 @@ class ZigbeeAdapter:
             manufacturer=device.manufacturer,
             model=device.model,
             available=True,
-            last_seen=(
-                datetime.fromtimestamp(device.last_seen, UTC).isoformat()
-                if device.last_seen
-                else None
-            ),
-            signal_quality=device.lqi,
+            last_seen=last_seen,
+            signal_quality=signal_quality,
             signals=signals,
             zone_type=zone_types[0][1] if zone_types else None,
         )
