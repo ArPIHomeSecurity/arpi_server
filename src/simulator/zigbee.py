@@ -16,13 +16,14 @@ from zigpy.zcl.clusters.security import IasZone, ZoneStatus, ZoneType
 
 from monitor.adapters.mock.utils import (
     get_zigbee_devices,
-    set_zigbee_signal,
     set_zigbee_devices,
+    set_zigbee_signal,
     set_zigbee_trouble,
 )
 from monitor.database import create_database_session
 from utils.models import ZigbeeDevice
 from utils.zigbee import (
+    IAS_ZONE_STATUS_ATTRIBUTE,
     ZIGBEE_ATTRIBUTE_REGISTRY,
     describe_zigbee_attribute,
 )
@@ -129,7 +130,7 @@ class ZigbeeDevices(Widget):
         """Populate the device list from the database when the tab mounts."""
         self.refresh_zigbee_devices(update_state=True)
 
-    def load_zigbee_devices(self) -> dict:
+    def load_zigbee_devices_from_database(self) -> dict:
         """
         Load the Zigbee devices registered by the monitor from the database.
         Returns a dict mapping IEEE addresses to device attributes.
@@ -175,10 +176,11 @@ class ZigbeeDevices(Widget):
         container.remove_children()
 
         # load the Zigbee devices from the database
-        devices = self.load_zigbee_devices()
+        devices = self.load_zigbee_devices_from_database()
         simulator_state = get_zigbee_devices()
         if not isinstance(simulator_state, dict):
             simulator_state = {}
+
         if "devices" not in simulator_state:
             simulator_devices = simulator_state
             simulator_state = {"devices": simulator_devices}
@@ -195,10 +197,37 @@ class ZigbeeDevices(Widget):
                 if not isinstance(simulator_device, dict):
                     simulator_device = {}
                     simulator_devices[ieee] = simulator_device
+
                 current_signals = simulator_device.get("signal_values", [])
-                signals = device.get("signals") or []
+                signals = list(device.get("signals") or [])
+                signal_identities = {_signal_identity(signal) for signal in signals}
+                alarm_endpoints = {
+                    signal["endpoint"] for signal in signals
+                    if signal["clusterId"] == int(IasZone.cluster_id)
+                    and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
+                    and signal.get("field") == "alarm"
+                }
+                for endpoint in alarm_endpoints:
+                    signals.extend(
+                        signal
+                        for signal in describe_zigbee_attribute(
+                            IAS_ZONE_STATUS_ATTRIBUTE, int(endpoint)
+                        )
+                        if signal.get("field") == "trouble"
+                        and _signal_identity(signal) not in signal_identities
+                    )
+                    signal_identities.update(_signal_identity(signal) for signal in signals)
                 simulator_device["signal_values"] = [
-                    _signal_value_record(signal, _find_signal_value(current_signals, signal))
+                    _signal_value_record(
+                        signal,
+                        bool(
+                            int(simulator_device.get("ias_zone_status", {}).get(signal["endpoint"], 0))
+                            & ZoneStatus.Trouble
+                        )
+                        if signal.get("field") == "trouble"
+                        and signal["endpoint"] in simulator_device.get("ias_zone_status", {})
+                        else _find_signal_value(current_signals, signal),
+                    )
                     for signal in signals
                 ]
                 simulator_device["signal_metadata"] = signals
@@ -240,6 +269,8 @@ class ZigbeeDevices(Widget):
             signals = device.get("signals") or []
             signal_values = simulator_devices.get(ieee, {}).get("signal_values", [])
             for property_index, signal in enumerate(signals):
+                if signal.get("field") == "trouble":
+                    continue
                 widget_id = f"zigbee-property-{generation}-{index}-{property_index}"
                 self.zigbee_properties[widget_id] = (ieee, signal)
                 row.append(

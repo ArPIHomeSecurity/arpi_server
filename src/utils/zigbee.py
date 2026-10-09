@@ -60,11 +60,12 @@ IAS_ZONE_STATUS_ATTRIBUTE = ZigbeeAttributeDefinition(
     signals=(
         ZigbeeSignalDefinition("alarm"),
         ZigbeeSignalDefinition("tamper"),
+        ZigbeeSignalDefinition("trouble"),
     ),
     commands=(IasZone.ClientCommandDefs.status_change_notification,),
 )
 
-ZIGBEE_ATTRIBUTE_REGISTRY = {
+ZIGBEE_ATTRIBUTE_REGISTRY: dict[int, tuple[ZigbeeAttributeDefinition, ...]] = {
     int(IasZone.cluster_id): (
         IAS_ZONE_STATUS_ATTRIBUTE,
         ZigbeeAttributeDefinition(
@@ -110,12 +111,15 @@ ZIGBEE_ATTRIBUTE_REGISTRY = {
 def decode_zigbee_attribute(definition: ZigbeeAttributeDefinition, value) -> ZigbeeDecodedValue:
     match definition.decoder:
         case None:
+            # No decoder specified, treat the raw value as the signal value
             return ZigbeeDecodedValue(
                 signals=tuple((signal, value) for signal in definition.signals)
             )
+
+        # decode ias zone status bitfield
         case ZigbeeValueDecoder.IAS_ZONE_STATUS:
-            alarm, tamper = decode_zone_status(value)
-            decoded_fields = {"alarm": alarm, "tamper": tamper}
+            alarm, tamper, trouble = decode_zone_status(value)
+            decoded_fields = {"alarm": alarm, "tamper": tamper, "trouble": trouble}
             return ZigbeeDecodedValue(
                 signals=tuple(
                     (signal, decoded_fields[signal.field])
@@ -123,16 +127,22 @@ def decode_zigbee_attribute(definition: ZigbeeAttributeDefinition, value) -> Zig
                     if signal.field in decoded_fields
                 )
             )
+
+        # decode battery percentage remaining
         case ZigbeeValueDecoder.BATTERY_PERCENTAGE:
             try:
                 battery_level = min(100, int(value) // 2)
             except (TypeError, ValueError):
                 return ZigbeeDecodedValue()
             return ZigbeeDecodedValue(device_state=("battery_level", battery_level))
+
+        # decode zone type
         case ZigbeeValueDecoder.ZONE_TYPE:
             if value is None:
                 return ZigbeeDecodedValue()
             return ZigbeeDecodedValue(device_state=("zone_type", int(value)))
+
+        # fallback for unknown decoders
         case _:
             return ZigbeeDecodedValue()
 
@@ -199,9 +209,10 @@ def _describe_attribute_signals(
     return descriptors
 
 
-def decode_zone_status(value) -> tuple[bool, bool]:
+def decode_zone_status(value) -> tuple[bool, bool, bool]:
     status = ZoneStatus(int(value))
     return (
         bool(status & (ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2)),
         bool(status & ZoneStatus.Tamper),
+        bool(status & ZoneStatus.Trouble),
     )

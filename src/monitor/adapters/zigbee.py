@@ -7,10 +7,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from os import environ
 
-from zigpy.application import ControllerApplication as ZigpyControllerApplication
 from bellows.zigbee.application import ControllerApplication
+from zigpy.application import ControllerApplication as ZigpyControllerApplication
+from zigpy.device import Device
 from zigpy.exceptions import ZigbeeException
 from zigpy.types import EUI64
+from zigpy.zcl import Cluster
 
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
@@ -169,7 +171,7 @@ class ZigbeeAdapter:
         self._running = False
 
     # --- zigpy application listener callbacks, invoked from the loop thread ---
-    def device_initialized(self, device):
+    def device_initialized(self, device: Device):
         """
         Callback invoked by zigpy when a new device is paired or restored from the database.
         Schedule the subscription to attribute reports on the event loop thread.
@@ -191,19 +193,19 @@ class ZigbeeAdapter:
 
         logger.info("Discovered Zigbee device %s", ieee_address)
 
-    def device_reinterviewed(self, device):
+    def device_reinterviewed(self, device: Device):
         """
         Callback invoked by zigpy when a device has been re-interviewed after a reset or rejoin.
         """
         self._schedule_subscribe(device)
 
-    def device_left(self, device):
+    def device_left(self, device: Device):
         """
         Callback invoked by zigpy when a device has been removed from the network.
         """
         self._mark_unavailable(str(device.ieee))
 
-    def device_removed(self, device):
+    def device_removed(self, device: Device):
         """
         Callback invoked by zigpy when a device has been removed from the network.
         """
@@ -216,7 +218,7 @@ class ZigbeeAdapter:
         """
         self._store_reading(cluster, attrid, value, timestamp)
 
-    def cluster_command(self, cluster, _tsn, command_id, args):
+    def cluster_command(self, cluster: Cluster, _tsn, command_id, args) -> None:
         """
         Callback invoked by zigpy when a cluster command is received.
         This is used to handle IAS Zone status notifications, which are sent
@@ -251,7 +253,7 @@ class ZigbeeAdapter:
         )
 
     # --- Zigbee cluster subscription and attribute handling ---
-    async def _subscribe_clusters(self, device):
+    async def _subscribe_clusters(self, device: Device):
         """
         Subscribe to attribute reports for all clusters on the device.
         This is called when a device is first paired or restored from the zigpy database.
@@ -264,8 +266,8 @@ class ZigbeeAdapter:
             for cluster in endpoint.in_clusters.values():
                 # check for a registered attribute definition for this cluster
                 cluster_id = int(cluster.cluster_id)
-                definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(cluster_id)
-                if definitions is None:
+                definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(cluster_id, ())
+                if not definitions:
                     continue
 
                 # attach a listener to the cluster
@@ -277,7 +279,8 @@ class ZigbeeAdapter:
                         await self._setup_reporting(
                             cluster,
                             attribute.name,
-                            *definition.reporting,
+                            definition.reporting[0],
+                            definition.reporting[1],
                         )
                     else:
                         cached_value = cluster.get(definition.attribute_id)
@@ -292,7 +295,7 @@ class ZigbeeAdapter:
 
     async def _setup_reporting(
         self,
-        cluster,
+        cluster: Cluster,
         attribute: str,
         min_interval: int,
         max_interval: int,
@@ -314,7 +317,7 @@ class ZigbeeAdapter:
 
         await self._read_attribute(cluster, attribute)
 
-    async def _read_attribute(self, cluster, attribute: str):
+    async def _read_attribute(self, cluster: Cluster, attribute: str):
         ieee_address = str(cluster.endpoint.device.ieee)
         try:
             success, _ = await cluster.read_attributes([attribute])
@@ -327,7 +330,7 @@ class ZigbeeAdapter:
         for value in success.values():
             self._store_reading(cluster, attribute_def.id, value, datetime.now(UTC))
 
-    def _build_discovered_device(self, device) -> ZigbeeDevice:
+    def _build_discovered_device(self, device: Device) -> ZigbeeDevice:
         signals = []
         for endpoint_id, endpoint in device.endpoints.items():
             if endpoint_id == 0:
@@ -359,7 +362,7 @@ class ZigbeeAdapter:
             zone_type=zone_types[0][1] if zone_types else None,
         )
 
-    def _schedule_subscribe(self, device):
+    def _schedule_subscribe(self, device: Device):
         """
         Schedule the subscription to attribute reports on the event loop thread.
         This is necessary because zigpy invokes listener callbacks synchronously on the loop thread,
@@ -369,15 +372,12 @@ class ZigbeeAdapter:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    def _store_reading(self, cluster, attrid, value, timestamp):
+    def _store_reading(self, cluster: Cluster, attrid: int, value, timestamp: datetime):
         """Normalize an attribute value and publish it as the latest reading."""
         definitions = ZIGBEE_ATTRIBUTE_REGISTRY.get(int(cluster.cluster_id), ())
-        definition = None
-        for d in definitions:
-            if d.attribute_id == attrid:
-                definition = d
-                break
 
+        # Find the attribute definition for the given attribute ID
+        definition = next((d for d in definitions if d.attribute_id == attrid), None)
         if definition is None:
             return
 

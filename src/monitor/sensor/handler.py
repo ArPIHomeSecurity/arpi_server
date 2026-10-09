@@ -307,22 +307,30 @@ class SensorHandler:
         found_error = False
         for sensor in self._sensors:
             if self.is_zigbee_sensor(sensor):
-                zigbee_data = None
+                alarm_data = None
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
-                    zigbee_data = ZigbeeDeviceStore.get_sensor_data(
+                    alarm_data = ZigbeeDeviceStore.get_sensor_data(
                         device.ieee_address,
                         sensor.zigbee_endpoint,
                         sensor.zigbee_cluster_id,
                         sensor.zigbee_attribute_id,
                         sensor.zigbee_field,
                     )
+                    # get trouble
+                    trouble_data = ZigbeeDeviceStore.get_sensor_data(
+                        device.ieee_address,
+                        sensor.zigbee_endpoint,
+                        sensor.zigbee_cluster_id,
+                        sensor.zigbee_attribute_id,
+                        "trouble",
+                    )
                 is_alert = (
-                    bool(zigbee_data.value)
-                    if zigbee_data is not None and zigbee_data.value is not None
+                    bool(alarm_data.value)
+                    if alarm_data is not None and alarm_data.value is not None
                     else False
                 )
-                is_error = zigbee_data is None or zigbee_data.value is None
+                is_error = alarm_data is None or alarm_data.value is None or trouble_data and trouble_data.value
                 if is_error:
                     logger.error(
                         "Sensor %s (zigbee/%s/%04x/%04x/%s) encountered an error: %s",
@@ -331,7 +339,7 @@ class SensorHandler:
                         sensor.zigbee_cluster_id,
                         sensor.zigbee_attribute_id,
                         sensor.zigbee_field,
-                        zigbee_data,
+                        alarm_data,
                     )
                 logger.trace(
                     "Sensor %s (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s",
@@ -340,7 +348,7 @@ class SensorHandler:
                     sensor.zigbee_cluster_id,
                     sensor.zigbee_attribute_id,
                     sensor.zigbee_field,
-                    getattr(zigbee_data, "value", None),
+                    getattr(alarm_data, "value", None),
                     is_alert,
                     is_error,
                 )
