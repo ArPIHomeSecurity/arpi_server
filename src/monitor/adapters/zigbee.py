@@ -52,7 +52,6 @@ class ZigbeeDevice:
     battery_level: int | None = None
     signal_quality: int | None = None
     signals: list[dict] = field(default_factory=list)
-    zone_type: int | None = None
 
 
 def get_zigbee_adapter():
@@ -399,7 +398,6 @@ class ZigbeeAdapter:
             last_seen=last_seen,
             signal_quality=signal_quality,
             signals=signals,
-            zone_type=next(iter(zone_types.values()), None),
         )
 
     def _schedule_subscribe(self, device: Device):

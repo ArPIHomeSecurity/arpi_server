@@ -217,7 +217,6 @@ def load_zigbee_device_states() -> dict:
                 device.ieee_address,
                 {
                     "name": device.name, "available": True, "signal_values": [],
-                    "zone_type": device.zone_type,
                     "signal_metadata": (device.device_metadata or {}).get("signals", []),
                 },
             )

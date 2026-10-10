@@ -96,8 +96,6 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, met
         "battery_level": device.battery_level,
         "signal_quality": device.signal_quality,
     }
-    if device.zone_type is not None:
-        values["zone_type"] = device.zone_type
     if device.signals or include_identity or metadata is not None:
         metadata = {key: value for key, value in (metadata or {}).items() if key != "capabilities"}
         values["metadata"] = {
@@ -199,7 +197,6 @@ class ZigbeeHandler(Thread):
                             ieee_address=device.ieee_address,
                             network_address=device.network_address,
                             manufacturer=device.manufacturer,
-                            zone_type=device.zone_type,
                             available=False,  # default to False when loading from the database
                             last_seen=device.last_seen,
                             battery_level=device.battery_level,

@@ -118,7 +118,6 @@ class ZigbeeAdapter:
                     battery_level=device.get("battery_level", 100),
                     signal_quality=device.get("signal_quality", 100),
                     signals=self._signal_metadata(device),
-                    zone_type=device.get("zone_type"),
                 )
             )
 
@@ -139,7 +138,6 @@ class ZigbeeAdapter:
                 battery_level=device.get("battery_level"),
                 signal_quality=device.get("signal_quality"),
                 signals=self._signal_metadata(device),
-                zone_type=device.get("zone_type"),
             )
             for ieee_address, device in state.get("devices", {}).items()
         ]

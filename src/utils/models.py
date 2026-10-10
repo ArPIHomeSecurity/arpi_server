@@ -408,7 +408,6 @@ class ZigbeeDevice(BaseModel):
     last_seen = Column(DateTime(timezone=True), nullable=True)
     battery_level = Column(Integer, nullable=True)
     signal_quality = Column(Integer, nullable=True)
-    zone_type = Column(Integer, nullable=True)
     device_metadata = Column("metadata", JSON, nullable=True)
     sensors = relationship("Sensor", back_populates="zigbee_device")
     deleted = Column(Boolean, nullable=False, default=False)
@@ -425,7 +424,6 @@ class ZigbeeDevice(BaseModel):
         battery_level=None,
         signal_quality=None,
         metadata=None,
-        zone_type=None,
     ):
         self.ieee_address = ieee_address
         self.network_address = network_address
@@ -436,7 +434,6 @@ class ZigbeeDevice(BaseModel):
         self.last_seen = last_seen
         self.battery_level = battery_level
         self.signal_quality = signal_quality
-        self.zone_type = zone_type
         self.device_metadata = metadata
 
     def update(self, data):
@@ -455,7 +452,6 @@ class ZigbeeDevice(BaseModel):
                 "last_seen",
                 "battery_level",
                 "signal_quality",
-                "zone_type",
                 "device_metadata",
             ),
             data,
@@ -475,7 +471,6 @@ class ZigbeeDevice(BaseModel):
                 "last_seen",
                 "battery_level",
                 "signal_quality",
-                "zone_type",
                 "device_metadata",
             )
         )
