@@ -115,7 +115,7 @@ class ZigbeeAdapter:
                     model=device.get("model"),
                     available=bool(device.get("available", True)),
                     last_seen=device.get("last_seen"),
-                    battery_level=device.get("battery_level", 100),
+                    battery_level=device.get("battery_level", 1),
                     signal_quality=device.get("signal_quality", 100),
                     signals=self._signal_metadata(device),
                 )
