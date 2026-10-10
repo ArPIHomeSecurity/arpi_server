@@ -237,18 +237,16 @@ def get_zigbee_devices():
     return protected_read(ZIGBEE_FILE, deepcopy(load_zigbee_device_states()))
 
 
+def set_zigbee_devices(data):
+    """Replace the entire Zigbee simulator state payload."""
+    protected_write(ZIGBEE_FILE, data)
+
+
 def reset_zigbee_devices():
     """Discard simulator state and reload database defaults on the next read."""
     load_zigbee_device_states.cache_clear()
     with contextlib.suppress(FileNotFoundError):
         os.unlink(ZIGBEE_FILE)
-
-
-def set_zigbee_devices(data):
-    """
-    Replace the entire Zigbee simulator state payload.
-    """
-    protected_write(ZIGBEE_FILE, data)
 
 
 def _signal_matches(signal, endpoint, cluster_id, attribute_id, field):

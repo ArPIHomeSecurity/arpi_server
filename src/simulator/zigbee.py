@@ -204,6 +204,16 @@ class ZigbeeDevices(Widget):
 
                 current_signals = simulator_device.get("signal_values", [])
                 signals = list(device.get("signals") or [])
+                zone_type = device.get("zone_type")
+                signals = [
+                    {
+                        **signal,
+                        "zoneType": zone_type,
+                    }
+                    if signal["clusterId"] == int(IasZone.cluster_id) and zone_type is not None
+                    else signal
+                    for signal in signals
+                ]
                 signal_identities = {_signal_identity(signal) for signal in signals}
                 alarm_endpoints = {
                     signal["endpoint"] for signal in signals
@@ -324,12 +334,22 @@ class ZigbeeDevices(Widget):
         device["battery_level"] = 100
         device["signal_quality"] = 100
 
-        device["signal_values"] = [_signal_value_record(signal, False) for signal in signals]
-        device["signal_metadata"] = signals
+        zone_type = None
         if selected_device_type == ZigbeeDeviceType.OPEN_DETECTOR:
-            device["zone_type"] = int(ZoneType.Contact_Switch)
+            zone_type = int(ZoneType.Contact_Switch)
         elif selected_device_type == ZigbeeDeviceType.MOTION_SENSOR:
-            device["zone_type"] = int(ZoneType.Motion_Sensor)
+            zone_type = int(ZoneType.Motion_Sensor)
+        device["signal_values"] = [_signal_value_record(signal, False) for signal in signals]
+        device["signal_metadata"] = [
+            {**signal, "zoneType": zone_type}
+            if signal["clusterId"] == int(IasZone.cluster_id) and zone_type is not None
+            else signal
+            for signal in signals
+        ]
+        if zone_type is not None:
+            device["zone_type"] = zone_type
+        else:
+            device.pop("zone_type", None)
         device["last_seen"] = datetime.now().astimezone().isoformat()
 
         set_zigbee_devices(devices)

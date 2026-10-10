@@ -13,6 +13,7 @@ from zigpy.device import Device
 from zigpy.exceptions import ZigbeeException
 from zigpy.types import EUI64
 from zigpy.zcl import Cluster
+from zigpy.zcl.clusters.security import IasZone
 
 from monitor.config.models import ZigbeeCoordinatorConfig
 from monitor.database import create_database_session
@@ -375,13 +376,19 @@ class ZigbeeAdapter:
 
         ieee_address = str(device.ieee)
         with self._state_lock:
-            zone_types = sorted(
-                (endpoint_id, zone_type)
+            zone_types = {
+                endpoint_id: zone_type
                 for (ieee, endpoint_id), zone_type in self._zone_types.items()
                 if ieee == ieee_address
-            )
+            }
             last_seen = self._last_seen.get(ieee_address)
             signal_quality = self._signal_qualities.get(ieee_address)
+
+        for signal in signals:
+            if int(signal["clusterId"]) == int(IasZone.cluster_id):
+                zone_type = zone_types.get(int(signal["endpoint"]))
+                if zone_type is not None:
+                    signal["zoneType"] = zone_type
 
         return ZigbeeDevice(
             ieee_address=str(device.ieee),
@@ -392,7 +399,7 @@ class ZigbeeAdapter:
             last_seen=last_seen,
             signal_quality=signal_quality,
             signals=signals,
-            zone_type=zone_types[0][1] if zone_types else None,
+            zone_type=next(iter(zone_types.values()), None),
         )
 
     def _schedule_subscribe(self, device: Device):

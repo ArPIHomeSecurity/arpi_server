@@ -60,6 +60,9 @@ SENSOR_DEVICE_MAPPING = {
     "Warning": "warning",
     "Glass": "glass_break",
     "Repeater": "repeater",
+
+    # Zigbee Occupancy sensor
+    "Occupancy": "occupancy",
 }
 
 CONFIG_SUFFIX = "config"
