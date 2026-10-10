@@ -40,22 +40,26 @@ def _registered_signals(cluster):
 
 
 OPEN_DETECTOR_SIGNALS = _registered_signals(IasZone) + _registered_signals(OnOff)
-MOTION_SENSOR_SIGNALS = _registered_signals(OccupancySensing)
+MOTION_SENSOR_SIGNALS = _registered_signals(IasZone)
+OCCUPANCY_SENSOR_SIGNALS = _registered_signals(OccupancySensing)
 
 
 class ZigbeeDeviceType(str, Enum):
     OPEN_DETECTOR = "Open detector"
     MOTION_SENSOR = "Motion sensor"
+    OCCUPANCY_SENSOR = "Occupancy sensor"
 
 
 ZIGBEE_SIGNALS = {
     ZigbeeDeviceType.OPEN_DETECTOR: OPEN_DETECTOR_SIGNALS,
     ZigbeeDeviceType.MOTION_SENSOR: MOTION_SENSOR_SIGNALS,
+    ZigbeeDeviceType.OCCUPANCY_SENSOR: OCCUPANCY_SENSOR_SIGNALS,
 }
 
 ZIGBEE_TYPE_OPTIONS = [
     ("Open detector", ZigbeeDeviceType.OPEN_DETECTOR),
     ("Motion sensor", ZigbeeDeviceType.MOTION_SENSOR),
+    ("Occupancy sensor", ZigbeeDeviceType.OCCUPANCY_SENSOR),
 ]
 
 
@@ -177,7 +181,7 @@ class ZigbeeDevices(Widget):
 
         # load the Zigbee devices from the database
         devices = self.load_zigbee_devices_from_database()
-        simulator_state = get_zigbee_devices()
+        simulator_state = {"devices": {}} if update_state else get_zigbee_devices()
         if not isinstance(simulator_state, dict):
             simulator_state = {}
 
@@ -324,6 +328,8 @@ class ZigbeeDevices(Widget):
         device["signal_metadata"] = signals
         if selected_device_type == ZigbeeDeviceType.OPEN_DETECTOR:
             device["zone_type"] = int(ZoneType.Contact_Switch)
+        elif selected_device_type == ZigbeeDeviceType.MOTION_SENSOR:
+            device["zone_type"] = int(ZoneType.Motion_Sensor)
         device["last_seen"] = datetime.now().astimezone().isoformat()
 
         set_zigbee_devices(devices)

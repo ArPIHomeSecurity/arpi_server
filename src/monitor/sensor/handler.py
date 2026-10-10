@@ -330,7 +330,11 @@ class SensorHandler:
                     if alarm_data is not None and alarm_data.value is not None
                     else False
                 )
-                is_error = alarm_data is None or alarm_data.value is None or trouble_data and trouble_data.value
+                is_error = bool(
+                    alarm_data is None
+                    or alarm_data.value is None
+                    or (trouble_data is not None and trouble_data.value)
+                )
                 if is_error:
                     logger.error(
                         "Sensor %s (zigbee/%s/%04x/%04x/%s) encountered an error: %s",
