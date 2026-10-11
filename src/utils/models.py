@@ -249,6 +249,8 @@ class Sensor(BaseModel):
         zigbee_cluster_id: int | None = None,
         zigbee_attribute_id: int | None = None,
         zigbee_field: str | None = None,
+        ui_order: int | None = None,
+        ui_hidden: bool = False,
     ):
         self.channel = channel
         self.zone = zone
@@ -273,6 +275,8 @@ class Sensor(BaseModel):
         self.zigbee_cluster_id = zigbee_cluster_id
         self.zigbee_attribute_id = zigbee_attribute_id
         self.zigbee_field = zigbee_field
+        self.ui_order = ui_order
+        self.ui_hidden = ui_hidden
         self.deleted = False
         self._validate_source()
 

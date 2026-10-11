@@ -21,6 +21,7 @@ from utils.models import (
     SensorType,
     Zone,
 )
+from utils.zigbee import IAS_ZONE_STATUS_ATTRIBUTE
 
 
 class SensorService(BaseService):
@@ -116,6 +117,7 @@ class SensorService(BaseService):
             raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
 
         self._db_session.add(new_sensor)
+        self._ensure_zigbee_tamper_sensor(new_sensor)
         self._db_session.commit()
         self._db_session.refresh(new_sensor)
 
@@ -147,10 +149,76 @@ class SensorService(BaseService):
                 raise ChannelConflictError("Channel conflict with existing sensors.")
             raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
 
+        self._ensure_zigbee_tamper_sensor(sensor)
         self._db_session.commit()
         self._db_session.refresh(sensor)
         IPCClient().update_configuration()
         return sensor
+
+    def _ensure_zigbee_tamper_sensor(self, sensor: Sensor) -> None:
+        """Create the IAS Zone tamper companion for an alarm sensor if needed."""
+        if (
+            sensor.channel is not None
+            or sensor.zigbee_field != "alarm"
+            or sensor.zigbee_cluster_id != int(IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id)
+            or sensor.zigbee_attribute_id != IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
+            or not any(signal.field == "tamper" for signal in IAS_ZONE_STATUS_ATTRIBUTE.signals)
+        ):
+            return
+
+        tamper_type = (
+            self._db_session.query(SensorType).filter(SensorType.name == "Tamper").first()
+        )
+        if not tamper_type:
+            return
+
+        existing_tamper = (
+            self._db_session.query(Sensor)
+            .filter(
+                Sensor.zigbee_device_id == sensor.zigbee_device_id,
+                Sensor.type_id == tamper_type.id,
+                Sensor.deleted == False,
+            )
+            .first()
+        )
+        if existing_tamper:
+            return
+
+        # ensure there is a zone for the tamper sensor
+        tamper_zone = (
+            self._db_session.query(Zone)
+            .filter(Zone.disarmed_delay.isnot(None), Zone.deleted == False)
+            .first()
+        )
+        if not tamper_zone:
+            tamper_zone = Zone(
+                name="Tamper",
+                description="Sabotage alert",
+                disarmed_delay=0,
+                away_alert_delay=0,
+                stay_alert_delay=0,
+                away_arm_delay=0,
+                stay_arm_delay=0,
+            )
+            self._db_session.add(tamper_zone)
+            self._db_session.commit()
+
+        tamper_sensor = Sensor(
+            channel=None,
+            sensor_type=tamper_type,
+            area=sensor.area,
+            zone=tamper_zone,
+            name=f"{sensor.name[:Sensor.NAME_LENGTH-4]} (T)",
+            description=f"Tamper signal for {sensor.name}",
+            enabled=sensor.enabled,
+            zigbee_device_id=sensor.zigbee_device_id,
+            zigbee_endpoint=sensor.zigbee_endpoint,
+            zigbee_cluster_id=sensor.zigbee_cluster_id,
+            zigbee_attribute_id=sensor.zigbee_attribute_id,
+            zigbee_field="tamper",
+            ui_hidden=True,
+        )
+        self._db_session.add(tamper_sensor)
 
     def delete_sensor(self, sensor_id) -> None:
         """
