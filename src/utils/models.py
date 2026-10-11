@@ -186,8 +186,7 @@ class Sensor(BaseModel):
             ChannelTypes.CHANNEL_B.value,
             name="channel_types",
         ),
-        nullable=False,
-        default=ChannelTypes.NORMAL.value,
+        nullable=True,
     )
     sensor_contact_type = Column(
         Enum(
@@ -195,8 +194,7 @@ class Sensor(BaseModel):
             SensorContactTypes.NC.value,
             name="sensor_contact_types",
         ),
-        nullable=False,
-        default=SensorContactTypes.NO.value,
+        nullable=True,
     )
     sensor_eol_count = Column(
         Enum(
@@ -204,8 +202,7 @@ class Sensor(BaseModel):
             SensorEOLCount.DOUBLE.value,
             name="sensor_eol_count",
         ),
-        nullable=False,
-        default=SensorEOLCount.SINGLE.value,
+        nullable=True,
     )
 
     reference_value = Column(Float, nullable=True)
@@ -244,9 +241,9 @@ class Sensor(BaseModel):
         silent_alert: bool = False,
         monitor_period: int | None = None,
         monitor_threshold: int | None = None,
-        channel_type: ChannelTypes = ChannelTypes.BASIC,
-        sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
-        sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
+        channel_type: ChannelTypes | None = ChannelTypes.BASIC,
+        sensor_contact_type: SensorContactTypes | None = SensorContactTypes.NO,
+        sensor_eol_count: SensorEOLCount | None = SensorEOLCount.SINGLE,
         zigbee_device_id: int | None = None,
         zigbee_endpoint: str | None = None,
         zigbee_cluster_id: int | None = None,
@@ -263,9 +260,14 @@ class Sensor(BaseModel):
         self.silent_alert = silent_alert
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
-        self.channel_type = channel_type
-        self.sensor_contact_type = sensor_contact_type
-        self.sensor_eol_count = sensor_eol_count
+        if channel is None:
+            self.channel_type = None
+            self.sensor_contact_type = None
+            self.sensor_eol_count = None
+        else:
+            self.channel_type = channel_type or ChannelTypes.BASIC
+            self.sensor_contact_type = sensor_contact_type or SensorContactTypes.NO
+            self.sensor_eol_count = sensor_eol_count or SensorEOLCount.SINGLE
         self.zigbee_device_id = zigbee_device_id
         self.zigbee_endpoint = zigbee_endpoint
         self.zigbee_cluster_id = zigbee_cluster_id
@@ -329,6 +331,18 @@ class Sensor(BaseModel):
             data,
         )
         self._validate_source()
+
+        wired_settings = (
+            ("channel_type", ChannelTypes.BASIC),
+            ("sensor_contact_type", SensorContactTypes.NO),
+            ("sensor_eol_count", SensorEOLCount.SINGLE),
+        )
+        for attribute, default in wired_settings:
+            value = None if self.channel is None else getattr(self, attribute) or default
+            if getattr(self, attribute) != value:
+                setattr(self, attribute, value)
+                updated = True
+
         return updated
 
     @property
