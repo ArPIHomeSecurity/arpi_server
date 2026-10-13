@@ -210,6 +210,10 @@ def _describe_attribute_signals(
 
 
 def decode_zone_status(value) -> tuple[bool, bool, bool]:
+    """
+    Decode the zone status value into a tuple of booleans representing:
+    (alarm, tamper, trouble)
+    """
     status = ZoneStatus(int(value))
     return (
         bool(status & (ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2)),

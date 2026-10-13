@@ -207,19 +207,19 @@ tasks:
         {{.CLI_ARGS}}
 
   test:functional:arm:api:
-    desc: Run arm functional tests
+    desc: Run arm functional tests with API
     cmds:
       - task: test:functional:folder
         vars: { FOLDER: test_arm/api }
 
   test:functional:arm:mqtt:
-    desc: Run arm functional tests
+    desc: Run arm functional tests with MQTT
     cmds:
       - task: test:functional:folder
         vars: { FOLDER: test_arm/mqtt }
 
   test:functional:arm:gsm:
-    desc: Run arm functional tests
+    desc: Run arm functional tests with GSM
     cmds:
       - task: test:functional:folder
         vars: { FOLDER: test_arm/gsm }

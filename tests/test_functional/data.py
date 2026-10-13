@@ -285,7 +285,6 @@ def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
         "X001": ZigbeeDevice(
             ieee_address="11:22:33:44:55:66:77:88",
             name="Zigbee Contact Sensor",
-            zone_type=int(ZoneType.Contact_Switch),
             metadata={
                 "signals": [
                     {
