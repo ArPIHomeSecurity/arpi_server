@@ -77,7 +77,7 @@ def reorder_zones():
     Change only the ui_order of the zones
     """
     for zone_data in request.json:
-        db.session.query(Zone).get(zone_data["id"]).update_record(["ui_order"], zone_data)
+        db.session.get(Zone, zone_data["id"]).update_record(["ui_order"], zone_data)
 
     db.session.commit()
 

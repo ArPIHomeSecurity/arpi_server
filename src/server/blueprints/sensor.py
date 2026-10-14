@@ -169,7 +169,7 @@ def reorder_sensors():
     Change only the ui_order of the sensors
     """
     for sensor_data in request.json:
-        db.session.query(Sensor).get(sensor_data["id"]).update_record(["ui_order"], sensor_data)
+        db.session.get(Sensor, sensor_data["id"]).update_record(["ui_order"], sensor_data)
 
     db.session.commit()
 

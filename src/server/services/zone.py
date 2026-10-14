@@ -38,7 +38,7 @@ class ZoneService(BaseService):
         Returns:
             Zone object or None if not found
         """
-        zone = self._db_session.query(Zone).get(zone_id)
+        zone = self._db_session.get(Zone, zone_id)
         if not zone:
             raise ObjectNotFound("Zone not found")
 

@@ -40,7 +40,7 @@ class OutputService(BaseService):
         Returns:
             Output object or None if not found
         """
-        output = self._db_session.query(Output).get(output_id)
+        output = self._db_session.get(Output, output_id)
         if not output:
             raise ObjectNotFound("Output not found")
 
@@ -144,7 +144,7 @@ class OutputService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        output = self._db_session.query(Output).get(output_id)
+        output = self._db_session.get(Output, output_id)
         if not output:
             raise ObjectNotFound("Output not found")
 
@@ -162,7 +162,7 @@ class OutputService(BaseService):
         Returns:
             IPC response dict
         """
-        output = self._db_session.query(Output).get(output_id)
+        output = self._db_session.get(Output, output_id)
         if not output:
             raise ObjectNotFound("Output not found")
 
@@ -181,7 +181,7 @@ class OutputService(BaseService):
         Returns:
             IPC response dict
         """
-        output = self._db_session.query(Output).get(output_id)
+        output = self._db_session.get(Output, output_id)
         if not output:
             raise ObjectNotFound("Output not found")
 

@@ -22,7 +22,7 @@ class ZigbeeService(BaseService):
         )
 
     def get_device(self, device_id: int) -> ZigbeeDevice:
-        device = self._db_session.query(ZigbeeDevice).get(device_id)
+        device = self._db_session.get(ZigbeeDevice, device_id)
         if not device:
             raise ObjectNotFound("Zigbee device not found")
         return device

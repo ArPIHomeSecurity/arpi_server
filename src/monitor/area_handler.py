@@ -286,7 +286,7 @@ class AreaHandler:
         Return True if the area was found and the arm state was changed.
         """
         logger.info("Arming area id=%s to %s", area_id, arm_type)
-        area = self._db_session.query(Area).get(area_id)
+        area = self._db_session.get(Area, area_id)
         if area is None or area.deleted:
             logger.error("Area not found or deleted")
             return False

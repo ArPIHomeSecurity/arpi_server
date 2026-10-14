@@ -62,7 +62,7 @@ class SensorAlert(Thread):
         if disarm_id is not None:
             db_session = get_database_session()
             alert = db_session.query(Alert).filter_by(end_time=None).first()
-            disarm = db_session.query(Disarm).get(disarm_id)
+            disarm = db_session.get(Disarm, disarm_id)
             if alert:
                 alert.end_time = datetime.now().astimezone()
                 alert.disarm = disarm
@@ -186,7 +186,7 @@ class SensorAlert(Thread):
         Adds a sensor to the given alert with the specified start time and delay.
         If the sensor is already added to the alert, it will not be added again.
         """
-        sensor = session.query(Sensor).get(self._sensor_id)
+        sensor = session.get(Sensor, self._sensor_id)
         already_added = any(alert_sensor.sensor.id == sensor.id for alert_sensor in alert.sensors)
 
         # we can't add a sensor twice to the same alert, check database AlertSensor schema

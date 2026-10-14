@@ -62,7 +62,7 @@ def user(user_id, request_user_id=None, requester_role=None):
     ):
         return jsonify({"error": "Unauthorized"}), 401
 
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if not db_user:
         return jsonify({"error": "User not found"}), 404
 
@@ -112,7 +112,7 @@ def user(user_id, request_user_id=None, requester_role=None):
 @authenticated()
 @restrict_host
 def delete_user(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if not db_user:
         return jsonify({"error": "User not found"}), 404
 
@@ -125,7 +125,7 @@ def delete_user(user_id):
 @registered
 @restrict_host
 def get_user_name(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     return jsonify(db_user.name)
 
 
@@ -149,7 +149,7 @@ def registration_code(user_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     if request.method == "GET":
-        db_user: User = db.session.query(User).get(user_id)
+        db_user: User = db.session.get(User, user_id)
         if db_user:
             if db_user.registration_code:
                 return jsonify({"error": "Already has registration code"}), 400
@@ -161,7 +161,7 @@ def registration_code(user_id):
 
         return jsonify({"error": "User not found"}), 404
     elif request.method == "DELETE":
-        db_user: User = db.session.query(User).get(user_id)
+        db_user: User = db.session.get(User, user_id)
         if db_user:
             db_user.registration_code = None
             db_user.registration_expiry = None
@@ -236,7 +236,7 @@ def authenticate():
     device_token = jwt.decode(
         request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256"
     )
-    db_user: User = db.session.query(User).get(device_token["user_id"])
+    db_user: User = db.session.get(User, device_token["user_id"])
     if db_user:
         if db_user.check_access_code(request.json["access_code"]):
             # check if anything changed that needs to be saved
@@ -277,7 +277,7 @@ def get_mcp_token(user_id: int):
     ttl = int(request.args.get("ttl", 0))
     requester_role = request.environ.get("requester_role")
     if requester_role == ROLE_ADMIN:
-        db_user: User = db.session.query(User).get(user_id)
+        db_user: User = db.session.get(User, user_id)
         if not db_user:
             return jsonify({"error": "User not found"}), 404
 
@@ -305,7 +305,7 @@ def has_mcp_token(user_id: int):
     """
     requester_role = request.environ.get("requester_role")
     if requester_role == ROLE_ADMIN:
-        db_user: User = db.session.query(User).get(user_id)
+        db_user: User = db.session.get(User, user_id)
         if not db_user:
             return jsonify({"error": "User not found"}), 404
 
@@ -323,7 +323,7 @@ def remove_mcp_token(user_id: int):
     """
     requester_role = request.environ.get("requester_role")
     if requester_role == ROLE_ADMIN:
-        db_user: User = db.session.query(User).get(user_id)
+        db_user: User = db.session.get(User, user_id)
         if not db_user:
             return jsonify({"error": "User not found"}), 404
 
@@ -340,7 +340,7 @@ def remove_mcp_token(user_id: int):
 def register_card(user_id):
     for db_user in db.session.query(User).all():
         db_user.card_registration_expiry = None
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     db_user.set_card_registration()
     db.session.commit()
 
@@ -349,7 +349,7 @@ def register_card(user_id):
 
 @user_blueprint.route("/api/user/<int:user_id>/cards", methods=["GET"])
 def cards(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     return jsonify([i.serialized for i in db_user.cards])
 
 
@@ -357,7 +357,7 @@ def cards(user_id):
 @authenticated(ROLE_ADMIN)
 @restrict_host
 def has_ssh_key(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if db_user:
         key_manager = SSHKeyManager()
         key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
@@ -372,7 +372,7 @@ def has_ssh_key(user_id):
 @authenticated(ROLE_ADMIN)
 @restrict_host
 def delete_ssh_key(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if db_user:
         key_manager = SSHKeyManager()
         key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
@@ -387,7 +387,7 @@ def delete_ssh_key(user_id):
 @authenticated(ROLE_ADMIN)
 @restrict_host
 def generate_ssh_key(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if db_user:
         key_manager = SSHKeyManager()
         key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)
@@ -410,7 +410,7 @@ def generate_ssh_key(user_id):
 @authenticated(ROLE_ADMIN)
 @restrict_host
 def set_public_key(user_id):
-    db_user: User = db.session.query(User).get(user_id)
+    db_user: User = db.session.get(User, user_id)
     if db_user:
         key_manager = SSHKeyManager()
         key_name = SSHKeyManager.get_key_name(db_user.id, db_user.name)

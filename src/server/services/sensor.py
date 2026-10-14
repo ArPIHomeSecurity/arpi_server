@@ -83,9 +83,9 @@ class SensorService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        area = self._db_session.query(Area).get(area_id)
-        zone = self._db_session.query(Zone).get(zone_id)
-        sensor_type = self._db_session.query(SensorType).get(sensor_type_id)
+        area = self._db_session.get(Area, area_id)
+        zone = self._db_session.get(Zone, zone_id)
+        sensor_type = self._db_session.get(SensorType, sensor_type_id)
 
         try:
             new_sensor = Sensor(
@@ -315,7 +315,7 @@ class SensorService(BaseService):
             raise ConfigChangesNotAllowed()
 
         if sensor_id:
-            sensor = self._db_session.query(Sensor).get(sensor_id)
+            sensor = self._db_session.get(Sensor, sensor_id)
             if not sensor:
                 raise ObjectNotFound("Sensor not found")
             sensor.reference_value = None

@@ -23,11 +23,11 @@ def get_cards():
 @authenticated(role=ROLE_USER)
 @restrict_host
 def manage_card(card_id, request_user_id):
-    card = db.session.query(Card).get(card_id)
+    card = db.session.get(Card, card_id)
     if not card:
         return jsonify({"error": "Card not found"}), 404
 
-    user = db.session.query(User).get(request_user_id)
+    user = db.session.get(User, request_user_id)
     if card.user_id != request_user_id and user.role != ROLE_ADMIN:
         return jsonify({"error": "Not authorized"}), 403
 

@@ -107,7 +107,7 @@ def reorder_areas():
     Change only the ui_order of the areas
     """
     for area_data in request.json:
-        db.session.query(Area).get(area_data["id"]).update_record(["ui_order"], area_data)
+        db.session.get(Area, area_data["id"]).update_record(["ui_order"], area_data)
 
     db.session.commit()
 

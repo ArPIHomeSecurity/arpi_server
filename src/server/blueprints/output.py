@@ -110,7 +110,7 @@ def reorder_outputs():
     Change only the ui_order of the outputs
     """
     for output_data in request.json:
-        db.session.query(Output).get(output_data["id"]).update_record(["ui_order"], output_data)
+        db.session.get(Output, output_data["id"]).update_record(["ui_order"], output_data)
 
     db.session.commit()
 

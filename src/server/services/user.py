@@ -32,7 +32,7 @@ class UserService(BaseService):
             User object or None if not found
 
         """
-        user = self._db_session.query(User).get(user_id)
+        user = self._db_session.get(User, user_id)
         if not user:
             raise ObjectNotFound("User not found")
         return user

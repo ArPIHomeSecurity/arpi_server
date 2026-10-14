@@ -22,7 +22,7 @@ class KeypadService(BaseService):
         """
         Get a keypad by ID.
         """
-        keypad = self._db_session.query(Keypad).get(keypad_id)
+        keypad = self._db_session.get(Keypad, keypad_id)
         if not keypad:
             raise ObjectNotFound("Keypad not found")
 
@@ -32,7 +32,7 @@ class KeypadService(BaseService):
         """
         Create a new keypad and notify the monitor.
         """
-        keypad_type = self._db_session.query(KeypadType).get(type_id)
+        keypad_type = self._db_session.get(KeypadType, type_id)
         keypad = Keypad(keypad_type=keypad_type, enabled=enabled)
         self._db_session.add(keypad)
         self._db_session.commit()
@@ -42,7 +42,7 @@ class KeypadService(BaseService):
         """
         Update an existing keypad and notify the monitor.
         """
-        keypad = self._db_session.query(Keypad).get(keypad_id)
+        keypad = self._db_session.get(Keypad, keypad_id)
         if not keypad:
             raise ObjectNotFound("Keypad not found")
 
@@ -56,7 +56,7 @@ class KeypadService(BaseService):
         """
         Soft-delete a keypad and notify the monitor.
         """
-        keypad = self._db_session.query(Keypad).get(keypad_id)
+        keypad = self._db_session.get(Keypad, keypad_id)
         if not keypad:
             raise ObjectNotFound("Keypad not found")
 
