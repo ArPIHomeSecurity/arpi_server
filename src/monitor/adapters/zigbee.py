@@ -69,6 +69,7 @@ class ZigbeeAdapter:
     """
     A class to manage the Zigbee coordinator for device communication.
     """
+
     def __init__(self):
         self._enabled = False
         self._serial_port: str | None = None
@@ -552,9 +553,7 @@ class ZigbeeAdapter:
         with self._readings_lock:
             return list(self._readings.values())
 
-    def get_value(
-        self, ieee_address, endpoint, cluster_id, attribute_id, signal_field=None
-    ):
+    def get_value(self, ieee_address, endpoint, cluster_id, attribute_id, signal_field=None):
         with self._readings_lock:
             return self._readings.get(
                 (

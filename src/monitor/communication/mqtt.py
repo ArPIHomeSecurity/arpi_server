@@ -46,7 +46,6 @@ SENSOR_DEVICE_MAPPING = {
     "Tamper": "tamper",
     "Open": "opening",
     "Break": "glass_break",
-
     # Zigbee IAS zone types
     "Contact": "contact",
     "Fire": "smoke",
@@ -60,7 +59,6 @@ SENSOR_DEVICE_MAPPING = {
     "Warning": "warning",
     "Glass": "glass_break",
     "Repeater": "repeater",
-
     # Zigbee Occupancy sensor
     "Occupancy": "occupancy",
 }

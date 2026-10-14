@@ -24,6 +24,7 @@ class ZigbeeAttributeDefinition:
     """
     Defines the characteristics of a Zigbee attribute.
     """
+
     cluster: Any
     attribute: Any
     # the reporting interval in seconds as a tuple of (min, max) or None if not reportable
@@ -32,7 +33,7 @@ class ZigbeeAttributeDefinition:
     decoder: ZigbeeValueDecoder | None = None
     # the signals that this attribute can produce, or an empty tuple if none
     signals: tuple[ZigbeeSignalDefinition, ...] = ()
-    # the commands that this attribute can produce, or an empty tuple if none 
+    # the commands that this attribute can produce, or an empty tuple if none
     commands: tuple[Any, ...] = ()
 
     @property

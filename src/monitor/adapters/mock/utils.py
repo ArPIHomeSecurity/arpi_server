@@ -216,7 +216,9 @@ def load_zigbee_device_states() -> dict:
             simulated_device = data["devices"].setdefault(
                 device.ieee_address,
                 {
-                    "name": device.name, "available": True, "signal_values": [],
+                    "name": device.name,
+                    "available": True,
+                    "signal_values": [],
                     "signal_metadata": (device.device_metadata or {}).get("signals", []),
                 },
             )
@@ -303,7 +305,8 @@ def set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, field, v
         if is_ias_signal and endpoint in statuses:
             flag = (
                 ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2
-                if new["field"] == "alarm" else ZoneStatus.Tamper
+                if new["field"] == "alarm"
+                else ZoneStatus.Tamper
             )
             status = int(statuses[endpoint]) & ~int(flag)
             if new["value"]:
@@ -380,7 +383,10 @@ def set_zigbee_trouble(ieee_address, endpoint, enabled):
             status = 0
             if _get_signal_value(device, endpoint, alarm_cluster, alarm_attribute, "alarm") is True:
                 status |= int(ZoneStatus.Alarm_1)
-            if _get_signal_value(device, endpoint, alarm_cluster, alarm_attribute, "tamper") is True:
+            if (
+                _get_signal_value(device, endpoint, alarm_cluster, alarm_attribute, "tamper")
+                is True
+            ):
                 status |= int(ZoneStatus.Tamper)
         status = int(status) & ~int(ZoneStatus.Trouble)
         if new["enabled"]:

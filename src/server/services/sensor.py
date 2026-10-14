@@ -166,9 +166,7 @@ class SensorService(BaseService):
         ):
             return
 
-        tamper_type = (
-            self._db_session.query(SensorType).filter(SensorType.name == "Tamper").first()
-        )
+        tamper_type = self._db_session.query(SensorType).filter(SensorType.name == "Tamper").first()
         if not tamper_type:
             return
 
@@ -208,7 +206,7 @@ class SensorService(BaseService):
             sensor_type=tamper_type,
             area=sensor.area,
             zone=tamper_zone,
-            name=f"{sensor.name[:Sensor.NAME_LENGTH-4]} (T)",
+            name=f"{sensor.name[: Sensor.NAME_LENGTH - 4]} (T)",
             description=f"Tamper signal for {sensor.name}",
             enabled=sensor.enabled,
             zigbee_device_id=sensor.zigbee_device_id,

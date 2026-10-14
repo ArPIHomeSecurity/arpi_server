@@ -205,7 +205,8 @@ class ZigbeeDevices(Widget):
                 signals = list(device.get("signals") or [])
                 signal_identities = {_signal_identity(signal) for signal in signals}
                 alarm_endpoints = {
-                    signal["endpoint"] for signal in signals
+                    signal["endpoint"]
+                    for signal in signals
                     if signal["clusterId"] == int(IasZone.cluster_id)
                     and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
                     and signal.get("field") == "alarm"
@@ -224,7 +225,11 @@ class ZigbeeDevices(Widget):
                     _signal_value_record(
                         signal,
                         bool(
-                            int(simulator_device.get("ias_zone_status", {}).get(signal["endpoint"], 0))
+                            int(
+                                simulator_device.get("ias_zone_status", {}).get(
+                                    signal["endpoint"], 0
+                                )
+                            )
                             & ZoneStatus.Trouble
                         )
                         if signal.get("field") == "trouble"
@@ -285,7 +290,8 @@ class ZigbeeDevices(Widget):
                 )
 
             ias_endpoints = {
-                signal["endpoint"] for signal in signals
+                signal["endpoint"]
+                for signal in signals
                 if signal["clusterId"] == int(IasZone.cluster_id)
                 and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
                 and signal.get("field") == "alarm"
@@ -294,10 +300,14 @@ class ZigbeeDevices(Widget):
                 widget_id = f"zigbee-trouble-{generation}-{index}-{endpoint}"
                 self.zigbee_trouble_properties[widget_id] = (ieee, endpoint)
                 status = simulator_devices.get(ieee, {}).get("ias_zone_status", {}).get(endpoint, 0)
-                row.append(Checkbox(
-                    f"IAS Zone: Trouble (endpoint {endpoint})", id=widget_id,
-                    value=bool(int(status) & ZoneStatus.Trouble), classes="zigbee-property",
-                ))
+                row.append(
+                    Checkbox(
+                        f"IAS Zone: Trouble (endpoint {endpoint})",
+                        id=widget_id,
+                        value=bool(int(status) & ZoneStatus.Trouble),
+                        classes="zigbee-property",
+                    )
+                )
 
             container.mount(Vertical(*row, classes="zigbee-device-row"))
 

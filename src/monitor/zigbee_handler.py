@@ -41,9 +41,7 @@ class ZigbeeDeviceStore:
     """
 
     _lock = RLock()
-    _sensor_data: ClassVar[
-        dict[tuple[str, str, int, int, str | None], ZigbeeSensorData]
-    ] = {}
+    _sensor_data: ClassVar[dict[tuple[str, str, int, int, str | None], ZigbeeSensorData]] = {}
 
     @classmethod
     def is_initialized(cls) -> bool:

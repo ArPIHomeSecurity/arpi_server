@@ -67,14 +67,16 @@ class ZigbeeAdapter:
                 cluster_id = int(signal["clusterId"])
                 attribute_id = int(signal["attributeId"])
                 field = signal.get("field")
-                cache[(str(ieee_address), endpoint, cluster_id, attribute_id, field)] = ZigbeeSensorData(
-                    ieee_address=str(ieee_address),
-                    endpoint=endpoint,
-                    cluster_id=cluster_id,
-                    attribute_id=attribute_id,
-                    field=field,
-                    value=raw_value,
-                    timestamp=timestamp,
+                cache[(str(ieee_address), endpoint, cluster_id, attribute_id, field)] = (
+                    ZigbeeSensorData(
+                        ieee_address=str(ieee_address),
+                        endpoint=endpoint,
+                        cluster_id=cluster_id,
+                        attribute_id=attribute_id,
+                        field=field,
+                        value=raw_value,
+                        timestamp=timestamp,
+                    )
                 )
 
             for endpoint, status in device.get("ias_zone_status", {}).items():
@@ -82,7 +84,9 @@ class ZigbeeAdapter:
                 for signal, value in decoded.signals:
                     cluster_id = int(IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id)
                     attribute_id = IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
-                    cache[(str(ieee_address), str(endpoint), cluster_id, attribute_id, signal.field)] = ZigbeeSensorData(
+                    cache[
+                        (str(ieee_address), str(endpoint), cluster_id, attribute_id, signal.field)
+                    ] = ZigbeeSensorData(
                         ieee_address=str(ieee_address),
                         endpoint=str(endpoint),
                         cluster_id=cluster_id,
@@ -145,9 +149,7 @@ class ZigbeeAdapter:
     @staticmethod
     def _signal_metadata(device):
         return [
-            dict(signal)
-            for signal in device.get("signal_metadata", [])
-            if isinstance(signal, dict)
+            dict(signal) for signal in device.get("signal_metadata", []) if isinstance(signal, dict)
         ]
 
     def get_values(self):

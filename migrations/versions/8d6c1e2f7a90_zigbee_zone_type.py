@@ -7,8 +7,6 @@ Revises: 4f5bdd462125
 import sqlalchemy as sa
 from alembic import op
 
-from utils.models import SensorType
-
 revision = "8d6c1e2f7a90"
 down_revision = "4f5bdd462125"
 branch_labels = None

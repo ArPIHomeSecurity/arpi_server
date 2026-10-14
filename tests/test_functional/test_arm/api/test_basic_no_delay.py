@@ -3,6 +3,7 @@ import logging
 import pytest
 from dotenv import load_dotenv
 from zigpy.zcl.clusters.security import IasZone
+
 from monitor.adapters.mock.utils import (
     set_input_state,
     set_zigbee_signal,

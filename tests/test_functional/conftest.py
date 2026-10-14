@@ -35,6 +35,7 @@ def setup_logging():
     logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("zigpy").setLevel(logging.WARNING)
 
+
 @pytest.fixture(scope="session")
 def database_host():
     logger.debug("Starting database...")
