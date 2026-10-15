@@ -1,0 +1,18 @@
+{
+	"mcpServers": {
+		"ArPI system": {
+			"type": "http",
+			"url": "http://localhost:7000/mcp",
+			"tools": [
+				"*"
+			]
+		},
+		"ArPI docs": {
+			"type": "http",
+			"url": "http://localhost:7001/mcp",
+			"tools": [
+				"*"
+			]
+		}
+	}
+}
