@@ -7,6 +7,9 @@ import argparse
 import logging
 
 from tools.ssh_keymanager import SSHKeyManager
+from utils.constants import LOG_SC_ACCESS
+
+logger = logging.getLogger(LOG_SC_ACCESS)
 
 
 def main():
@@ -35,22 +38,22 @@ def main():
         private_key, public_key = manager.generate_ssh_keys(
             args.key_type, args.key_name, args.passphrase
         )
-        logging.info("Generated private key:\n%s", private_key)
-        logging.info("Generated public key:\n%s", public_key)
+        logger.info("Generated private key:\n%s", private_key)
+        logger.info("Generated public key:\n%s", public_key)
     elif args.command == "generate":
-        logging.error("Key type and key name are required to generate keys.")
+        logger.error("Key type and key name are required to generate keys.")
 
     if args.command == "set" and args.public_key and args.key_name:
         manager.set_public_key(args.public_key, args.key_name)
-        logging.info("Public key %s set successfully.", args.key_name)
+        logger.info("Public key %s set successfully.", args.key_name)
     elif args.command == "set":
-        logging.error("Public key and key name are required to set a public key.")
+        logger.error("Public key and key name are required to set a public key.")
 
     if args.command == "remove" and args.key_name:
         manager.remove_public_key(args.key_name)
-        logging.info("Public key %s removed successfully.", args.key_name)
+        logger.info("Public key %s removed successfully.", args.key_name)
     elif args.command == "remove":
-        logging.error("Key name is required to remove a public key.")
+        logger.error("Key name is required to remove a public key.")
 
 
 def cli_main():

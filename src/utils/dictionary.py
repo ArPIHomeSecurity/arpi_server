@@ -48,7 +48,7 @@ def filter_keys(data, keys=None):
             del data[filter_key]
 
     # filter sub dictionaries
-    for _, value in data.items():
+    for value in data.values():
         if isinstance(value, dict):
             filter_keys(value, keys)
 
@@ -61,16 +61,15 @@ def replace_keys(data, replacers=None):
         return
 
     # filter key
-    for filter_key in replacers.keys():
-        if filter_key in data:
-            if (
-                replacers["replace_empty"]
-                or not replacers["replace_empty"]
-                and data[filter_key] not in [None, ""]
-            ):
-                data[filter_key] = replacers[filter_key]
+    for filter_key in replacers.keys():  # noqa: SIM118
+        if filter_key in data and (
+            replacers["replace_empty"]
+            or not replacers["replace_empty"]
+            and data[filter_key] not in [None, ""]
+        ):
+            data[filter_key] = replacers[filter_key]
 
     # filter sub dictionaries
-    for _, value in data.items():
+    for value in data.values():
         if isinstance(value, dict):
             replace_keys(value, replacers)

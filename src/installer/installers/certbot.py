@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import click
 
 from installer.helpers import PackageHelper, SecurityHelper, SystemHelper
@@ -7,7 +9,11 @@ from installer.installers.base import BaseInstaller, InstallerConfig
 class CertbotInstaller(BaseInstaller):
     """Installer for SSL certificate management"""
 
-    FOLDERS = ["/var/lib/letsencrypt", "/var/log/letsencrypt", "/etc/letsencrypt"]
+    FOLDERS: ClassVar[list[str]] = [
+        "/var/lib/letsencrypt",
+        "/var/log/letsencrypt",
+        "/etc/letsencrypt",
+    ]
 
     def __init__(self, config: InstallerConfig):
         super().__init__(config)

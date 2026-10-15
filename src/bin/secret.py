@@ -5,6 +5,8 @@ import fcntl
 import logging
 import os
 
+logger = logging.getLogger(__name__)
+
 
 def _is_secret_defined(file_path: str, key: str) -> bool:
     """
@@ -30,7 +32,7 @@ def _is_secret_defined(file_path: str, key: str) -> bool:
                 if line.startswith(f"{key}="):
                     return True
     except OSError:
-        logging.error("Error reading %s", file_path)
+        logger.error("Error reading %s", file_path)
         return False
 
     return False
@@ -71,9 +73,9 @@ def ensure_secret_exists(secret_type: str) -> None:
             if not _is_secret_defined(secrets_file_path, key):
                 secret_file.write(f'{key}="{os.urandom(32).hex()}"\n')
                 secret_file.flush()
-                logging.info("Generated new %s", key)
+                logger.info("Generated new %s to %s", key, secrets_file_path)
             else:
-                logging.info("%s exists", key)
+                logger.info("%s exists in %s", key, secrets_file_path)
         finally:
             # release lock
             fcntl.flock(secret_file.fileno(), fcntl.LOCK_UN)

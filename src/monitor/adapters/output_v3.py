@@ -1,10 +1,11 @@
-""" """
+"""DRV8860-based output adapter."""
 
 import logging
 import os
 from enum import Enum
 from threading import Lock
 from time import sleep
+from typing import ClassVar
 
 import lgpio
 from gpiozero import DigitalInputDevice, DigitalOutputDevice
@@ -14,7 +15,7 @@ from utils.constants import LOG_ADOUTPUT
 
 logger = logging.getLogger(LOG_ADOUTPUT)
 
-OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
+OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", "8"))
 
 
 class Commands(Enum):
@@ -22,11 +23,11 @@ class Commands(Enum):
     DRV8860 commands
     """
 
-    WRITE_CONTROL_REGISTER = [1, 2, 2, 3]
-    READ_CONTROL_REGISTER = [1, 4, 2, 3]
-    READ_DATA_REGISTER = [1, 4, 4, 3]
-    RESET_FAULT_REGISTER = [1, 2, 4, 3]
-    PWM_START = [1, 6, 6, 3]
+    WRITE_CONTROL_REGISTER: ClassVar[list[int]] = [1, 2, 2, 3]
+    READ_CONTROL_REGISTER: ClassVar[list[int]] = [1, 4, 2, 3]
+    READ_DATA_REGISTER: ClassVar[list[int]] = [1, 4, 4, 3]
+    RESET_FAULT_REGISTER: ClassVar[list[int]] = [1, 2, 4, 3]
+    PWM_START: ClassVar[list[int]] = [1, 6, 6, 3]
 
 
 state_lock = Lock()

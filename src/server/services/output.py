@@ -53,7 +53,7 @@ class OutputService(BaseService):
         description: str = "",
         channel: int = 0,
         trigger_type: OutputTriggerType = OutputTriggerType.BUTTON,
-        area_id: int = None,
+        area_id: int | None = None,
         delay: int = 0,
         duration: int = 0,
         default_state: bool = False,

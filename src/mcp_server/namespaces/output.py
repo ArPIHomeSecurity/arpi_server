@@ -187,7 +187,7 @@ async def update_output(
     ctx: Context,
     output_id: int,
     name: Annotated[
-        str, Field(description="The new name of the output", max_length=Output.NAME_LENGTH)
+        str | None, Field(description="The new name of the output", max_length=Output.NAME_LENGTH)
     ] = None,
     description: Annotated[str | None, "The new description of the output"] = _UNSET,
     channel: Annotated[int | None, "The new channel number for the output"] = _UNSET,

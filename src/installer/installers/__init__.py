@@ -8,13 +8,13 @@ from installer.installers.service import ServiceInstaller
 from installer.installers.system import SystemInstaller
 
 __all__ = [
-    InstallerConfig,
-    BaseInstaller,
-    CertbotInstaller,
-    DatabaseInstaller,
-    HardwareInstaller,
-    MqttInstaller,
-    NginxInstaller,
-    ServiceInstaller,
-    SystemInstaller,
+    "BaseInstaller",
+    "CertbotInstaller",
+    "DatabaseInstaller",
+    "HardwareInstaller",
+    "InstallerConfig",
+    "MqttInstaller",
+    "NginxInstaller",
+    "ServiceInstaller",
+    "SystemInstaller",
 ]

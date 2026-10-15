@@ -40,7 +40,7 @@ def add_sensor(
     description: str = "",
     enabled: bool = True,
     silent_alert: bool = False,
-    monitor_period: int = None,
+    monitor_period: int | None = None,
     monitor_threshold: int = 100,
     channel_type: ChannelTypes = ChannelTypes.BASIC,
     sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,

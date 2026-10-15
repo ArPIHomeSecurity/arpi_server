@@ -264,9 +264,11 @@ class SensorService(BaseService):
                 select(Sensor).where(Sensor.deleted == False)
             ).all()
 
-        if sensor.channel_type in [ChannelTypes.BASIC, ChannelTypes.NORMAL]:
-            if same_channel_sensors:
-                return False
+        if (
+            sensor.channel_type in [ChannelTypes.BASIC, ChannelTypes.NORMAL]
+            and same_channel_sensors
+        ):
+            return False
 
         if sensor.channel_type in [ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B]:
             for existing_sensor in same_channel_sensors:
@@ -298,7 +300,7 @@ class SensorService(BaseService):
         )
         return duplicate is None
 
-    def reset_references(self, sensor_id: int = None) -> None:
+    def reset_references(self, sensor_id: int | None = None) -> None:
         """
         Reset reference values for a specific sensor or all sensors.
         """

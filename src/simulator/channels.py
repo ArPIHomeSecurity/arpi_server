@@ -364,7 +364,7 @@ class Channels(Widget):
     @on(Button.Pressed, "#channels-refresh")
     async def channels_refresh_pressed(self, _event: Button.Pressed) -> None:
         """Reload channel settings from the database."""
-        input_number = int(environ.get("INPUT_NUMBER", 15))
+        input_number = int(environ.get("INPUT_NUMBER", "15"))
         self.load_configuration(input_number)
         self.save_input_states()
         await self.recompose()

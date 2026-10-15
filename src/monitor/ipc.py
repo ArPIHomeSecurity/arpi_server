@@ -10,6 +10,7 @@ from pwd import getpwnam
 from select import select
 from threading import Event, Thread
 from time import sleep
+from typing import ClassVar
 
 from monitor.actions import ParseCommandError, from_dict
 from monitor.alert import Syren
@@ -69,7 +70,7 @@ class IPCServer(Thread):
     Class for handling the actions from the server and executing them on monitoring.
     """
 
-    BROADCASTED_ACTIONS = [
+    BROADCASTED_ACTIONS: ClassVar[list[str]] = [
         MONITOR_ARM_AWAY,
         MONITOR_ARM_STAY,
         MONITOR_DISARM,

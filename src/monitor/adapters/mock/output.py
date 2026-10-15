@@ -12,7 +12,7 @@ from utils.constants import LOG_ADOUTPUT
 
 logger = logging.getLogger(LOG_ADOUTPUT)
 
-OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", 8))
+OUTPUT_NUMBER = int(os.environ.get("OUTPUT_NUMBER", "8"))
 
 # shared state and lock across all instances (similar to hardware adapters)
 _shared_states = [0] * OUTPUT_NUMBER

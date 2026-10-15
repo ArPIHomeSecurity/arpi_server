@@ -72,7 +72,7 @@ def get_user_tool(user_id: int):
 
 
 @user_mcp.tool()
-def create_user(name: str, role: str, access_code: str, comment: str = None) -> dict:
+def create_user(name: str, role: str, access_code: str, comment: str | None = None) -> dict:
     """
     Create a new user in the database.
 

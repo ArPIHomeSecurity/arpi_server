@@ -29,7 +29,7 @@ R_B = 3600
 # wiring_config = PullUpConfig(R_PULL_UP, R_A, R_B)
 wiring_config = PullUpDownConfig(R_PULL_UP, R_PULL_DOWN, R_A, R_B)
 
-BOARD_VERSION = int(environ.get("BOARD_VERSION", 1))
+BOARD_VERSION = int(environ.get("BOARD_VERSION", "1"))
 
 logger = logging.getLogger(LOG_SENSORS)
 
@@ -229,7 +229,4 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
     if is_close(current_value, shortcut, TOLERANCE_V3):
         return True
 
-    if is_close(current_value, open_circuit, TOLERANCE_V3):
-        return True
-
-    return False
+    return bool(is_close(current_value, open_circuit, TOLERANCE_V3))

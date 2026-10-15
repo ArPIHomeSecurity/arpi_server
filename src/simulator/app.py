@@ -28,7 +28,7 @@ class SimulatorApp(App):
 
     def compose(self) -> ComposeResult:
         """Add our widgets in a tabbed layout."""
-        input_number = int(environ.get("INPUT_NUMBER", 15))
+        input_number = int(environ.get("INPUT_NUMBER", "15"))
         with TabbedContent(id="simulator-tabs"):
             with TabPane("Channels", id="channels-tab"):
                 yield Channels(

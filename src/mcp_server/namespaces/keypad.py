@@ -115,7 +115,7 @@ def create_keypad(type_id: int, enabled: bool = True):
 @keypad_mcp.tool(
     name="update",
 )
-def update_keypad(keypad_id: int, type_id: int = None, enabled: bool = None):
+def update_keypad(keypad_id: int, type_id: int | None = None, enabled: bool | None = None):
     """
     Update an existing keypad.
 

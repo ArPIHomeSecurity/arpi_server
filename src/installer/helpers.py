@@ -24,7 +24,7 @@ class SystemHelper:
         input: str = "",
         check: bool = True,
         capture: bool = False,
-        cwd: str = None,
+        cwd: str | None = None,
         suppress_output: bool = True,
     ) -> subprocess.CompletedProcess:
         """
@@ -258,7 +258,7 @@ class PackageHelper:
             return False
 
     @staticmethod
-    def install_packages(packages: list, description: str = None):
+    def install_packages(packages: list, description: str | None = None):
         """Install multiple packages if not already installed"""
         missing_packages = []
         for package in packages:
@@ -394,7 +394,7 @@ class SecretsManager:
             SecurityHelper.set_permissions(secrets_file, f"{self.user}:{self.user}", "600")
 
             click.echo(
-                f"   ✓ Secrets saved to {self.secrets_file}: {', '.join([s for s in self._secrets.keys()])}"
+                f"   ✓ Secrets saved to {self.secrets_file}: {', '.join([s for s in self._secrets])}"
             )
         except Exception as e:
             click.echo(f"   ⚠️ Warning: Could not save secrets to file: {e}")

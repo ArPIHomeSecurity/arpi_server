@@ -1,6 +1,7 @@
 import logging
 import os
 from time import sleep, time
+from typing import ClassVar
 
 from monitor.adapters.keypads.base import Function, KeypadBase
 from utils.constants import LOG_ADKEYPAD
@@ -14,7 +15,7 @@ class MockKeypad(KeypadBase):
     # ACTIONS = "                                                            1234"
     # ACTIONS = "                                                                  A"
     ACTIONS = " "
-    CARDS = [
+    CARDS: ClassVar[list[str]] = [
         "305419896",  # 12:34:56:78   <== C0
         "272625547",  # 10:3F:EF:8B   <== C1
     ]

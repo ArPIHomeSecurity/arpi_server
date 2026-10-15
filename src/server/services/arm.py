@@ -18,12 +18,12 @@ class ArmService(BaseService):
 
     def get_arms(
         self,
-        has_alert: bool = None,
-        user_id: int = None,
-        keypad_id: int = None,
-        arm_type: str = None,
-        start: str = None,
-        end: str = None,
+        has_alert: bool | None = None,
+        user_id: int | None = None,
+        keypad_id: int | None = None,
+        arm_type: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
         limit: int = 10,
         offset: int = 0,
     ) -> list[dict]:
@@ -77,12 +77,12 @@ class ArmService(BaseService):
 
     def get_arms_count(
         self,
-        has_alert: bool = None,
-        user_id: int = None,
-        keypad_id: int = None,
-        arm_type: str = None,
-        start: str = None,
-        end: str = None,
+        has_alert: bool | None = None,
+        user_id: int | None = None,
+        keypad_id: int | None = None,
+        arm_type: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
     ) -> int:
         """
         Get the count of arm/disarm events matching the given filters.

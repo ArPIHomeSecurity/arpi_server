@@ -148,10 +148,11 @@ export PATH="$HOME/.local/bin:$PATH"
             "python3-pip",
         ]
 
-        if PackageHelper.install_packages(tools_packages, "common development tools"):
+        if PackageHelper.install_packages(
+            tools_packages, "common development tools"
+        ) and os.path.exists("/etc/pip.conf"):
             # Remove pip configuration to avoid hash mismatch
-            if os.path.exists("/etc/pip.conf"):
-                os.remove("/etc/pip.conf")
+            os.remove("/etc/pip.conf")
 
     def is_user_in_gpio_group(self) -> bool:
         """Check if user is in gpio group"""

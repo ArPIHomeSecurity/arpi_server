@@ -40,7 +40,9 @@ class UserService(BaseService):
             raise ObjectNotFound("User not found")
         return user
 
-    def create_user(self, name: str, role: str, access_code: str, comment: str = None) -> User:
+    def create_user(
+        self, name: str, role: str, access_code: str, comment: str | None = None
+    ) -> User:
         """
         Create a new user in the database.
 

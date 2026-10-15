@@ -47,9 +47,9 @@ MEASUREMENT_TIME = 3
 
 
 # alert time window length in seconds
-ALERT_WINDOW = int(environ.get("ALERT_TIME_WINDOW", 1))
+ALERT_WINDOW = int(environ.get("ALERT_TIME_WINDOW", "1"))
 # threshold in the percent of high values in the time window (0-100)
-ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", 100))
+ALERT_THRESHOLD = int(environ.get("ALERT_THRESHOLD", "100"))
 # board version
 BOARD_VERSION = int(environ["BOARD_VERSION"])
 

@@ -56,8 +56,7 @@ def print_logging():
     for h in rootlogger.handlers:
         if h.formatter and h.formatter._fmt.startswith("%(levelname)s"):
             print(
-                "Loggers: name=%s, h=%s, fmt=%s"
-                % (rootlogger.name, h, h.formatter._fmt if h.formatter else None)
+                f"Loggers: name={rootlogger.name}, h={h}, fmt={h.formatter._fmt if h.formatter else None}"
             )
 
     # get list of all logger, the handler of the loggers and their formatter
@@ -68,11 +67,5 @@ def print_logging():
         for handler in logger.handlers:
             if handler.formatter and handler.formatter._fmt.startswith("%(levelname)s"):
                 print(
-                    "Handler: name=%s level=%s, h=%s, fmt=%s"
-                    % (
-                        logger_name,
-                        logger.level,
-                        handler,
-                        handler.formatter._fmt if handler.formatter else None,
-                    )
+                    f"Handler: name={logger_name} level={logger.level}, h={handler}, fmt={handler.formatter._fmt if handler.formatter else None}"
                 )

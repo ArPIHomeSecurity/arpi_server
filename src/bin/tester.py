@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import subprocess
+import sys
 from time import sleep
 
 try:
@@ -20,6 +21,9 @@ from monitor.adapters.sensor import get_sensor_adapter
 from monitor.logger import ArgusLogger
 from monitor.output import OUTPUT_NAMES
 from utils.constants import LOG_ADSENSOR
+
+logger = logging.getLogger(LOG_ADSENSOR)
+logger.__class__ = ArgusLogger
 
 
 def print_channels(correct_channels, values):
@@ -39,8 +43,8 @@ def test_sensor_adapter(board_version) -> bool:
     """
     adapter = get_sensor_adapter(board_version)
     if not adapter.is_initialized():
-        logging.error("Sensor adapter not initialized properly. Exiting test.")
-        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        logger.error("Sensor adapter not initialized properly. Exiting test.")
+        logger.info("Check if argus_monitor service is running and using the GPIO.")
         return False
 
     # mark channels as correct if they changed
@@ -69,14 +73,14 @@ def test_sensor_adapter(board_version) -> bool:
 
             # break if all correct
             if all(correct_channels):
-                logging.info("All channels verified successfully.")
+                logger.info("All channels verified successfully.")
                 return True
     except KeyboardInterrupt:
         print("\n")
 
     if not all(correct_channels):
         print_channels(correct_channels, values)
-        logging.warning("Some channels were not verified.")
+        logger.warning("Some channels were not verified.")
         return False
 
 
@@ -86,14 +90,14 @@ def test_power_adapter(board_version) -> bool:
     """
     adapter = get_power_adapter(board_version)
     if not adapter.is_initialized():
-        logging.error("Power adapter not initialized properly. Exiting test.")
-        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        logger.error("Power adapter not initialized properly. Exiting test.")
+        logger.info("Check if argus_monitor service is running and using the GPIO.")
         return False
 
-    logging.info("Press Ctrl-C to exit")
+    logger.info("Press Ctrl-C to exit")
 
     while True:
-        logging.info("Source: %s", adapter.source_type)
+        logger.info("Source: %s", adapter.source_type)
         sleep(1)
 
 
@@ -103,16 +107,16 @@ def test_output_adapter(board_version) -> bool:
     """
     adapter = get_output_adapter(board_version)
     if not adapter.is_initialized():
-        logging.error("Output adapter not initialized properly. Exiting test.")
-        logging.info("Check if argus_monitor service is running and using the GPIO.")
+        logger.error("Output adapter not initialized properly. Exiting test.")
+        logger.info("Check if argus_monitor service is running and using the GPIO.")
         return False
 
-    output_count = int(os.environ.get("OUTPUT_NUMBER", 8))
+    output_count = int(os.environ.get("OUTPUT_NUMBER", "8"))
 
     # turn on outputs
     for i in range(output_count):
         adapter.control_channel(i, True)
-        logging.info(
+        logger.info(
             "Outputs: %s",
             {name: state for name, state in zip(OUTPUT_NAMES.values(), adapter.states)},
         )
@@ -121,7 +125,7 @@ def test_output_adapter(board_version) -> bool:
     # turn off outputs
     for i in range(output_count):
         adapter.control_channel(i, False)
-        logging.info(
+        logger.info(
             "Outputs: %s",
             {name: state for name, state in zip(OUTPUT_NAMES.values(), adapter.states)},
         )
@@ -136,7 +140,7 @@ def test_keypad_adapter(board_version) -> bool:
     """
     adapter = get_wiegand_keypad(board_version)
 
-    logging.info("Press Ctrl-C to exit")
+    logger.info("Press Ctrl-C to exit")
 
     while True:
         adapter.communicate()
@@ -146,11 +150,11 @@ def test_keypad_adapter(board_version) -> bool:
                 break
 
             if last_action == Action.CARD:
-                logging.info("Card presented: %s", adapter.get_card())
+                logger.info("Card presented: %s", adapter.get_card())
             elif last_action == Action.KEY:
-                logging.info("Key pressed: %s", adapter.get_last_key())
+                logger.info("Key pressed: %s", adapter.get_last_key())
             elif last_action == Action.FUNCTION:
-                logging.info("Function activated: %s", adapter.get_function())
+                logger.info("Function activated: %s", adapter.get_function())
         sleep(1)
 
 
@@ -196,10 +200,6 @@ def main() -> int:
         help="Board version (2=GPIO/OPTO, 3=SPI/AD)",
     )
 
-    # add the ArgusLogger as handler
-    logger = logging.getLogger(LOG_ADSENSOR)
-    logger.__class__ = ArgusLogger
-
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(format="%(message)s", level=logging.DEBUG)
@@ -207,7 +207,7 @@ def main() -> int:
         logging.basicConfig(format="%(message)s", level=logging.INFO)
 
     if check_service_running():
-        logging.error("argus_monitor service is running. Please stop it before running the tests.")
+        logger.error("argus_monitor service is running. Please stop it before running the tests.")
         return 1
 
     test_function = f"test_{args.adapter}_adapter"
@@ -220,7 +220,7 @@ def main() -> int:
 
 def cli_main():
     try:
-        exit(main())
+        sys.exit(main())
     except KeyboardInterrupt:
         print("\n")
 

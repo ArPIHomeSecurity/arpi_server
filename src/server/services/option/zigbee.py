@@ -2,7 +2,7 @@ from attr import asdict
 
 from monitor.config.helper import save_config
 from monitor.config.models import ZigbeeCoordinatorConfig
-from server.services.base import BaseService
+from server.services.base import BaseService, ConfigChangesNotAllowed
 
 
 class ZigbeeService(BaseService):

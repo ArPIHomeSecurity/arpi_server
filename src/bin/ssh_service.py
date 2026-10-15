@@ -8,6 +8,9 @@ import logging
 from ipaddress import ip_network
 
 from tools.ssh_service import SSHService
+from utils.constants import LOG_SC_ACCESS
+
+logger = logging.getLogger(LOG_SC_ACCESS)
 
 
 def main():
@@ -67,21 +70,34 @@ def main():
         ssh = SSHService()
         ssh.enable_password_authentication(False)
 
+    if not any(
+        [
+            args.enable_ssh,
+            args.disable_ssh,
+            args.allow_local_networks,
+            args.allow_any_networks,
+            args.enable_password,
+            args.disable_password,
+            args.get_local_ip,
+        ]
+    ):
+        logger.info("No SSH service action specified")
+
 
 def update_ssh_service(enabled: bool):
     """
     Update SSH service status
     """
     ssh = SSHService()
-    logging.info("Updating SSH service")
+    logger.info("Updating SSH service")
     if enabled:
-        logging.info("Enabling SSH")
+        logger.info("Enabling SSH")
         ssh.enable_service(True)
-        logging.info("SSH is enabled")
+        logger.info("SSH is enabled")
     else:
-        logging.info("Disabling SSH")
+        logger.info("Disabling SSH")
         ssh.enable_service(False)
-        logging.info("SSH is disabled")
+        logger.info("SSH is disabled")
 
 
 def update_access_local_network(enabled: bool):
@@ -93,13 +109,13 @@ def update_access_local_network(enabled: bool):
     ip_range = ip_network(cidr, False)
     local_network = f"{ip_range.network_address}/{ip_range.netmask}"
     if enabled:
-        logging.info("Allow SSH access only from local network")
+        logger.info("Allow SSH access only from local network")
         ssh._update_access_cidr(local_network, True)
-        logging.info("Access from router is enabled")
+        logger.info("Access from router is enabled")
     else:
-        logging.info("Allow SSH access from any networks")
+        logger.info("Allow SSH access from any networks")
         ssh._update_access_cidr(local_network, False)
-        logging.info("Access from router is disabled")
+        logger.info("Access from router is disabled")
 
 
 def cli_main():

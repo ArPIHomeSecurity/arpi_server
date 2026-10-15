@@ -94,10 +94,13 @@ def user(user_id, request_user_id=None, requester_role=None):
             del user_data["newAccessCode"]
             del user_data["oldAccessCode"]
 
-        if "role" in user_data and user_data["role"] != db_user.role:
+        if (
+            "role" in user_data
+            and user_data["role"] != db_user.role
+            and requester_role != ROLE_ADMIN
+        ):
             # only admin can change roles
-            if requester_role != ROLE_ADMIN:
-                return jsonify({"error": "Cannot change user role"}), 403
+            return jsonify({"error": "Cannot change user role"}), 403
 
         current_app.logger.debug("Updating user %s", db_user)
         if not db_user.update(request.json):

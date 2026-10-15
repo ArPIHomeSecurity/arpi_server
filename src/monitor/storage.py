@@ -65,12 +65,12 @@ class States:
         try:
             with open("status.json", "r+", encoding="utf-8") as status_file:
                 fcntl.flock(status_file, fcntl.LOCK_EX)
-                cls._data = json.load(status_file)
+                cls._data = json.load(status_file) or {}
                 fcntl.flock(status_file, fcntl.LOCK_UN)
         except (FileNotFoundError, json.JSONDecodeError):
             cls._data = {}
 
-        for key in cls._data.keys():
+        for key in cls._data.keys():  # noqa: SIM118
             # pylint: disable=unsubscriptable-object
             cls._logger.debug("Data stored: %s: %s", key, cls._data[key])
             if key == State.MONITORING:

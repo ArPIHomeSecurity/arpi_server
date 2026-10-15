@@ -77,8 +77,8 @@ class SMTPSender:
                 from_addr="alert@arpi-security.info", to_addrs=to_address, msg=message
             )
             logger.info("Sent email")
-        except SMTPServerDisconnected as error:
-            raise error
+        except SMTPServerDisconnected:
+            raise
         except SMTPRecipientsRefused:
             logger.error("Recipient refused: %s", to_address)
         except SMTPException as error:

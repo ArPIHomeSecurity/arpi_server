@@ -92,7 +92,7 @@ def registered(request_handler):
     return _registered
 
 
-def generate_user_token(user_id: int, name: str, role: str, origin: str, ttl: int = None):
+def generate_user_token(user_id: int, name: str, role: str, origin: str, ttl: int | None = None):
     """
     Generate a JWT token for a user with the given information and optional TTL.
 
@@ -207,7 +207,7 @@ def authenticated(role=ROLE_ADMIN):
                             request_handler,
                             response,
                         )
-                        raise e
+                        raise
                     return response
                 except jose.exceptions.JWTError:
                     logger.warning("Bad token (%s) from %s", raw_token, remote_address)

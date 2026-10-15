@@ -35,7 +35,7 @@ DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
 DEFAULT_ZIGBEE_DATA = {"devices": {}}
 
 DEFAULT_INPUT_DATA = {
-    f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", 15)) + 1)
+    f"CH{str(i).zfill(2)}": 0 for i in range(1, int(os.environ.get("INPUT_NUMBER", "15")) + 1)
 }
 DEFAULT_INPUT_DATA["POWER"] = 0
 
@@ -67,15 +67,17 @@ def protected_read(filename, default_data):
     Read data from a JSON file with file locking to avoid reading incomplete data
     or returning the default data.
     """
-    with contextlib.suppress(FileNotFoundError, OSError):
-        with open(filename, "r", encoding="utf-8") as file_handle:
-            fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                raw_data = json.load(file_handle)
-            except json.JSONDecodeError:
-                raw_data = default_data
-            fcntl.flock(file_handle, fcntl.LOCK_UN)
-            return raw_data
+    with (
+        contextlib.suppress(FileNotFoundError, OSError),
+        open(filename, "r", encoding="utf-8") as file_handle,
+    ):
+        fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            raw_data = json.load(file_handle)
+        except json.JSONDecodeError:
+            raw_data = default_data
+        fcntl.flock(file_handle, fcntl.LOCK_UN)
+        return raw_data
     return default_data
 
 
@@ -83,31 +85,35 @@ def protected_write(filename, data):
     """
     Write data to a JSON file with file locking to avoid conflicts.
     """
-    with contextlib.suppress(FileNotFoundError, OSError):
-        with open(filename, "w", encoding="utf-8") as file_handle:
-            fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            json.dump(data, file_handle)
-            fcntl.flock(file_handle, fcntl.LOCK_UN)
+    with (
+        contextlib.suppress(FileNotFoundError, OSError),
+        open(filename, "w", encoding="utf-8") as file_handle,
+    ):
+        fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        json.dump(data, file_handle)
+        fcntl.flock(file_handle, fcntl.LOCK_UN)
 
 
 def protected_transfer(filename, default_data):
     """
     Read the data from the input and clear it with default data.
     """
-    with contextlib.suppress(FileNotFoundError, OSError):
-        with open(filename, "r+", encoding="utf-8") as file_handle:
-            fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                raw_data = json.load(file_handle)
-            except json.JSONDecodeError:
-                raw_data = default_data
+    with (
+        contextlib.suppress(FileNotFoundError, OSError),
+        open(filename, "r+", encoding="utf-8") as file_handle,
+    ):
+        fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            raw_data = json.load(file_handle)
+        except json.JSONDecodeError:
+            raw_data = default_data
 
-            # clear the file with default data
-            file_handle.seek(0)
-            file_handle.truncate()
-            json.dump(default_data, file_handle)
-            fcntl.flock(file_handle, fcntl.LOCK_UN)
-            return raw_data
+        # clear the file with default data
+        file_handle.seek(0)
+        file_handle.truncate()
+        json.dump(default_data, file_handle)
+        fcntl.flock(file_handle, fcntl.LOCK_UN)
+        return raw_data
 
     return default_data
 
@@ -120,22 +126,24 @@ def protected_update(filename, data, default_data, merge_function):
     if not os.path.exists(filename):
         protected_write(filename, default_data)
 
-    with contextlib.suppress(FileNotFoundError, OSError):
-        with open(filename, "r+", encoding="utf-8") as file_handle:
-            fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            try:
-                raw_data = json.load(file_handle)
-            except json.JSONDecodeError:
-                raw_data = default_data
+    with (
+        contextlib.suppress(FileNotFoundError, OSError),
+        open(filename, "r+", encoding="utf-8") as file_handle,
+    ):
+        fcntl.flock(file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            raw_data = json.load(file_handle)
+        except json.JSONDecodeError:
+            raw_data = default_data
 
-            # apply the merge function
-            merged_data = merge_function(raw_data, data)
+        # apply the merge function
+        merged_data = merge_function(raw_data, data)
 
-            # write the merged data back to the file
-            file_handle.seek(0)
-            file_handle.truncate()
-            json.dump(merged_data, file_handle)
-            fcntl.flock(file_handle, fcntl.LOCK_UN)
+        # write the merged data back to the file
+        file_handle.seek(0)
+        file_handle.truncate()
+        json.dump(merged_data, file_handle)
+        fcntl.flock(file_handle, fcntl.LOCK_UN)
 
 
 def get_input_state(input_name):

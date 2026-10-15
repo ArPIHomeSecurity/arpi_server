@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 from collections.abc import Callable
@@ -32,6 +33,21 @@ class AssetNotFoundError(Exception):
     pass
 
 
+class UnknownProjectError(Exception):
+    """Exception raised when an unknown project type is encountered."""
+
+    def __init__(self, project: str):
+        self.project = project
+        super().__init__(f"Unknown project type: {project}.")
+
+
+class NoReleaseFoundError(Exception):
+    """Exception raised when no suitable release is found."""
+
+    def __init__(self):
+        super().__init__("No suitable release found.")
+
+
 def get_latest_release(api_url: str, prerelease: bool = False) -> dict:
     """
     Fetch the latest release from the GitHub API.
@@ -43,7 +59,7 @@ def get_latest_release(api_url: str, prerelease: bool = False) -> dict:
         if prerelease or not release["prerelease"]:
             return release
 
-    raise Exception("No suitable release found.")
+    raise NoReleaseFoundError()
 
 
 def download_asset(release: dict[str, any], extension: str = ".tar.gz") -> str:
@@ -222,7 +238,7 @@ def upgrade_project(release: dict, project: str, board_version: str, use_simulat
         print("      ⚙️  Upgrading webapplication files...")
         upgrade_webapplication(tmp_dir)
     else:
-        raise Exception("Unknown project type.")
+        raise UnknownProjectError(project)
 
     print(f"    ✅ {project} upgrade complete.")
 
@@ -295,12 +311,12 @@ def main():
 def cli_main():
     try:
         main()
-        exit(0)
+        sys.exit(0)
     except KeyboardInterrupt:
         pass
     except Exception as e:
         print(f"  ❌ Something went wrong: {e}")
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

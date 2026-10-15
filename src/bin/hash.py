@@ -2,12 +2,15 @@
 
 import argparse
 import logging
+import sys
 from logging import basicConfig
 
 from sqlalchemy import select
 
 from monitor.database import get_database_session
 from utils.models import Card, User, hash_code, hash_code_2
+
+logger = logging.getLogger(__name__)
 
 
 def check_hashes():
@@ -27,18 +30,18 @@ def check_hashes():
             or (tmp_user.fourkey_code and not tmp_user.fourkey_code.startswith("$2b$"))
             or (tmp_user.registration_code and not tmp_user.registration_code.startswith("$2b$"))
         ):
-            logging.info("User %s(%d) is not using bcrypt hashes.", tmp_user.name, tmp_user.id)
+            logger.info("User %s(%d) is not using bcrypt hashes.", tmp_user.name, tmp_user.id)
             return 1
 
     cards = db_session.scalars(select(Card)).all()
     for tmp_card in cards:
         if not tmp_card.code.startswith("$2b$"):
-            logging.info(
+            logger.info(
                 "Card %s(%d) is not using bcrypt hashes.", tmp_card.card_number, tmp_card.id
             )
             return 1
 
-    logging.info("All hashes are using bcrypt.")
+    logger.info("All hashes are using bcrypt.")
     return 0
 
 
@@ -52,10 +55,10 @@ def main():
     args = parser.parse_args()
 
     if args.check:
-        exit(check_hashes())
+        sys.exit(check_hashes())
     elif args.input:
-        logging.info("SHA256 hash: %s", hash_code(args.input))
-        logging.info("BCrypt hash: %s", hash_code_2(args.input))
+        logger.info("SHA256 hash: %s", hash_code(args.input))
+        logger.info("BCrypt hash: %s", hash_code_2(args.input))
 
 
 def cli_main():

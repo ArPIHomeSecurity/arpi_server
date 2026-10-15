@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime
 from time import sleep, time
+from typing import ClassVar
 
 if os.environ.get("USE_SIMULATOR", "false").lower() == "false":
     from RPi import GPIO
@@ -66,7 +67,7 @@ class Lights:
 
 
 class Buttons:
-    codes = {
+    codes: ClassVar[dict[int, str]] = {
         0x00: "0",
         0x05: "1",
         0x0A: "2",
@@ -242,16 +243,16 @@ class DSCKeypad(KeypadBase):
         if count == 2:
             param = 0x04
         elif count == 3:
-            param == 0x06
+            param = 0x06
         elif count == 4:
-            param == 0x08
+            param = 0x08
         elif count == 6:
-            param == 0x0C
+            param = 0x0C
 
         self._line.send_and_receive(self.add_CRC([self.BEEP, param]))
 
     def send_keybus_query(self):
-        logger.info("KEYBUS QUERY 0x%0X" % self.KEYBUS_QUERY)
+        logger.info(f"KEYBUS QUERY 0x{self.KEYBUS_QUERY:0X}")
         self._line.send_and_receive(
             [
                 self.KEYBUS_QUERY,
@@ -270,14 +271,14 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_partition_status(self):
-        logger.trace("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
+        logger.trace("PARTITION STATUS 0x%0X", self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             [self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED]
         )
 
     def send_zone_status(self):
-        logger.debug("ZONE STATUS 0x%0X" % self.ZONE_STATUS)
+        logger.debug("ZONE STATUS 0x%0X", self.ZONE_STATUS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0xC7, 0x02])
@@ -285,7 +286,7 @@ class DSCKeypad(KeypadBase):
 
     def send_datetime(self):
         timestamp = datetime.now().astimezone()
-        logger.debug("DATETIME 0x%0X => %s" % (self.DATETIME_STATUS, timestamp.isoformat()))
+        logger.debug("DATETIME 0x%0X => %s", self.DATETIME_STATUS, timestamp.isoformat())
 
         b1 = int((timestamp.year - 2000) / 10) << 4
         b1 |= 0x0F & ((timestamp.year - 2000) % 10)
@@ -299,7 +300,7 @@ class DSCKeypad(KeypadBase):
         )
 
     def send_zone_lights(self):
-        logger.debug("ZONE LIGHTS 0x%0X" % self.ZONE_LIGHTS)
+        logger.debug("ZONE LIGHTS 0x%0X", self.ZONE_LIGHTS)
         led_status = self._lights.get_lights()
         self._line.send_and_receive(
             self.add_CRC([self.ZONE_LIGHTS, led_status, 0x01, 0x65, NULL, NULL, NULL, NULL])
@@ -318,11 +319,11 @@ class DSCKeypad(KeypadBase):
         received = ""
         for message in self._line.conversation:
             if "sent_b" in message and "received_b" in message:
-                sent += " {0:01b}".format(message["sent_b"])
-                received += " {0:01b}".format(message["received_b"])
+                sent += f" {message['sent_b']:01b}"
+                received += f" {message['received_b']:01b}"
             elif "sent" in message and "received" in message:
-                sent += " {0:08b}".format(message["sent"])
-                received += " {0:08b}".format(message["received"])
+                sent += f" {message['sent']:08b}"
+                received += f" {message['received']:08b}"
 
         # logger.debug("Sent:     {}".format(sent))
         # logger.debug("Received: {}".format(received))

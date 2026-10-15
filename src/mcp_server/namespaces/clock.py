@@ -33,7 +33,7 @@ def get_clock_tool():
 @clock_mcp.tool(
     name="set_clock",
 )
-def set_clock_tool(timezone: str = None, datetime: str = None):
+def set_clock_tool(timezone: str | None = None, datetime: str | None = None):
     """
     Tool to set the system timezone and/or datetime.
 

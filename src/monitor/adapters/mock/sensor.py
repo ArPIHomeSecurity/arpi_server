@@ -30,7 +30,7 @@ class SensorAdapter(SensorAdapterBase):
 
     @property
     def channel_count(self):
-        return int(environ.get("INPUT_NUMBER", 8))
+        return int(environ.get("INPUT_NUMBER", "8"))
 
     def close(self):
         logger.debug("Mock SensorAdapter closed")

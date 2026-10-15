@@ -1,3 +1,7 @@
+"""
+Sensor adapter for board version 3 using SPI/AD converters (MCP3008).
+"""
+
 import logging
 
 import lgpio
@@ -49,9 +53,7 @@ class SensorAdapter(SensorAdapterBase):
                     channel=ad_channel,
                 )
             except (OSError, ValueError, RuntimeError, lgpio.error) as e:
-                logger.error(
-                    "Failed to init MCP3008 output=%s: %s", ad_chip, self._channels[idx], e
-                )
+                logger.error("Failed to init MCP3008 output=%s: %s", ad_chip, e)
 
     def is_initialized(self) -> bool:
         """

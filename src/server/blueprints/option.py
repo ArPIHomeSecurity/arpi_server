@@ -208,9 +208,8 @@ def option_put(option_name, section) -> Response:
     changed = db_option.update_value(request.json)
     db.session.commit()
 
-    if option_name == "notifications":
-        if changed:
-            return process_ipc_response(IPCClient().update_configuration())
+    if option_name == "notifications" and changed:
+        return process_ipc_response(IPCClient().update_configuration())
     return ""
 
 

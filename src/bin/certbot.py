@@ -27,7 +27,7 @@ def main():
         format="%(asctime)-15s: %(message)s", level=logging.DEBUG if args.verbose else logging.INFO
     )
 
-    certbot = Certbot(logging.getLogger("argus_certbot"))
+    certbot = Certbot()
     if args.generate:
         certbot.generate_certificate()
         return

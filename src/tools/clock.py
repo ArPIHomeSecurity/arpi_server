@@ -82,20 +82,20 @@ class Clock:
 
         if network is not None:
             logger.info(f"Network time: {network} => writing to hw clock")
-            run(["sudo", "date", f"--set={network}"])
-            run(["sudo", "/sbin/hwclock", "-w", "--verbose"])
+            run(["sudo", "date", f"--set={network}"], check=False)
+            run(["sudo", "/sbin/hwclock", "-w", "--verbose"], check=False)
         else:
             hw = self.get_time_hw()
             if hw:
                 logger.info(f"HW clock time: {hw} => wrinting to system clock")
-                run(["sudo", "date", f"--set={hw}"])
+                run(["sudo", "date", f"--set={hw}"], check=False)
 
     def set_clock(self, settings):
         try:
             if "timezone" in settings and os.path.isfile(
                 "/usr/share/zoneinfo/" + settings["timezone"]
             ):
-                run(["sudo", "rm", "-f", "/etc/localtime"])
+                run(["sudo", "rm", "-f", "/etc/localtime"], check=False)
                 run(
                     [
                         "sudo",
@@ -103,13 +103,20 @@ class Clock:
                         "-s",
                         "/usr/share/zoneinfo/" + settings["timezone"],
                         "/etc/localtime",
-                    ]
+                    ],
+                    check=False,
                 )
                 run(
-                    ["sudo", "bash", "-c", "echo '{}' > /etc/timezone".format(settings["timezone"])]
+                    [
+                        "sudo",
+                        "bash",
+                        "-c",
+                        "echo '{}' > /etc/timezone".format(settings["timezone"]),
+                    ],
+                    check=False,
                 )
             if settings.get("datetime"):
-                run(["sudo", "date", "--set={}".format(settings["datetime"])])
+                run(["sudo", "date", "--set={}".format(settings["datetime"])], check=False)
         except (PermissionError, CalledProcessError) as e:
             logger.error("Permission denied when changing date/time and zone: %s", e)
             return False

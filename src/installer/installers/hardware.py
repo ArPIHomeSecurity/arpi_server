@@ -129,7 +129,7 @@ class HardwareInstaller(BaseInstaller):
                 click.echo("   ✓ WiringPi already installed")
                 return
         except Exception:
-            pass
+            click.echo("   ⚠️ WARNING: WiringPi check failed")
 
         # Clone and build WiringPi
         with tempfile.TemporaryDirectory() as temp_dir:

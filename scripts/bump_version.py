@@ -74,7 +74,7 @@ def get_git_commit() -> str:
 
 
 def bump_version(
-    version: dict, version_type: str, pre_release: str = None, release: bool = False
+    version: dict, version_type: str, pre_release: str | None = None, release: bool = False
 ) -> tuple:
     """Bump the version based on the given version type"""
     current_version = VersionInfo.from_string(version["version"])

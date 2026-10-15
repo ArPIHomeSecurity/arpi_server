@@ -9,6 +9,9 @@ import logging
 from psycopg2 import OperationalError
 
 from tools.dyndns import DynDns
+from utils.constants import LOG_SC_DYNDNS
+
+logger = logging.getLogger(LOG_SC_DYNDNS)
 
 
 def main():
@@ -33,7 +36,7 @@ def cli_main():
     except KeyboardInterrupt:
         pass
     except OperationalError as database_error:
-        logging.warning("Database error: %s", database_error)
+        logger.warning("Database error: %s", database_error)
 
 
 if __name__ == "__main__":

@@ -246,9 +246,7 @@ def wait_for_monitoring_state(state: str, device_token: str, timeout=15):
 
         sleep(0.5)
     else:
-        raise RuntimeError(
-            "Monitoring did not reach state '%s' within %s seconds" % (state, timeout)
-        )
+        raise RuntimeError(f"Monitoring did not reach state '{state}' within {timeout} seconds")
 
 
 class MqttStateRecorder:

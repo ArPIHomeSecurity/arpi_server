@@ -49,7 +49,7 @@ class ZoneService(BaseService):
         self,
         name: str,
         description: str = "",
-        disarmed_delay: int = None,
+        disarmed_delay: int | None = None,
         away_alert_delay: int = 0,
         stay_alert_delay: int = 0,
         away_arm_delay: int = 0,

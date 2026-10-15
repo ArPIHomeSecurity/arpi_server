@@ -379,8 +379,8 @@ class Notifier(Thread):
         for action in alert_chain:
             try:
                 action(self, notification)
-            except (KeyError, TypeError) as error:
-                logger.exception("Failed to send message: '%s'! (%s)", notification, error)
+            except (KeyError, TypeError):
+                logger.exception("Failed to send message: '%s'!", notification)
             except Exception:
                 logger.exception("Sending message failed!")
 
