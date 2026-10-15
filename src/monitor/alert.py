@@ -2,6 +2,8 @@ import logging
 from datetime import datetime
 from threading import Event, Thread
 
+from sqlalchemy import select
+
 from monitor.actions import (
     MonitoringAlertCommand,
     MonitoringAlertDelayCommand,
@@ -61,7 +63,7 @@ class SensorAlert(Thread):
 
         if disarm_id is not None:
             db_session = get_database_session()
-            alert = db_session.query(Alert).filter_by(end_time=None).first()
+            alert = db_session.scalar(select(Alert).where(Alert.end_time.is_(None)))
             disarm = db_session.get(Disarm, disarm_id)
             if alert:
                 alert.end_time = datetime.now().astimezone()
@@ -122,7 +124,7 @@ class SensorAlert(Thread):
 
         new_alert = False
         session = get_database_session()
-        alert = session.query(Alert).filter_by(end_time=None).first()
+        alert = session.scalar(select(Alert).where(Alert.end_time.is_(None)))
         if alert is None:
             alert = self.create_alert(session)
             new_alert = True
@@ -172,7 +174,7 @@ class SensorAlert(Thread):
         setting the start time to the current time, and initializing an empty list of sensors.
         The alert is then added to the database and returned.
         """
-        arm = session.query(Arm).filter_by(disarm=None).first()
+        arm = session.scalar(select(Arm).where(~Arm.disarm.has()))
         start_time = datetime.now().astimezone()
         alert = Alert(arm=arm, start_time=start_time, sensors=[])
         session.add(alert)

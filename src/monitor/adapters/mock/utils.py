@@ -13,6 +13,7 @@ from enum import Enum
 from functools import cache
 from random import randint
 
+from sqlalchemy import select
 from zigpy.zcl.clusters.security import ZoneStatus
 
 from monitor.database import create_database_session
@@ -210,7 +211,7 @@ def load_zigbee_device_states() -> dict:
     """Build inactive Zigbee simulator states from database sensor mappings."""
     data = deepcopy(DEFAULT_ZIGBEE_DATA)
     with create_database_session() as session:
-        sensors = session.query(Sensor).filter(Sensor.zigbee_device_id.isnot(None)).all()
+        sensors = session.scalars(select(Sensor).where(Sensor.zigbee_device_id.isnot(None))).all()
         for sensor in sensors:
             device = sensor.zigbee_device
             simulated_device = data["devices"].setdefault(
@@ -434,12 +435,11 @@ def load_channel_configs(input_number: int) -> dict:
     Returns a dict mapping channel names (CH01, CH02, ...) to ChannelConfig instances.
     """
     with create_database_session() as session:
-        sensors = (
-            session.query(Sensor)
-            .filter(Sensor.channel.isnot(None), ~Sensor.deleted)
+        sensors = session.scalars(
+            select(Sensor)
+            .where(Sensor.channel.isnot(None), ~Sensor.deleted)
             .order_by(Sensor.channel)
-            .all()
-        )
+        ).all()
 
         channel_configs = {
             f"CH{i:02d}": ChannelConfig(

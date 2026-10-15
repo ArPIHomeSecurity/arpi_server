@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 from flask import Response, jsonify, request
 from flask.blueprints import Blueprint
+from sqlalchemy import select
 
 from monitor.config.models import (
     AlertSensitivityConfig,
@@ -119,7 +120,9 @@ def option_get(option_name, section) -> Response:
             }
         )
 
-    db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
+    db_option = db.session.scalar(
+        select(Option).where(Option.name == option_name, Option.section == section)
+    )
     return jsonify(db_option.serialized) if db_option else jsonify(None), 404
 
 
@@ -193,7 +196,9 @@ def option_put(option_name, section) -> Response:
         return ""
 
     # handle other options
-    db_option = db.session.query(Option).filter_by(name=option_name, section=section).first()
+    db_option = db.session.scalar(
+        select(Option).where(Option.name == option_name, Option.section == section)
+    )
     if not db_option:
         # create the new option
         db_option = Option(name=option_name, section=section, value="")
@@ -309,7 +314,9 @@ def public_access():
 
 @config_blueprint.route("/api/config/installation", methods=["GET"])
 def get_installation():
-    dyndns = db.session.query(Option).filter_by(name="network", section="dyndns").first()
+    dyndns = db.session.scalar(
+        select(Option).where(Option.name == "network", Option.section == "dyndns")
+    )
 
     if dyndns:
         dyndns = json.loads(dyndns.value)

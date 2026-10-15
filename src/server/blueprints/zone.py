@@ -1,5 +1,6 @@
 from flask import jsonify, request
 from flask.blueprints import Blueprint
+from sqlalchemy import select
 
 from server.database import db
 from server.decorators import authenticated, registered, restrict_host
@@ -15,7 +16,8 @@ zone_blueprint = Blueprint("zone", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_zones():
-    return jsonify([i.serialized for i in db.session.query(Zone).filter_by(deleted=False).all()])
+    zones = db.session.scalars(select(Zone).where(Zone.deleted == False)).all()
+    return jsonify([zone.serialized for zone in zones])
 
 
 @zone_blueprint.route("/api/zones/", methods=["POST"])

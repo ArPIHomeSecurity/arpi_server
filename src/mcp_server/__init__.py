@@ -1,6 +1,7 @@
 from importlib.resources import files
 
 from fastmcp import FastMCP
+from sqlalchemy import select
 
 from mcp_server.auth import JWTVerifier
 from mcp_server.namespaces.area import area_mcp
@@ -84,7 +85,7 @@ def generate_system_prompt():
 
     # get sensor types from the database
     db_session = get_database_session()
-    sensor_types = db_session.query(SensorType).all()
+    sensor_types = db_session.scalars(select(SensorType)).all()
 
     # we add data types to the main MCP for global usage
     system_prompt += PROMPT_DYNAMIC_DATA.format(

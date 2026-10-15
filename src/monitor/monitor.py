@@ -179,7 +179,7 @@ class Monitor(Thread, ActionHandler):
         sleep(3)
 
         # send initial states
-        alert = self._db_session.query(Alert).filter_by(end_time=None).first()
+        alert = self._db_session.scalar(select(Alert).where(Alert.end_time.is_(None)))
         if alert:
             logger.info("Continue unresolved alert: %s", alert)
             send_alert_state(alert)
@@ -474,7 +474,7 @@ class Monitor(Thread, ActionHandler):
             self._delay_timer.cancel()
             self._delay_timer = None
 
-        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+        arm = self._db_session.scalar(select(Arm).where(~Arm.disarm.has()))
         disarm = Disarm(
             arm_id=arm.id if arm else None,
             time=dt.now().astimezone(),
@@ -511,7 +511,7 @@ class Monitor(Thread, ActionHandler):
         """
         # arm the system
         now = dt.now().astimezone()
-        arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+        arm = self._db_session.scalar(select(Arm).where(~Arm.disarm.has()))
         if arm is None:
             user = self._db_session.get(User, user_id) if user_id else None
             arm = Arm(arm_type=arm_type, time=now, user=user, keypad_id=keypad_id)
@@ -520,7 +520,8 @@ class Monitor(Thread, ActionHandler):
             logger.info("Arm state to database: %s", arm.type)
             arm.type = ArmStates.merge(arm.type, arm_type)
 
-        for sensor in self._db_session.query(Sensor).filter_by(deleted=False).all():
+        sensors = self._db_session.scalars(select(Sensor).where(Sensor.deleted == False))
+        for sensor in sensors:
             delay = SensorHandler.get_sensor_delay(sensor, States.get(State.MONITORING))
             logger.debug("Sensor (id=%s) delay: %s", sensor.id, delay)
             sensor_state = ArmSensor.from_sensor(arm=arm, sensor=sensor, timestamp=now, delay=delay)
@@ -558,7 +559,7 @@ class Monitor(Thread, ActionHandler):
         """
         # close the alert if the system is not alerting
         alert_states = [MONITORING_ALERT, MONITORING_ALERT_DELAY]
-        alert = self._db_session.query(Alert).filter_by(end_time=None).first()
+        alert = self._db_session.scalar(select(Alert).where(Alert.end_time.is_(None)))
         if alert and States.get(State.MONITORING) not in alert_states:
             alert.end_time = dt.now().astimezone()
             logger.info("Close invalid alert: %s", alert)

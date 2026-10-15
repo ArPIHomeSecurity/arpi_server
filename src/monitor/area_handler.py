@@ -90,7 +90,7 @@ class AreaHandler:
             return True
 
         with create_database_session() as session:
-            for area in session.query(Area).filter(Area.deleted == False).all():
+            for area in session.scalars(select(Area).where(Area.deleted == False)):
                 if area.id == item_id:
                     return True
 

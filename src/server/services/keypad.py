@@ -2,6 +2,8 @@
 Keypad service module to handle keypad-related operations.
 """
 
+from sqlalchemy import select
+
 from server.ipc import IPCClient
 from server.services.base import BaseService, ObjectNotChanged, ObjectNotFound
 from utils.models import Keypad, KeypadType
@@ -16,7 +18,7 @@ class KeypadService(BaseService):
         """
         Get all existing keypads.
         """
-        return self._db_session.query(Keypad).all()
+        return self._db_session.scalars(select(Keypad)).all()
 
     def get_keypad(self, keypad_id: int) -> Keypad:
         """
@@ -68,4 +70,4 @@ class KeypadService(BaseService):
         """
         Get all keypad types.
         """
-        return self._db_session.query(KeypadType).all()
+        return self._db_session.scalars(select(KeypadType)).all()

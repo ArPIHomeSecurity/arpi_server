@@ -2,6 +2,8 @@
 Sensor service module to handle sensor-related operations.
 """
 
+from sqlalchemy import select
+
 from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
@@ -33,24 +35,21 @@ class SensorService(BaseService):
         """
         Get all existing sensors or alerting sensors.
         """
-        query = self._db_session.query(Sensor)
+        statement = select(Sensor)
 
         if alerting:
-            query = query.filter(Sensor.alert == True)
+            statement = statement.where(Sensor.alert == True)
 
-        query = query.filter(Sensor.deleted == False)
+        statement = statement.where(Sensor.deleted == False)
 
-        return query.order_by(Sensor.channel.asc()).all()
+        return self._db_session.scalars(statement.order_by(Sensor.channel.asc())).all()
 
     def get_sensor(self, sensor_id) -> Sensor:
         """
         Get a sensor by ID.
         """
-        sensor = (
-            self._db_session.query(Sensor)
-            .filter(Sensor.id == sensor_id, Sensor.deleted == False)
-            .first()
-        )
+        statement = select(Sensor).where(Sensor.id == sensor_id, Sensor.deleted == False)
+        sensor = self._db_session.scalar(statement)
         if not sensor:
             raise ObjectNotFound("Sensor not found")
 
@@ -132,7 +131,7 @@ class SensorService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        sensor = self._db_session.query(Sensor).filter(Sensor.id == sensor_id).first()
+        sensor = self._db_session.scalar(select(Sensor).where(Sensor.id == sensor_id))
         if not sensor:
             raise ObjectNotFound("Sensor not found")
 
@@ -166,27 +165,23 @@ class SensorService(BaseService):
         ):
             return
 
-        tamper_type = self._db_session.query(SensorType).filter(SensorType.name == "Tamper").first()
+        tamper_type = self._db_session.scalar(select(SensorType).where(SensorType.name == "Tamper"))
         if not tamper_type:
             return
 
-        existing_tamper = (
-            self._db_session.query(Sensor)
-            .filter(
+        existing_tamper = self._db_session.scalar(
+            select(Sensor).where(
                 Sensor.zigbee_device_id == sensor.zigbee_device_id,
                 Sensor.type_id == tamper_type.id,
                 Sensor.deleted == False,
             )
-            .first()
         )
         if existing_tamper:
             return
 
         # ensure there is a zone for the tamper sensor
-        tamper_zone = (
-            self._db_session.query(Zone)
-            .filter(Zone.disarmed_delay.isnot(None), Zone.deleted == False)
-            .first()
+        tamper_zone = self._db_session.scalar(
+            select(Zone).where(Zone.disarmed_delay.isnot(None), Zone.deleted == False)
         )
         if not tamper_zone:
             tamper_zone = Zone(
@@ -228,7 +223,7 @@ class SensorService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        sensor = self._db_session.query(Sensor).filter(Sensor.id == sensor_id).first()
+        sensor = self._db_session.scalar(select(Sensor).where(Sensor.id == sensor_id))
         if not sensor:
             raise ObjectNotFound("Sensor not found")
 
@@ -243,7 +238,7 @@ class SensorService(BaseService):
         """
         Get all sensor types.
         """
-        return self._db_session.query(SensorType).all()
+        return self._db_session.scalars(select(SensorType)).all()
 
     def validate_binding(self, sensor: Sensor) -> bool:
         """
@@ -257,17 +252,17 @@ class SensorService(BaseService):
         """
         Validate that the sensor's channel does not conflict with existing sensors.
         """
-        same_channel_sensors = (
-            self._db_session.query(Sensor)
-            .filter(
+        if sensor:
+            statement = select(Sensor).where(
                 Sensor.id != sensor.id,
                 Sensor.channel == sensor.channel,
                 Sensor.deleted == False,
             )
-            .all()
-            if sensor
-            else (self._db_session.query(Sensor).filter(Sensor.deleted == False).all())
-        )
+            same_channel_sensors = self._db_session.scalars(statement).all()
+        else:
+            same_channel_sensors = self._db_session.scalars(
+                select(Sensor).where(Sensor.deleted == False)
+            ).all()
 
         if sensor.channel_type in [ChannelTypes.BASIC, ChannelTypes.NORMAL]:
             if same_channel_sensors:
@@ -290,9 +285,8 @@ class SensorService(BaseService):
         """
         Validate that the sensor's Zigbee endpoint/attribute/signal is not already bound elsewhere.
         """
-        duplicate = (
-            self._db_session.query(Sensor)
-            .filter(
+        duplicate = self._db_session.scalar(
+            select(Sensor).where(
                 Sensor.id != sensor.id,
                 Sensor.zigbee_device_id == sensor.zigbee_device_id,
                 Sensor.zigbee_endpoint == sensor.zigbee_endpoint,
@@ -301,7 +295,6 @@ class SensorService(BaseService):
                 Sensor.zigbee_field == sensor.zigbee_field,
                 Sensor.deleted == False,
             )
-            .first()
         )
         return duplicate is None
 
@@ -318,7 +311,7 @@ class SensorService(BaseService):
                 raise ObjectNotFound("Sensor not found")
             sensor.reference_value = None
         else:
-            sensors = self._db_session.query(Sensor).all()
+            sensors = self._db_session.scalars(select(Sensor)).all()
             for sensor in sensors:
                 sensor.reference_value = None
 
@@ -331,29 +324,29 @@ class SensorService(BaseService):
         Returns true when the specified sensor is in alert state,
         or if any sensor is in alert state.
         """
-        query = self._db_session.query(Sensor).filter(
+        statement = select(Sensor).where(
             Sensor.enabled == True,
             Sensor.alert == True,
             Sensor.deleted == False,
         )
 
         if sensor_id:
-            query = query.filter(Sensor.id == sensor_id)
+            statement = statement.where(Sensor.id == sensor_id)
 
-        return query.first() is not None
+        return self._db_session.scalar(statement) is not None
 
     def get_sensor_error(self, sensor_id: int) -> bool:
         """
         Returns true when the specified sensor is in error state,
         or if any sensor is in error state.
         """
-        query = self._db_session.query(Sensor).filter(
+        statement = select(Sensor).where(
             Sensor.enabled == True,
             Sensor.error == True,
             Sensor.deleted == False,
         )
 
         if sensor_id:
-            query = query.filter(Sensor.id == sensor_id)
+            statement = statement.where(Sensor.id == sensor_id)
 
-        return query.first() is not None
+        return self._db_session.scalar(statement) is not None

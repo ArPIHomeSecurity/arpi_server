@@ -4,6 +4,8 @@ import argparse
 import logging
 from logging import basicConfig
 
+from sqlalchemy import select
+
 from monitor.database import get_database_session
 from utils.models import Card, User, hash_code, hash_code_2
 
@@ -18,7 +20,7 @@ def check_hashes():
     db_session = get_database_session()
 
     # Check if the database is using bcrypt hashes
-    users = db_session.query(User).all()
+    users = db_session.scalars(select(User)).all()
     for tmp_user in users:
         if (
             (tmp_user.access_code and not tmp_user.access_code.startswith("$2b$"))
@@ -28,7 +30,7 @@ def check_hashes():
             logging.info("User %s(%d) is not using bcrypt hashes.", tmp_user.name, tmp_user.id)
             return 1
 
-    cards = db_session.query(Card).all()
+    cards = db_session.scalars(select(Card)).all()
     for tmp_card in cards:
         if not tmp_card.code.startswith("$2b$"):
             logging.info(

@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 from random import randint
 
+from sqlalchemy import select
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -140,12 +141,11 @@ class ZigbeeDevices(Widget):
         Returns a dict mapping IEEE addresses to device attributes.
         """
         with create_database_session() as session:
-            devices = (
-                session.query(ZigbeeDevice)
-                .filter_by(deleted=False)
+            devices = session.scalars(
+                select(ZigbeeDevice)
+                .where(ZigbeeDevice.deleted == False)
                 .order_by(ZigbeeDevice.ieee_address)
-                .all()
-            )
+            ).all()
 
             return {
                 device.ieee_address: {

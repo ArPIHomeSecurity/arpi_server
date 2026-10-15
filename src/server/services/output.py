@@ -2,6 +2,8 @@
 Output service module to handle output-related operations.
 """
 
+from sqlalchemy import exists, select
+
 from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
@@ -26,9 +28,8 @@ class OutputService(BaseService):
         Returns:
             List of Output objects
         """
-        query = self._db_session.query(Output)
-
-        return query.order_by(Output.name.asc()).all()
+        statement = select(Output).order_by(Output.name.asc())
+        return self._db_session.scalars(statement).all()
 
     def get_output_by_id(self, output_id: int) -> Output:
         """
@@ -111,7 +112,7 @@ class OutputService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        output = self._db_session.query(Output).filter(Output.id == output_id).first()
+        output = self._db_session.scalar(select(Output).where(Output.id == output_id))
         if not output:
             raise ObjectNotFound("Output not found")
 
@@ -219,8 +220,5 @@ class OutputService(BaseService):
         Returns:
             True if the channel is valid, False otherwise
         """
-        query = self._db_session.query(Output).filter(
-            Output.channel == output.channel, Output.id != output.id
-        )
-
-        return not self._db_session.query(query.exists()).scalar()
+        statement = select(exists().where(Output.channel == output.channel, Output.id != output.id))
+        return not self._db_session.scalar(statement)

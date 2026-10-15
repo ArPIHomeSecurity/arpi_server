@@ -2,6 +2,8 @@
 User service module to handle user-related operations.
 """
 
+from sqlalchemy import select
+
 from server.services.base import BaseService, ConfigChangesNotAllowed, ObjectNotFound
 from utils.models import User
 
@@ -19,7 +21,8 @@ class UserService(BaseService):
             List of User objects
 
         """
-        return self._db_session.query(User).order_by(User.name).all()
+        statement = select(User).order_by(User.name)
+        return self._db_session.scalars(statement).all()
 
     def get_user(self, user_id: int):
         """

@@ -7,6 +7,8 @@ import logging
 from queue import Empty, Queue
 from threading import Event, Thread
 
+from sqlalchemy import select
+
 from monitor.actions import MonitorStopCommand, MonitorUpdateConfigCommand
 from monitor.adapters.output import get_output_adapter
 from monitor.broadcast import Broadcaster
@@ -116,7 +118,7 @@ class OutputHandler(Thread):
     def is_outputname_valid(self, item_id: int | None, item_name: str) -> bool:
         """Return whether a retained MQTT name belongs to a current output."""
         with create_database_session() as session:
-            for output in session.query(Output).all():
+            for output in session.scalars(select(Output)):
                 if output.id == item_id:
                     return True
 
@@ -129,7 +131,7 @@ class OutputHandler(Thread):
         """
         logger.debug("Loading outputs from database")
         with create_database_session() as db_session:
-            self._outputs = db_session.query(Output).all()
+            self._outputs = db_session.scalars(select(Output)).all()
 
             # initialize output default states
             logger.info("Initializing outputs from database")

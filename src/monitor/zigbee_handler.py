@@ -14,6 +14,8 @@ from threading import RLock, Thread
 from time import time
 from typing import ClassVar
 
+from sqlalchemy import select
+
 from monitor.actions import (
     MonitorStopCommand,
     MonitorUnpairZigbeeDeviceCommand,
@@ -185,7 +187,7 @@ class ZigbeeHandler(Thread):
     def load_devices_from_database(self):
         try:
             with create_database_session() as session:
-                devices = session.query(ZigbeeDeviceModel).all()
+                devices = session.scalars(select(ZigbeeDeviceModel)).all()
                 zigbee_devices = []
                 for device in devices:
                     zigbee_devices.append(
@@ -262,13 +264,11 @@ class ZigbeeHandler(Thread):
                 for device in devices:
                     values = extract_attributes(device, include_identity=True)
 
-                    registered = (
-                        session.query(ZigbeeDeviceModel)
-                        .filter_by(
-                            ieee_address=device.ieee_address,
-                            deleted=False,
+                    registered = session.scalar(
+                        select(ZigbeeDeviceModel).where(
+                            ZigbeeDeviceModel.ieee_address == device.ieee_address,
+                            ZigbeeDeviceModel.deleted == False,
                         )
-                        .first()
                     )
                     if registered is None:
                         session.add(ZigbeeDeviceModel(ieee_address=device.ieee_address, **values))
@@ -310,10 +310,11 @@ class ZigbeeHandler(Thread):
 
         with create_database_session() as session:
             for device in devices:
-                registered = (
-                    session.query(ZigbeeDeviceModel)
-                    .filter_by(ieee_address=device.ieee_address, deleted=False)
-                    .first()
+                registered = session.scalar(
+                    select(ZigbeeDeviceModel).where(
+                        ZigbeeDeviceModel.ieee_address == device.ieee_address,
+                        ZigbeeDeviceModel.deleted == False,
+                    )
                 )
                 if registered is None:
                     continue

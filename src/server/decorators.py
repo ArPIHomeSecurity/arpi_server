@@ -13,6 +13,7 @@ from flask.globals import request
 from flask.helpers import make_response
 from flask.json import jsonify
 from jose import jwt
+from sqlalchemy import select
 
 from server.database import db
 from utils.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
@@ -34,7 +35,9 @@ def restrict_host(request_handler):
 
     @functools.wraps(request_handler)
     def _restrict_host(*args, **kws):
-        noip_config = db.session.query(Option).filter_by(name="network", section="dyndns").first()
+        noip_config = db.session.scalar(
+            select(Option).where(Option.name == "network", Option.section == "dyndns")
+        )
         if noip_config:
             noip_config = json.loads(noip_config.value)
 

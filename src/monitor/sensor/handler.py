@@ -99,7 +99,7 @@ class SensorHandler:
     def is_sensorname_valid(self, item_id: int | None, item_name: str):
         """Return whether a retained MQTT name belongs to a current sensor."""
         with create_database_session() as session:
-            for sensor in session.query(Sensor).filter(Sensor.deleted == False).all():
+            for sensor in session.scalars(select(Sensor).where(Sensor.deleted == False)):
                 if sensor.id == item_id:
                     return True
 
@@ -158,7 +158,9 @@ class SensorHandler:
 
         # force reload the sensors from the database
         self._db_session.expire_all()
-        self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
+        self._sensors = self._db_session.scalars(
+            select(Sensor).where(Sensor.deleted == False)
+        ).all()
         logger.debug("Sensors reloaded!")
 
         alert_sensitivity = AlertSensitivityConfig.load_config(session=self._db_session)
@@ -419,7 +421,7 @@ class SensorHandler:
             # synchronizing the two threads
             retries = 0
             while not arm and retries < 50:
-                arm = self._db_session.query(Arm).filter_by(disarm=None).first()
+                arm = self._db_session.scalar(select(Arm).where(~Arm.disarm.has()))
                 retries += 1
                 if not arm:
                     sleep(0.1)
@@ -506,10 +508,11 @@ class SensorHandler:
                 and sensor.id in self._alerting_sensors
             ):
                 logger.debug("Stop alerting sensor id: %s", sensor.id)
-                alert_sensor = (
-                    self._db_session.query(AlertSensor)
-                    .filter_by(sensor_id=sensor.id, end_time=None)
-                    .first()
+                alert_sensor = self._db_session.scalar(
+                    select(AlertSensor).where(
+                        AlertSensor.sensor_id == sensor.id,
+                        AlertSensor.end_time.is_(None),
+                    )
                 )
                 if alert_sensor is not None:
                     alert_sensor.end_time = dt.now().astimezone()

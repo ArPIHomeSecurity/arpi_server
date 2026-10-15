@@ -1,5 +1,7 @@
 """Service for registered Zigbee device management."""
 
+from sqlalchemy import select
+
 from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
@@ -14,12 +16,12 @@ class ZigbeeService(BaseService):
     """Service for registered Zigbee device CRUD operations."""
 
     def get_devices(self) -> list[ZigbeeDevice]:
-        return (
-            self._db_session.query(ZigbeeDevice)
-            .filter_by(deleted=False)
+        statement = (
+            select(ZigbeeDevice)
+            .where(ZigbeeDevice.deleted == False)
             .order_by(ZigbeeDevice.name.asc())
-            .all()
         )
+        return self._db_session.scalars(statement).all()
 
     def get_device(self, device_id: int) -> ZigbeeDevice:
         device = self._db_session.get(ZigbeeDevice, device_id)
@@ -33,14 +35,12 @@ class ZigbeeService(BaseService):
 
         device = self.get_device(device_id)
         if "ieee_address" in data:
-            duplicate = (
-                self._db_session.query(ZigbeeDevice)
-                .filter(
+            duplicate = self._db_session.scalar(
+                select(ZigbeeDevice).where(
                     ZigbeeDevice.ieee_address == data["ieee_address"],
                     ZigbeeDevice.id != device_id,
                     ZigbeeDevice.deleted.is_(False),
                 )
-                .first()
             )
             if duplicate:
                 raise ObjectNotChanged("A Zigbee device with this IEEE address already exists")

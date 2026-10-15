@@ -6,7 +6,7 @@ from dateutil.tz.tz import tzlocal
 from flask import current_app, jsonify, request
 from flask.blueprints import Blueprint
 from jose import jwt
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 
 from server.database import db
 from server.decorators import (
@@ -29,7 +29,8 @@ user_blueprint = Blueprint("user", __name__)
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_users():
-    return jsonify([i.serialized for i in db.session.query(User).order_by(User.role).all()])
+    users = db.session.scalars(select(User).order_by(User.role)).all()
+    return jsonify([user.serialized for user in users])
 
 
 @user_blueprint.route("/api/users", methods=["POST"])
@@ -186,7 +187,7 @@ def register_device():
     )
 
     if request.json["registration_code"]:
-        users = db.session.query(User).all()
+        users = db.session.scalars(select(User)).all()
         db_user = None
         for tmp_user in users:
             if tmp_user.check_registration_code(request.json["registration_code"]):
@@ -338,7 +339,7 @@ def remove_mcp_token(user_id: int):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def register_card(user_id):
-    for db_user in db.session.query(User).all():
+    for db_user in db.session.scalars(select(User)):
         db_user.card_registration_expiry = None
     db_user: User = db.session.get(User, user_id)
     db_user.set_card_registration()

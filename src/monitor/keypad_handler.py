@@ -5,7 +5,7 @@ from queue import Empty, Queue
 from threading import Thread
 from time import sleep, time
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 
 from monitor.actions import (
     MonitorArmAwayCommand,
@@ -55,7 +55,7 @@ class KeypadHandler(Thread):
     def configure(self):
         logger.debug("Configure keypad")
         with create_database_session() as db_session:
-            keypad_settings = db_session.query(Keypad).first()
+            keypad_settings = db_session.scalar(select(Keypad))
 
             if keypad_settings is None or not keypad_settings.enabled:
                 self._keypad = None
@@ -176,7 +176,7 @@ class KeypadHandler(Thread):
             arm = None
             retries = 5
             while not arm and retries > 0:
-                arm = session.query(Arm).filter_by(disarm=None).first()
+                arm = session.scalar(select(Arm).where(~Arm.disarm.has()))
                 retries -= 1
                 sleep(1)
 
@@ -244,7 +244,7 @@ class KeypadHandler(Thread):
         Find the first card from the database matching the card number
         """
         with create_database_session() as db_session:
-            users = db_session.query(User).all()
+            users = db_session.scalars(select(User)).all()
 
             cards = []
             for user in users:
@@ -264,9 +264,11 @@ class KeypadHandler(Thread):
         card_number : str - card number to register
         """
         with create_database_session() as db_session:
-            users = db_session.query(User).filter(User.card_registration_expiry >= "NOW()").all()
+            users = db_session.scalars(
+                select(User).where(User.card_registration_expiry >= "NOW()")
+            ).all()
             if users:
-                cards = db_session.query(Card).all()
+                cards = db_session.scalars(select(Card)).all()
                 for tmp_card in cards:
                     if tmp_card.check_card(card_number):
                         # ensure any changes are committed

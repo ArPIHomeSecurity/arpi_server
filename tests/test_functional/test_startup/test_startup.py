@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from monitor.adapters.mock.utils import set_input_state, set_input_states
-from monitor.database import get_database_session
+from monitor.database import create_database_session
 from monitor.sensor.detector import wiring_config
 from tests.test_functional.data import create_test_no_delay_v2, create_test_no_delay_v2_armed
 from tests.test_functional.helpers import (
@@ -100,17 +100,18 @@ def test_monitoring_armed(device_token: str, user_token: str):
 
     # set all input states to their default values based on the wiring configuration
     channel_values = [0.0] * int(os.environ["INPUT_NUMBER"])
-    sensors = get_database_session().scalars(select(Sensor)).all()
-    for sensor in sensors:
-        if sensor.channel is None:
-            # it's zigbee, it doesn't have a channel
-            continue
+    with create_database_session() as session:
+        sensors = session.scalars(select(Sensor)).all()
+        for sensor in sensors:
+            if sensor.channel is None:
+                # it's zigbee, it doesn't have a channel
+                continue
 
-        channel_values[sensor.channel] = wiring_config.select_strategy(
-            sensor.sensor_contact_type,
-            sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B),
-            sensor.sensor_eol_count,
-        ).default
+            channel_values[sensor.channel] = wiring_config.select_strategy(
+                sensor.sensor_contact_type,
+                sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B),
+                sensor.sensor_eol_count,
+            ).default
     set_input_states(channel_values)
 
     try:

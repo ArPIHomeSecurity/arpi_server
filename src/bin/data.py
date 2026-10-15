@@ -4,6 +4,7 @@ import json
 import logging
 from dataclasses import asdict
 
+from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
 from monitor.config.models import SSHConfig
@@ -476,7 +477,7 @@ def env_test_with_v2():
 
 def env_admin_registration():
     with create_database_session() as session:
-        admin_user = session.query(User).filter(User.role == ROLE_ADMIN).first()
+        admin_user = session.scalar(select(User).where(User.role == ROLE_ADMIN))
         code = admin_user.add_registration_code("ABCD")
         logger.info("Code: %s", code)
         admin_user.update({"access_code": "1234"})

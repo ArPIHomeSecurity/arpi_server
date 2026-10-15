@@ -1,9 +1,7 @@
 import logging
 
-from sqlalchemy import distinct, inspect
-from sqlalchemy.future import select
+from sqlalchemy import distinct, func, inspect, select
 from sqlalchemy.sql.expression import false, true
-from sqlalchemy.sql.functions import func
 
 from utils.constants import ARM_AWAY, ARM_DISARM, ARM_MIXED, ARM_STAY, LOG_MONITOR
 from utils.models import Area, Sensor, User, Zone
@@ -13,18 +11,16 @@ logger = logging.getLogger(LOG_MONITOR)
 
 def get_arm_delay(session, arm_type):
     if arm_type == ARM_AWAY:
-        return (
-            session.query(func.max(Zone.away_arm_delay).label("max_delay"))
-            .filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true()))
-            .one()
-            .max_delay
+        return session.scalar(
+            select(func.max(Zone.away_arm_delay).label("max_delay")).where(
+                Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())
+            )
         )
     elif arm_type == ARM_STAY:
-        return (
-            session.query(func.max(Zone.stay_arm_delay).label("max_delay"))
-            .filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true()))
-            .one()
-            .max_delay
+        return session.scalar(
+            select(func.max(Zone.stay_arm_delay).label("max_delay")).where(
+                Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())
+            )
         )
     else:
         logger.error("Unknown arm type: %s", arm_type)
@@ -32,25 +28,23 @@ def get_arm_delay(session, arm_type):
 
 def get_alert_delay(session, arm_type):
     if arm_type == ARM_AWAY:
-        return (
-            session.query(func.max(Zone.away_alert_delay).label("max_delay"))
-            .filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true()))
-            .one()
-            .max_delay
+        return session.scalar(
+            select(func.max(Zone.away_alert_delay).label("max_delay")).where(
+                Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())
+            )
         )
     elif arm_type == ARM_STAY:
-        return (
-            session.query(func.max(Zone.stay_alert_delay).label("max_delay"))
-            .filter(Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true()))
-            .one()
-            .max_delay
+        return session.scalar(
+            select(func.max(Zone.stay_alert_delay).label("max_delay")).where(
+                Zone.deleted == false(), Zone.sensors.any(Sensor.enabled == true())
+            )
         )
     else:
         logger.error("Unknown arm type: %s", arm_type)
 
 
 def get_user_with_access_code(session, code) -> User:
-    users = session.query(User).all()
+    users = session.scalars(select(User)).all()
     for tmp_user in users:
         if tmp_user.check_access_code(code):
             state = inspect(tmp_user)

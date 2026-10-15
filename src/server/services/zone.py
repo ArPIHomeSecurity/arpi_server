@@ -2,6 +2,8 @@
 Zone service module to handle zone-related operations.
 """
 
+from sqlalchemy import select
+
 from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
@@ -24,9 +26,8 @@ class ZoneService(BaseService):
         Returns:
             List of Zone objects
         """
-        query = self._db_session.query(Zone)
-
-        return query.order_by(Zone.name.asc()).all()
+        statement = select(Zone).order_by(Zone.name.asc())
+        return self._db_session.scalars(statement).all()
 
     def get_zone(self, zone_id: int) -> Zone:
         """

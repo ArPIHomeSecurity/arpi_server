@@ -4,6 +4,8 @@ This module provides helper functions to load configuration settings from the da
 
 import json
 
+from sqlalchemy import select
+
 from monitor.database import get_database_session
 from utils.models import Option
 
@@ -18,7 +20,7 @@ def load_config(name, section, config_type, session=None):
         new_session = True
         session = get_database_session()
 
-    config = session.query(Option).filter_by(name=name, section=section).first()
+    config = session.scalar(select(Option).where(Option.name == name, Option.section == section))
 
     if new_session:
         session.close()
@@ -42,7 +44,7 @@ def save_config(name: str, section: str, value: dict, session=None):
         new_session = True
         session = get_database_session()
 
-    config = session.query(Option).filter_by(name=name, section=section).first()
+    config = session.scalar(select(Option).where(Option.name == name, Option.section == section))
     if not config:
         config = Option(name=name, section=section, value=json.dumps(value))
         session.add(config)
@@ -64,7 +66,7 @@ def delete_config(name: str, section: str, session=None):
         new_session = True
         session = get_database_session()
 
-    config = session.query(Option).filter_by(name=name, section=section).first()
+    config = session.scalar(select(Option).where(Option.name == name, Option.section == section))
     if config:
         session.delete(config)
         session.commit()

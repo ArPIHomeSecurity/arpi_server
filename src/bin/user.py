@@ -9,6 +9,7 @@ from time import sleep
 
 import sqlalchemy
 from dateutil.tz.tz import tzlocal
+from sqlalchemy import select
 
 from monitor.database import get_database_session
 from utils.models import User
@@ -29,7 +30,7 @@ logger.addHandler(handler)
 
 def get_users():
     logger.info("Users:")
-    for user in session.query(User).all():
+    for user in session.scalars(select(User)):
         logger.info("ID: %s = %s (%s)", user.id, user.name, user.role)
 
 
@@ -51,7 +52,7 @@ def new_registration_code(user_id, code: str | None, expiry: int | None):
     Generate a new registration code for the user.
     """
     try:
-        user = session.query(User).filter(User.id == user_id).one()
+        user = session.execute(select(User).where(User.id == user_id)).scalar_one()
     except sqlalchemy.exc.NoResultFound:
         logger.error("User with id %s not found", user_id)
         return
@@ -90,7 +91,7 @@ def new_access_code(user_id, code: str | None):
     """
     Generate a new access code for the user.
     """
-    user = session.query(User).filter(User.id == user_id).one()
+    user = session.execute(select(User).where(User.id == user_id)).scalar_one()
 
     if user.access_code is not None:
         logger.warning("User has access code")

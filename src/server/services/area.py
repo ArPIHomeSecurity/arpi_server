@@ -2,6 +2,8 @@
 Area service module to handle area-related operations.
 """
 
+from sqlalchemy import select
+
 from server.ipc import IPCClient
 from server.services.base import (
     BaseService,
@@ -24,9 +26,8 @@ class AreaService(BaseService):
         Returns:
             List of Area objects
         """
-        query = self._db_session.query(Area)
-
-        return query.order_by(Area.name.asc()).filter(Area.deleted == False).all()
+        statement = select(Area).where(Area.deleted == False).order_by(Area.name.asc())
+        return self._db_session.scalars(statement).all()
 
     def get_area(self, area_id: int) -> Area:
         """
@@ -38,9 +39,8 @@ class AreaService(BaseService):
         Returns:
             Area object or None if not found
         """
-        area = (
-            self._db_session.query(Area).filter(Area.id == area_id, Area.deleted == False).first()
-        )
+        statement = select(Area).where(Area.id == area_id, Area.deleted == False)
+        area = self._db_session.scalar(statement)
         if not area:
             raise ObjectNotFound("Area not found")
 

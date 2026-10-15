@@ -6,6 +6,8 @@ import logging
 from threading import Thread
 from time import sleep, time
 
+from sqlalchemy import update
+
 from monitor.adapters.output import get_output_adapter
 from monitor.database import get_database_session
 from monitor.output import OUTPUT_NAMES
@@ -39,7 +41,7 @@ class OutputSign(Thread):
         default_state = self._output.default_state
 
         # update state in database
-        session.query(Output).filter_by(id=self._output.id).update({"state": True})
+        session.execute(update(Output).where(Output.id == self._output.id).values(state=True))
         session.commit()
         send_output_state(self._output.id, True)
         self._notify_state_change(True)
@@ -110,7 +112,7 @@ class OutputSign(Thread):
         logger.debug("Output sign exited on channel '%s'", OUTPUT_NAMES[channel])
 
         # update state in database
-        session.query(Output).filter_by(id=self._output.id).update({"state": False})
+        session.execute(update(Output).where(Output.id == self._output.id).values(state=False))
         session.commit()
         session.close()
         send_output_state(self._output.id, False)

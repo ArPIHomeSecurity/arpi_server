@@ -2,6 +2,8 @@
 Card service module to handle card-related operations.
 """
 
+from sqlalchemy import select
+
 from server.services.base import BaseService
 from utils.models import Card
 
@@ -22,9 +24,9 @@ class CardService(BaseService):
             List of Card objects
 
         """
-        query = self._db_session.query(Card)
+        query = select(Card)
 
         if user_id is not None:
-            query = query.filter(Card.user_id == user_id)
+            query = query.where(Card.user_id == user_id)
 
-        return query.order_by(Card.description).all()
+        return self._db_session.scalars(query.order_by(Card.description)).all()

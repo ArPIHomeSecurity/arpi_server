@@ -4,7 +4,7 @@ Arm service module to handle arm/disarm event queries.
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_, select
 
 from server.services.base import BaseService
 from utils.constants import ARM_DISARM
@@ -35,18 +35,18 @@ class ArmService(BaseService):
         """
         filters = self._build_filters(has_alert, user_id, keypad_id, arm_type, start, end)
 
-        query = (
-            self._db_session.query(Disarm)
-            .with_entities(Arm, Disarm)
+        statement = (
+            select(Arm, Disarm)
+            .select_from(Disarm)
             .outerjoin(Arm, full=True)
-            .filter(*filters)
+            .where(*filters)
             .order_by(Disarm.time.desc())
             .limit(limit)
             .offset(offset)
         )
 
         results = []
-        for arm, disarm in query.all():
+        for arm, disarm in self._db_session.execute(statement).all():
             event = {}
             if arm:
                 event["arm"] = arm.serialized
@@ -89,7 +89,10 @@ class ArmService(BaseService):
         """
         filters = self._build_filters(has_alert, user_id, keypad_id, arm_type, start, end)
 
-        return self._db_session.query(Disarm).outerjoin(Arm, full=True).filter(*filters).count()
+        statement = (
+            select(func.count()).select_from(Disarm).outerjoin(Arm, full=True).where(*filters)
+        )
+        return self._db_session.scalar(statement)
 
     def _build_filters(
         self,
