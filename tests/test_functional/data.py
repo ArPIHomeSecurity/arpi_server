@@ -381,6 +381,28 @@ def create_test_no_delay_v2():
         logger.info("Database setup is complete")
 
 
+def create_test_v3_zigbee():
+    """Create a v3 test setup with one double-EOL wired sensor."""
+    with create_database_session() as session:
+        _create_users(session)
+        _create_options(session)
+        sensor_types = _create_sensor_types(session)
+
+        area = Area(name="House")
+        session.add(area)
+        zones = _create_zones(session)
+        sensors = _create_sensors(
+            session, sensor_types, area, zones["no_delay"], zones["no_delay"], zones["tamper"]
+        )
+        sensors["Room 1"].sensor_eol_count = SensorEOLCount.DOUBLE
+
+        zigbee_devices = _create_zigbee_devices(session)
+        _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)
+
+        session.commit()
+        logger.info("Error-state test database setup is complete")
+
+
 def create_test_outputs_v2():
     """
     This configuration has one output of every trigger type.
