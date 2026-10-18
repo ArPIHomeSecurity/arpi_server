@@ -78,6 +78,35 @@ def env_prod():
         session.add_all(SENSOR_TYPES)
         logger.info(" - Created sensor types")
 
+        # add default zones: tamper, instant alert, delayed alert
+        z1 = Zone(
+            name="Tamper",
+            disarmed_delay=0,
+            away_alert_delay=0,
+            stay_alert_delay=0,
+            description="Sabotage alert",
+        )
+        z2 = Zone(
+            name="Instant alert",
+            disarmed_delay=None,
+            away_arm_delay=0,
+            away_alert_delay=0,
+            stay_arm_delay=0,
+            stay_alert_delay=0,
+            description="Arm and alert with no delay",
+        )
+        z3 = Zone(
+            name="Delayed",
+            disarmed_delay=None,
+            away_arm_delay=30,
+            away_alert_delay=30,
+            stay_arm_delay=30,
+            stay_alert_delay=30,
+            description="Arm and alert with delay",
+        )
+        session.add_all([z1, z2, z3])
+        logger.info(" - Created default zones")
+
         kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
         kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
         session.add_all([kt1, kt2])
