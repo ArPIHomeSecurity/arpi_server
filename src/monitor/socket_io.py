@@ -65,6 +65,10 @@ def send_sensors_error(sensors_error):
     send_message("sensors_error_change", sensors_error)
 
 
+def send_sensors_tamper(sensors_tamper):
+    send_message("sensors_tamper_change", sensors_tamper)
+
+
 def send_area_state(area_state):
     send_message("area_state_change", area_state)
 

@@ -151,9 +151,19 @@ class SensorContactTypes(str, enum.Enum):
 class ChannelTypes(str, enum.Enum):
     """Channel type"""
 
+    # Basic channel type for wired sensors
+    # The reference value is measured when the sensor is in its normal state
     BASIC = "basic"
+
+    # Normal channel type for wired sensors
+    # The reference value is calculated based on the EOL resistor configuration
     NORMAL = "normal"
+
+    # Zone doubling for wired sensors using channel A
+    # The reference value is calculated based on the EOL resistor configuration
     CHANNEL_A = "channel_a"
+    # Zone doubling for wired sensors using channel B
+    # The reference value is calculated based on the EOL resistor configuration
     CHANNEL_B = "channel_b"
 
 
@@ -212,6 +222,7 @@ class Sensor(BaseModel):
     alert = Column(Boolean, nullable=False, default=False)
     silent_alert = Column(Boolean, nullable=True, default=None)
     error = Column(Boolean, nullable=False, default=False)
+    tamper = Column(Boolean, nullable=False, default=False)
     enabled = Column(Boolean, nullable=False, default=True)
     deleted = Column(Boolean, nullable=False, default=False)
 
@@ -260,6 +271,7 @@ class Sensor(BaseModel):
         self.description = description
         self.enabled = enabled
         self.silent_alert = silent_alert
+        self.tamper = False
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
         if channel is None:
@@ -368,6 +380,7 @@ class Sensor(BaseModel):
                     "sensor_eol_count",
                     "alert",
                     "error",
+                    "tamper",
                     "zone_id",
                     "area_id",
                     "type_id",

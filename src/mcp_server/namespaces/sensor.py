@@ -484,7 +484,7 @@ def reset_sensor_reference(sensor_id=None):
 @sensor_mcp.tool(
     name="get_sensor_alert",
 )
-def get_sensor_alert(sensor_id=None):
+def get_sensor_alert(sensor_id=None) -> bool:
     """
     Get the alert status of a specific sensor or all sensors.
 
@@ -501,7 +501,7 @@ def get_sensor_alert(sensor_id=None):
 @sensor_mcp.tool(
     name="get_sensor_error",
 )
-def get_sensor_error(sensor_id=None):
+def get_sensor_error(sensor_id=None) -> bool:
     """
     Get the error status of a specific sensor or all sensors.
 
@@ -511,5 +511,22 @@ def get_sensor_error(sensor_id=None):
     try:
         sensor_service = SensorService(get_database_session())
         return sensor_service.get_sensor_error(sensor_id=sensor_id)
+    except ObjectNotFound:
+        raise ToolObjectNotFound("Sensor")
+
+
+@sensor_mcp.tool(
+    name="get_sensor_tamper",
+)
+def get_sensor_tamper(sensor_id=None) -> bool:
+    """
+    Get the tamper status of a specific sensor or all sensors.
+
+    Args:
+        sensor_id: ID of the sensor to get tamper status for (if None, gets tamper status for all sensors)
+    """
+    try:
+        sensor_service = SensorService(get_database_session())
+        return sensor_service.get_sensor_tamper(sensor_id=sensor_id)
     except ObjectNotFound:
         raise ToolObjectNotFound("Sensor")

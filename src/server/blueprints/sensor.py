@@ -161,6 +161,17 @@ def get_sensor_error():
     return jsonify(sensor_service.get_sensor_error(sensor_id=request.args.get("sensorId")))
 
 
+@sensor_blueprint.route("/api/sensor/tamper", methods=["GET"])
+@registered
+@restrict_host
+def get_sensor_tamper():
+    """
+    Get the tamper status of a specific sensor or all sensors.
+    """
+    sensor_service = SensorService(db.session)
+    return jsonify(sensor_service.get_sensor_tamper(sensor_id=request.args.get("sensorId")))
+
+
 @sensor_blueprint.route("/api/sensor/reorder", methods=["PUT"])
 @registered
 @restrict_host

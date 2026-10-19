@@ -23,7 +23,6 @@ from utils.models import (
     SensorType,
     Zone,
 )
-from utils.zigbee import IAS_ZONE_STATUS_ATTRIBUTE
 
 
 class SensorService(BaseService):
@@ -116,7 +115,6 @@ class SensorService(BaseService):
             raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
 
         self._db_session.add(new_sensor)
-        self._ensure_zigbee_tamper_sensor(new_sensor)
         self._db_session.commit()
         self._db_session.refresh(new_sensor)
 
@@ -148,70 +146,10 @@ class SensorService(BaseService):
                 raise ChannelConflictError("Channel conflict with existing sensors.")
             raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
 
-        self._ensure_zigbee_tamper_sensor(sensor)
         self._db_session.commit()
         self._db_session.refresh(sensor)
         IPCClient().update_configuration()
         return sensor
-
-    def _ensure_zigbee_tamper_sensor(self, sensor: Sensor) -> None:
-        """Create the IAS Zone tamper companion for an alarm sensor if needed."""
-        if (
-            sensor.channel is not None
-            or sensor.zigbee_field != "alarm"
-            or sensor.zigbee_cluster_id != int(IAS_ZONE_STATUS_ATTRIBUTE.cluster.cluster_id)
-            or sensor.zigbee_attribute_id != IAS_ZONE_STATUS_ATTRIBUTE.attribute_id
-            or not any(signal.field == "tamper" for signal in IAS_ZONE_STATUS_ATTRIBUTE.signals)
-        ):
-            return
-
-        tamper_type = self._db_session.scalar(select(SensorType).where(SensorType.name == "Tamper"))
-        if not tamper_type:
-            return
-
-        existing_tamper = self._db_session.scalar(
-            select(Sensor).where(
-                Sensor.zigbee_device_id == sensor.zigbee_device_id,
-                Sensor.type_id == tamper_type.id,
-                Sensor.deleted == False,
-            )
-        )
-        if existing_tamper:
-            return
-
-        # ensure there is a zone for the tamper sensor
-        tamper_zone = self._db_session.scalar(
-            select(Zone).where(Zone.disarmed_delay.isnot(None), Zone.deleted == False)
-        )
-        if not tamper_zone:
-            tamper_zone = Zone(
-                name="Tamper",
-                description="Sabotage alert",
-                disarmed_delay=0,
-                away_alert_delay=0,
-                stay_alert_delay=0,
-                away_arm_delay=0,
-                stay_arm_delay=0,
-            )
-            self._db_session.add(tamper_zone)
-            self._db_session.commit()
-
-        tamper_sensor = Sensor(
-            channel=None,
-            sensor_type=tamper_type,
-            area=sensor.area,
-            zone=tamper_zone,
-            name=f"{sensor.name[: Sensor.NAME_LENGTH - 4]} (T)",
-            description=f"Tamper signal for {sensor.name}",
-            enabled=sensor.enabled,
-            zigbee_device_id=sensor.zigbee_device_id,
-            zigbee_endpoint=sensor.zigbee_endpoint,
-            zigbee_cluster_id=sensor.zigbee_cluster_id,
-            zigbee_attribute_id=sensor.zigbee_attribute_id,
-            zigbee_field="tamper",
-            ui_hidden=True,
-        )
-        self._db_session.add(tamper_sensor)
 
     def delete_sensor(self, sensor_id) -> None:
         """
@@ -321,7 +259,7 @@ class SensorService(BaseService):
 
         return IPCClient().update_configuration()
 
-    def get_sensor_alert(self, sensor_id: int) -> bool:
+    def get_sensor_alert(self, sensor_id: int | None = None) -> bool:
         """
         Returns true when the specified sensor is in alert state,
         or if any sensor is in alert state.
@@ -337,7 +275,7 @@ class SensorService(BaseService):
 
         return self._db_session.scalar(statement) is not None
 
-    def get_sensor_error(self, sensor_id: int) -> bool:
+    def get_sensor_error(self, sensor_id: int | None = None) -> bool:
         """
         Returns true when the specified sensor is in error state,
         or if any sensor is in error state.
@@ -345,6 +283,22 @@ class SensorService(BaseService):
         statement = select(Sensor).where(
             Sensor.enabled == True,
             Sensor.error == True,
+            Sensor.deleted == False,
+        )
+
+        if sensor_id:
+            statement = statement.where(Sensor.id == sensor_id)
+
+        return self._db_session.scalar(statement) is not None
+
+    def get_sensor_tamper(self, sensor_id: int | None = None) -> bool:
+        """
+        Returns true when the specified sensor is tampered,
+        or if any sensor is tampered.
+        """
+        statement = select(Sensor).where(
+            Sensor.enabled == True,
+            Sensor.tamper == True,
             Sensor.deleted == False,
         )
 

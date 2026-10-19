@@ -50,7 +50,7 @@ class SensorAlert(Thread):
         sensor_id,
         delay,
         alert_type,
-        sensitivity: AlertSensitivityConfig,
+        sensitivity: AlertSensitivityConfig | None,
         broadcaster: Broadcaster,
     ):
         cls._stop_event.clear()
@@ -82,7 +82,7 @@ class SensorAlert(Thread):
         sensor_id,
         delay,
         alert_type,
-        sensitivity: AlertSensitivityConfig,
+        sensitivity: AlertSensitivityConfig | None,
         broadcaster: Broadcaster,
     ):
         """
@@ -204,8 +204,8 @@ class SensorAlert(Thread):
             start_time=start_time,
             delay=delay,
             silent=resolve_silent(syren_config.silent, sensor.silent_alert),
-            monitor_period=self._sensitivity.monitor_period,
-            monitor_threshold=self._sensitivity.monitor_threshold,
+            monitor_period=self._sensitivity.monitor_period if self._sensitivity else None,
+            monitor_threshold=self._sensitivity.monitor_threshold if self._sensitivity else None,
         )
         alert_sensor.sensor = sensor
         alert.sensors.append(alert_sensor)

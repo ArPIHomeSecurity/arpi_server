@@ -69,6 +69,22 @@ def detect_error(sensor: Sensor, current_value: float) -> bool:
         raise ValueError(f"Unsupported BOARD_VERSION: {BOARD_VERSION}")
 
 
+def detect_tamper(sensor: Sensor, current_value: float) -> bool:
+    """Detect cut or shortcut tampering on double-EOL wired sensors."""
+    if BOARD_VERSION != 3:
+        return False
+
+    if (
+        sensor.channel_type == ChannelTypes.NORMAL
+        and sensor.sensor_eol_count == SensorEOLCount.DOUBLE
+    ):
+        return is_close(current_value, wiring_config.shortcut, TOLERANCE_V3) or is_close(
+            current_value, wiring_config.open_circuit, TOLERANCE_V3
+        )
+
+    return False
+
+
 def detect_alert_v2(sensor: Sensor, current_value: float) -> bool:
     return not is_close(current_value, sensor.reference_value, TOLERANCE_V2)
 
@@ -168,14 +184,13 @@ def detect_alert_v3(sensor: Sensor, current_value: float) -> bool:
 
 def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
     """
-    Detect error condition based on sensor configuration and current value
-    for BOARD_VERSION 3.
+    Detect error condition for the sensor based on its channel type
+    and EOL configuration for BOARD_VERSION 3.
 
-    Only NORMAL channel types can have error conditions and only sensors with
-    2 EOL resistors can show error for both SHORTCUT and OPEN_CIRCUIT.
-
-    1 EOL resistors can only show error for SHORTCUT condition.
+    An error means that the sensor's current value is not close to any expected
+    reference value (normal, alert, tamper).
     """
+    # Basic channels are never considered in error state
     if sensor.channel_type == ChannelTypes.BASIC:
         return False
 
@@ -194,39 +209,31 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
 
     # suppress error if the value is close to normal active value
     if sensor.channel_type == ChannelTypes.NORMAL:
-        reference_active = wiring_config.select_strategy(
+        references = wiring_config.select_strategy(
             sensor.sensor_contact_type,
             dual=False,
             two_eol=sensor.sensor_eol_count == SensorEOLCount.DOUBLE,
-        ).active
-        if is_close(current_value, reference_active, TOLERANCE_V3):
-            return False
+        )
 
+        acceptable_values = [references.active, references.default]
+
+        if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
+            acceptable_values.extend([wiring_config.shortcut, wiring_config.open_circuit])
     # suppress error if the value is close to any of the dual channel active values
-    if sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B):
-        reference_active_a = wiring_config.select_strategy(
+    elif sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B):
+        references = wiring_config.select_strategy(
             sensor.sensor_contact_type,
             dual=True,
             two_eol=False,
-        ).channel_a_active
-        reference_active_b = wiring_config.select_strategy(
-            sensor.sensor_contact_type,
-            dual=True,
-            two_eol=False,
-        ).channel_b_active
-        reference_active_ab = wiring_config.select_strategy(
-            sensor.sensor_contact_type,
-            dual=True,
-            two_eol=False,
-        ).both_active
-        if (
-            is_close(current_value, reference_active_a, TOLERANCE_V3)
-            or is_close(current_value, reference_active_b, TOLERANCE_V3)
-            or is_close(current_value, reference_active_ab, TOLERANCE_V3)
-        ):
-            return False
+        )
 
-    if is_close(current_value, shortcut, TOLERANCE_V3):
-        return True
+        acceptable_values = [
+            references.default,
+            references.channel_a_active,
+            references.channel_b_active,
+            references.both_active
+        ]
+    else:
+        raise ValueError(f"Unsupported channel type: {sensor.channel_type}")
 
-    return bool(is_close(current_value, open_circuit, TOLERANCE_V3))
+    return not any(is_close(current_value, value, TOLERANCE_V3) for value in acceptable_values)

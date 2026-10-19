@@ -15,9 +15,9 @@ from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
 from monitor.config.models import AlertSensitivityConfig
 from monitor.database import create_database_session, get_database_session
-from monitor.sensor.detector import detect_alert, detect_error
+from monitor.sensor.detector import detect_alert, detect_error, detect_tamper
 from monitor.sensor.history import SensorsHistory
-from monitor.socket_io import send_sensors_error, send_sensors_state
+from monitor.socket_io import send_sensors_error, send_sensors_state, send_sensors_tamper
 from monitor.storage import State, States
 from monitor.zigbee_handler import ZigbeeDeviceStore
 from utils.constants import (
@@ -66,6 +66,7 @@ class SensorHandler:
         self._broadcaster = broadcaster
         self._sensor_adapter = None
         self._alerting_sensors = set()
+        self._tampering_sensors = set()
         self._sensors_history = None
         self._sensors = None
         self._mqtt_client: MQTTClient | None = None
@@ -307,9 +308,13 @@ class SensorHandler:
         changes = False
         found_alert = False
         found_error = False
+        found_tamper = False
         for sensor in self._sensors:
+            is_tamper = False
             if self.is_zigbee_sensor(sensor):
                 alarm_data = None
+                trouble_data = None
+                tamper_data = None
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
                     alarm_data = ZigbeeDeviceStore.get_sensor_data(
@@ -319,7 +324,6 @@ class SensorHandler:
                         sensor.zigbee_attribute_id,
                         sensor.zigbee_field,
                     )
-                    # get trouble
                     trouble_data = ZigbeeDeviceStore.get_sensor_data(
                         device.ieee_address,
                         sensor.zigbee_endpoint,
@@ -327,10 +331,20 @@ class SensorHandler:
                         sensor.zigbee_attribute_id,
                         "trouble",
                     )
+                    tamper_data = ZigbeeDeviceStore.get_sensor_data(
+                        device.ieee_address,
+                        sensor.zigbee_endpoint,
+                        sensor.zigbee_cluster_id,
+                        sensor.zigbee_attribute_id,
+                        "tamper",
+                    )
                 is_alert = (
                     bool(alarm_data.value)
                     if alarm_data is not None and alarm_data.value is not None
                     else False
+                )
+                is_tamper = bool(
+                    tamper_data is not None and tamper_data.value is not None and tamper_data.value
                 )
                 is_error = bool(
                     alarm_data is None
@@ -348,7 +362,7 @@ class SensorHandler:
                         alarm_data,
                     )
                 logger.trace(
-                    "Sensor %s (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s",
+                    "Sensor %s (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s, tamper: %s",
                     sensor.name,
                     sensor.zigbee_endpoint,
                     sensor.zigbee_cluster_id,
@@ -357,30 +371,41 @@ class SensorHandler:
                     getattr(alarm_data, "value", None),
                     is_alert,
                     is_error,
+                    is_tamper,
                 )
             else:
                 # skip sensor without a channel
                 if sensor.channel == -1:
-                    continue
+                    is_alert = False
+                    is_error = False
+                else:
+                    value = self._sensor_adapter.get_value(sensor.channel)
 
-                value = self._sensor_adapter.get_value(sensor.channel)
+                    is_alert = detect_alert(sensor, value)
+                    logger.trace(
+                        "Sensor %s (CH%02d) value: %s => alert: %s",
+                        sensor.name,
+                        sensor.channel,
+                        float(f"{value:.3f}"),
+                        is_alert,
+                    )
+                    is_tamper = detect_tamper(sensor, value)
+                    is_error = detect_error(sensor, value)
+                    if is_error:
+                        logger.error(
+                            "Sensor %s (CH%02d) encountered an error: %s",
+                            sensor.name,
+                            sensor.channel,
+                            value,
+                        )
 
-                is_alert = detect_alert(sensor, value)
-                logger.trace(
-                    "Sensor %s (CH%02d) value: %s => alert: %s",
-                    sensor.name,
-                    sensor.channel,
-                    float(f"{value:.3f}"),
-                    is_alert,
-                )
-                is_error = detect_error(sensor, value)
-                logger.trace(
-                    "Sensor %s (CH%02d) value: %s => error: %s",
-                    sensor.name,
-                    sensor.channel,
-                    float(f"{value:.3f}"),
-                    is_error,
-                )
+                    logger.trace(
+                        "Sensor %s (CH%02d) value: %s => tamper: %s",
+                        sensor.name,
+                        sensor.channel,
+                        float(f"{value:.3f}"),
+                        is_tamper,
+                    )
 
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
@@ -391,11 +416,18 @@ class SensorHandler:
                 sensor.error = is_error
                 changes = True
 
+            if is_tamper != sensor.tamper:
+                sensor.tamper = is_tamper
+                changes = True
+
             if sensor.alert and sensor.enabled:
                 found_alert = True
 
             if sensor.error and sensor.enabled:
                 found_error = True
+
+            if sensor.tamper and sensor.enabled:
+                found_tamper = True
 
         self._sensors_history.add_states([sensor.alert for sensor in self._sensors])
 
@@ -403,6 +435,7 @@ class SensorHandler:
             self._db_session.commit()
             send_sensors_state(found_alert)
             send_sensors_error(found_error)
+            send_sensors_tamper(found_tamper)
 
     def handle_alerts(self):
         """
@@ -432,6 +465,14 @@ class SensorHandler:
             logger.debug("Arm: %s", arm)
 
         for idx, sensor in enumerate(self._sensors):
+            if sensor.tamper and sensor.enabled:
+                if sensor.id not in self._tampering_sensors:
+                    self._tampering_sensors.add(sensor.id)
+                    self._alerting_sensors.add(sensor.id)
+                    SensorAlert.start_alert(sensor.id, 0, ALERT_SABOTAGE, None, self._broadcaster)
+                continue
+
+            self._tampering_sensors.discard(sensor.id)
             alert_type = SensorHandler.get_alert_type(sensor, current_monitoring)
             delay = SensorHandler.get_sensor_delay(sensor, current_monitoring)
             sensitivity = self._sensors_history.get_sensitivity(idx)
@@ -535,6 +576,7 @@ class SensorHandler:
         """
         # clear all alerting sensors if disarmed
         self._alerting_sensors.clear()
+        self._tampering_sensors.clear()
 
     def close(self):
         """
@@ -542,6 +584,7 @@ class SensorHandler:
         """
         logger.debug("Closing sensor handler...")
         self._alerting_sensors.clear()
+        self._tampering_sensors.clear()
         if self._mqtt_client is not None:
             self._mqtt_client.close()
         if self._db_session is not None:
@@ -586,7 +629,7 @@ class SensorHandler:
         if monitoring_state == MONITORING_READY:
             if sensor.zone.disarmed_delay is not None:
                 delay = sensor.zone.disarmed_delay
-        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT):
+        elif monitoring_state in (MONITORING_ARMED, MONITORING_ALERT, MONITORING_SABOTAGE):
             if sensor.zone.disarmed_delay is not None:
                 delay = sensor.zone.disarmed_delay
             elif sensor.area.arm_state == ARM_AWAY and sensor.zone.away_alert_delay is not None:
