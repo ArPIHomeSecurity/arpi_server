@@ -103,6 +103,7 @@ def _create_sensor_types(session):
         "Warning": SensorType(name="Warning", description="IAS Zone warning device"),
         "Glass": SensorType(name="Glass", description="IAS Zone glass break sensor"),
         "Repeater": SensorType(name="Repeater", description="IAS Zone security repeater"),
+        "Occupancy": SensorType(name="Occupancy", description="IAS Zone occupancy sensor")
     }
     session.add_all(sensor_types.values())
     logger.info(" - Created sensor types")

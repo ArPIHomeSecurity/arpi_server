@@ -2,12 +2,18 @@
 import argparse
 import json
 import logging
+import os
+import sys
 from dataclasses import asdict
 
-from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 
-from monitor.config.models import SSHConfig
+from monitor.config.models import (
+    MQTTConfigExternalPublish,
+    MQTTConfigInternalPublish,
+    MQTTConfigInternalRead,
+    SSHConfig,
+)
 from monitor.database import create_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
@@ -25,30 +31,106 @@ from utils.models import (
     metadata,
 )
 
+
+class InvalidBoardVersion(Exception):
+    def __init__(self, board_version: str):
+        super().__init__(f"Invalid board version: {board_version}")
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
-SENSOR_TYPES = [
-    SensorType(id=1, name="Motion", description="Detect motion"),
-    SensorType(id=2, name="Tamper", description="Detect sabotage"),
-    SensorType(id=3, name="Open", description="Detect opening"),
-    SensorType(id=4, name="Break", description="Detect glass break"),
-    SensorType(id=5, name="Contact", description="IAS Zone contact switch"),
-    SensorType(id=6, name="Fire", description="IAS Zone fire sensor"),
-    SensorType(id=7, name="Water", description="IAS Zone water sensor"),
-    SensorType(id=8, name="CO", description="IAS Zone carbon monoxide sensor"),
-    SensorType(id=9, name="Emergency", description="IAS Zone emergency device"),
-    SensorType(id=10, name="Vibration", description="IAS Zone vibration sensor"),
-    SensorType(id=11, name="Remote", description="IAS Zone remote control"),
-    SensorType(id=12, name="Key fob", description="IAS Zone key fob"),
-    SensorType(id=13, name="Keypad", description="IAS Zone keypad"),
-    SensorType(id=14, name="Warning", description="IAS Zone warning device"),
-    SensorType(id=15, name="Glass", description="IAS Zone glass break sensor"),
-    SensorType(id=16, name="Repeater", description="IAS Zone security repeater"),
-    SensorType(id=17, name="Occupancy", description="Occupancy sensor"),
-]
+SENSOR_TYPE_DATA = (
+    (1, "Motion", "Detect motion"),
+    (2, "Tamper", "Detect sabotage"),
+    (3, "Open", "Detect opening"),
+    (4, "Break", "Detect glass break"),
+    (5, "Contact", "IAS Zone contact switch"),
+    (6, "Fire", "IAS Zone fire sensor"),
+    (7, "Water", "IAS Zone water sensor"),
+    (8, "CO", "IAS Zone carbon monoxide sensor"),
+    (9, "Emergency", "IAS Zone emergency device"),
+    (10, "Vibration", "IAS Zone vibration sensor"),
+    (11, "Remote", "IAS Zone remote control"),
+    (12, "Key fob", "IAS Zone key fob"),
+    (13, "Keypad", "IAS Zone keypad"),
+    (14, "Warning", "IAS Zone warning device"),
+    (15, "Glass", "IAS Zone glass break sensor"),
+    (16, "Repeater", "IAS Zone security repeater"),
+    (17, "Occupancy", "Occupancy sensor"),
+)
+
+
+def _create_sensor_types(session) -> dict[str, SensorType]:
+    sensor_types = {
+        name: SensorType(id=sensor_type_id, name=name, description=description)
+        for sensor_type_id, name, description in SENSOR_TYPE_DATA
+    }
+    session.add_all(sensor_types.values())
+    logger.info(" - Created sensor types")
+    return sensor_types
+
+
+def _create_admin_user(
+    session, user_id: int | None = None, registration_code: str | None = None
+) -> User:
+    admin_user = User(id=user_id, name="Administrator", role=ROLE_ADMIN, access_code="1234")
+    if registration_code:
+        admin_user.add_registration_code(registration_code)
+    session.add(admin_user)
+    return admin_user
+
+
+def _create_test_zones(session, delay: int) -> dict[str, Zone]:
+    zones = {
+        "no_delay": Zone(name="No delay", description="Alert with no delay"),
+        "tamper": Zone(
+            name="Tamper",
+            disarmed_delay=0,
+            away_alert_delay=0,
+            stay_alert_delay=0,
+            description="Sabotage alert",
+        ),
+        "away_stay_delayed": Zone(
+            name="Away/stay delayed",
+            away_alert_delay=delay,
+            stay_alert_delay=delay,
+            description="Alert delayed when armed AWAY or STAY",
+        ),
+        "stay_delayed": Zone(
+            name="Stay delayed",
+            stay_alert_delay=delay,
+            description="Alert delayed when armed STAY",
+        ),
+        "stay": Zone(
+            name="Stay",
+            stay_alert_delay=None,
+            description="No alert when armed STAY",
+        ),
+    }
+    session.add_all(zones.values())
+    logger.info(" - Created zones")
+    return zones
+
+
+def _create_keypad(
+    session, keypad_type_name: str, *, include_wiegand: bool = False, enabled: bool | None = None
+) -> Keypad:
+    keypad_types = {"DSC": KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")}
+    if include_wiegand:
+        keypad_types["WIEGAND"] = KeypadType(2, "WIEGAND", "Wiegand keypad")
+
+    session.add_all(keypad_types.values())
+    logger.info(" - Created keypad types")
+
+    if enabled is None:
+        keypad = Keypad(keypad_type=keypad_types[keypad_type_name])
+    else:
+        keypad = Keypad(keypad_type=keypad_types[keypad_type_name], enabled=enabled)
+    session.add(keypad)
+    logger.info(" - Created keypads")
+    return keypad
 
 
 def cleanup():
@@ -70,13 +152,9 @@ def env_prod():
     This configuration is used for the released production version.
     """
     with create_database_session() as session:
-        admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
-        admin_user.add_registration_code("ABCD1234")
-        session.add(admin_user)
+        _create_admin_user(session, registration_code="ABCD1234")
         logger.info(" - Created admin user")
-
-        session.add_all(SENSOR_TYPES)
-        logger.info(" - Created sensor types")
+        _create_sensor_types(session)
 
         # add default zones: tamper, instant alert, delayed alert
         z1 = Zone(
@@ -107,14 +185,7 @@ def env_prod():
         session.add_all([z1, z2, z3])
         logger.info(" - Created default zones")
 
-        kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-        kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
-        session.add_all([kt1, kt2])
-        logger.info(" - Created keypad types")
-
-        k1 = Keypad(keypad_type=kt2)
-        session.add_all([k1])
-        logger.info(" - Created keypads")
+        _create_keypad(session, "WIEGAND", include_wiegand=True)
 
         a1 = Area(name="House")
         session.add(a1)
@@ -133,12 +204,8 @@ def env_live_01():
     This configuration is used for live testing with real hardware.
     """
     with create_database_session() as session:
-        session.add_all(
-            [
-                User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
-                User(name="Chuck.Norris", role=ROLE_USER, access_code="1111"),
-            ]
-        )
+        _create_admin_user(session)
+        session.add(User(name="Chuck.Norris", role=ROLE_USER, access_code="1111"))
         logger.info(" - Created users")
 
         z1 = Zone(name="No delay", description="Alert with no delay")
@@ -169,8 +236,7 @@ def env_live_01():
         session.add_all([z1, z2, z3, z4, z5, z6])
         logger.info(" - Created zones")
 
-        session.add_all(SENSOR_TYPES)
-        logger.info(" - Created sensor types")
+        sensor_types = _create_sensor_types(session)
 
         area = Area(name="House")
         session.add(area)
@@ -179,7 +245,7 @@ def env_live_01():
         s1 = Sensor(
             channel=0,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z5,
@@ -189,7 +255,7 @@ def env_live_01():
         s2 = Sensor(
             channel=1,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z5,
@@ -199,7 +265,7 @@ def env_live_01():
         s3 = Sensor(
             channel=2,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[2],
+            sensor_type=sensor_types["Open"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z5,
@@ -209,7 +275,7 @@ def env_live_01():
         s4 = Sensor(
             channel=3,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z3,
@@ -219,7 +285,7 @@ def env_live_01():
         s5 = Sensor(
             channel=4,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z1,
@@ -229,7 +295,7 @@ def env_live_01():
         s6 = Sensor(
             channel=5,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z4,
@@ -239,7 +305,7 @@ def env_live_01():
         s7 = Sensor(
             channel=6,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
+            sensor_type=sensor_types["Motion"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z4,
@@ -249,7 +315,7 @@ def env_live_01():
         s8 = Sensor(
             channel=7,
             channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[1],
+            sensor_type=sensor_types["Tamper"],
             sensor_contact_type=SensorContactTypes.NC,
             sensor_eol_count=SensorEOLCount.SINGLE,
             zone=z6,
@@ -259,260 +325,202 @@ def env_live_01():
         session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
         logger.info(" - Created sensors")
 
-        kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-        session.add_all([kt1])
-        logger.info(" - Created keypad types")
+        _create_keypad(session, "DSC")
 
-        k1 = Keypad(keypad_type=kt1)
-        session.add_all([k1])
-        logger.info(" - Created keypads")
+        session.commit()
 
+def env_dev_with_v3():
+    with create_database_session() as session:
+        _env_with_v3(session)
         session.commit()
 
 
 def env_test_with_v3():
+    with create_database_session() as session:
+        _env_with_v3(session)
+        session.commit()
+
+
+def _env_with_v3(session):
     """
     This configuration is used for testing with V3 board.
     """
-    with create_database_session() as session:
-        admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
-        admin_user.add_registration_code("ABCD1234")
-        session.add_all(
-            [admin_user, User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")]
-        )
-        logger.info(" - Created users")
+    board_version = os.environ["BOARD_VERSION"]
+    if board_version != "3":
+        raise InvalidBoardVersion(board_version)
 
-        z1 = Zone(name="No delay", description="Alert with no delay")
-        z2 = Zone(
-            name="Tamper",
-            disarmed_delay=0,
-            away_alert_delay=0,
-            stay_alert_delay=0,
-            description="Sabotage alert",
-        )
-        z3 = Zone(
-            name="Away/stay delayed",
-            away_alert_delay=5,
-            stay_alert_delay=5,
-            description="Alert delayed when armed AWAY or STAY",
-        )
-        z4 = Zone(
-            name="Stay delayed",
-            stay_alert_delay=5,
-            description="Alert delayed when armed STAY",
-        )
-        z5 = Zone(
-            name="Stay",
-            stay_alert_delay=None,
-            description="No alert when armed STAY",
-        )
-        session.add_all([z1, z2, z3, z4, z5])
-        logger.info(" - Created zones")
+    _create_admin_user(session, user_id=1, registration_code="ABCD1234")
+    session.add(User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111"))
+    logger.info(" - Created users")
 
-        session.add_all(SENSOR_TYPES)
-        logger.info(" - Created sensor types")
+    zones = _create_test_zones(session, delay=5)
 
-        area = Area(name="House")
-        session.add(area)
-        logger.info(" - Created area")
+    sensor_types = _create_sensor_types(session)
 
-        s1 = Sensor(
-            channel=0,
-            channel_type=ChannelTypes.CHANNEL_A,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=SENSOR_TYPES[0],
-            area=area,
-            zone=z3,
-            name="Test room",
-            description="Test room movement sensor",
-            silent_alert=True,
-        )
-        s2 = Sensor(
-            channel=0,
-            channel_type=ChannelTypes.CHANNEL_B,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=SENSOR_TYPES[2],
-            area=area,
-            zone=z5,
-            name="Test room 0",
-            description="Test room 0 door sensor",
-        )
-        s3 = Sensor(
-            channel=1,
-            channel_type=ChannelTypes.BASIC,
-            sensor_type=SENSOR_TYPES[0],
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            area=area,
-            zone=z1,
-            name="Test room 1",
-            description="Test room 1 movement sensor",
-        )
-        s4 = Sensor(
-            channel=2,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            area=area,
-            zone=z1,
-            name="Test room 2",
-            description="Test room 2 movement sensor",
-        )
-        s5 = Sensor(
-            channel=3,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
-            sensor_contact_type=SensorContactTypes.NO,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            area=area,
-            zone=z1,
-            name="Test room 3",
-            description="Test room 3 movement sensor",
-        )
-        s6 = Sensor(
-            channel=4,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[0],
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.DOUBLE,
-            area=area,
-            zone=z1,
-            name="Test room 4",
-            description="Test room 4 movement sensor",
-        )
-        s7 = Sensor(
-            channel=5,
-            channel_type=ChannelTypes.NORMAL,
-            sensor_type=SENSOR_TYPES[1],
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            area=area,
-            zone=z2,
-            name="Tamper",
-            description="Sabotage wire",
-        )
-        session.add_all([s1, s2, s3, s4, s5, s6, s7])
-        logger.info(" - Created sensors")
+    area = Area(name="House")
+    session.add(area)
+    logger.info(" - Created area")
 
-        kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-        kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
-        session.add_all([kt1, kt2])
-        logger.info(" - Created keypad types")
+    s1 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.CHANNEL_A,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Motion"],
+        area=area,
+        zone=zones["away_stay_delayed"],
+        name="Test room",
+        description="Test room movement sensor",
+        silent_alert=True,
+    )
+    s2 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.CHANNEL_B,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Open"],
+        area=area,
+        zone=zones["stay"],
+        name="Test room 0",
+        description="Test room 0 door sensor",
+    )
+    s3 = Sensor(
+        channel=1,
+        channel_type=ChannelTypes.BASIC,
+        sensor_type=sensor_types["Motion"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["no_delay"],
+        name="Test room 1",
+        description="Test room 1 movement sensor",
+    )
+    s4 = Sensor(
+        channel=2,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=sensor_types["Motion"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["no_delay"],
+        name="Test room 2",
+        description="Test room 2 movement sensor",
+    )
+    s5 = Sensor(
+        channel=3,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=sensor_types["Motion"],
+        sensor_contact_type=SensorContactTypes.NO,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["no_delay"],
+        name="Test room 3",
+        description="Test room 3 movement sensor",
+    )
+    s6 = Sensor(
+        channel=4,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=sensor_types["Motion"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.DOUBLE,
+        area=area,
+        zone=zones["no_delay"],
+        name="Test room 4",
+        description="Test room 4 movement sensor",
+    )
+    s7 = Sensor(
+        channel=5,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_type=sensor_types["Tamper"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["tamper"],
+        name="Tamper",
+        description="Sabotage wire",
+    )
+    session.add_all([s1, s2, s3, s4, s5, s6, s7])
+    logger.info(" - Created sensors")
 
-        k1 = Keypad(keypad_type=kt2, enabled=True)
-        session.add_all([k1])
-        logger.info(" - Created keypads")
-
-        session.commit()
+    _create_keypad(session, "WIEGAND", include_wiegand=True, enabled=True)
 
 
 def env_test_with_v2():
+    with create_database_session() as session:
+        _env_with_v2(session)
+
+        # setup MQTT configuration
+        MQTTConfigInternalPublish(hostname="localhost").load_config(cleanup=True, session=session)
+        MQTTConfigInternalRead(hostname="localhost").load_config(cleanup=False, session=session)
+        MQTTConfigExternalPublish(hostname="localhost").load_config(cleanup=False, session=session)
+
+        session.commit()
+
+
+def env_dev_with_v2():
+    with create_database_session() as session:
+        _env_with_v2(session)
+        session.commit()
+
+def _env_with_v2(session):
     """
     This configuration is used for testing with V2 board.
     """
-    with create_database_session() as session:
-        admin_user = User(id=1, name="Administrator", role=ROLE_ADMIN, access_code="1234")
-        admin_user.add_registration_code("ABCD1234")
-        session.add_all(
-            [admin_user, User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111")]
-        )
-        logger.info(" - Created users")
 
-        z1 = Zone(name="No delay", description="Alert with no delay")
-        z2 = Zone(
-            name="Tamper",
-            disarmed_delay=0,
-            away_alert_delay=0,
-            stay_alert_delay=0,
-            description="Sabotage alert",
-        )
-        z3 = Zone(
-            name="Away/stay delayed",
-            away_alert_delay=10,
-            stay_alert_delay=10,
-            description="Alert delayed when armed AWAY or STAY",
-        )
-        z4 = Zone(
-            name="Stay delayed",
-            stay_alert_delay=10,
-            description="Alert delayed when armed STAY",
-        )
-        z5 = Zone(
-            name="Stay",
-            stay_alert_delay=None,
-            description="No alert when armed STAY",
-        )
-        session.add_all([z1, z2, z3, z4, z5])
-        logger.info(" - Created zones")
+    board_Version = os.getenv("BOARD_VERSION")
+    if board_Version != "2":
+        raise InvalidBoardVersion(board_Version)
 
-        session.add_all(SENSOR_TYPES)
-        logger.info(" - Created sensor types")
+    _create_admin_user(session, user_id=1, registration_code="ABCD1234")
+    session.add(User(id=2, name="Chuck Norris", role=ROLE_USER, access_code="1111"))
+    logger.info(" - Created users")
 
-        area = Area(name="House")
-        session.add(area)
-        logger.info(" - Created area")
+    zones = _create_test_zones(session, delay=10)
 
-        s1 = Sensor(
-            channel=0,
-            channel_type=ChannelTypes.CHANNEL_A,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=SENSOR_TYPES[0],
-            area=area,
-            zone=z3,
-            name="Test room",
-            description="Test room movement sensor",
-            silent_alert=True,
-        )
-        s2 = Sensor(
-            channel=1,
-            channel_type=ChannelTypes.CHANNEL_B,
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            sensor_type=SENSOR_TYPES[2],
-            area=area,
-            zone=z3,
-            name="Test room 0",
-            description="Test room 0 door sensor",
-        )
-        s3 = Sensor(
-            channel=2,
-            channel_type=ChannelTypes.BASIC,
-            sensor_type=SENSOR_TYPES[1],
-            sensor_contact_type=SensorContactTypes.NC,
-            sensor_eol_count=SensorEOLCount.SINGLE,
-            area=area,
-            zone=z2,
-            name="Tamper",
-            description="Sabotage wire",
-        )
-        session.add_all([s1, s2, s3])
-        logger.info(" - Created sensors")
+    sensor_types = _create_sensor_types(session)
 
-        kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
-        kt2 = KeypadType(2, "WIEGAND", "Wiegand keypad")
-        session.add_all([kt1, kt2])
-        logger.info(" - Created keypad types")
+    area = Area(name="House")
+    session.add(area)
+    logger.info(" - Created area")
 
-        k1 = Keypad(keypad_type=kt2, enabled=True)
-        session.add_all([k1])
-        logger.info(" - Created keypads")
+    s1 = Sensor(
+        channel=0,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Motion"],
+        area=area,
+        zone=zones["away_stay_delayed"],
+        name="Test room",
+        description="Test room movement sensor",
+        silent_alert=True,
+    )
+    s2 = Sensor(
+        channel=1,
+        channel_type=ChannelTypes.NORMAL,
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        sensor_type=sensor_types["Open"],
+        area=area,
+        zone=zones["away_stay_delayed"],
+        name="Test room 0",
+        description="Test room 0 door sensor",
+    )
+    s3 = Sensor(
+        channel=2,
+        channel_type=ChannelTypes.BASIC,
+        sensor_type=sensor_types["Tamper"],
+        sensor_contact_type=SensorContactTypes.NC,
+        sensor_eol_count=SensorEOLCount.SINGLE,
+        area=area,
+        zone=zones["tamper"],
+        name="Tamper",
+        description="Sabotage wire",
+    )
+    session.add_all([s1, s2, s3])
+    logger.info(" - Created sensors")
 
-        session.commit()
-
-
-def env_admin_registration():
-    with create_database_session() as session:
-        admin_user = session.scalar(select(User).where(User.role == ROLE_ADMIN))
-        code = admin_user.add_registration_code("ABCD")
-        logger.info("Code: %s", code)
-        admin_user.update({"access_code": "1234"})
-        logger.info("Password: %s", "1234")
-        session.commit()
-        logger.info("Admin registration added and password changed")
+    _create_keypad(session, "WIEGAND", include_wiegand=True, enabled=True)
 
 
 def main():
@@ -558,12 +566,14 @@ def main():
         return 0
 
 
-def cli_main():
+def cli_main() -> int:
     try:
-        main()
+        return main()
+    except InvalidBoardVersion as e:
+        logger.error("ERROR: %s", e)
+        return 1
     except KeyboardInterrupt:
-        pass
-
+        return 0
 
 if __name__ == "__main__":
-    cli_main()
+    sys.exit(cli_main())
