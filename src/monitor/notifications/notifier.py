@@ -37,8 +37,8 @@ class Notifier(Thread):
     # TODO: consider instead of calling these methods to be notified with actions
     # and retrieve information from the database
     @classmethod
-    def notify_alert_started(cls, alert_id, sensors, start_time: datetime):
-        logger.debug("Message adding alert start id: %s", alert_id)
+    def notify_alert_started(cls, alert_id: int, sensors: list[str], start_time: datetime):
+        logger.debug("Message adding alert(%s) start for sensors %s", alert_id, sensors)
         cls._notifications.put(
             Notification(
                 type=NotificationType.ALERT_STARTED,
@@ -49,8 +49,8 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_alert_stopped(cls, alert_id, stop_time):
-        logger.debug("Message adding alert stop id: %s", alert_id)
+    def notify_alert_stopped(cls, alert_id: int, stop_time: datetime):
+        logger.debug("Message adding alert(%s) stop", alert_id)
         cls._notifications.put(
             Notification(
                 type=NotificationType.ALERT_STOPPED,
@@ -61,7 +61,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_power_outage_started(cls, start_time):
+    def notify_power_outage_started(cls, start_time: datetime):
         logger.debug("Message adding power outage start")
         cls._notifications.put(
             Notification(
@@ -73,7 +73,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_power_outage_stopped(cls, stop_time):
+    def notify_power_outage_stopped(cls, stop_time: datetime):
         logger.debug("Message adding power outage end")
         cls._notifications.put(
             Notification(
@@ -85,7 +85,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_local_network_issue_started(cls, start_time):
+    def notify_local_network_issue_started(cls, start_time: datetime):
         logger.debug("Message adding local network issue start")
         cls._notifications.put(
             Notification(
@@ -97,7 +97,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_local_network_issue_stopped(cls, stop_time):
+    def notify_local_network_issue_stopped(cls, stop_time: datetime):
         logger.debug("Message adding local network issue end")
         cls._notifications.put(
             Notification(
@@ -109,7 +109,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_internet_issue_started(cls, start_time):
+    def notify_internet_issue_started(cls, start_time: datetime):
         logger.debug("Message adding internet issue start")
         cls._notifications.put(
             Notification(
@@ -121,7 +121,7 @@ class Notifier(Thread):
         )
 
     @classmethod
-    def notify_internet_issue_stopped(cls, stop_time):
+    def notify_internet_issue_stopped(cls, stop_time: datetime):
         logger.debug("Message adding internet issue end")
         cls._notifications.put(
             Notification(

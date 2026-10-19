@@ -153,10 +153,12 @@ class AreaHandler:
         # using a new session here
         # because the MQTT client thread cannot use the active session of the monitoring thread
         user_id = None
+        user_name = None
         with create_database_session() as session:
             user = get_user_with_access_code(session, code)
             if user:
                 user_id = user.id
+                user_name = user.name
 
         if not user_id:
             logger.warning("Rejected MQTT command for '%s': invalid access code", panel_name)
@@ -190,7 +192,8 @@ class AreaHandler:
             return
 
         logger.info(
-            "MQTT command from user id=%s for '%s': %s",
+            "MQTT command from user %s(%s) for '%s': %s",
+            user_name,
             user_id,
             panel_name,
             arm_type,
@@ -285,21 +288,28 @@ class AreaHandler:
 
         Return True if the area was found and the arm state was changed.
         """
-        logger.info("Arming area id=%s to %s", area_id, arm_type)
         area = self._db_session.get(Area, area_id)
         if area is None or area.deleted:
-            logger.error("Area not found or deleted")
+            logger.error("Cannot arm unknown or deleted area(%s)", area_id)
             return False
 
+        logger.info("Arming area %s(%s) to %s", area.name, area.id, arm_type)
+
         if area.sensors == []:
-            logger.error("Area has no sensors")
+            logger.error("Area %s(%s) has no sensors", area.name, area.id)
             return False
 
         if area.arm_state == arm_type:
-            logger.info("Area id=%s already in state %s", area_id, arm_type)
+            logger.info("Area %s(%s) already in state %s", area.name, area.id, arm_type)
             return False
 
-        logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
+        logger.info(
+            "Area %s(%s) state changed from %s to %s",
+            area.name,
+            area.id,
+            area.arm_state,
+            arm_type,
+        )
 
         # update output channel
         if arm_type in (ARM_AWAY, ARM_STAY):
@@ -332,10 +342,16 @@ class AreaHandler:
         arm_changed = False
         for area in areas:
             if area.arm_state == arm_type:
-                logger.info("Area id=%s already in state %s", area.id, arm_type)
+                logger.info("Area %s(%s) already in state %s", area.name, area.id, arm_type)
                 continue
 
-            logger.info("Area id=%s state changed from %s to %s", area.id, area.arm_state, arm_type)
+            logger.info(
+                "Area %s(%s) state changed from %s to %s",
+                area.name,
+                area.id,
+                area.arm_state,
+                arm_type,
+            )
             area.arm_state = arm_type
             arm_changed = True
 

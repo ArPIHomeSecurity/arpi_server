@@ -260,7 +260,7 @@ def authenticate():
             )
     elif not db_user:
         sleep(2)
-        current_app.logger.warning("Invalid user id %s", device_token["user_id"])
+        current_app.logger.warning("Unknown user id: %s", device_token["user_id"])
         return jsonify({"error": "invalid user id"}), 400
 
     sleep(2)

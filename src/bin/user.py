@@ -31,7 +31,7 @@ logger.addHandler(handler)
 def get_users():
     logger.info("Users:")
     for user in session.scalars(select(User)):
-        logger.info("ID: %s = %s (%s)", user.id, user.name, user.role)
+        logger.info("User %s(%s) (%s)", user.name, user.id, user.role)
 
 
 def wait(seconds=5):
@@ -54,7 +54,7 @@ def new_registration_code(user_id, code: str | None, expiry: int | None):
     try:
         user = session.execute(select(User).where(User.id == user_id)).scalar_one()
     except sqlalchemy.exc.NoResultFound:
-        logger.error("User with id %s not found", user_id)
+        logger.error("Unknown user(%s) not found", user_id)
         return
 
     if user.registration_code is not None:
