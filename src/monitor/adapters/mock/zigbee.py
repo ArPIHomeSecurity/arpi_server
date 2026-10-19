@@ -194,6 +194,18 @@ class ZigbeeAdapter:
 
         set_zigbee_devices(state)
 
+    def unpair_device(self, ieee_address: str) -> bool:
+        """Unpair a simulated device by its IEEE address."""
+        state = get_zigbee_devices()
+        devices = state.get("devices", {})
+        device = devices.get(str(ieee_address))
+        if not device:
+            return False
+
+        device["pairing"] = False
+        set_zigbee_devices(state)
+        return True
+
     def get_device_state(self, ieee_address: str):
         """Return the raw runtime state for one simulated device."""
         state = get_zigbee_devices()
