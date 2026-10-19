@@ -523,7 +523,7 @@ class Monitor(Thread, ActionHandler):
         sensors = self._db_session.scalars(select(Sensor).where(Sensor.deleted == False))
         for sensor in sensors:
             delay = SensorHandler.get_sensor_delay(sensor, States.get(State.MONITORING))
-            logger.debug("Sensor (id=%s) delay: %s", sensor.id, delay)
+            logger.debug("Sensor %s(%s) delay: %s", sensor.name, sensor.id, delay)
             sensor_state = ArmSensor.from_sensor(arm=arm, sensor=sensor, timestamp=now, delay=delay)
             self._db_session.add(sensor_state)
 

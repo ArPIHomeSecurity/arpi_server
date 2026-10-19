@@ -104,7 +104,7 @@ class SensorHandler:
                 if sensor.id == item_id:
                     return True
 
-        logger.warning("MQTT topic '%s / %s' does not match any current sensor", item_name, item_id)
+        logger.warning("MQTT topic '%s(%s)' does not match any current sensor", item_name, item_id)
         return False
 
     def has_active_sensor(self, area_id: int | None = None) -> bool:
@@ -139,7 +139,7 @@ class SensorHandler:
             if self.is_zigbee_sensor(sensor):
                 continue
             if sensor.reference_value is None and sensor.channel != -1:
-                logger.info("Found uncalibrated sensor: %s => %s", sensor.id, sensor.name)
+                logger.info("Found uncalibrated sensor: %s(%s)", sensor.name, sensor.id)
                 return True
 
         logger.info("No uncalibrated sensors found")
@@ -353,8 +353,9 @@ class SensorHandler:
                 )
                 if is_error:
                     logger.error(
-                        "Sensor %s (zigbee/%s/%04x/%04x/%s) encountered an error: %s",
+                        "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) encountered an error: %s",
                         sensor.name,
+                        sensor.id,
                         sensor.zigbee_endpoint,
                         sensor.zigbee_cluster_id,
                         sensor.zigbee_attribute_id,
@@ -362,8 +363,9 @@ class SensorHandler:
                         alarm_data,
                     )
                 logger.trace(
-                    "Sensor %s (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s, tamper: %s",
+                    "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s, tamper: %s",
                     sensor.name,
+                    sensor.id,
                     sensor.zigbee_endpoint,
                     sensor.zigbee_cluster_id,
                     sensor.zigbee_attribute_id,
@@ -383,8 +385,9 @@ class SensorHandler:
 
                     is_alert = detect_alert(sensor, value)
                     logger.trace(
-                        "Sensor %s (CH%02d) value: %s => alert: %s",
+                        "Sensor %s(%s) (CH%02d) value: %s => alert: %s",
                         sensor.name,
+                        sensor.id,
                         sensor.channel,
                         float(f"{value:.3f}"),
                         is_alert,
@@ -393,15 +396,17 @@ class SensorHandler:
                     is_error = detect_error(sensor, value)
                     if is_error:
                         logger.error(
-                            "Sensor %s (CH%02d) encountered an error: %s",
+                            "Sensor %s(%s) (CH%02d) encountered an error: %s",
                             sensor.name,
+                            sensor.id,
                             sensor.channel,
                             value,
                         )
 
                     logger.trace(
-                        "Sensor %s (CH%02d) value: %s => tamper: %s",
+                        "Sensor %s(%s) (CH%02d) value: %s => tamper: %s",
                         sensor.name,
+                        sensor.id,
                         sensor.channel,
                         float(f"{value:.3f}"),
                         is_tamper,
@@ -469,7 +474,9 @@ class SensorHandler:
                 if sensor.id not in self._tampering_sensors:
                     self._tampering_sensors.add(sensor.id)
                     self._alerting_sensors.add(sensor.id)
-                    SensorAlert.start_alert(sensor.id, 0, ALERT_SABOTAGE, None, self._broadcaster)
+                    SensorAlert.start_alert(
+                        sensor.id, sensor.name, 0, ALERT_SABOTAGE, None, self._broadcaster
+                    )
                 continue
 
             self._tampering_sensors.discard(sensor.id)
@@ -488,8 +495,9 @@ class SensorHandler:
                 and delay is not None
             ):
                 logger.warning(
-                    "Sensor %s (CH%02d) has suppressed alert! %ss%s | (%r)",
+                    "Sensor %s(%s) (CH%02d) has suppressed alert! %ss%s | (%r)",
                     sensor.name,
+                    sensor.id,
                     sensor.channel,
                     sensitivity.monitor_period,
                     sensitivity.monitor_threshold,
@@ -510,7 +518,8 @@ class SensorHandler:
                     and (arm is not None and arm.time + timedelta(seconds=delay) > now)
                 ):
                     logger.debug(
-                        "Ignore alert on sensor(%s): %s + %s < %s",
+                        "Ignore alert on sensor %s(%s): %s + %s < %s",
+                        sensor.name,
                         sensor.id,
                         arm.time,
                         timedelta(seconds=delay),
@@ -521,7 +530,8 @@ class SensorHandler:
 
                 # start the alert
                 logger.debug(
-                    "Found alerting sensor id: %s, states: %s, delay: %s, alert type: %s",
+                    "Found alerting sensor %s(%s), states: %s, delay: %s, alert type: %s",
+                    sensor.name,
                     sensor.id,
                     self._sensors_history.get_states(idx),
                     delay,
@@ -529,26 +539,35 @@ class SensorHandler:
                 )
                 if alert_type is not None and delay is not None:
                     logger.debug(
-                        "Start alerting on sensor with history: %s => %s",
-                        sensor,
+                        "Start alerting on sensor %s(%s) with history: %s",
+                        sensor.name,
+                        sensor.id,
                         self._sensors_history.get_states(idx),
                     )
                     self._alerting_sensors.add(sensor.id)
                     SensorAlert.start_alert(
-                        sensor.id, delay, alert_type, sensitivity, self._broadcaster
+                        sensor.id, sensor.name, delay, alert_type, sensitivity, self._broadcaster
                     )
 
                 if alert_type is None:
-                    logger.debug("Do not start alert on sensor: %s (no alert type)", sensor.id)
+                    logger.debug(
+                        "Do not start alert on sensor %s(%s) (no alert type)",
+                        sensor.name,
+                        sensor.id,
+                    )
                 if delay is None:
-                    logger.debug("Do not start alert on sensor: %s (no delay)", sensor.id)
+                    logger.debug(
+                        "Do not start alert on sensor %s(%s) (no delay)",
+                        sensor.name,
+                        sensor.id,
+                    )
 
             # stop alert of sensor
             elif (
                 not self._sensors_history.is_sensor_alerting(idx)
                 and sensor.id in self._alerting_sensors
             ):
-                logger.debug("Stop alerting sensor id: %s", sensor.id)
+                logger.debug("Stop alerting sensor %s(%s)", sensor.name, sensor.id)
                 alert_sensor = self._db_session.scalar(
                     select(AlertSensor).where(
                         AlertSensor.sensor_id == sensor.id,
@@ -558,15 +577,17 @@ class SensorHandler:
                 if alert_sensor is not None:
                     alert_sensor.end_time = dt.now().astimezone()
                     logger.debug(
-                        "Cleared sensor alert: alert id=%s, sensor id=%s",
+                        "Cleared sensor alert: alert id=%s, sensor %s(%s)",
                         alert_sensor.alert_id,
+                        alert_sensor.name,
                         alert_sensor.sensor_id,
                     )
                     self._db_session.commit()
                     self._alerting_sensors.remove(sensor.id)
                 else:
                     logger.debug(
-                        "Cleared sensor alert: sensor id=%s (already closed in alert)",
+                        "Cleared sensor alert: sensor %s(%s) (already closed in alert)",
+                        sensor.name,
                         sensor.id,
                     )
 
@@ -646,5 +667,5 @@ class SensorHandler:
         else:
             logger.error("Unknown monitoring state: %s", monitoring_state)
 
-        logger.debug("Sensor (id=%s) delay: %s", sensor.id, delay)
+        logger.debug("Sensor %s(%s) delay: %s", sensor.name, sensor.id, delay)
         return delay

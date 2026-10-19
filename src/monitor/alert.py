@@ -48,13 +48,14 @@ class SensorAlert(Thread):
     def start_alert(
         cls,
         sensor_id,
+        sensor_name,
         delay,
         alert_type,
         sensitivity: AlertSensitivityConfig | None,
         broadcaster: Broadcaster,
     ):
         cls._stop_event.clear()
-        SensorAlert(sensor_id, delay, alert_type, sensitivity, broadcaster).start()
+        SensorAlert(sensor_id, sensor_name, delay, alert_type, sensitivity, broadcaster).start()
 
     @classmethod
     def stop_alerts(cls, disarm_id: int):
@@ -80,6 +81,7 @@ class SensorAlert(Thread):
     def __init__(
         self,
         sensor_id,
+        sensor_name,
         delay,
         alert_type,
         sensitivity: AlertSensitivityConfig | None,
@@ -90,6 +92,7 @@ class SensorAlert(Thread):
         """
         super().__init__(name=THREAD_ALERT)
         self._sensor_id = sensor_id
+        self._sensor_name = sensor_name
         self._delay = delay
         self._alert_type = alert_type
         self._sensitivity = sensitivity
@@ -99,7 +102,8 @@ class SensorAlert(Thread):
         start_time = datetime.now().astimezone()
         logger.debug("Alert prepared in arm state: %s", self._alert_type)
         logger.info(
-            "Alert prepared on sensor (id:%s) with %s seconds delay",
+            "Alert prepared on sensor %s(%s) with %s seconds delay",
+            self._sensor_name,
             self._sensor_id,
             self._delay,
         )
@@ -110,14 +114,16 @@ class SensorAlert(Thread):
 
         if self._stop_event.wait(self._delay):
             logger.info(
-                "Sensor (%s) alert stopped before %s seconds delay",
+                "Sensor %s(%s) alert stopped before %s seconds delay",
+                self._sensor_name,
                 self._sensor_id,
                 self._delay,
             )
             return
 
         logger.info(
-            "Alert started sensor (id:%s) after %s seconds delay",
+            "Alert started on sensor %s(%s) after %s seconds delay",
+            self._sensor_name,
             self._sensor_id,
             self._delay,
         )
@@ -193,7 +199,7 @@ class SensorAlert(Thread):
 
         # we can't add a sensor twice to the same alert, check database AlertSensor schema
         if already_added:
-            logger.debug("Sensor by id: %s already added", self._sensor_id)
+            logger.debug("Sensor %s(%s) already added", sensor.name, sensor.id)
             return
 
         alert_sensor = AlertSensor(
@@ -211,6 +217,6 @@ class SensorAlert(Thread):
         alert.sensors.append(alert_sensor)
         alert.silent = all(item.silent for item in alert.sensors)
         session.commit()
-        logger.debug("Added sensor by id: %s", self._sensor_id)
+        logger.debug("Added sensor %s(%s)", sensor.name, sensor.id)
 
         send_alert_state(alert.serialized)
