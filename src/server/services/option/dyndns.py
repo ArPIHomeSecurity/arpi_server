@@ -1,7 +1,7 @@
 import os
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import DyndnsConfig
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed
@@ -16,12 +16,7 @@ class DyndnsService(BaseService):
         """
         Get the current dynamic DNS configuration
         """
-        config = DyndnsConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = DyndnsConfig()
-
-        return config
+        return load_config(DyndnsConfig)
 
     def set_dyndns_config(self, config: DyndnsConfig) -> dict | None:
         """
@@ -30,7 +25,7 @@ class DyndnsService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = DyndnsConfig.load_config(session=self._db_session)
+        db_config = load_config(DyndnsConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -39,7 +34,6 @@ class DyndnsService(BaseService):
             DyndnsConfig.OPTION_NAME,
             DyndnsConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         if os.environ.get("USE_SSH_CONNECTION", "true").lower() == "true":

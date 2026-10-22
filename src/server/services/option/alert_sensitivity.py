@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import AlertSensitivityConfig
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed
@@ -18,7 +18,7 @@ class AlertSensitivityService(BaseService):
         """
         Get the current alert sensitivity configuration
         """
-        return AlertSensitivityConfig.load_config(session=self._db_session)
+        return load_config(AlertSensitivityConfig)
 
     def set_alert_sensitivity_config(self, config: AlertSensitivityConfig):
         """
@@ -27,11 +27,11 @@ class AlertSensitivityService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = AlertSensitivityConfig.load_config(session=self._db_session)
+        db_config = load_config(AlertSensitivityConfig)
         if db_config and db_config == config:
             return
 
-        save_config(OPTION_NAME, OPTION_SECTION, asdict(config), session=self._db_session)
+        save_config(OPTION_NAME, OPTION_SECTION, asdict(config))
 
         IPCClient().update_configuration()
 
@@ -39,5 +39,9 @@ class AlertSensitivityService(BaseService):
         """
         Remove the custom alert sensitivity configuration and reset it to default values
         """
-        AlertSensitivityConfig.load_config(cleanup=True, session=self._db_session)
+        save_config(
+            OPTION_NAME,
+            OPTION_SECTION,
+            asdict(AlertSensitivityConfig()),
+        )
         return "Success"

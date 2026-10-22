@@ -134,8 +134,6 @@ def option_put(option_name, section) -> Response:
     Update the configuration option by name and section.
     If the option is not found, create a new one.
     """
-    # handle syren configuration separately
-    # we will move all the other options to services later
     if option_name == SyrenConfig.OPTION_NAME and section == SyrenConfig.SECTION_NAME:
         syren_service = SyrenService(db.session)
         syren_service.set_syren_config(SyrenConfig(**request.json))

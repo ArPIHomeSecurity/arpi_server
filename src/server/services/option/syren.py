@@ -1,8 +1,7 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import SyrenConfig
-from monitor.syren import Syren
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed, TestingNotAllowed
 
@@ -16,12 +15,7 @@ class SyrenService(BaseService):
         """
         Get the current siren configuration
         """
-        config = SyrenConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = SyrenConfig(silent=Syren.SILENT, delay=Syren.DELAY, duration=Syren.DURATION)
-
-        return config
+        return load_config(SyrenConfig)
 
     def set_syren_config(self, config: SyrenConfig):
         """
@@ -34,7 +28,6 @@ class SyrenService(BaseService):
             SyrenConfig.OPTION_NAME,
             SyrenConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
     def test_syren(self, duration: int = 5) -> dict:

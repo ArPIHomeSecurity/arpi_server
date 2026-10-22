@@ -33,3 +33,20 @@ def get_registered_config_sections():
         A list of all registered config option sections
     """
     return [config_class.SECTION_NAME for config_class in registry]
+
+def get_registered_config_class(option_name: str, section: str):
+    """
+    Get the registered config class for a given option name and section.
+
+    Args:
+        option_name: The name of the config option
+        section: The section of the config option
+
+    Returns:
+        The config class if found, None otherwise
+    """
+    for config_class in registry:
+        if config_class.OPTION_NAME == option_name and config_class.SECTION_NAME == section:
+            return config_class
+
+    return None

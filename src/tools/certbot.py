@@ -8,7 +8,7 @@ from time import time
 
 from cryptography import x509
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import (
     DEFAULT_MQTT_CA_CERT,
     DyndnsConfig,
@@ -40,7 +40,7 @@ class Certbot:
         Returns: True if the certificate was generated, False otherwise
         """
         logger.info("Generating certbot certificate...")
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
         if not dyndns_config.provider:
             logger.info("No dynamic dns provider found")
             return False
@@ -173,12 +173,13 @@ class Certbot:
         """
         Keep the MQTT client CA configuration aligned with nginx's certificate.
         """
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
 
-        mqtt_connection = MQTTConnection().load_config()
+        mqtt_connection = load_config(MQTTConnection)
 
         if mqtt_connection.external:
-            mqtt_config = MQTTConfigExternalPublish.load_config()
+            logger.info("Updating external MQTT configuration with hostname %s", dyndns_config.hostname)
+            mqtt_config = load_config(MQTTConfigExternalPublish)
             mqtt_config.ca_certs = ca_certificate
             save_config(
                 MQTTConfigExternalPublish.OPTION_NAME,
@@ -186,7 +187,8 @@ class Certbot:
                 asdict(mqtt_config),
             )
         else:
-            mqtt_config = MQTTConfigInternalPublish.load_config()
+            logger.info("Updating internal MQTT configuration with hostname %s", dyndns_config.hostname)
+            mqtt_config = load_config(MQTTConfigInternalPublish)
             mqtt_config.hostname = dyndns_config.hostname
             mqtt_config.ca_certs = ca_certificate
             save_config(
@@ -199,10 +201,7 @@ class Certbot:
         """
         Updates the server_name in the remote.conf file
         """
-        dyndns_config = DyndnsConfig.load_config()
-        if not dyndns_config:
-            logger.info("Missing dynamic dns configuration")
-            return
+        dyndns_config = load_config(DyndnsConfig)
 
         logger.info("Updating remote configurations for hostname %s", dyndns_config.hostname)
         # it is linked to NGINX_REMOTE_AVAILABLE
@@ -268,7 +267,7 @@ class Certbot:
                 ].value
                 logger.info("Domain in certificate: %s", cert_domain)
 
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
         if dyndns_config and dyndns_config.hostname == cert_domain:
             logger.info("Domain not changed")
             return False
@@ -299,7 +298,7 @@ class Certbot:
         Returns: True if the configuration was changed, False otherwise
         """
         logger.info("Verifying certificate configuration")
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
         use_certbot = bool(dyndns_config.provider) and self.check_certificate_exists()
 
         nginx_enabled = Path(NGINX_REMOTE_CONF).exists()

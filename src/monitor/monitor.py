@@ -29,7 +29,8 @@ from monitor.adapters.power_base import SOURCE_BATTERY, SOURCE_NETWORK
 from monitor.alert import SensorAlert
 from monitor.area_handler import AreaHandler
 from monitor.broadcast import Broadcaster
-from monitor.config.models import AlertSensitivityConfig, DyndnsConfig, SSHConfig, SyrenConfig
+from monitor.config.helper import load_config
+from monitor.config.models import SyrenConfig
 from monitor.connection import SecureConnection
 from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
@@ -183,13 +184,7 @@ class Monitor(Thread, ActionHandler):
         if alert:
             logger.info("Continue unresolved alert: %s", alert)
             send_alert_state(alert)
-            syren_config = SyrenConfig.load_config(cleanup=True, session=self._db_session)
-            if syren_config is None:
-                syren_config = SyrenConfig(
-                    silent=Syren.SILENT,
-                    delay=Syren.DELAY,
-                    duration=Syren.DURATION,
-                )
+            syren_config = load_config(SyrenConfig)
             Syren.start_syren(
                 silent=alert.silent,
                 delay=syren_config.delay,
@@ -565,9 +560,4 @@ class Monitor(Thread, ActionHandler):
             logger.info("Close invalid alert: %s", alert)
             send_alert_state(None)
 
-        # overwrite invalid values in the database with default values
-        SSHConfig.load_config(cleanup=True, session=self._db_session)
-        SyrenConfig.load_config(cleanup=True, session=self._db_session)
-        AlertSensitivityConfig.load_config(cleanup=True, session=self._db_session)
-        DyndnsConfig.load_config(cleanup=True, session=self._db_session)
         self._db_session.commit()

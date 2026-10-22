@@ -231,7 +231,7 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
             references.default,
             references.channel_a_active,
             references.channel_b_active,
-            references.both_active
+            references.both_active,
         ]
     else:
         raise ValueError(f"Unsupported channel type: {sensor.channel_type}")

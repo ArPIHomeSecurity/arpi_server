@@ -3,6 +3,8 @@ from threading import Event, Thread
 from time import time
 
 from monitor.adapters.output import get_output_adapter
+from monitor.config.helper import load_config
+from monitor.config.models import SyrenConfig
 from monitor.socket_io import send_syren_state
 from utils.constants import LOG_ALERT, THREAD_ALERT
 
@@ -13,11 +15,6 @@ class Syren(Thread):
     """
     Handling of syren alerts.
     """
-
-    # default config
-    SILENT = False  # alarm type not silent
-    DELAY = 0  # default delay 0 seconds
-    DURATION = 0  # default stop never
 
     SYREN_CHANNEL = 0
 
@@ -33,9 +30,9 @@ class Syren(Thread):
         logger = logging.getLogger(LOG_ALERT)
         logger.debug("Starting syren...")
 
-        resolved_silent = cls.SILENT if silent is None else silent
-        resolved_delay = cls.DELAY if delay is None else delay
-        resolved_duration = cls.DURATION if duration is None else duration
+        resolved_silent = silent
+        resolved_delay = delay
+        resolved_duration = duration
 
         logger.info(
             "Using resolved syren settings: silent=%s, delay=%s, duration=%s",

@@ -10,6 +10,7 @@ from monitor.actions import (
     MonitoringSabotageCommand,
 )
 from monitor.broadcast import Broadcaster
+from monitor.config.helper import load_config
 from monitor.config.models import AlertSensitivityConfig, SyrenConfig
 from monitor.database import get_database_session
 from monitor.notifications.notifier import Notifier
@@ -135,12 +136,7 @@ class SensorAlert(Thread):
             alert = self.create_alert(session)
             new_alert = True
 
-        syren_config = SyrenConfig.load_config()
-        if syren_config is None:
-            logger.info("Missing syren settings, using defaults")
-            syren_config = SyrenConfig(
-                silent=Syren.SILENT, delay=Syren.DELAY, duration=Syren.DURATION
-            )
+        syren_config = load_config(SyrenConfig)
 
         self.add_sensor_to_alert(
             session=session,

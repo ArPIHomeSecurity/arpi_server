@@ -11,8 +11,8 @@ from textual.widget import Widget
 from textual.widgets import Button, Input
 
 from monitor.adapters.mock.utils import append_sms_message
+from monitor.config.helper import load_config
 from monitor.config.models import GSMConfig
-from monitor.database import create_database_session
 
 
 class GSM(Widget):
@@ -39,8 +39,7 @@ class GSM(Widget):
     @on(Button.Pressed, "#gsm-refresh")
     def gsm_refresh_pressed(self, _event: Button.Pressed) -> None:
         """Reload the configured GSM source number from the database."""
-        with create_database_session() as session:
-            config = GSMConfig.load_config(session=session) or GSMConfig()
+        config = load_config(GSMConfig)
         self.query_one("#gsm-source-number", Input).value = config.phone_number_1 or ""
 
     @on(Button.Pressed, "#gsm-add")

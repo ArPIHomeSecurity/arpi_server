@@ -125,11 +125,13 @@ def test_silent_alert_cases(device_token, user_token, case):
         wait_for_monitoring_ready(device_token)
 
         # Configure system-level syren behavior directly in DB.
-        save_config(
-            "syren",
-            "timing",
+        response = call_api(
+            "PUT",
+            "/api/config/syren/timing",
             {"silent": case["system_syren_silent"], "delay": 0, "duration": 0},
+            user_token,
         )
+        check_api_response(response, expected_status=[200, 204])
 
         # Configure sensor-level silent alert only.
         response = call_api(

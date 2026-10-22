@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import SubscriptionsConfig
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed
@@ -15,12 +15,7 @@ class SubscriptionsService(BaseService):
         """
         Get the current subscriptions configuration
         """
-        config = SubscriptionsConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = SubscriptionsConfig()
-
-        return config
+        return load_config(SubscriptionsConfig)
 
     def set_subscriptions_config(self, config: SubscriptionsConfig) -> dict | None:
         """
@@ -29,7 +24,7 @@ class SubscriptionsService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = SubscriptionsConfig.load_config(session=self._db_session)
+        db_config = load_config(SubscriptionsConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -38,7 +33,6 @@ class SubscriptionsService(BaseService):
             SubscriptionsConfig.OPTION_NAME,
             SubscriptionsConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()

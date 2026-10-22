@@ -7,6 +7,7 @@ from time import sleep, time
 import requests
 from noipy.main import execute_update
 
+from monitor.config.helper import load_config
 from monitor.config.models import DyndnsConfig
 from utils.constants import LOG_SC_DYNDNS
 from utils.dictionary import filter_keys
@@ -60,7 +61,7 @@ class DynDns:
         Update the IP address at DNSprovider if it's necessary.
         :param force: force the update
         """
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
         if not dyndns_config.provider:
             logger.info("No dynamic dns provider found")
             return False
@@ -130,7 +131,7 @@ class DynDns:
         Wait for the update to be finished.
         :param timeout: timeout in seconds
         """
-        dyndns_config = DyndnsConfig.load_config()
+        dyndns_config = load_config(DyndnsConfig)
         if not dyndns_config.provider:
             logger.info("No dynamic dns provider found")
             return False

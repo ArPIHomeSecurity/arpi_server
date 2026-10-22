@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import GSMConfig, SMSActionConfig, SMSCommandConfig
 from server.ipc import IPCClient
 from server.services.base import BaseService, ConfigChangesNotAllowed, TestingNotAllowed
@@ -15,12 +15,7 @@ class GSMService(BaseService):
         """
         Get the current GSM configuration
         """
-        config = GSMConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = GSMConfig()
-
-        return config
+        return load_config(GSMConfig)
 
     def set_gsm_config(self, config: GSMConfig) -> dict | None:
         """
@@ -29,7 +24,7 @@ class GSMService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = GSMConfig.load_config(session=self._db_session)
+        db_config = load_config(GSMConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -38,7 +33,6 @@ class GSMService(BaseService):
             GSMConfig.OPTION_NAME,
             GSMConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()
@@ -47,12 +41,7 @@ class GSMService(BaseService):
         """
         Get the current SMS action configuration
         """
-        config = SMSActionConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = SMSActionConfig()
-
-        return config
+        return load_config(SMSActionConfig)
 
     def set_sms_action_config(self, config: SMSActionConfig) -> dict | None:
         """
@@ -61,7 +50,7 @@ class GSMService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = SMSActionConfig.load_config(session=self._db_session)
+        db_config = load_config(SMSActionConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -70,7 +59,6 @@ class GSMService(BaseService):
             SMSActionConfig.OPTION_NAME,
             SMSActionConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()
@@ -79,12 +67,7 @@ class GSMService(BaseService):
         """
         Get the current SMS command configuration
         """
-        config = SMSCommandConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = SMSCommandConfig()
-
-        return config
+        return load_config(SMSCommandConfig)
 
     def set_sms_command_config(self, config: SMSCommandConfig) -> dict | None:
         """
@@ -93,7 +76,7 @@ class GSMService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = SMSCommandConfig.load_config(session=self._db_session)
+        db_config = load_config(SMSCommandConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -102,7 +85,6 @@ class GSMService(BaseService):
             SMSCommandConfig.OPTION_NAME,
             SMSCommandConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()

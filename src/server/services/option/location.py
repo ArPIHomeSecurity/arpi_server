@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import LocationConfig
 from server.services.base import BaseService, ConfigChangesNotAllowed
 
@@ -14,12 +14,7 @@ class LocationConfigService(BaseService):
         """
         Get the current location configuration
         """
-        config = LocationConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = LocationConfig()
-
-        return config
+        return load_config(LocationConfig)
 
     def set_location_config(self, config: LocationConfig) -> None:
         """
@@ -28,7 +23,7 @@ class LocationConfigService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = LocationConfig.load_config(session=self._db_session)
+        db_config = load_config(LocationConfig)
         if db_config and db_config == config:
             # No changes needed
             return
@@ -37,5 +32,4 @@ class LocationConfigService(BaseService):
             LocationConfig.OPTION_NAME,
             LocationConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )

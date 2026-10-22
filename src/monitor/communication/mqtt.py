@@ -9,6 +9,7 @@ from unicodedata import normalize
 
 import paho.mqtt.client as mqtt
 
+from monitor.config.helper import load_config
 from monitor.config.models import (
     MQTTConfigExternalPublish,
     MQTTConfigInternalPublish,
@@ -193,8 +194,8 @@ class MQTTClient:
         Connect to MQTT broker.
         """
 
-        mqtt_connection = MQTTConnection.load_config()
-        if mqtt_connection is None or not mqtt_connection.enabled:
+        mqtt_connection = load_config(MQTTConnection)
+        if not mqtt_connection.enabled:
             logger.info("MQTT connection is not enabled")
             return
 
@@ -209,10 +210,10 @@ class MQTTClient:
 
         mqtt_config = None
         if mqtt_connection.external:
-            mqtt_config = MQTTConfigExternalPublish.load_config()
+            mqtt_config = load_config(MQTTConfigExternalPublish)
             logger.info("Using external MQTT connection configuration")
         else:
-            mqtt_config = MQTTConfigInternalPublish.load_config()
+            mqtt_config = load_config(MQTTConfigInternalPublish)
             logger.info("Using internal MQTT connection configuration")
 
         username = mqtt_config.username
@@ -221,7 +222,7 @@ class MQTTClient:
             logger.debug(
                 "Using password authentication user: %s password length = %s",
                 username,
-                len(password),
+                len(password or ""),
             )
             try:
                 # FIXME:theoretically self._client should never be None here

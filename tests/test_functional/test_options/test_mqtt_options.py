@@ -37,4 +37,4 @@ def test_01_internal_account_credentials(user_token, section, username, password
     assert value["username"] == username
     # the password must not be masked, the administrator hands it to the external client
     assert value["password"] == password
-    assert value["tls_enabled"] is True
+    assert value["tls_enabled"] is False

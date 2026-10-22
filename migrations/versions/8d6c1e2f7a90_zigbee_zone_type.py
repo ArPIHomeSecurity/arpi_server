@@ -30,7 +30,8 @@ def upgrade():
         "('Keypad', 'IAS Zone keypad'),"
         "('Warning', 'IAS Zone warning device'),"
         "('Glass', 'IAS Zone glass break sensor'),"
-        "('Repeater', 'IAS Zone security repeater')"
+        "('Repeater', 'IAS Zone security repeater'),"
+        "('Occupancy', 'IAS Zone occupancy sensor')"
     )
 
 
@@ -41,6 +42,6 @@ def downgrade():
     op.execute(
         "DELETE FROM sensor_type WHERE name IN ("
         "'Contact', 'Fire', 'Water', 'CO', 'Emergency', 'Vibration', "
-        "'Remote', 'Key fob', 'Keypad', 'Warning', 'Glass', 'Repeater'"
+        "'Remote', 'Key fob', 'Keypad', 'Warning', 'Glass', 'Repeater', 'Occupancy'"
         ")"
     )

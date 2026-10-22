@@ -18,6 +18,7 @@ from monitor.actions import (
 )
 from monitor.adapters.gsm_provider import GSMProvider
 from monitor.broadcast import Broadcaster
+from monitor.config.helper import load_config
 from monitor.config.models import GSMConfig, SMSActionConfig, SMSCommandConfig
 from monitor.database import get_database_session
 from utils.constants import LOG_SMS, THREAD_SMS
@@ -92,7 +93,7 @@ class SmsHandler(Thread):
         # Normalize and mask sender number (e.g., keep last 4 digits)
         logger.debug("Processing SMS from %s", number)
 
-        action_config = SMSActionConfig.load_config()
+        action_config = load_config(SMSActionConfig)
 
         if not action_config.enabled:
             logger.info("SMS action config is disabled, ignoring message from %s", number)
@@ -162,7 +163,7 @@ class SmsHandler(Thread):
         """Dispatch SMS command to appropriate handler (stub implementations)."""
 
         logger.debug("Handling message: %s from user %s", command, user.id if user else None)
-        command_config = SMSCommandConfig.load_config()
+        command_config = load_config(SMSCommandConfig)
 
         def compare(a: str, b: str, case_sensitive: bool) -> bool:
             if case_sensitive:

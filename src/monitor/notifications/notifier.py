@@ -14,6 +14,7 @@ from monitor.adapters.gsm import CallResult, CallType
 from monitor.adapters.gsm_provider import GSMProvider
 from monitor.adapters.smtp import SMTPSender
 from monitor.broadcast import Broadcaster
+from monitor.config.helper import load_config
 from monitor.config.models import LocationConfig, SMTPConfig, SubscriptionsConfig
 from monitor.database import create_database_session
 from monitor.notifications.notification import Notification, NotificationType
@@ -135,7 +136,7 @@ class Notifier(Thread):
     @staticmethod
     def send_test_email():
         logger.debug("Sending test email")
-        smtp_config = SMTPConfig.load_config()
+        smtp_config = load_config(SMTPConfig)
         smtp = SMTPSender(
             hostname=smtp_config.smtp_hostname,
             port=smtp_config.smtp_port,
@@ -148,7 +149,7 @@ class Notifier(Thread):
             messages["connection"] = False
             return False, messages
 
-        location = LocationConfig.load_config().name
+        location = load_config(LocationConfig).name
         notification = Notification(
             type=NotificationType.TEST_NOTIFICATION,
             id=None,
@@ -296,8 +297,8 @@ class Notifier(Thread):
         logger.info("Notifier stopped")
 
     def setup_connections(self):
-        self._smtp_config = SMTPConfig.load_config()
-        self._subscriptions = SubscriptionsConfig.load_config()
+        self._smtp_config = load_config(SMTPConfig)
+        self._subscriptions = load_config(SubscriptionsConfig)
 
         GSMProvider.load_config()
 

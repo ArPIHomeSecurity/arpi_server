@@ -3,9 +3,9 @@ This module defines the configuration dataclasses for the monitor.
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 
-from monitor.config.base import BaseConfig
+from monitor.config.registry import register_config_option
 
 
 @dataclass
@@ -19,60 +19,81 @@ class Subscription:
     internet_issue_started: bool = False
     internet_issue_stopped: bool = False
 
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
 
 @dataclass
-class SubscriptionsConfig(BaseConfig):
+class SubscriptionsConfig:
     OPTION_NAME = "notifications"
     SECTION_NAME = "subscriptions"
 
-    call1: Subscription = None
-    call2: Subscription = None
-    sms1: Subscription = None
-    sms2: Subscription = None
-    email1: Subscription = None
-    email2: Subscription = None
+    call1: Subscription | dict = None
+    call2: Subscription | dict = None
+    sms1: Subscription | dict = None
+    sms2: Subscription | dict = None
+    email1: Subscription | dict = None
+    email2: Subscription | dict = None
 
     def __post_init__(self):
-        self.call1 = (
-            Subscription(**self.call1)
-            if isinstance(self.call1, dict)
-            else (self.call1 or Subscription())
-        )
-        self.call2 = (
-            Subscription(**self.call2)
-            if isinstance(self.call2, dict)
-            else (self.call2 or Subscription())
-        )
-        self.sms1 = (
-            Subscription(**self.sms1)
-            if isinstance(self.sms1, dict)
-            else (self.sms1 or Subscription())
-        )
-        self.sms2 = (
-            Subscription(**self.sms2)
-            if isinstance(self.sms2, dict)
-            else (self.sms2 or Subscription())
-        )
-        self.email1 = (
-            Subscription(**self.email1)
-            if isinstance(self.email1, dict)
-            else (self.email1 or Subscription())
-        )
-        self.email2 = (
-            Subscription(**self.email2)
-            if isinstance(self.email2, dict)
-            else (self.email2 or Subscription())
-        )
+        try:
+            # try to create Subscription from dict if possible
+            self.call1 = (
+                Subscription(**self.call1) if isinstance(self.call1, dict) else Subscription()
+            )
+        except TypeError:
+            # fallback to from_dict if TypeError occurs
+            self.call1 = Subscription.from_dict(self.call1)
+
+        try:
+            self.call2 = (
+                Subscription(**self.call2) if isinstance(self.call2, dict) else Subscription()
+            )
+        except TypeError:
+            self.call2 = Subscription.from_dict(self.call2)
+
+        try:
+            self.sms1 = Subscription(**self.sms1) if isinstance(self.sms1, dict) else Subscription()
+        except TypeError:
+            self.sms1 = Subscription.from_dict(self.sms1)
+
+        try:
+            self.sms2 = Subscription(**self.sms2) if isinstance(self.sms2, dict) else Subscription()
+        except TypeError:
+            self.sms2 = Subscription.from_dict(self.sms2)
+
+        try:
+            self.email1 = (
+                Subscription(**self.email1) if isinstance(self.email1, dict) else Subscription()
+            )
+        except TypeError:
+            self.email1 = Subscription.from_dict(self.email1)
+
+        try:
+            self.email2 = (
+                Subscription(**self.email2) if isinstance(self.email2, dict) else Subscription()
+            )
+        except TypeError:
+            self.email2 = Subscription.from_dict(self.email2)
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
 
 @dataclass
-class LocationConfig(BaseConfig):
+class LocationConfig:
     """
     Configuration for the location information, the source of the notifications.
     """
 
     OPTION_NAME = "system"
     SECTION_NAME = "location"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     name: str = None
     description: str = None
@@ -89,9 +110,13 @@ class LocationConfig(BaseConfig):
 
 
 @dataclass
-class SMTPConfig(BaseConfig):
+class SMTPConfig:
     OPTION_NAME = "notifications"
     SECTION_NAME = "smtp"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     enabled: bool = False
     smtp_hostname: str = None
@@ -103,9 +128,13 @@ class SMTPConfig(BaseConfig):
 
 
 @dataclass
-class GSMConfig(BaseConfig):
+class GSMConfig:
     OPTION_NAME = "notifications"
     SECTION_NAME = "gsm"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     enabled: bool = False
     pin_code: str = None
@@ -114,9 +143,13 @@ class GSMConfig(BaseConfig):
 
 
 @dataclass
-class SMSActionConfig(BaseConfig):
+class SMSActionConfig:
     OPTION_NAME = "notifications"
     SECTION_NAME = "sms_action"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     enabled: bool = False
     check_phone_number: bool = True
@@ -124,9 +157,13 @@ class SMSActionConfig(BaseConfig):
 
 
 @dataclass
-class SMSCommandConfig(BaseConfig):
+class SMSCommandConfig:
     OPTION_NAME = "notifications"
     SECTION_NAME = "sms_command"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     case_sensitive: bool = False
     arm_away_command: str = "away"
@@ -135,9 +172,13 @@ class SMSCommandConfig(BaseConfig):
 
 
 @dataclass
-class DyndnsConfig(BaseConfig):
+class DyndnsConfig:
     OPTION_NAME = "network"
     SECTION_NAME = "dyndns"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     username: str = None
     password: str = None
@@ -148,9 +189,13 @@ class DyndnsConfig(BaseConfig):
 
 
 @dataclass
-class SyrenConfig(BaseConfig):
+class SyrenConfig:
     OPTION_NAME = "syren"
     SECTION_NAME = "timing"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     silent: bool | None = False
     delay: int = 0
@@ -158,9 +203,13 @@ class SyrenConfig(BaseConfig):
 
 
 @dataclass
-class SSHConfig(BaseConfig):
+class SSHConfig:
     OPTION_NAME = "network"
     SECTION_NAME = "access"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     service_enabled: bool = True
     restrict_local_network: bool = False
@@ -168,7 +217,7 @@ class SSHConfig(BaseConfig):
 
 
 @dataclass
-class AlertSensitivityConfig(BaseConfig):
+class AlertSensitivityConfig:
     """
     Configuration for the alert sensitivity settings of the monitor.
 
@@ -184,6 +233,10 @@ class AlertSensitivityConfig(BaseConfig):
 
     OPTION_NAME = "alert"
     SECTION_NAME = "sensitivity"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     monitor_period: int | None = None
     """
@@ -204,16 +257,20 @@ DEFAULT_MQTT_CA_CERT = os.environ.get(
 
 
 @dataclass
-class MQTTConnection(BaseConfig):
+class MQTTConnection:
     OPTION_NAME = "mqtt"
     SECTION_NAME = "connection"
+
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
     enabled: bool = True
     external: bool = False
 
 
 @dataclass
-class MQTTConfigInternalRead(BaseConfig):
+class MQTTConfigInternalRead:
     """
     Access configuration to the internal MQTT broker for reading by other services.
     """
@@ -221,18 +278,22 @@ class MQTTConfigInternalRead(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_read"
 
-    hostname: str = "arpi.local"
-    port: int = 8883
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
+    hostname: str = os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local")
+    port: int = int(os.environ.get("ARGUS_MQTT_PORT", "8883"))
     username: str = "argus_reader"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_READER_MQTT_PASSWORD"))
-    tls_enabled: bool = True
+    tls_enabled: bool = bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true")
     # only turns off the hostname check, the certificate chain is still verified
-    tls_insecure: bool = True
+    tls_insecure: bool = bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true")
     ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
-class MQTTConfigInternalControl(BaseConfig):
+class MQTTConfigInternalControl:
     """
     Access configuration to the internal MQTT broker for external clients that also
     arm and disarm, in addition to reading the state.
@@ -241,18 +302,22 @@ class MQTTConfigInternalControl(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_control"
 
-    hostname: str = "arpi.local"
-    port: int = 8883
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
+    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = "argus_control"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_CONTROL_MQTT_PASSWORD"))
-    tls_enabled: bool = True
+    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
     # only turns off the hostname check, the certificate chain is still verified
-    tls_insecure: bool = False
+    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
     ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
-class MQTTConfigInternalPublish(BaseConfig):
+class MQTTConfigInternalPublish:
     """
     Access configuration to the internal MQTT broker for publishing by the monitor.
     """
@@ -260,19 +325,23 @@ class MQTTConfigInternalPublish(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "internal_publish"
 
-    hostname: str = "arpi.local"
-    port: int = 8883
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
+    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = "argus"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
-    tls_enabled: bool = True
+    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
     # the internal broker is reached over a trusted network and is expected to have a
     # self signed certificate, so it is verified but the hostname check is turned off
-    tls_insecure: bool = False
+    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
     ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
 @dataclass
-class MQTTConfigExternalPublish(BaseConfig):
+class MQTTConfigExternalPublish:
     """
     Access configuration to the external MQTT broker for publishing by the monitor.
     """
@@ -280,18 +349,22 @@ class MQTTConfigExternalPublish(BaseConfig):
     OPTION_NAME = "mqtt"
     SECTION_NAME = "external_publish"
 
-    hostname: str = None
-    port: int = 8883
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
+    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = None
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
-    tls_enabled: bool = True
-    tls_insecure: bool = True
+    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
+    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
     # no explicit CA means the system certificate store is used
     ca_certs: str | None = None
 
 
 @dataclass
-class ZigbeeCoordinatorConfig(BaseConfig):
+class ZigbeeCoordinatorConfig:
     """
     Configuration for the Zigbee coordinator.
     """
@@ -299,8 +372,24 @@ class ZigbeeCoordinatorConfig(BaseConfig):
     OPTION_NAME = "zigbee"
     SECTION_NAME = "coordinator"
 
+    @classmethod
+    def from_dict(cls, value):
+        raise NotImplementedError(f"{cls.__name__} conversion not implemented")
+
     enabled: bool = True
     serial_port: str | None = "/dev/ttyUSB0"
     baudrate: int = 115200
     adapter: str = "bellows"
     permit_join: bool = False
+
+
+# automatically register all dataclass-based configuration options defined in this module
+for config_option_class in list(globals().values()):
+    if (
+        isinstance(config_option_class, type)
+        and config_option_class.__module__ == __name__
+        and is_dataclass(config_option_class)
+        and "OPTION_NAME" in config_option_class.__dict__
+        and "SECTION_NAME" in config_option_class.__dict__
+    ):
+        register_config_option(config_option_class)

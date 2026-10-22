@@ -11,6 +11,7 @@ import os
 from contextlib import contextmanager
 from threading import RLock
 
+from monitor.config.helper import load_config
 from monitor.config.models import GSMConfig
 from utils.constants import LOG_ADGSM
 
@@ -37,7 +38,7 @@ class GSMProvider:
         dropped only when the connection settings changed.
         """
         with cls._lock:
-            cls._config = GSMConfig.load_config()
+            cls._config = load_config(GSMConfig)
             if not cls._instance:
                 return
 

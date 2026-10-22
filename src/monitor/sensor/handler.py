@@ -13,6 +13,7 @@ from sqlalchemy import select
 from monitor.adapters.sensor import get_sensor_adapter
 from monitor.alert import SensorAlert
 from monitor.communication.mqtt import MQTTClient
+from monitor.config.helper import load_config
 from monitor.config.models import AlertSensitivityConfig
 from monitor.database import create_database_session, get_database_session
 from monitor.sensor.detector import detect_alert, detect_error, detect_tamper
@@ -164,7 +165,7 @@ class SensorHandler:
         ).all()
         logger.debug("Sensors reloaded!")
 
-        alert_sensitivity = AlertSensitivityConfig.load_config(session=self._db_session)
+        alert_sensitivity = load_config(AlertSensitivityConfig)
 
         # initialize the sensors history for the alert sensitivity
         sample_rate = int(environ["SAMPLE_RATE"])

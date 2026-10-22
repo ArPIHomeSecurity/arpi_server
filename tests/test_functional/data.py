@@ -75,6 +75,7 @@ def cleanup_database():
         session.execute(Disarm.__table__.delete())
         session.execute(Arm.__table__.delete())
         session.execute(Alert.__table__.delete())
+        session.execute(Option.__table__.delete())
         session.commit()
 
         _reset_sequences(session)
@@ -86,24 +87,28 @@ def cleanup_database():
 
 
 def _create_sensor_types(session):
+    # list existing sensor types and create them if they don't exist
+    existing_sensor_types = {st.name for st in session.query(SensorType).all()}
+    logger.info(" - Existing sensor types: %s", existing_sensor_types)
+
     sensor_types = {
-        "Motion": SensorType(name="Motion", description="Detect motion"),
-        "Tamper": SensorType(name="Tamper", description="Detect sabotage"),
-        "Open": SensorType(name="Open", description="Detect opening"),
-        "Break": SensorType(name="Break", description="Detect glass break"),
-        "Contact": SensorType(name="Contact", description="IAS Zone contact switch"),
-        "Fire": SensorType(name="Fire", description="IAS Zone fire sensor"),
-        "Water": SensorType(name="Water", description="IAS Zone water sensor"),
-        "CO": SensorType(name="CO", description="IAS Zone carbon monoxide sensor"),
-        "Emergency": SensorType(name="Emergency", description="IAS Zone emergency device"),
-        "Vibration": SensorType(name="Vibration", description="IAS Zone vibration sensor"),
-        "Remote": SensorType(name="Remote", description="IAS Zone remote control"),
-        "Key fob": SensorType(name="Key fob", description="IAS Zone key fob"),
-        "Keypad": SensorType(name="Keypad", description="IAS Zone keypad"),
-        "Warning": SensorType(name="Warning", description="IAS Zone warning device"),
-        "Glass": SensorType(name="Glass", description="IAS Zone glass break sensor"),
-        "Repeater": SensorType(name="Repeater", description="IAS Zone security repeater"),
-        "Occupancy": SensorType(name="Occupancy", description="IAS Zone occupancy sensor")
+        "Motion": SensorType(id=1, name="Motion", description="Detect motion"),
+        "Tamper": SensorType(id=2, name="Tamper", description="Detect sabotage"),
+        "Open": SensorType(id=3, name="Open", description="Detect opening"),
+        "Break": SensorType(id=4, name="Break", description="Detect glass break"),
+        "Contact": SensorType(id=5, name="Contact", description="IAS Zone contact switch"),
+        "Fire": SensorType(id=6, name="Fire", description="IAS Zone fire sensor"),
+        "Water": SensorType(id=7, name="Water", description="IAS Zone water sensor"),
+        "CO": SensorType(id=8, name="CO", description="IAS Zone carbon monoxide sensor"),
+        "Emergency": SensorType(id=9, name="Emergency", description="IAS Zone emergency device"),
+        "Vibration": SensorType(id=10, name="Vibration", description="IAS Zone vibration sensor"),
+        "Remote": SensorType(id=11, name="Remote", description="IAS Zone remote control"),
+        "Key fob": SensorType(id=12, name="Key fob", description="IAS Zone key fob"),
+        "Keypad": SensorType(id=13, name="Keypad", description="IAS Zone keypad"),
+        "Warning": SensorType(id=14, name="Warning", description="IAS Zone warning device"),
+        "Glass": SensorType(id=15, name="Glass", description="IAS Zone glass break sensor"),
+        "Repeater": SensorType(id=16, name="Repeater", description="IAS Zone security repeater"),
+        "Occupancy": SensorType(id=17, name="Occupancy", description="IAS Zone occupancy sensor"),
     }
     session.add_all(sensor_types.values())
     logger.info(" - Created sensor types")

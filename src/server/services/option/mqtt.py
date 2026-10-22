@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import (
     MQTTConfigExternalPublish,
     MQTTConfigInternalControl,
@@ -20,7 +20,7 @@ class MQTTService(BaseService):
         """
         Get the current MQTT connection configuration
         """
-        return MQTTConnection.load_config(session=self._db_session)
+        return load_config(MQTTConnection)
 
     def set_connection_config(self, config: MQTTConnection) -> dict | None:
         """
@@ -29,7 +29,7 @@ class MQTTService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = MQTTConnection.load_config(session=self._db_session)
+        db_config = load_config(MQTTConnection)
         if db_config and db_config == config:
             return
 
@@ -37,7 +37,6 @@ class MQTTService(BaseService):
             MQTTConnection.OPTION_NAME,
             MQTTConnection.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()
@@ -46,19 +45,19 @@ class MQTTService(BaseService):
         """
         Get the internal MQTT broker read configuration (read-only)
         """
-        return MQTTConfigInternalRead.load_config(session=self._db_session)
+        return load_config(MQTTConfigInternalRead)
 
     def get_internal_control_config(self) -> MQTTConfigInternalControl:
         """
         Get the internal MQTT broker read and control configuration (read-only)
         """
-        return MQTTConfigInternalControl.load_config(session=self._db_session)
+        return load_config(MQTTConfigInternalControl)
 
     def get_external_publish_config(self) -> MQTTConfigExternalPublish:
         """
         Get the external MQTT broker publish configuration
         """
-        return MQTTConfigExternalPublish.load_config(session=self._db_session)
+        return load_config(MQTTConfigExternalPublish)
 
     def set_external_publish_config(self, config: MQTTConfigExternalPublish) -> dict | None:
         """
@@ -67,7 +66,7 @@ class MQTTService(BaseService):
         if not self.are_changes_allowed:
             raise ConfigChangesNotAllowed()
 
-        db_config = MQTTConfigExternalPublish.load_config(session=self._db_session)
+        db_config = load_config(MQTTConfigExternalPublish)
         if db_config and db_config == config:
             return
 
@@ -75,7 +74,6 @@ class MQTTService(BaseService):
             MQTTConfigExternalPublish.OPTION_NAME,
             MQTTConfigExternalPublish.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )
 
         return IPCClient().update_configuration()

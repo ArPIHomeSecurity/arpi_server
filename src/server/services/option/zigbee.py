@@ -1,6 +1,6 @@
 from attr import asdict
 
-from monitor.config.helper import save_config
+from monitor.config.helper import load_config, save_config
 from monitor.config.models import ZigbeeCoordinatorConfig
 from server.services.base import BaseService, ConfigChangesNotAllowed
 
@@ -10,14 +10,7 @@ class ZigbeeService(BaseService):
         """
         Get the current Zigbee coordinator configuration
         """
-        from monitor.config.models import ZigbeeCoordinatorConfig
-
-        config = ZigbeeCoordinatorConfig.load_config(session=self._db_session)
-        if config is None:
-            # create new config with default values if not exists
-            config = ZigbeeCoordinatorConfig()
-
-        return config
+        return load_config(ZigbeeCoordinatorConfig)
 
     def set_zigbee_coordinator_config(self, config):
         """
@@ -30,5 +23,4 @@ class ZigbeeService(BaseService):
             ZigbeeCoordinatorConfig.OPTION_NAME,
             ZigbeeCoordinatorConfig.SECTION_NAME,
             asdict(config),
-            session=self._db_session,
         )

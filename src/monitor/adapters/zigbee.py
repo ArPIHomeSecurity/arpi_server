@@ -15,8 +15,8 @@ from zigpy.types import EUI64
 from zigpy.zcl import Cluster
 from zigpy.zcl.clusters.security import IasZone
 
+from monitor.config.helper import load_config
 from monitor.config.models import ZigbeeCoordinatorConfig
-from monitor.database import create_database_session
 from utils.constants import LOG_ADZIGBEE
 from utils.zigbee import (
     ZIGBEE_ATTRIBUTE_REGISTRY,
@@ -101,11 +101,10 @@ class ZigbeeAdapter:
         if self._running:
             return
 
-        with create_database_session() as db_session:
-            config = ZigbeeCoordinatorConfig.load_config(session=db_session)
-            self._enabled = config.enabled
-            self._serial_port = config.serial_port
-            self._baudrate = config.baudrate
+        config = load_config(ZigbeeCoordinatorConfig)
+        self._enabled = config.enabled
+        self._serial_port = config.serial_port
+        self._baudrate = config.baudrate
 
         if not self._enabled:
             logger.info("Zigbee coordinator is disabled")

@@ -11,7 +11,18 @@ from re import search
 
 import bcrypt
 from dateutil.tz.tz import tzlocal
-from sqlalchemy import JSON, Boolean, Column, DateTime, Enum, Float, Integer, MetaData, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey
@@ -1134,10 +1145,11 @@ class Option(BaseModel):
     """Model for option table"""
 
     __tablename__ = "option"
+    __table_args__ = (UniqueConstraint("name", "section", name="uq_option_name_section"),)
 
     OPTION_LENGTH = 32
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, autoincrement=True, primary_key=True)
     name = Column(String(OPTION_LENGTH), nullable=False)
     section = Column(String(OPTION_LENGTH), nullable=False)
     value = Column(String)

@@ -8,12 +8,7 @@ from dataclasses import asdict
 
 from sqlalchemy.exc import ProgrammingError
 
-from monitor.config.models import (
-    MQTTConfigExternalPublish,
-    MQTTConfigInternalPublish,
-    MQTTConfigInternalRead,
-    SSHConfig,
-)
+from monitor.config.models import SSHConfig
 from monitor.database import create_database_session
 from utils.constants import ROLE_ADMIN, ROLE_USER
 from utils.models import (
@@ -35,6 +30,7 @@ from utils.models import (
 class InvalidBoardVersion(Exception):
     def __init__(self, board_version: str):
         super().__init__(f"Invalid board version: {board_version}")
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -329,6 +325,7 @@ def env_live_01():
 
         session.commit()
 
+
 def env_dev_with_v3():
     with create_database_session() as session:
         _env_with_v3(session)
@@ -448,12 +445,6 @@ def _env_with_v3(session):
 def env_test_with_v2():
     with create_database_session() as session:
         _env_with_v2(session)
-
-        # setup MQTT configuration
-        MQTTConfigInternalPublish(hostname="localhost").load_config(cleanup=True, session=session)
-        MQTTConfigInternalRead(hostname="localhost").load_config(cleanup=False, session=session)
-        MQTTConfigExternalPublish(hostname="localhost").load_config(cleanup=False, session=session)
-
         session.commit()
 
 
@@ -461,6 +452,7 @@ def env_dev_with_v2():
     with create_database_session() as session:
         _env_with_v2(session)
         session.commit()
+
 
 def _env_with_v2(session):
     """
@@ -574,6 +566,7 @@ def cli_main() -> int:
         return 1
     except KeyboardInterrupt:
         return 0
+
 
 if __name__ == "__main__":
     sys.exit(cli_main())
