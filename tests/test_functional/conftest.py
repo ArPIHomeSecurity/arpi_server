@@ -16,9 +16,9 @@ import requests
 from monitor.adapters.mock.utils import (
     DEFAULT_ZIGBEE_DATA,
     ZIGBEE_FILE,
+    initialize_input_states,
     protected_read,
     reset_zigbee_devices,
-    set_input_states,
     set_zigbee_devices,
 )
 from tests.test_functional.data import cleanup_database, clear_database
@@ -98,6 +98,8 @@ def database_data(request, database_host):
     if seed_function:
         logger.debug("Applying database seed function: %s", seed_function.__name__)
         seed_function()
+
+    initialize_input_states(int(os.environ.get("INPUT_NUMBER", "15")), power_state=1)
 
     try:
         yield
@@ -205,8 +207,7 @@ def authenticate(device_token):
 def reset_input_states():
     logger.debug("Resetting input states...")
     num_channels = int(os.environ.get("INPUT_NUMBER", "15"))
-    channel_values = [0] * num_channels + [1]  # 0 for channels, 1 for POWER
-    set_input_states(channel_values)
+    initialize_input_states(num_channels, power_state=1)
     reset_zigbee_devices()
     yield
 

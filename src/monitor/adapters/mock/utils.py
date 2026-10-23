@@ -18,6 +18,7 @@ from zigpy.zcl.clusters.security import ZoneStatus
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
+from monitor.sensor.detector import wiring_config
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
 from utils.zigbee import (
     IAS_ZONE_STATUS_ATTRIBUTE,
@@ -60,6 +61,31 @@ class ChannelConfig:
     contact_type: SensorContactTypes
     sensor_a_active: bool = False
     sensor_b_active: bool = False
+
+
+def calculate_channel_value(config: ChannelConfig) -> float:
+    """Calculate a mock channel reading from its wiring and contact state."""
+    if config.wiring_strategy == WiringStrategies.CUT.value:
+        return wiring_config.open_circuit
+    if config.wiring_strategy == WiringStrategies.SHORTAGE.value:
+        return wiring_config.shortcut
+
+    dual = config.wiring_strategy == WiringStrategies.DUAL.value
+    two_eol = config.wiring_strategy == WiringStrategies.SINGLE_WITH_2EOL.value
+    if not dual and not two_eol and config.wiring_strategy != WiringStrategies.SINGLE_WITH_EOL.value:
+        raise ValueError(f"Unknown wiring strategy: {config.wiring_strategy}")
+
+    strategy = wiring_config.select_strategy(config.contact_type, dual=dual, two_eol=two_eol)
+    if dual:
+        if config.sensor_a_active and config.sensor_b_active:
+            return strategy.both_active
+        if config.sensor_a_active:
+            return strategy.channel_a_active
+        if config.sensor_b_active:
+            return strategy.channel_b_active
+        return strategy.default
+
+    return strategy.active if config.sensor_a_active else strategy.default
 
 
 def protected_read(filename, default_data):
@@ -481,3 +507,13 @@ def load_channel_configs(input_number: int) -> dict:
             )
 
         return channel_configs
+
+
+def initialize_input_states(input_number: int, power_state: int = 1) -> None:
+    """Initialize mock channels from database wiring with inactive contacts."""
+    channel_configs = load_channel_configs(input_number)
+    channel_values = [
+        calculate_channel_value(channel_configs[f"CH{i:02d}"])
+        for i in range(1, input_number + 1)
+    ]
+    set_input_states([*channel_values, power_state])

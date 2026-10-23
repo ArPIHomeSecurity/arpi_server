@@ -59,6 +59,12 @@ SENSOR_TYPE_DATA = (
 
 
 def _create_sensor_types(session) -> dict[str, SensorType]:
+    # cleanup existing sensor types
+    session.execute(SensorType.__table__.delete())
+    session.commit()
+    logger.info(" - Cleaned up existing sensor types")
+
+    # create sensor types from data
     sensor_types = {
         name: SensorType(id=sensor_type_id, name=name, description=description)
         for sensor_type_id, name, description in SENSOR_TYPE_DATA

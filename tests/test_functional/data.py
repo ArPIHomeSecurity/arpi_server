@@ -87,10 +87,11 @@ def cleanup_database():
 
 
 def _create_sensor_types(session):
-    # list existing sensor types and create them if they don't exist
-    existing_sensor_types = {st.name for st in session.query(SensorType).all()}
-    logger.info(" - Existing sensor types: %s", existing_sensor_types)
+    # cleanup existing sensor types
+    session.execute(SensorType.__table__.delete())
+    session.commit()
 
+    # create new sensor types
     sensor_types = {
         "Motion": SensorType(id=1, name="Motion", description="Detect motion"),
         "Tamper": SensorType(id=2, name="Tamper", description="Detect sabotage"),
@@ -259,7 +260,7 @@ def _create_sensors(session, sensor_types, area, zone_1, zone_2, zone_tamper) ->
         "Room 2": Sensor(
             channel=1,  # CH02
             channel_type=ChannelTypes.NORMAL,
-            sensor_contact_type=SensorContactTypes.NC,
+            sensor_contact_type=SensorContactTypes.NO,
             sensor_eol_count=SensorEOLCount.SINGLE,
             sensor_type=sensor_types["Open"],
             area=area,
@@ -397,10 +398,9 @@ def create_test_v3_zigbee():
         area = Area(name="House")
         session.add(area)
         zones = _create_zones(session)
-        sensors = _create_sensors(
+        _create_sensors(
             session, sensor_types, area, zones["no_delay"], zones["no_delay"], zones["tamper"]
         )
-        sensors["Room 1"].sensor_eol_count = SensorEOLCount.DOUBLE
 
         zigbee_devices = _create_zigbee_devices(session)
         _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones)

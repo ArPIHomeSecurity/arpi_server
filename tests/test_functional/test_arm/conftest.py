@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 
 import pytest
 
@@ -11,8 +12,15 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def monitoring_state():
-    with open("status.json", "w") as f:
-        json.dump({"State.MONITORING": "monitoring_stopped", "State.POWER": "network"}, f)
+    status_file = Path(os.getenv("STATUS_FILE", "status.json"))
+    status_file.write_text(
+        json.dumps({"State.MONITORING": "monitoring_stopped", "State.POWER": "network"}),
+        encoding="utf-8",
+    )
+    try:
+        yield
+    finally:
+        status_file.unlink(missing_ok=True)
 
 
 @pytest.fixture(scope="module", autouse=True)

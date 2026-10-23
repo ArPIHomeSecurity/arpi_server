@@ -4,6 +4,7 @@ Monitoring the sensors and manage alerting.
 
 import contextlib
 import logging
+import os
 from datetime import datetime as dt
 from os import environ
 from queue import Empty, Queue
@@ -95,6 +96,7 @@ class Monitor(Thread, ActionHandler):
 
     def run(self):
         logger.info("Monitoring started")
+        logger.info("Using board version %s", os.getenv("BOARD_VERSION"))
 
         try:
             self.startup_monitoring()

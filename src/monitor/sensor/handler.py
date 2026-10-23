@@ -385,34 +385,47 @@ class SensorHandler:
                     value = self._sensor_adapter.get_value(sensor.channel)
 
                     is_alert = detect_alert(sensor, value)
+                    is_tamper = detect_tamper(sensor, value)
+                    is_error = detect_error(sensor, value)
+
                     logger.trace(
-                        "Sensor %s(%s) (CH%02d) value: %s => alert: %s",
+                        "Sensor %s(%s) (CH%02d) value: %s => alert: %s, error: %s, tamper: %s",
                         sensor.name,
                         sensor.id,
                         sensor.channel,
                         float(f"{value:.3f}"),
                         is_alert,
+                        is_error,
+                        is_tamper,
                     )
-                    is_tamper = detect_tamper(sensor, value)
-                    is_error = detect_error(sensor, value)
-                    if is_error:
-                        logger.error(
-                            "Sensor %s(%s) (CH%02d) encountered an error: %s",
+
+                    if is_alert:
+                        logger.warning(
+                            "Sensor %s(%s) (CH%02d) value: %.3f triggered an alert",
                             sensor.name,
                             sensor.id,
                             sensor.channel,
                             value,
                         )
 
-                    logger.trace(
-                        "Sensor %s(%s) (CH%02d) value: %s => tamper: %s",
-                        sensor.name,
-                        sensor.id,
-                        sensor.channel,
-                        float(f"{value:.3f}"),
-                        is_tamper,
-                    )
+                    if is_error:
+                        logger.error(
+                            "Sensor %s(%s) (CH%02d) value: %.3f encountered an error",
+                            sensor.name,
+                            sensor.id,
+                            sensor.channel,
+                            value,
+                        )
 
+                    if is_tamper:
+                        logger.warning(
+                            "Sensor %s(%s) (CH%02d) value: %.3f tamper detected",
+                            sensor.name,
+                            sensor.id,
+                            sensor.channel,
+                            value,
+                        )
+                    
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
                 self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.alert)
@@ -549,18 +562,13 @@ class SensorHandler:
                     SensorAlert.start_alert(
                         sensor.id, sensor.name, delay, alert_type, sensitivity, self._broadcaster
                     )
-
-                if alert_type is None:
+                else:
                     logger.debug(
-                        "Do not start alert on sensor %s(%s) (no alert type)",
+                        "Do not start alert on sensor %s(%s) (%s, %s)",
                         sensor.name,
                         sensor.id,
-                    )
-                if delay is None:
-                    logger.debug(
-                        "Do not start alert on sensor %s(%s) (no delay)",
-                        sensor.name,
-                        sensor.id,
+                        "missing alert type" if alert_type is None else f"{alert_type}",
+                        "missing delay" if delay is None else f"{delay}",
                     )
 
             # stop alert of sensor

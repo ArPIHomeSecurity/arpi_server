@@ -59,30 +59,27 @@ def _wait_for_sensor_error(user_token, expected, sensor_id=None, timeout=5):
 
 @pytest.mark.parametrize("database_data", [create_test_v3_zigbee], indirect=True)
 @pytest.mark.parametrize(
-    ("fault_name", "fault_value"),
+    ("sensor_id", "channel", "fault_value"),
     [
-        pytest.param("cut", wiring_config.open_circuit, id="cut"),
-        pytest.param("shortcut", wiring_config.shortcut, id="shortcut"),
+        pytest.param(1, "CH01", wiring_config.shortcut, id="NC shortcut"),
+        pytest.param(2, "CH02", wiring_config.open_circuit, id="NO open circuit"),
     ],
 )
-def test_wired_double_eol_error_state(device_token, user_token, fault_name, fault_value):
+def test_wired_double_eol_error_state(device_token, user_token, sensor_id, channel, fault_value):
     monitor_events = MonitorEventsClient(device_token)
     try:
         wait_for_monitoring_ready(device_token)
-        _set_healthy_mock_state()
-        _wait_for_sensor_error(user_token, False)
-        monitor_events.clear_events()
 
-        set_input_state("CH01", fault_value)
+        set_input_state(channel, fault_value)
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=True),
-            timeout=5,
+            timeout=1,
         )
-        assert _get_sensor_error(user_token, sensor_id=1) is True
+        assert _get_sensor_error(user_token, sensor_id=sensor_id) is True
 
         monitor_events.clear_events()
         set_input_state(
-            "CH01",
+            channel,
             wiring_config.select_strategy(
                 SensorContactTypes.NC,
                 two_eol=True,
@@ -90,9 +87,9 @@ def test_wired_double_eol_error_state(device_token, user_token, fault_name, faul
         )
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=False),
-            timeout=5,
+            timeout=1,
         )
-        assert _get_sensor_error(user_token, sensor_id=1) is False
+        assert _get_sensor_error(user_token, sensor_id=sensor_id) is False
     finally:
         try:
             _set_healthy_mock_state()
@@ -112,7 +109,7 @@ def test_zigbee_ias_zone_trouble_error_state(device_token, user_token):
         set_zigbee_trouble(IEEE_ADDRESS, ENDPOINT, True)
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=True),
-            timeout=5,
+            timeout=1,
         )
         assert _get_sensor_error(user_token, sensor_id=4) is True
 
@@ -120,7 +117,7 @@ def test_zigbee_ias_zone_trouble_error_state(device_token, user_token):
         set_zigbee_trouble(IEEE_ADDRESS, ENDPOINT, False)
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=False),
-            timeout=5,
+            timeout=1,
         )
         assert _get_sensor_error(user_token, sensor_id=4) is False
     finally:

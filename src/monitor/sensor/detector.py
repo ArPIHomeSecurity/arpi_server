@@ -1,5 +1,30 @@
 """
 Utility functions to detect alerts and errors based on sensor readings.
+
+V3 sensor NORMAL detection:
+
+| EOL count | Contact type | Contact state       | Detection |
+|-----------|--------------|---------------------|-----------|
+| Single    | NC           | Closed              | Normal    |
+| Single    | NC           | Open                | Alert     |
+| Single    | NC           | Wire cut            | Alert     |
+| Single    | NC           | Shortcut            | Error     |
+| Single    | NO           | Open                | Normal    |
+| Single    | NO           | Closed              | Alert     |
+| Single    | NO           | Shortcut            | Alert     |
+| Single    | NO           | Wire cut            | Error     |
+|-----------|--------------|---------------------|-----------|
+| Double    | NC           | Closed              | Normal    |
+| Double    | NC           | Open                | Alert     |
+| Double    | NC           | Wire cut            | Tamper    |
+| Double    | NC           | Shortcut            | Tamper    |
+| Double    | NO           | Open                | Normal    |
+| Double    | NO           | Closed              | Alert     |
+| Double    | NO           | Wire cut            | Tamper    |
+| Double    | NO           | Shortcut            | Tamper    |
+|-----------|--------------|---------------------|-----------|
+
+
 """
 
 import logging
@@ -194,18 +219,9 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
     if sensor.channel_type == ChannelTypes.BASIC:
         return False
 
+    acceptable_values = []
     shortcut = wiring_config.shortcut
     open_circuit = wiring_config.open_circuit
-    logger.trace(
-        "Detecting error for sensor %s: %.3f-%.3f<%.3f | %.3f-%.3f<%.3f",
-        sensor.name,
-        current_value,
-        shortcut,
-        TOLERANCE_V3,
-        current_value,
-        open_circuit,
-        TOLERANCE_V3,
-    )
 
     # suppress error if the value is close to normal active value
     if sensor.channel_type == ChannelTypes.NORMAL:
@@ -219,6 +235,16 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
 
         if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
             acceptable_values.extend([wiring_config.shortcut, wiring_config.open_circuit])
+    
+        logger.trace(
+            "Detecting error for sensor %s(%s): default=%.3f active=%.3f shortcut=%.3f open=%.3f",
+            sensor.name,
+            sensor.id,
+            references.default,
+            references.active,
+            shortcut,
+            open_circuit,
+        )
     # suppress error if the value is close to any of the dual channel active values
     elif sensor.channel_type in (ChannelTypes.CHANNEL_A, ChannelTypes.CHANNEL_B):
         references = wiring_config.select_strategy(
@@ -233,6 +259,18 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
             references.channel_b_active,
             references.both_active,
         ]
+
+        logger.trace(
+            "Detecting error for sensor %s(%s): default=%.3f active A=%.3f active B=%.3f both active=%.3f shortcut=%.3f open=%.3f",
+            sensor.name,
+            sensor.id,
+            references.default,
+            references.channel_a_active,
+            references.channel_b_active,
+            references.both_active,
+            shortcut,
+            open_circuit,
+        )
     else:
         raise ValueError(f"Unsupported channel type: {sensor.channel_type}")
 

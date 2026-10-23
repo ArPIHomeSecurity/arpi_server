@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 
 import pytest
 from dotenv import load_dotenv
@@ -14,10 +15,16 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture()
 def monitoring_state(request: pytest.FixtureRequest):
-    with open("status.json", "w") as f:
-        monitoring_state = request.param[0]
-        power_state = request.param[1]
-        json.dump({"State.MONITORING": monitoring_state, "State.POWER": power_state}, f)
+    status_file = Path(os.getenv("STATUS_FILE", "status.json"))
+    monitoring_state, power_state = request.param
+    status_file.write_text(
+        json.dumps({"State.MONITORING": monitoring_state, "State.POWER": power_state}),
+        encoding="utf-8",
+    )
+    try:
+        yield
+    finally:
+        status_file.unlink(missing_ok=True)
 
 
 @pytest.fixture(scope="function", autouse=True)

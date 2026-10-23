@@ -10,6 +10,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Select, Static
 
+from monitor.adapters.mock import utils as mock_utils
 from monitor.adapters.mock.utils import (
     ChannelConfig,
     WiringStrategies,
@@ -205,43 +206,17 @@ class Channels(Widget):
         Calculate the channel value based on wiring strategy and sensor states
         """
         config = self._channel_configs[channel]
-        wiring_strategy = config.wiring_strategy
-        contact_type = config.contact_type
-        sensor_a_active = config.sensor_a_active
-        sensor_b_active = config.sensor_b_active
 
         logger.debug(
             "Calculating value channel: %s, strategy: %s, contact: %s, A active: %s, B active: %s",
             channel,
-            wiring_strategy,
-            contact_type,
-            sensor_a_active,
-            sensor_b_active,
+            config.wiring_strategy,
+            config.contact_type,
+            config.sensor_a_active,
+            config.sensor_b_active,
         )
 
-        if wiring_strategy == WiringStrategies.CUT.value:
-            return CHANNEL_CUT
-        elif wiring_strategy == WiringStrategies.SHORTAGE.value:
-            return CHANNEL_SHORTAGE
-
-        if wiring_strategy == WiringStrategies.SINGLE_WITH_EOL.value:
-            strategy = wiring_config.select_strategy(contact_type, dual=False, two_eol=False)
-            return strategy.active if sensor_a_active else strategy.default
-        elif wiring_strategy == WiringStrategies.SINGLE_WITH_2EOL.value:
-            strategy = wiring_config.select_strategy(contact_type, dual=False, two_eol=True)
-            return strategy.active if sensor_a_active else strategy.default
-        elif wiring_strategy == WiringStrategies.DUAL.value:
-            strategy = wiring_config.select_strategy(contact_type, dual=True, two_eol=False)
-            if sensor_a_active and sensor_b_active:
-                return strategy.both_active
-            elif sensor_a_active:
-                return strategy.channel_a_active
-            elif sensor_b_active:
-                return strategy.channel_b_active
-            else:
-                return strategy.default
-        else:
-            raise ValueError(f"Unknown wiring strategy: {wiring_strategy}")
+        return mock_utils.calculate_channel_value(config)
 
     @on(Button.Pressed, "#channels-pane .sensor-button")
     def sensor_button_pressed(self, event: Button.Pressed) -> None:
