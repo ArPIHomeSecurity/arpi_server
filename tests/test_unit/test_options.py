@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from unittest.mock import MagicMock
 
@@ -22,7 +23,14 @@ register_config_option(OptionConfig)
 @pytest.fixture
 def session(monkeypatch):
 	session = MagicMock()
-	monkeypatch.setattr("monitor.config.helper.get_database_session", lambda: session)
+	@contextmanager
+	def database_session():
+		try:
+			yield session
+		finally:
+			session.close()
+
+	monkeypatch.setattr("monitor.config.helper.create_database_session", database_session)
 	return session
 
 

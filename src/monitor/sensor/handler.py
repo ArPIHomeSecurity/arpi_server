@@ -381,6 +381,7 @@ class SensorHandler:
                 if sensor.channel == -1:
                     is_alert = False
                     is_error = False
+                    is_tamper = False
                 else:
                     value = self._sensor_adapter.get_value(sensor.channel)
 
@@ -392,7 +393,7 @@ class SensorHandler:
                         "Sensor %s(%s) (CH%02d) value: %s => alert: %s, error: %s, tamper: %s",
                         sensor.name,
                         sensor.id,
-                        sensor.channel,
+                        sensor.channel+1,
                         float(f"{value:.3f}"),
                         is_alert,
                         is_error,
@@ -404,7 +405,7 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f triggered an alert",
                             sensor.name,
                             sensor.id,
-                            sensor.channel,
+                            sensor.channel+1,
                             value,
                         )
 
@@ -413,7 +414,7 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f encountered an error",
                             sensor.name,
                             sensor.id,
-                            sensor.channel,
+                            sensor.channel+1,
                             value,
                         )
 
@@ -422,39 +423,33 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f tamper detected",
                             sensor.name,
                             sensor.id,
-                            sensor.channel,
+                            sensor.channel+1,
                             value,
                         )
                     
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
                 self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.alert)
+                if sensor.enabled:
+                    send_sensors_state(sensor.alert)
                 changes = True
 
             if is_error != sensor.error:
                 sensor.error = is_error
+                if sensor.enabled:
+                    send_sensors_error(sensor.error)
                 changes = True
 
             if is_tamper != sensor.tamper:
                 sensor.tamper = is_tamper
+                if sensor.enabled:
+                    send_sensors_tamper(sensor.tamper)
                 changes = True
-
-            if sensor.alert and sensor.enabled:
-                found_alert = True
-
-            if sensor.error and sensor.enabled:
-                found_error = True
-
-            if sensor.tamper and sensor.enabled:
-                found_tamper = True
 
         self._sensors_history.add_states([sensor.alert for sensor in self._sensors])
 
         if changes:
             self._db_session.commit()
-            send_sensors_state(found_alert)
-            send_sensors_error(found_error)
-            send_sensors_tamper(found_tamper)
 
     def handle_alerts(self):
         """

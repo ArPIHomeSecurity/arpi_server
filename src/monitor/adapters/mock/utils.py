@@ -26,11 +26,11 @@ from utils.zigbee import (
 )
 
 # buffer files between the simulator and the mock adapters
-INPUT_FILE = os.environ.get("MOCK_INPUT_FILE", "simulator_input.json")
-OUTPUT_FILE = os.environ.get("MOCK_OUTPUT_FILE", "simulator_output.json")
-KEYPAD_FILE = os.environ.get("MOCK_KEYPAD_FILE", "simulator_keypad.json")
-GSM_FILE = os.environ.get("MOCK_GSM_FILE", "simulator_gsm.json")
-ZIGBEE_FILE = os.environ.get("MOCK_ZIGBEE_FILE", "simulator_zigbee.json")
+SIMULATOR_INPUT_FILE = os.environ.get("SIMULATOR_INPUT_FILE", "simulator_input.json")
+SIMULATOR_OUTPUT_FILE = os.environ.get("SIMULATOR_OUTPUT_FILE", "simulator_output.json")
+SIMULATOR_KEYPAD_FILE = os.environ.get("SIMULATOR_KEYPAD_FILE", "simulator_keypad.json")
+SIMULATOR_GSM_FILE = os.environ.get("SIMULATOR_GSM_FILE", "simulator_gsm.json")
+SIMULATOR_ZIGBEE_FILE = os.environ.get("SIMULATOR_ZIGBEE_FILE", "simulator_zigbee.json")
 
 DEFAULT_KEYPAD = {"pending_bits": 0, "data": []}
 DEFAULT_ZIGBEE_DATA = {"devices": {}}
@@ -177,7 +177,7 @@ def get_input_state(input_name):
     Get the numeric state of a specific input channel.
     """
     default_data = DEFAULT_INPUT_DATA.copy()
-    data = protected_read(INPUT_FILE, default_data)
+    data = protected_read(SIMULATOR_INPUT_FILE, default_data)
     return data.get(input_name, 0)
 
 
@@ -186,9 +186,9 @@ def set_input_state(input_name, state):
     Set the numeric state of a specific input channel.
     """
     default_data = DEFAULT_INPUT_DATA.copy()
-    data = protected_read(INPUT_FILE, default_data)
+    data = protected_read(SIMULATOR_INPUT_FILE, default_data)
     data[input_name] = state
-    protected_write(INPUT_FILE, data)
+    protected_write(SIMULATOR_INPUT_FILE, data)
 
 
 def set_input_states(channel_values):
@@ -197,7 +197,7 @@ def set_input_states(channel_values):
     """
     data = {f"CH{str(i).zfill(2)}": value for i, value in enumerate(channel_values[:-1], start=1)}
     data["POWER"] = channel_values[-1]
-    protected_write(INPUT_FILE, data)
+    protected_write(SIMULATOR_INPUT_FILE, data)
 
 
 def get_output_states() -> list[bool]:
@@ -205,7 +205,7 @@ def get_output_states() -> list[bool]:
     Get the state of all output channels.
     """
     default_data = {name: 0 for name in OUTPUT_NAMES}
-    return list(protected_read(OUTPUT_FILE, default_data).values())
+    return list(protected_read(SIMULATOR_OUTPUT_FILE, default_data).values())
 
 
 def set_output_states(states):
@@ -213,7 +213,7 @@ def set_output_states(states):
     Set the state of all output channels.
     """
     data = {name: state for name, state in zip(OUTPUT_NAMES.values(), states)}
-    protected_write(OUTPUT_FILE, data)
+    protected_write(SIMULATOR_OUTPUT_FILE, data)
 
 
 def get_keypad_state():
@@ -221,7 +221,7 @@ def get_keypad_state():
     Get the state of a specific keypad.
     """
     defaults = DEFAULT_KEYPAD.copy()
-    return protected_transfer(KEYPAD_FILE, defaults)
+    return protected_transfer(SIMULATOR_KEYPAD_FILE, defaults)
 
 
 def set_keypad_state(pending_bits, data):
@@ -237,7 +237,7 @@ def set_keypad_state(pending_bits, data):
 
     new_data = {"pending_bits": pending_bits, "data": data}
 
-    protected_update(KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
+    protected_update(SIMULATOR_KEYPAD_FILE, new_data, DEFAULT_KEYPAD, merge_keypad_data)
 
 
 @cache
@@ -270,19 +270,19 @@ def load_zigbee_device_states() -> dict:
 
 def get_zigbee_devices():
     """Get structured simulator state."""
-    return protected_read(ZIGBEE_FILE, deepcopy(load_zigbee_device_states()))
+    return protected_read(SIMULATOR_ZIGBEE_FILE, deepcopy(load_zigbee_device_states()))
 
 
 def set_zigbee_devices(data):
     """Replace the entire Zigbee simulator state payload."""
-    protected_write(ZIGBEE_FILE, data)
+    protected_write(SIMULATOR_ZIGBEE_FILE, data)
 
 
 def reset_zigbee_devices():
     """Discard simulator state and reload database defaults on the next read."""
     load_zigbee_device_states.cache_clear()
     with contextlib.suppress(FileNotFoundError):
-        os.unlink(ZIGBEE_FILE)
+        os.unlink(SIMULATOR_ZIGBEE_FILE)
 
 
 def _signal_matches(signal, endpoint, cluster_id, attribute_id, field):
@@ -360,7 +360,7 @@ def set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, field, v
         return base
 
     protected_update(
-        ZIGBEE_FILE,
+        SIMULATOR_ZIGBEE_FILE,
         {
             "ieee_address": str(ieee_address),
             "endpoint": str(endpoint),
@@ -398,7 +398,7 @@ def set_zigbee_zone_status(ieee_address, endpoint, status):
         return base
 
     protected_update(
-        ZIGBEE_FILE,
+        SIMULATOR_ZIGBEE_FILE,
         {"ieee_address": str(ieee_address), "endpoint": str(endpoint), "status": int(status)},
         default_data,
         merge_status,
@@ -430,7 +430,7 @@ def set_zigbee_trouble(ieee_address, endpoint, enabled):
         return base
 
     protected_update(
-        ZIGBEE_FILE,
+        SIMULATOR_ZIGBEE_FILE,
         {"ieee_address": str(ieee_address), "endpoint": str(endpoint), "enabled": bool(enabled)},
         default_data,
         merge_trouble,
@@ -442,7 +442,7 @@ def get_sms_messages():
     Get the list of SMS messages from the mock GSM adapter.
     """
     default_data = []
-    return protected_transfer(GSM_FILE, default_data)
+    return protected_transfer(SIMULATOR_GSM_FILE, default_data)
 
 
 def append_sms_message(number, text, time):
@@ -456,7 +456,7 @@ def append_sms_message(number, text, time):
 
     new_message = {"number": number, "text": text, "time": time.isoformat()}
     protected_update(
-        GSM_FILE,
+        SIMULATOR_GSM_FILE,
         new_message,
         default_data,
         merge_sms_data,

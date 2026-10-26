@@ -1,4 +1,6 @@
 # pylint: disable=wrong-import-position
+import contextlib
+
 from dotenv import load_dotenv
 
 load_dotenv(".env.pytest", override=True)
@@ -15,7 +17,7 @@ import requests
 
 from monitor.adapters.mock.utils import (
     DEFAULT_ZIGBEE_DATA,
-    ZIGBEE_FILE,
+    SIMULATOR_ZIGBEE_FILE,
     initialize_input_states,
     protected_read,
     reset_zigbee_devices,
@@ -109,9 +111,9 @@ def database_data(request, database_host):
 
 @pytest.fixture(scope="module")
 def zigbee_state(database_data):
-    zigbee_path = Path(ZIGBEE_FILE)
+    zigbee_path = Path(SIMULATOR_ZIGBEE_FILE)
     zigbee_file_exists = zigbee_path.exists()
-    original_zigbee_data = protected_read(ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
+    original_zigbee_data = protected_read(SIMULATOR_ZIGBEE_FILE, DEFAULT_ZIGBEE_DATA)
 
     try:
         reset_zigbee_devices()
@@ -167,6 +169,18 @@ def server(database_data):
     with server_service(host, port):
         yield
 
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(os.environ["SIMULATOR_INPUT_FILE"])
+
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(os.environ["SIMULATOR_OUTPUT_FILE"])
+
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(os.environ["SIMULATOR_KEYPAD_FILE"])
+
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(os.environ["SIMULATOR_ZIGBEE_FILE"])
+
 
 @pytest.fixture(scope="module", name="device_token")
 def register_device():
@@ -203,22 +217,13 @@ def authenticate(device_token):
     yield response.json()["user_token"]
 
 
-@pytest.fixture(scope="function", autouse=True)
-def reset_input_states():
+@pytest.fixture(autouse=True)
+def reset_input_states(database_data):
     logger.debug("Resetting input states...")
     num_channels = int(os.environ.get("INPUT_NUMBER", "15"))
     initialize_input_states(num_channels, power_state=1)
     reset_zigbee_devices()
     yield
-
-    try:
-        os.unlink(os.environ["MOCK_INPUT_FILE"])
-    except FileNotFoundError:
-        pass
-    try:
-        os.unlink(os.environ["MOCK_OUTPUT_FILE"])
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="function", autouse=True)

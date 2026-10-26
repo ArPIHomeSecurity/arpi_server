@@ -359,7 +359,7 @@ def test_loud_alert_not_overridden_by_silent_sensor(device_token, user_token):
         monitor_events.clear_events()
 
         # Trigger second sensor configured as loud; alert should become loud and syren turns on.
-        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NC).active)
+        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NO).active)
 
         monitor_events.wait_for_events(
             [
@@ -422,7 +422,7 @@ def test_loud_alert_not_overridden_by_silent_sensor(device_token, user_token):
 
         # Reset inputs.
         set_input_state("CH01", wiring_config.select_strategy(SensorContactTypes.NC).default)
-        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NC).default)
+        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NO).default)
         time.sleep(0.1)
 
         response = call_api("PUT", "/api/monitoring/disarm", {}, user_token)
@@ -557,7 +557,7 @@ def test_silent_alert_changes_to_loud_with_second_sensor(device_token, user_toke
         monitor_events.clear_events()
 
         # Trigger second sensor configured as loud; alert should become loud and syren turns on.
-        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NC).active)
+        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NO).active)
 
         monitor_events.wait_for_events(
             [
@@ -624,7 +624,7 @@ def test_silent_alert_changes_to_loud_with_second_sensor(device_token, user_toke
 
         # Reset inputs.
         set_input_state("CH01", wiring_config.select_strategy(SensorContactTypes.NC).default)
-        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NC).default)
+        set_input_state("CH02", wiring_config.select_strategy(SensorContactTypes.NO).default)
         time.sleep(0.1)
 
         response = call_api("PUT", "/api/monitoring/disarm", {}, user_token)
