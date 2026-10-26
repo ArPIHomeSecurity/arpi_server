@@ -2,7 +2,7 @@ import logging
 import re
 from enum import Enum
 from multiprocessing import Event
-from time import sleep
+from time import monotonic, sleep
 
 from gsmmodem.exceptions import (
     CmeError,
@@ -73,6 +73,10 @@ class GSM:
     MAX_RETRY = 5
     # upper bound for a full dial + DTMF playback + hangup cycle
     CALL_TIMEOUT_SECONDS = 120
+    # limits re-registration attempts of a SIM the network keeps rejecting
+    RADIO_RESET_COOLDOWN_SECONDS = 600
+    RADIO_RESET_COMMAND_TIMEOUT_SECONDS = 15
+    REGISTRATION_TIMEOUT_SECONDS = 60
 
     def __init__(self, pin_code, port, baud, sms_received_callback=None, enabled=True):
         self._pin_code = pin_code
@@ -83,6 +87,7 @@ class GSM:
         self._modem = None
         self._call_event = Event()
         self.call_result: CallResult = None
+        self._last_radio_reset: float | None = None
 
     @property
     def connected(self) -> bool:
@@ -108,6 +113,12 @@ class GSM:
         self.setup()
 
     def setup(self):
+        """
+        Sets up the GSM modem connection.
+
+        Returns:
+            bool: True if the modem was successfully connected, False otherwise.
+        """
         if not self._enabled:
             logger.debug("GSM disabled")
             return False
@@ -192,25 +203,7 @@ class GSM:
         if message is None:
             return False
 
-        logger.debug("Checking for network coverage...")
-        try:
-            self._modem.waitForNetworkCoverage(10)
-        except CommandError as error:
-            logger.error("Command error: %s", error)
-            return False
-        except InvalidStateException:
-            logger.error("Modem is not in a valid state!")
-            self.destroy()
-            return False
-        except TimeoutException:
-            logger.error(
-                "Network signal strength is not sufficient, "
-                "please adjust modem position/antenna and try again."
-            )
-            return False
-        except PortNotOpenError:
-            logger.error("Modem serial port not open!")
-            self.destroy()
+        if not self._wait_for_network(10):
             return False
 
         try:
@@ -220,7 +213,7 @@ class GSM:
         except TimeoutException:
             logger.error("Failed to send message: the send operation timed out")
             return False
-        except (CmsError, CmeError) as error:
+        except CommandError as error:
             logger.error("Failed to send message: %s", error)
             return False
 
@@ -276,25 +269,7 @@ class GSM:
         if not self._modem:
             return CallResult.FAILED
 
-        logger.debug("Checking for network coverage...")
-        try:
-            self._modem.waitForNetworkCoverage(30)
-        except CommandError as error:
-            logger.error("Command error: %s", error)
-            return CallResult.FAILED
-        except InvalidStateException:
-            logger.error("Modem is not in a valid state!")
-            self.destroy()
-            return CallResult.FAILED
-        except TimeoutException:
-            logger.error(
-                "Network signal strength is not sufficient, "
-                "please adjust modem position/antenna and try again."
-            )
-            return CallResult.FAILED
-        except PortNotOpenError:
-            logger.error("Modem serial port not open!")
-            self.destroy()
+        if not self._wait_for_network(30):
             return CallResult.FAILED
 
         try:
@@ -417,7 +392,94 @@ class GSM:
         logger.debug("Manage test call")
         self.play_dtmf(call, "5")
 
+    def _wait_for_network(self, timeout) -> bool:
+        """
+        Wait for network registration, restarting the radio once if the modem gave up.
+
+        Args:
+            timeout (int): The maximum time to wait for network registration in seconds.
+
+        Returns:
+            bool: True if network registration was successful, False otherwise.
+        """
+        for attempt in range(2):
+            logger.debug("Checking for network coverage...")
+            try:
+                self._modem.waitForNetworkCoverage(timeout)
+                return True
+            except InvalidStateException as error:
+                logger.error("Modem is not in a valid state: %s", error)
+                self._log_registration_error()
+                if attempt == 1 or not self._reset_radio():
+                    self.destroy()
+                    return False
+            except CommandError as error:
+                logger.error("Command error: %s", error)
+                return False
+            except TimeoutException:
+                logger.error(
+                    "Network signal strength is not sufficient, "
+                    "please adjust modem position/antenna and try again."
+                )
+                return False
+            except PortNotOpenError:
+                logger.error("Modem serial port not open!")
+                self.destroy()
+                return False
+
+            if not self.setup() or not self._modem:
+                return False
+
+            # the modem may report "not searching" briefly after the SIM is unlocked
+            sleep(GSM.RETRY_GAP_SECONDS)
+            timeout = GSM.REGISTRATION_TIMEOUT_SECONDS
+
+        return False
+
+    def _log_registration_error(self):
+        """
+        Logs the extended error report from the modem if available.
+        """
+        try:
+            response = self._modem.write("AT+CEER", parseError=False)
+            logger.error("Extended error report: %s", " ".join(response))
+        except (CommandError, TimeoutException, PortNotOpenError) as error:
+            logger.debug("Extended error report unavailable: %s", error)
+
+    def _reset_radio(self) -> bool:
+        """
+        Resets the modem radio to recover network registration when it is lost.
+
+        Returns:
+            bool: True if the radio was successfully reset, False otherwise.
+        """
+        now = monotonic()
+        if (
+            self._last_radio_reset is not None
+            and now - self._last_radio_reset < GSM.RADIO_RESET_COOLDOWN_SECONDS
+        ):
+            logger.warning(
+                "Radio reset skipped, last reset was %d seconds ago",
+                now - self._last_radio_reset,
+            )
+            return False
+
+        self._last_radio_reset = now
+        logger.warning("Restarting modem radio to recover network registration")
+        try:
+            self._modem.write("AT+CFUN=0", timeout=GSM.RADIO_RESET_COMMAND_TIMEOUT_SECONDS)
+            self._modem.write("AT+CFUN=1", timeout=GSM.RADIO_RESET_COMMAND_TIMEOUT_SECONDS)
+        except (CommandError, TimeoutException, PortNotOpenError) as error:
+            logger.error("Radio reset failed: %s", error)
+
+        # reconnecting re-enters the PIN which the radio restart requires
+        self.destroy()
+        return True
+
     def destroy(self):
+        """
+        Cleans up and closes the GSM modem connection if it is open.
+        """
         if self._modem:
             logger.debug("Closing modem")
             self._modem.close()
