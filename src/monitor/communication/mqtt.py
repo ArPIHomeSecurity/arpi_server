@@ -193,6 +193,8 @@ class MQTTClient:
         """
         Connect to MQTT broker.
         """
+        if self._client is not None:
+            raise RuntimeError("MQTT client is already connected")
 
         mqtt_connection = load_config(MQTTConnection)
         if not mqtt_connection.enabled:
@@ -330,9 +332,11 @@ class MQTTClient:
         """
         Close connection to MQTT broker.
         """
-        if self._client is not None:
-            self._client.disconnect()
-            self._client = None
+        client = self._client
+        self._client = None
+        if client is not None:
+            client.disconnect()
+            client.loop_stop()
 
     def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
         """
@@ -365,9 +369,6 @@ class MQTTClient:
             return
 
         logger.info("Disconnected from MQTT broker")
-        if self._client is not None:
-            self._client.disconnect()
-            self._client = None
 
     def _on_message(self, client, userdata, msg: mqtt.MQTTMessage):
         """
