@@ -97,9 +97,10 @@ class IPCServer(Thread):
         _socket.settimeout(60)
         _socket.setblocking(False)
 
-        self.prepare_socket()
 
         try:
+            # create parent folder for the socket file if it doesn't exist
+            self.prepare_socket()
             _socket.bind(MONITOR_INPUT_SOCKET)
             _socket.listen(2)
         except OSError as error:
