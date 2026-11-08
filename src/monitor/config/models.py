@@ -3,6 +3,7 @@ This module defines the configuration dataclasses for the monitor.
 """
 
 import os
+import re
 from dataclasses import dataclass, field, is_dataclass
 
 from monitor.config.registry import register_config_option
@@ -379,8 +380,28 @@ class ZigbeeCoordinatorConfig:
     enabled: bool = True
     serial_port: str | None = "/dev/ttyUSB0"
     baudrate: int = 115200
-    adapter: str = "bellows"
-    permit_join: bool = False
+    supervision_timeout_seconds: int = 1800
+    supervision_timeout_overrides: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if not isinstance(self.supervision_timeout_overrides, dict):
+            raise ValueError("Zigbee supervision overrides must be a dictionary")
+        for timeout in (
+            self.supervision_timeout_seconds,
+            *self.supervision_timeout_overrides.values(),
+        ):
+            if type(timeout) is not int or timeout <= 0:
+                raise ValueError("Zigbee supervision timeouts must be positive integers")
+        if any(
+            not isinstance(address, str)
+            or re.fullmatch(r"(?:[0-9a-fA-F]{2}:){7}[0-9a-fA-F]{2}", address) is None
+            for address in self.supervision_timeout_overrides
+        ):
+            raise ValueError("Zigbee supervision overrides require IEEE addresses")
+        self.supervision_timeout_overrides = {
+            address.lower(): timeout
+            for address, timeout in self.supervision_timeout_overrides.items()
+        }
 
 
 # automatically register all dataclass-based configuration options defined in this module

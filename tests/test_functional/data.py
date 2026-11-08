@@ -300,9 +300,7 @@ def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
                         "clusterId": int(IasZone.cluster_id),
                         "attribute": zone_status.name,
                         "attributeId": int(zone_status.id),
-                        "valueType": zone_status.type.__name__,
                         "field": "alarm",
-                        "sources": ["command:status_change_notification"],
                     },
                     {
                         "endpoint": endpoint,
@@ -310,9 +308,7 @@ def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
                         "clusterId": int(IasZone.cluster_id),
                         "attribute": zone_status.name,
                         "attributeId": int(zone_status.id),
-                        "valueType": zone_status.type.__name__,
                         "field": "tamper",
-                        "sources": ["command:status_change_notification"],
                     },
                 ]
             },

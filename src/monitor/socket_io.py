@@ -104,6 +104,10 @@ def send_zigbee_pairing_state(state, remain_seconds: int, progress: float):
     )
 
 
+def send_zigbee_state():
+    send_message("zigbee_state_change", None)
+
+
 def send_card_registration_expired():
     send_message("card_registration_expired", None)
 

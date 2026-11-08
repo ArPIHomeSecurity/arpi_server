@@ -24,9 +24,10 @@ from monitor.adapters.mock.utils import (
 from monitor.database import create_database_session
 from utils.models import ZigbeeDevice
 from utils.zigbee import (
+    IasField,
     IAS_ZONE_STATUS_ATTRIBUTE,
-    ZIGBEE_ATTRIBUTE_REGISTRY,
-    describe_zigbee_attribute,
+    ZigbeeSignal,
+    zigbee_signals,
 )
 
 DEFAULT_ZIGBEE_ENDPOINT = "1"
@@ -34,9 +35,7 @@ DEFAULT_ZIGBEE_ENDPOINT = "1"
 
 def _registered_signals(cluster):
     return [
-        descriptor
-        for definition in ZIGBEE_ATTRIBUTE_REGISTRY[int(cluster.cluster_id)]
-        for descriptor in describe_zigbee_attribute(definition, int(DEFAULT_ZIGBEE_ENDPOINT))
+        signal.to_json() for signal in zigbee_signals(cluster.cluster_id, DEFAULT_ZIGBEE_ENDPOINT)
     ]
 
 
@@ -69,20 +68,21 @@ def random_ieee_address() -> str:
     return ":".join(f"{randint(0, 255):02X}" for _ in range(8))
 
 
-def _signal_identity(signal):
-    return (
-        str(signal["endpoint"]),
-        int(signal["clusterId"]),
-        int(signal["attributeId"]),
-        signal.get("field"),
-    )
+def _ias_endpoints(signals) -> set[str]:
+    """Endpoints with an IAS zone alarm signal."""
+    return {
+        signal["endpoint"]
+        for signal in signals
+        if ZigbeeSignal.from_json(signal)
+        == IAS_ZONE_STATUS_ATTRIBUTE.signal(signal["endpoint"], IasField.ALARM)
+    }
 
 
 def _find_signal_value(signal_values, descriptor):
-    identity = _signal_identity(descriptor)
-    for signal in signal_values:
-        if _signal_identity(signal) == identity:
-            return signal.get("value")
+    signal = ZigbeeSignal.from_json(descriptor)
+    for record in signal_values:
+        if ZigbeeSignal.from_json(record) == signal:
+            return record.get("value")
     return False
 
 
@@ -202,38 +202,18 @@ class ZigbeeDevices(Widget):
                     simulator_devices[ieee] = simulator_device
 
                 current_signals = simulator_device.get("signal_values", [])
+                statuses = simulator_device.get("ias_zone_status", {})
                 signals = list(device.get("signals") or [])
-                signal_identities = {_signal_identity(signal) for signal in signals}
-                alarm_endpoints = {
-                    signal["endpoint"]
-                    for signal in signals
-                    if signal["clusterId"] == int(IasZone.cluster_id)
-                    and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
-                    and signal.get("field") == "alarm"
-                }
-                for endpoint in alarm_endpoints:
-                    signals.extend(
-                        signal
-                        for signal in describe_zigbee_attribute(
-                            IAS_ZONE_STATUS_ATTRIBUTE, int(endpoint)
-                        )
-                        if signal.get("field") == "trouble"
-                        and _signal_identity(signal) not in signal_identities
-                    )
-                    signal_identities.update(_signal_identity(signal) for signal in signals)
+                known = {ZigbeeSignal.from_json(signal) for signal in signals}
+                for endpoint in _ias_endpoints(signals):
+                    trouble = IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, IasField.TROUBLE)
+                    if trouble not in known:
+                        signals.append(trouble.to_json())
                 simulator_device["signal_values"] = [
                     _signal_value_record(
                         signal,
-                        bool(
-                            int(
-                                simulator_device.get("ias_zone_status", {}).get(
-                                    signal["endpoint"], 0
-                                )
-                            )
-                            & ZoneStatus.Trouble
-                        )
-                        if signal.get("field") == "trouble"
-                        and signal["endpoint"] in simulator_device.get("ias_zone_status", {})
+                        bool(int(statuses[signal["endpoint"]]) & ZoneStatus.Trouble)
+                        if signal.get("field") == IasField.TROUBLE and signal["endpoint"] in statuses
                         else _find_signal_value(current_signals, signal),
                     )
                     for signal in signals
@@ -276,7 +256,7 @@ class ZigbeeDevices(Widget):
             signals = device.get("signals") or []
             signal_values = simulator_devices.get(ieee, {}).get("signal_values", [])
             for property_index, signal in enumerate(signals):
-                if signal.get("field") == "trouble":
+                if signal.get("field") == IasField.TROUBLE:
                     continue
                 widget_id = f"zigbee-property-{generation}-{index}-{property_index}"
                 self.zigbee_properties[widget_id] = (ieee, signal)
@@ -289,14 +269,7 @@ class ZigbeeDevices(Widget):
                     )
                 )
 
-            ias_endpoints = {
-                signal["endpoint"]
-                for signal in signals
-                if signal["clusterId"] == int(IasZone.cluster_id)
-                and signal["attributeId"] == int(IasZone.AttributeDefs.zone_status.id)
-                and signal.get("field") == "alarm"
-            }
-            for endpoint in sorted(ias_endpoints):
+            for endpoint in sorted(_ias_endpoints(signals)):
                 widget_id = f"zigbee-trouble-{generation}-{index}-{endpoint}"
                 self.zigbee_trouble_properties[widget_id] = (ieee, endpoint)
                 status = simulator_devices.get(ieee, {}).get("ias_zone_status", {}).get(endpoint, 0)
