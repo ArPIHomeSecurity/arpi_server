@@ -8,23 +8,18 @@ consume without bypassing the normal sensor/alert path.
 
 import logging
 import threading
-from types import MappingProxyType
 
 from monitor.adapters.mock.utils import (
     get_zigbee_devices,
     set_zigbee_devices,
 )
-from monitor.config.helper import load_config
-from monitor.config.models import ZigbeeCoordinatorConfig
 from utils.constants import LOG_ADZIGBEE
 from utils.zigbee import (
     IAS_ZONE_STATUS_ATTRIBUTE,
     ZigbeeDevice,
-    ZigbeeDeviceHealth,
     ZigbeeReading,
     ZigbeeSignal,
     ZigbeeSnapshot,
-    ZigbeeSupervision,
     decode_zigbee_attribute,
 )
 
@@ -40,22 +35,11 @@ class ZigbeeAdapter:
         self._running = False
         self._pairing = False
         self._pairing_duration = 0
-        self._supervision = ZigbeeSupervision()
-        self._packet_tokens: dict[str, str | None] = {}
 
     def start(self):
         """Initializes the simulator adapter and refreshes the cache."""
-        config = load_config(ZigbeeCoordinatorConfig)
         devices = get_zigbee_devices().get("devices", {})
         with self._lock:
-            self._supervision = ZigbeeSupervision(
-                config.supervision_timeout_seconds, config.supervision_timeout_overrides
-            )
-            self._packet_tokens = {
-                str(address): device.get("last_seen") for address, device in devices.items()
-            }
-            for address in self._packet_tokens:
-                self._supervision.register(address)
             self._running = True
             self._refresh_cache(devices)
         logger.debug("Mock ZigbeeAdapter started")
@@ -72,15 +56,6 @@ class ZigbeeAdapter:
         for ieee_address, device in devices.items():
             ieee_address = str(ieee_address)
             timestamp = device.get("last_seen")
-            if ieee_address not in self._packet_tokens:
-                self._supervision.register(ieee_address)
-            previous = self._packet_tokens.get(ieee_address)
-            self._packet_tokens[ieee_address] = timestamp
-            if not device.get("available", True):
-                self._supervision.mark_offline(ieee_address)
-                continue
-            if timestamp is not None and timestamp != previous:
-                self._supervision.record_packet(ieee_address)
             for signal in device.get("signal_values", []):
                 raw_value = signal.get("value")
                 if not isinstance(raw_value, bool):
@@ -113,35 +88,27 @@ class ZigbeeAdapter:
             for address, device in devices.items()
             if device.get("pairing")
         }
-        with self._lock:
-            for address in joining:
-                self._supervision.register(address)
         snapshot = self._snapshot(devices, include_devices=True)
         return [device for device in snapshot.devices or () if device.ieee_address in joining]
 
     def poll(self, include_devices: bool = False) -> ZigbeeSnapshot:
-        """Read the simulator file once for readings, health, and optional metadata."""
+        """Read the simulator file once for readings and optional metadata."""
         return self._snapshot(get_zigbee_devices().get("devices", {}), include_devices)
 
     def _snapshot(self, devices: dict, include_devices: bool) -> ZigbeeSnapshot:
         with self._lock:
             self._refresh_cache(devices)
-            health = {
-                address: health
-                for address, health in self._supervision.snapshot(self._running).items()
-                if address in devices
-            }
             metadata = (
                 tuple(
-                    self._build_device(str(address), device, health[str(address)])
+                    self._build_device(str(address), device)
                     for address, device in devices.items()
                 )
                 if include_devices else None
             )
-            return ZigbeeSnapshot(tuple(self._cache.values()), MappingProxyType(health), metadata)
+            return ZigbeeSnapshot(tuple(self._cache.values()), metadata)
 
     @staticmethod
-    def _build_device(address: str, device: dict, health: ZigbeeDeviceHealth) -> ZigbeeDevice:
+    def _build_device(address: str, device: dict) -> ZigbeeDevice:
         metadata = [signal for signal in device.get("signal_metadata", []) if isinstance(signal, dict)]
         return ZigbeeDevice(
             ieee_address=address,
@@ -149,7 +116,6 @@ class ZigbeeAdapter:
             name=device.get("name"),
             manufacturer=device.get("manufacturer"),
             model=device.get("model"),
-            available=health.available,
             last_seen=device.get("last_seen"),
             battery_level=device.get("battery_level"),
             signal_quality=device.get("signal_quality"),
@@ -159,7 +125,6 @@ class ZigbeeAdapter:
                 for signal in metadata
                 if signal.get("zoneType") is not None
             },
-            health=health,
         )
 
     def permit_joining(self, duration_seconds) -> bool:
@@ -197,9 +162,6 @@ class ZigbeeAdapter:
             return False
 
         device["pairing"] = False
-        device["available"] = False
-        with self._lock:
-            self._supervision.mark_offline(str(ieee_address), removed=True)
         set_zigbee_devices(state)
         return True
 

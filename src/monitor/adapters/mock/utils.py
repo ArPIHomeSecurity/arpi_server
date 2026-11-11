@@ -254,7 +254,6 @@ def load_zigbee_device_states() -> dict:
                 device.ieee_address,
                 {
                     "name": device.name,
-                    "available": True,
                     "signal_values": [],
                     "signal_metadata": (device.device_metadata or {}).get("signals", []),
                 },
@@ -287,23 +286,6 @@ def reset_zigbee_devices():
     load_zigbee_device_states.cache_clear()
     with contextlib.suppress(FileNotFoundError):
         os.unlink(SIMULATOR_ZIGBEE_FILE)
-
-
-def send_zigbee_heartbeat(ieee_address):
-    """Simulate a packet without changing the device's alarm or tamper state."""
-    default_data = get_zigbee_devices()
-
-    def merge_heartbeat(base, new):
-        device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
-        device["last_seen"] = datetime.now().astimezone().isoformat()
-        return base
-
-    protected_update(
-        SIMULATOR_ZIGBEE_FILE,
-        {"ieee_address": str(ieee_address)},
-        default_data,
-        merge_heartbeat,
-    )
 
 
 def _set_signal_value(device, signal: ZigbeeSignal, value):

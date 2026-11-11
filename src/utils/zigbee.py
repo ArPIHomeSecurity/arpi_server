@@ -1,8 +1,6 @@
-import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from time import monotonic
 from typing import Any, NamedTuple
 
 from zigpy.zcl.clusters.general import OnOff, PowerConfiguration
@@ -65,43 +63,6 @@ class ZigbeeReading:
         return (self.ieee_address, self.signal)
 
 
-class ZigbeeHealthState(StrEnum):
-    UNKNOWN = "unknown"
-    ONLINE = "online"
-    OVERDUE = "overdue"
-    OFFLINE = "offline"
-    COORDINATOR_UNAVAILABLE = "coordinator_unavailable"
-
-
-@dataclass(frozen=True)
-class ZigbeeDeviceHealth:
-    status: ZigbeeHealthState
-    deadline: float | None = None
-
-    @property
-    def state(self) -> ZigbeeHealthState:
-        if (
-            self.status == ZigbeeHealthState.ONLINE
-            and self.deadline is not None
-            and monotonic() >= self.deadline
-        ):
-            return ZigbeeHealthState.OVERDUE
-        return self.status
-
-    @property
-    def available(self) -> bool:
-        return self.state == ZigbeeHealthState.ONLINE
-
-    @property
-    def availability(self) -> str:
-        state = self.state
-        return (
-            state
-            if state in (ZigbeeHealthState.UNKNOWN, ZigbeeHealthState.ONLINE)
-            else ZigbeeHealthState.OFFLINE
-        ).value
-
-
 @dataclass
 class ZigbeeDevice:
     ieee_address: str
@@ -109,14 +70,12 @@ class ZigbeeDevice:
     manufacturer: str | None = None
     model: str | None = None
     name: str | None = None
-    available: bool = True
     last_seen: str | None = None
     battery_level: int | None = None
     signal_quality: int | None = None
     signals: list[ZigbeeSignal] = field(default_factory=list)
     # IAS zone type by endpoint
     zone_types: dict[str, int] = field(default_factory=dict)
-    health: ZigbeeDeviceHealth | None = None
 
     def signals_json(self) -> list[dict]:
         return [
@@ -132,58 +91,7 @@ class ZigbeeDevice:
 @dataclass(frozen=True)
 class ZigbeeSnapshot:
     readings: tuple[ZigbeeReading, ...]
-    health: Mapping[str, ZigbeeDeviceHealth]
     devices: tuple[ZigbeeDevice, ...] | None = None
-
-
-class ZigbeeSupervision:
-    def __init__(
-        self,
-        timeout_seconds: int = 1800,
-        timeout_overrides: Mapping[str, int] | None = None,
-    ):
-        self._timeout_seconds = timeout_seconds
-        self._timeout_overrides = dict(timeout_overrides or {})
-        self._lock = threading.Lock()
-        self._last_packets: dict[str, float | None] = {}
-        self._offline: set[str] = set()
-        self._removed: set[str] = set()
-
-    def register(self, ieee_address: str):
-        with self._lock:
-            if ieee_address in self._removed:
-                self._last_packets[ieee_address] = None
-                self._removed.discard(ieee_address)
-                self._offline.discard(ieee_address)
-            self._last_packets.setdefault(ieee_address, None)
-
-    def record_packet(self, ieee_address: str):
-        with self._lock:
-            if ieee_address in self._last_packets and ieee_address not in self._removed:
-                self._last_packets[ieee_address] = monotonic()
-                self._offline.discard(ieee_address)
-
-    def mark_offline(self, ieee_address: str, removed: bool = False):
-        with self._lock:
-            self._last_packets[ieee_address] = None
-            self._offline.add(ieee_address)
-            if removed:
-                self._removed.add(ieee_address)
-
-    def snapshot(self, running: bool) -> dict[str, ZigbeeDeviceHealth]:
-        with self._lock:
-            health = {}
-            for address, last_packet in self._last_packets.items():
-                if not running:
-                    health[address] = ZigbeeDeviceHealth(ZigbeeHealthState.COORDINATOR_UNAVAILABLE)
-                elif address in self._offline:
-                    health[address] = ZigbeeDeviceHealth(ZigbeeHealthState.OFFLINE)
-                elif last_packet is None:
-                    health[address] = ZigbeeDeviceHealth(ZigbeeHealthState.UNKNOWN)
-                else:
-                    timeout = self._timeout_overrides.get(address.lower(), self._timeout_seconds)
-                    health[address] = ZigbeeDeviceHealth(ZigbeeHealthState.ONLINE, last_packet + timeout)
-            return health
 
 
 class ZigbeeValueDecoder(StrEnum):

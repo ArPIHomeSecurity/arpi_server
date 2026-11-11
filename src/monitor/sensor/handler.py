@@ -21,7 +21,6 @@ from monitor.sensor.history import SensorsHistory
 from monitor.socket_io import send_sensors_error, send_sensors_state, send_sensors_tamper
 from monitor.storage import State, States
 from monitor.zigbee_handler import ZigbeeDeviceStore
-from utils.zigbee import ZigbeeHealthState
 from utils.constants import (
     ALERT_AWAY,
     ALERT_SABOTAGE,
@@ -314,17 +313,15 @@ class SensorHandler:
                 alarm_data = None
                 trouble_data = None
                 tamper_data = None
-                health_state = ZigbeeHealthState.UNKNOWN
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
-                    alarm_data, trouble_data, tamper_data, health = ZigbeeDeviceStore.get_sensor_state(
+                    alarm_data, trouble_data, tamper_data = ZigbeeDeviceStore.get_sensor_state(
                         device.ieee_address,
                         sensor.zigbee_endpoint,
                         sensor.zigbee_cluster_id,
                         sensor.zigbee_attribute_id,
                         sensor.zigbee_field,
                     )
-                    health_state = health.state
                 is_alert = (
                     bool(alarm_data.value)
                     if alarm_data is not None and alarm_data.value is not None
@@ -334,14 +331,13 @@ class SensorHandler:
                     tamper_data is not None and tamper_data.value is not None and tamper_data.value
                 )
                 is_error = bool(
-                    health_state != ZigbeeHealthState.ONLINE
-                    or alarm_data is None
+                    alarm_data is None
                     or alarm_data.value is None
                     or (trouble_data is not None and trouble_data.value)
                 )
                 if is_error and not sensor.error:
                     logger.error(
-                        "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) encountered an error: %s, health: %s, trouble: %s",
+                        "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) encountered an error: %s, trouble: %s",
                         sensor.name,
                         sensor.id,
                         sensor.zigbee_endpoint,
@@ -349,7 +345,6 @@ class SensorHandler:
                         sensor.zigbee_attribute_id,
                         sensor.zigbee_field,
                         alarm_data,
-                        health_state,
                         getattr(trouble_data, "value", None),
                     )
                 logger.trace(

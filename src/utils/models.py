@@ -446,7 +446,6 @@ class ZigbeeDevice(BaseModel):
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     name = Column(String(NAME_LENGTH), nullable=True)
-    availability = Column(String(16), nullable=False, default="unknown")
     last_seen = Column(DateTime(timezone=True), nullable=True)
     battery_level = Column(Integer, nullable=True)
     signal_quality = Column(Integer, nullable=True)
@@ -461,7 +460,6 @@ class ZigbeeDevice(BaseModel):
         manufacturer=None,
         model=None,
         name=None,
-        availability="unknown",
         last_seen=None,
         battery_level=None,
         signal_quality=None,
@@ -472,7 +470,6 @@ class ZigbeeDevice(BaseModel):
         self.manufacturer = manufacturer
         self.model = model
         self.name = name
-        self.availability = availability
         self.last_seen = last_seen
         self.battery_level = battery_level
         self.signal_quality = signal_quality
@@ -490,7 +487,6 @@ class ZigbeeDevice(BaseModel):
                 "manufacturer",
                 "model",
                 "name",
-                "availability",
                 "last_seen",
                 "battery_level",
                 "signal_quality",
@@ -509,7 +505,6 @@ class ZigbeeDevice(BaseModel):
                 "manufacturer",
                 "model",
                 "name",
-                "availability",
                 "last_seen",
                 "battery_level",
                 "signal_quality",

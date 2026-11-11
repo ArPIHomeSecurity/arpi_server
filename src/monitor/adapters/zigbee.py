@@ -5,7 +5,6 @@ import threading
 import time
 from datetime import UTC, datetime
 from os import environ
-from types import MappingProxyType
 
 from bellows.zigbee.application import ControllerApplication
 from zigpy.application import ControllerApplication as ZigpyControllerApplication
@@ -21,12 +20,9 @@ from utils.constants import LOG_ADZIGBEE
 from utils.zigbee import (
     ZIGBEE_ATTRIBUTE_REGISTRY,
     ZigbeeDevice,
-    ZigbeeDeviceHealth,
-    ZigbeeHealthState,
     ZigbeeReading,
     ZigbeeSignal,
     ZigbeeSnapshot,
-    ZigbeeSupervision,
     decode_zigbee_attribute,
     find_attribute_definition,
     zigbee_signals,
@@ -62,7 +58,6 @@ class ZigbeeAdapter:
         self._app: ZigpyControllerApplication | None = None
         self._running = False
         self._ready = False
-        self._supervision = ZigbeeSupervision()
 
         self._pairing_lock = threading.Lock()
         self._pairing_seen: set[str] = set()
@@ -86,9 +81,6 @@ class ZigbeeAdapter:
             return
 
         config = load_config(ZigbeeCoordinatorConfig)
-        self._supervision = ZigbeeSupervision(
-            config.supervision_timeout_seconds, config.supervision_timeout_overrides
-        )
         self._ready = False
         self._enabled = config.enabled
         self._serial_port = config.serial_port
@@ -177,10 +169,7 @@ class ZigbeeAdapter:
         self._schedule_subscribe(device, configure=True)
 
         ieee_address = str(device.ieee)
-        health = self._health_snapshot().get(
-            ieee_address, ZigbeeDeviceHealth(ZigbeeHealthState.UNKNOWN)
-        )
-        discovered = self._build_discovered_device(device, health)
+        discovered = self._build_discovered_device(device)
 
         with self._pairing_lock:
             if ieee_address in self._pairing_seen:
@@ -213,7 +202,6 @@ class ZigbeeAdapter:
             if device.lqi is not None:
                 self._signal_qualities[ieee_address] = device.lqi
 
-        self._supervision.register(ieee_address)
         device.add_context_listener(self)
 
     def device_last_seen_updated(self, device: Device, last_seen: datetime | None):
@@ -221,8 +209,6 @@ class ZigbeeAdapter:
         with self._state_lock:
             if self._metadata_listeners.get(str(device.ieee)) is not device:
                 return
-        if last_seen is not None:
-            self._supervision.record_packet(str(device.ieee))
         asyncio.get_running_loop().call_soon(self._update_device_metadata, device, last_seen)
 
     def _update_device_metadata(self, device: Device, last_seen: datetime | None):
@@ -235,18 +221,11 @@ class ZigbeeAdapter:
             if device.lqi is not None:
                 self._signal_qualities[ieee_address] = device.lqi
 
-    def device_left(self, device: Device):
-        """
-        Callback invoked by zigpy when a device has been removed from the network.
-        """
-        self._supervision.mark_offline(str(device.ieee))
-
     def device_removed(self, device: Device):
         """
         Callback invoked by zigpy when a device has been removed from the network.
         """
         ieee_address = str(device.ieee)
-        self._supervision.mark_offline(ieee_address, removed=True)
         with self._state_lock:
             self._metadata_listeners.pop(ieee_address, None)
 
@@ -426,7 +405,7 @@ class ZigbeeAdapter:
         for value in success.values():
             self._store_reading(cluster, attribute_def.id, value, datetime.now(UTC))
 
-    def _build_discovered_device(self, device: Device, health: ZigbeeDeviceHealth) -> ZigbeeDevice:
+    def _build_discovered_device(self, device: Device) -> ZigbeeDevice:
         signals = [
             signal
             for endpoint_id, endpoint in device.endpoints.items()
@@ -451,13 +430,11 @@ class ZigbeeAdapter:
             network_address=int(device.nwk),
             manufacturer=device.manufacturer,
             model=device.model,
-            available=health.available,
             last_seen=last_seen,
             signal_quality=signal_quality,
             battery_level=battery_level,
             signals=signals,
             zone_types=zone_types,
-            health=health,
         )
 
     def _schedule_subscribe(self, device: Device, configure: bool):
@@ -506,27 +483,18 @@ class ZigbeeAdapter:
                 value,
             )
 
-    def _health_snapshot(self) -> dict[str, ZigbeeDeviceHealth]:
-        running = bool(self._ready and self._thread and self._thread.is_alive())
-        return self._supervision.snapshot(running)
-
     # --- Poll-facing API, safe to call from any thread ---
     def poll(self, include_devices: bool = False) -> ZigbeeSnapshot:
-        """Copy readings and health; build device metadata only when requested."""
+        """Copy readings and build device metadata only when requested."""
         with self._readings_lock:
             readings = tuple(self._readings.values())
-        health = self._health_snapshot()
+
         devices = None
         if include_devices:
             with self._state_lock:
                 known_devices = tuple(self._metadata_listeners.values())
-            devices = tuple(
-                self._build_discovered_device(
-                    device, health.get(str(device.ieee), ZigbeeDeviceHealth(ZigbeeHealthState.UNKNOWN))
-                )
-                for device in known_devices
-            )
-        return ZigbeeSnapshot(readings, MappingProxyType(health), devices)
+            devices = tuple(self._build_discovered_device(device) for device in known_devices)
+        return ZigbeeSnapshot(readings, devices)
 
     def permit_joining(self, duration_seconds) -> bool:
         """

@@ -30,8 +30,6 @@ from utils.models import ZigbeeDevice as ZigbeeDeviceModel
 from utils.zigbee import (
     IasField,
     ZigbeeDevice,
-    ZigbeeDeviceHealth,
-    ZigbeeHealthState,
     ZigbeeReading,
     ZigbeeSignal,
     ZigbeeSnapshot,
@@ -53,19 +51,17 @@ class ZigbeeDeviceStore:
 
     _lock = Lock()
     _sensor_data: ClassVar[dict[tuple[str, ZigbeeSignal], ZigbeeReading]] = {}
-    _device_health: ClassVar[dict[str, ZigbeeDeviceHealth]] = {}
 
     @classmethod
     def update_snapshot(cls, snapshot: ZigbeeSnapshot):
         new_sensor_data = {reading.key: reading for reading in snapshot.readings}
         with cls._lock:
             cls._sensor_data = new_sensor_data
-            cls._device_health = dict(snapshot.health)
 
     @classmethod
     def get_sensor_state(
         cls, ieee_address, endpoint, cluster_id, attribute_id, field=None
-    ) -> tuple[ZigbeeReading | None, ZigbeeReading | None, ZigbeeReading | None, ZigbeeDeviceHealth]:
+    ) -> tuple[ZigbeeReading | None, ZigbeeReading | None, ZigbeeReading | None]:
         address = str(ieee_address)
         signal = ZigbeeSignal.create(endpoint, cluster_id, attribute_id, field)
         with cls._lock:
@@ -73,22 +69,12 @@ class ZigbeeDeviceStore:
                 cls._sensor_data.get((address, signal)),
                 cls._sensor_data.get((address, signal._replace(field=IasField.TROUBLE))),
                 cls._sensor_data.get((address, signal._replace(field=IasField.TAMPER))),
-                cls._device_health.get(address, ZigbeeDeviceHealth(ZigbeeHealthState.UNKNOWN)),
             )
-
-    @classmethod
-    def invalidate_health(cls):
-        with cls._lock:
-            cls._device_health = {
-                address: ZigbeeDeviceHealth(ZigbeeHealthState.COORDINATOR_UNAVAILABLE)
-                for address in cls._device_health
-            }
 
     @classmethod
     def clear(cls):
         with cls._lock:
             cls._sensor_data = {}
-            cls._device_health = {}
 
 
 def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, metadata=None):
@@ -110,11 +96,6 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, met
     if include_identity:
         values.update(
             {
-                "availability": (
-                    device.health.availability
-                    if device.health is not None
-                    else (ZigbeeHealthState.ONLINE if device.available else ZigbeeHealthState.OFFLINE).value
-                ),
                 "network_address": device.network_address,
                 "manufacturer": device.manufacturer,
                 "model": device.model,
@@ -135,7 +116,6 @@ class ZigbeeHandler(Thread):
         self._adapter = None
         self._pairing_start = None
         self._device_state_update = 0
-        self._health_states: dict[str, ZigbeeHealthState] = {}
 
         self._broadcaster = broadcaster
         self._broadcaster.register_queue(id(self), self._actions)
@@ -154,7 +134,7 @@ class ZigbeeHandler(Thread):
 
     def communicate(self):
         # load devices from the database
-        self.load_devices_from_database()
+        send_zigbee_state()
 
         while True:
             with contextlib.suppress(Empty):
@@ -195,21 +175,6 @@ class ZigbeeHandler(Thread):
                     remain_seconds=0,
                     progress=0.0,
                 )
-
-    def load_devices_from_database(self):
-        try:
-            with create_database_session() as session:
-                devices = session.scalars(
-                    select(ZigbeeDeviceModel).where(ZigbeeDeviceModel.deleted.is_(False))
-                ).all()
-                for device in devices:
-                    device.availability = ZigbeeHealthState.UNKNOWN.value
-
-                session.commit()
-
-            send_zigbee_state()
-        except Exception:
-            logger.exception("Failed to load Zigbee devices from the database")
 
     def start_pairing(self, duration_seconds: int = PAIRING_DURATION):
         """
@@ -312,19 +277,13 @@ class ZigbeeHandler(Thread):
         try:
             snapshot = self._adapter.poll(include_devices=monotonic() >= self._device_state_update)
             ZigbeeDeviceStore.update_snapshot(snapshot)
-            for address, health in snapshot.health.items():
-                state = health.state
-                if self._health_states.get(address) != state:
-                    logger.info("Zigbee device %s communication health: %s", address, state)
-                    self._health_states[address] = state
             return snapshot
         except Exception:
-            ZigbeeDeviceStore.invalidate_health()
             logger.exception("Failed to update the Zigbee device states")
 
     def update_registered_devices(self, snapshot: ZigbeeSnapshot):
         """
-        Persist the availability and health attributes reported by the coordinator.
+        Persist device metadata reported by the coordinator.
         """
         self._device_state_update = monotonic() + DEVICE_STATE_UPDATE_PERIOD
         devices = {device.ieee_address: device for device in snapshot.devices or ()}
@@ -340,11 +299,6 @@ class ZigbeeHandler(Thread):
                     registered.update(
                         {key: value for key, value in values.items() if value is not None}
                     )
-                health = snapshot.health.get(
-                    registered.ieee_address, ZigbeeDeviceHealth(ZigbeeHealthState.UNKNOWN)
-                )
-                registered.availability = health.availability
-
             session.commit()
 
         send_zigbee_state()

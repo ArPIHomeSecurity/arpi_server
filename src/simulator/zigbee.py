@@ -152,7 +152,6 @@ class ZigbeeDevices(Widget):
                     "name": device.name,
                     "manufacturer": device.manufacturer,
                     "model": device.model,
-                    "available": device.availability == "online",
                     "battery_level": device.battery_level,
                     "signal_quality": device.signal_quality,
                     "last_seen": device.last_seen.isoformat() if device.last_seen else None,
@@ -223,7 +222,6 @@ class ZigbeeDevices(Widget):
                     "name",
                     "manufacturer",
                     "model",
-                    "available",
                     "last_seen",
                     "battery_level",
                     "signal_quality",
@@ -300,7 +298,6 @@ class ZigbeeDevices(Widget):
         device["name"] = device.get("name", "Simulator Device")
         device["manufacturer"] = "Simulator"
         device["model"] = "Simulator Device"
-        device["available"] = True
         device["pairing"] = True
         device["battery_level"] = 1
         device["signal_quality"] = 100
