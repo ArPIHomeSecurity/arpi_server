@@ -50,10 +50,10 @@ tasks:
     desc: Start the database
     cmds:
       - docker volume create argus-database
+      - uv run --env-file .env -- sh -c 'mkdir -p $(dirname "$DB_HOST")'
       - cmd: |
           docker start argus-database || uv run --env-file .env -- sh -c \
-          'mkdir -p $(dirname "$DB_HOST") && \
-          docker run -d -it \
+          'docker run -d -it \
             --name argus-database \
             -p 127.0.0.1:5432:5432 \
             -v "$DB_HOST:/var/run/postgresql" \
