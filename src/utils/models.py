@@ -230,7 +230,7 @@ class Sensor(BaseModel):
     alert = Column(Boolean, nullable=False, default=False)
     silent_alert = Column(Boolean, nullable=True, default=None)
     error = Column(Boolean, nullable=False, default=False)
-    tamper = Column(Boolean, nullable=False, default=False)
+    tamper = Column(Boolean, nullable=True, default=None)
     enabled = Column(Boolean, nullable=False, default=True)
     deleted = Column(Boolean, nullable=False, default=False)
 
@@ -276,7 +276,7 @@ class Sensor(BaseModel):
         self.description = description
         self.enabled = enabled
         self.silent_alert = silent_alert
-        self.tamper = False
+        self.tamper = None
         self.monitor_period = monitor_period
         self.monitor_threshold = monitor_threshold
         if channel is None:
@@ -304,6 +304,35 @@ class Sensor(BaseModel):
             raise AssertionError(
                 "A sensor must use exactly one source: wired channel or Zigbee mapping"
             )
+
+    @property
+    def is_zigbee(self) -> bool:
+        return self.zigbee_device_id is not None and self.zigbee_entity_id is not None
+
+    def supports_tamper(self, board_version: int) -> bool:
+        if not self.is_zigbee:
+            return (
+                self.channel is not None
+                and self.channel >= 0
+                and board_version == 3
+                and self.channel_type == ChannelTypes.NORMAL
+                and self.sensor_eol_count == SensorEOLCount.DOUBLE
+            )
+
+        if self.zigbee_device is None:
+            return False
+
+        metadata = self.zigbee_device.device_metadata
+        if not isinstance(metadata, dict):
+            return False
+
+        return any(
+            entity.get("entityId") == self.zigbee_entity_id
+            and entity.get("cluster") == "IAS Zone"
+            and entity.get("attribute") == "zone_status"
+            for entity in metadata.get("entities") or []
+            if isinstance(entity, dict)
+        )
 
     def update(self, data):
         if "channel" in data and data["channel"] != self.channel:

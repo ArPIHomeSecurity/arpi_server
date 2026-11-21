@@ -9,6 +9,7 @@ from os import environ
 from time import sleep
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from monitor.adapters.sensor import get_sensor_adapter
 from monitor.alert import SensorAlert
@@ -73,14 +74,6 @@ class SensorHandler:
         self._mqtt_client: MQTTClient | None = None
         self._published_topics: set[tuple[int | None, str]] = set()
 
-    @staticmethod
-    def is_zigbee_sensor(sensor: Sensor) -> bool:
-        return (
-            sensor is not None
-            and sensor.zigbee_device_id is not None
-            and sensor.zigbee_entity_id is not None
-        )
-
     def initialize(self):
         self._mqtt_client = MQTTClient(topic_validator=self.is_sensorname_valid)
         self._mqtt_client.connect(client_id=self.MQTT_CLIENT_ID)
@@ -135,7 +128,7 @@ class SensorHandler:
         Check if there is any wired sensor without reference value.
         """
         for sensor in self._sensors:
-            if self.is_zigbee_sensor(sensor):
+            if sensor.is_zigbee:
                 continue
             if sensor.reference_value is None and sensor.channel != -1:
                 logger.info("Found uncalibrated sensor: %s(%s)", sensor.name, sensor.id)
@@ -159,7 +152,9 @@ class SensorHandler:
         # force reload the sensors from the database
         self._db_session.expire_all()
         self._sensors = self._db_session.scalars(
-            select(Sensor).where(Sensor.deleted == False)
+            select(Sensor)
+            .where(Sensor.deleted == False)
+            .options(joinedload(Sensor.zigbee_device))
         ).all()
         logger.debug("Sensors reloaded!")
 
@@ -201,7 +196,7 @@ class SensorHandler:
         # keep config update state
         sleep(2)
 
-        wired_sensor_count = sum(1 for sensor in self._sensors if not self.is_zigbee_sensor(sensor))
+        wired_sensor_count = sum(1 for sensor in self._sensors if not sensor.is_zigbee)
 
         # verify the sensor configuration
         if wired_sensor_count > self._sensor_adapter.channel_count:
@@ -235,7 +230,13 @@ class SensorHandler:
         previously_published_topics = self._published_topics
         self._published_topics = set()
         self._sensors = (
-            self._db_session.execute(select(Sensor).filter(Sensor.deleted == False)).scalars().all()
+            self._db_session.execute(
+                select(Sensor)
+                .filter(Sensor.deleted == False)
+                .options(joinedload(Sensor.zigbee_device))
+            )
+            .scalars()
+            .all()
         )
         for sensor in self._sensors:
             self._mqtt_client.publish_sensor_config(sensor.id, sensor.type.name, sensor.name)
@@ -254,7 +255,7 @@ class SensorHandler:
         logger.debug("Validating sensor configuration...")
         channels = set()
         for sensor in self._sensors:
-            if self.is_zigbee_sensor(sensor):
+            if sensor.is_zigbee:
                 continue
             if sensor.channel is None:
                 continue
@@ -290,7 +291,7 @@ class SensorHandler:
         Save the reference values to the database.
         """
         for sensor in self._sensors:
-            if self.is_zigbee_sensor(sensor):
+            if sensor.is_zigbee:
                 continue
             # skip sensors without a channel or already calibrated
             if sensor.channel == -1 or sensor.reference_value is not None:
@@ -306,8 +307,8 @@ class SensorHandler:
         """
         changes = False
         for sensor in self._sensors:
-            is_tamper = False
-            if self.is_zigbee_sensor(sensor):
+            is_tamper = None
+            if sensor.is_zigbee:
                 entity_data = None
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
@@ -322,14 +323,15 @@ class SensorHandler:
                     else False
                 )
                 attributes = entity_data.attributes if entity_data is not None else {}
-                is_tamper = bool(attributes.get("tamper", False)) or (
-                    entity_data is not None
-                    and entity_data.device_class == "tamper"
-                    and bool(entity_data.value)
-                ) or (
-                    device is not None
-                    and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "tamper")
-                )
+                if sensor.supports_tamper(BOARD_VERSION):
+                    is_tamper = bool(attributes.get("tamper", False)) or (
+                        entity_data is not None
+                        and entity_data.device_class == "tamper"
+                        and bool(entity_data.value)
+                    ) or (
+                        device is not None
+                        and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "tamper")
+                    )
                 is_error = (
                     entity_data is None
                     or entity_data.value is None
@@ -367,12 +369,13 @@ class SensorHandler:
                 if sensor.channel == -1:
                     is_alert = False
                     is_error = False
-                    is_tamper = False
                 else:
                     value = self._sensor_adapter.get_value(sensor.channel)
 
                     is_alert = detect_alert(sensor, value)
-                    is_tamper = detect_tamper(sensor, value)
+                    if sensor.supports_tamper(BOARD_VERSION):
+                        is_tamper = detect_tamper(sensor, value)
+
                     is_error = detect_error(sensor, value)
 
                     logger.trace(
