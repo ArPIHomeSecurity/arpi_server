@@ -286,29 +286,24 @@ def _create_sensors(session, sensor_types, area, zone_1, zone_2, zone_tamper) ->
 
 
 def _create_zigbee_devices(session) -> dict[str, ZigbeeDevice]:
-    endpoint = "1"
-    zone_status = IasZone.AttributeDefs.zone_status
+    unique_id = "11:22:33:44:55:66:77:88-1-1280"
+    entity_id = f"binary_sensor/{unique_id}"
     devices = {
         "X001": ZigbeeDevice(
             ieee_address="11:22:33:44:55:66:77:88",
             name="Zigbee Contact Sensor",
             metadata={
-                "signals": [
+                "entities": [
                     {
-                        "endpoint": endpoint,
-                        "cluster": IasZone.ep_attribute,
-                        "clusterId": int(IasZone.cluster_id),
-                        "attribute": zone_status.name,
-                        "attributeId": int(zone_status.id),
-                        "field": "alarm",
-                    },
-                    {
-                        "endpoint": endpoint,
-                        "cluster": IasZone.ep_attribute,
-                        "clusterId": int(IasZone.cluster_id),
-                        "attribute": zone_status.name,
-                        "attributeId": int(zone_status.id),
-                        "field": "tamper",
+                        "entityId": entity_id,
+                        "uniqueId": unique_id,
+                        "platform": "binary_sensor",
+                        "name": "Contact",
+                        "cluster": IasZone.name,
+                        "attribute": IasZone.AttributeDefs.zone_status.name,
+                        "deviceClass": "opening",
+                        "value": False,
+                        "available": True,
                     },
                 ]
             },
@@ -324,10 +319,7 @@ def _create_zigbee_sensor(session, sensor_types, zigbee_devices, area, zones) ->
     zigbee_sensor = Sensor(
         channel=None,
         zigbee_device_id=zigbee_devices["X001"].id,
-        zigbee_endpoint="1",
-        zigbee_cluster_id=int(IasZone.cluster_id),
-        zigbee_attribute_id=int(IasZone.AttributeDefs.zone_status.id),
-        zigbee_field="alarm",
+        zigbee_entity_id="binary_sensor/11:22:33:44:55:66:77:88-1-1280",
         sensor_type=sensor_types["Open"],
         area=area,
         zone=zones["no_delay"],

@@ -7,7 +7,7 @@ name = "arpi-server"
 dynamic = ["version"]
 description = "The backend service of the ArPI security system running on the Raspberry PI"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "ArPI Home Security"}
@@ -19,7 +19,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Home Automation",
     "Topic :: Security",
 ]
@@ -42,7 +42,9 @@ dependencies = [
     "stringcase~=1.2.0",
     "uvicorn~=0.42",
     "dotenv>=0.9.9",
-    "bellows~=1.0",
+    "zigpy>=2.4.0",
+    "zha>=2.4.0",
+    "zha-quirks>=2.4.0",
 ]
 
 [project.optional-dependencies]

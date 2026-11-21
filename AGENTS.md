@@ -3,7 +3,7 @@
 ## General Project Description
 ArPI Server is the Python backend for the ArPI home security system on Raspberry Pi.
 It provides REST APIs, monitoring workflows, and MCP integration.
-Main stack: Python 3.11, Flask, FastMCP, PostgreSQL, MQTT.
+Main stack: Python 3.12+, Flask, FastMCP, PostgreSQL, MQTT.
 
 ## General Architecture
 - src/server: core HTTP API, auth, DB access, business logic.
@@ -13,7 +13,7 @@ Main stack: Python 3.11, Flask, FastMCP, PostgreSQL, MQTT.
 - tests: pytest suites for startup, arm/disarm, helpers, fixtures.
 
 ## How To Run Locally
-Prerequisites: Python 3.11, uv, Task, Docker.
+Prerequisites: Python 3.12+, uv, Task, Docker.
 
 1. Install dependencies:
    uv sync --group=dev --extra=simulator

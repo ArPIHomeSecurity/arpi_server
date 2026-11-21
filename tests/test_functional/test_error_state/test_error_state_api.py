@@ -5,8 +5,8 @@ from zigpy.zcl.clusters.security import IasZone
 
 from monitor.adapters.mock.utils import (
     set_input_state,
-    set_zigbee_signal,
-    set_zigbee_trouble,
+    set_zigbee_entity_attribute,
+    set_zigbee_entity_value,
 )
 from monitor.sensor.detector import wiring_config
 from tests.test_functional.data import create_test_v3_zigbee
@@ -20,9 +20,7 @@ from tests.test_functional.helpers import (
 from utils.models import SensorContactTypes
 
 IEEE_ADDRESS = "11:22:33:44:55:66:77:88"
-ENDPOINT = "1"
-CLUSTER_ID = int(IasZone.cluster_id)
-ATTRIBUTE_ID = int(IasZone.AttributeDefs.zone_status.id)
+ENTITY_ID = f"binary_sensor/{IEEE_ADDRESS}-1-{int(IasZone.cluster_id)}"
 
 
 def _set_healthy_mock_state():
@@ -33,8 +31,8 @@ def _set_healthy_mock_state():
         )
         set_input_state(f"CH{channel:02d}", strategy.default)
 
-    set_zigbee_trouble(IEEE_ADDRESS, ENDPOINT, False)
-    set_zigbee_signal(IEEE_ADDRESS, ENDPOINT, CLUSTER_ID, ATTRIBUTE_ID, "alarm", False)
+    set_zigbee_entity_attribute(IEEE_ADDRESS, ENTITY_ID, "trouble", False)
+    set_zigbee_entity_value(IEEE_ADDRESS, ENTITY_ID, False)
 
 
 def _get_sensor_error(user_token, sensor_id=None):
@@ -106,7 +104,7 @@ def test_zigbee_ias_zone_trouble_error_state(device_token, user_token):
         _wait_for_sensor_error(user_token, False)
         monitor_events.clear_events()
 
-        set_zigbee_trouble(IEEE_ADDRESS, ENDPOINT, True)
+        set_zigbee_entity_attribute(IEEE_ADDRESS, ENTITY_ID, "trouble", True)
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=True),
             timeout=1,
@@ -114,7 +112,7 @@ def test_zigbee_ias_zone_trouble_error_state(device_token, user_token):
         assert _get_sensor_error(user_token, sensor_id=4) is True
 
         monitor_events.clear_events()
-        set_zigbee_trouble(IEEE_ADDRESS, ENDPOINT, False)
+        set_zigbee_entity_attribute(IEEE_ADDRESS, ENTITY_ID, "trouble", False)
         monitor_events.wait_for_event(
             MonitorEvent(name="sensors_error_change", payload=False),
             timeout=1,

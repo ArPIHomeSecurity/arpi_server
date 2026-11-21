@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from monitor.adapters.mock.utils import (
     set_input_state,
-    set_zigbee_signal,
+    set_zigbee_entity_value,
 )
 from monitor.sensor.detector import wiring_config
 from tests.test_functional.data import create_test_no_delay_v2
@@ -17,7 +17,6 @@ from tests.test_functional.helpers import (
     wait_for_monitoring_ready,
 )
 from utils.models import SensorContactTypes
-from utils.zigbee import IasZone
 
 load_dotenv(".env.pytest")
 
@@ -328,9 +327,7 @@ def test_03_alert(device_token, user_token):
 def test_04_zigbee_alert(device_token, user_token):
     monitor_events = MonitorEventsClient(device_token)
     ieee_address = "11:22:33:44:55:66:77:88"
-    endpoint = "1"
-    cluster_id = int(IasZone.cluster_id)
-    attribute_id = int(IasZone.AttributeDefs.zone_status.id)
+    entity_id = f"binary_sensor/{ieee_address}-1-1280"
 
     try:
         wait_for_monitoring_ready(device_token)
@@ -352,7 +349,7 @@ def test_04_zigbee_alert(device_token, user_token):
             timeout=0.5,
         )
 
-        set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, "alarm", True)
+        set_zigbee_entity_value(ieee_address, entity_id, True)
 
         # wait for the alert event
         monitor_events.wait_for_events(
@@ -457,6 +454,6 @@ def test_04_zigbee_alert(device_token, user_token):
 
     finally:
         try:
-            set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, "alarm", False)
+            set_zigbee_entity_value(ieee_address, entity_id, False)
         finally:
             monitor_events.disconnect()

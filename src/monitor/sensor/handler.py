@@ -78,9 +78,7 @@ class SensorHandler:
         return (
             sensor is not None
             and sensor.zigbee_device_id is not None
-            and sensor.zigbee_endpoint is not None
-            and sensor.zigbee_cluster_id is not None
-            and sensor.zigbee_attribute_id is not None
+            and sensor.zigbee_entity_id is not None
         )
 
     def initialize(self):
@@ -251,7 +249,7 @@ class SensorHandler:
     def validate_sensor_config(self):
         """
         Validate the sensor configuration.
-        Wired sensors must remain unique by channel; Zigbee sensors are mapped by device and signal.
+        Wired sensors must remain unique by channel; Zigbee sensors are mapped to ZHA entities.
         """
         logger.debug("Validating sensor configuration...")
         channels = set()
@@ -310,52 +308,56 @@ class SensorHandler:
         for sensor in self._sensors:
             is_tamper = False
             if self.is_zigbee_sensor(sensor):
-                alarm_data = None
-                trouble_data = None
-                tamper_data = None
+                entity_data = None
                 device = getattr(sensor, "zigbee_device", None)
                 if device is not None:
-                    alarm_data, trouble_data, tamper_data = ZigbeeDeviceStore.get_sensor_state(
-                        device.ieee_address,
-                        sensor.zigbee_endpoint,
-                        sensor.zigbee_cluster_id,
-                        sensor.zigbee_attribute_id,
-                        sensor.zigbee_field,
+                    entity_data = ZigbeeDeviceStore.get_entity_state(
+                        device.ieee_address, sensor.zigbee_entity_id
                     )
                 is_alert = (
-                    bool(alarm_data.value)
-                    if alarm_data is not None and alarm_data.value is not None
+                    bool(entity_data.value)
+                    if entity_data is not None
+                    and entity_data.value is not None
+                    and entity_data.device_class not in ("tamper", "problem")
                     else False
                 )
-                is_tamper = bool(
-                    tamper_data is not None and tamper_data.value is not None and tamper_data.value
+                attributes = entity_data.attributes if entity_data is not None else {}
+                is_tamper = bool(attributes.get("tamper", False)) or (
+                    entity_data is not None
+                    and entity_data.device_class == "tamper"
+                    and bool(entity_data.value)
+                ) or (
+                    device is not None
+                    and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "tamper")
                 )
-                is_error = bool(
-                    alarm_data is None
-                    or alarm_data.value is None
-                    or (trouble_data is not None and trouble_data.value)
+                is_error = (
+                    entity_data is None
+                    or entity_data.value is None
+                    or entity_data.available is False
+                    or bool(attributes.get("trouble", False))
+                    or (
+                        entity_data.device_class == "problem"
+                        and bool(entity_data.value)
+                    )
+                    or (
+                        device is not None
+                        and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "problem")
+                    )
                 )
                 if is_error and not sensor.error:
                     logger.error(
-                        "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) encountered an error: %s, trouble: %s",
+                        "Sensor %s(%s) (zigbee/%s) encountered an error: %s",
                         sensor.name,
                         sensor.id,
-                        sensor.zigbee_endpoint,
-                        sensor.zigbee_cluster_id,
-                        sensor.zigbee_attribute_id,
-                        sensor.zigbee_field,
-                        alarm_data,
-                        getattr(trouble_data, "value", None),
+                        sensor.zigbee_entity_id,
+                        entity_data,
                     )
                 logger.trace(
-                    "Sensor %s(%s) (zigbee/%s/%04x/%04x/%s) value: %s => alert: %s, error: %s, tamper: %s",
+                    "Sensor %s(%s) (zigbee/%s) value: %s => alert: %s, error: %s, tamper: %s",
                     sensor.name,
                     sensor.id,
-                    sensor.zigbee_endpoint,
-                    sensor.zigbee_cluster_id,
-                    sensor.zigbee_attribute_id,
-                    sensor.zigbee_field,
-                    getattr(alarm_data, "value", None),
+                    sensor.zigbee_entity_id,
+                    getattr(entity_data, "value", None),
                     is_alert,
                     is_error,
                     is_tamper,

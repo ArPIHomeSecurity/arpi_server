@@ -183,7 +183,7 @@ class Sensor(BaseModel):
     Model for the sensor table.
 
     Wired sensors use the channel field, while Zigbee sensors resolve their state
-    from a device endpoint/cluster/attribute/signal tuple. Exactly one source is used.
+    from a ZHA entity. Exactly one source is used.
     """
 
     NAME_LENGTH = 16
@@ -195,10 +195,7 @@ class Sensor(BaseModel):
     description = Column(String, nullable=True)
     channel = Column(Integer, nullable=True)
     zigbee_device_id = Column(Integer, ForeignKey("zigbee_device.id"), nullable=True)
-    zigbee_endpoint = Column(String(16), nullable=True)
-    zigbee_cluster_id = Column(Integer, nullable=True)
-    zigbee_attribute_id = Column(Integer, nullable=True)
-    zigbee_field = Column(String(32), nullable=True)
+    zigbee_entity_id = Column(String(512), nullable=True)
     channel_type = Column(
         Enum(
             ChannelTypes.BASIC.value,
@@ -267,10 +264,7 @@ class Sensor(BaseModel):
         sensor_contact_type: SensorContactTypes | None = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount | None = SensorEOLCount.SINGLE,
         zigbee_device_id: int | None = None,
-        zigbee_endpoint: str | None = None,
-        zigbee_cluster_id: int | None = None,
-        zigbee_attribute_id: int | None = None,
-        zigbee_field: str | None = None,
+        zigbee_entity_id: str | None = None,
         ui_order: int | None = None,
         ui_hidden: bool = False,
     ):
@@ -294,10 +288,7 @@ class Sensor(BaseModel):
             self.sensor_contact_type = sensor_contact_type or SensorContactTypes.NO
             self.sensor_eol_count = sensor_eol_count or SensorEOLCount.SINGLE
         self.zigbee_device_id = zigbee_device_id
-        self.zigbee_endpoint = zigbee_endpoint
-        self.zigbee_cluster_id = zigbee_cluster_id
-        self.zigbee_attribute_id = zigbee_attribute_id
-        self.zigbee_field = zigbee_field
+        self.zigbee_entity_id = zigbee_entity_id
         self.ui_order = ui_order
         self.ui_hidden = ui_hidden
         self.deleted = False
@@ -305,21 +296,10 @@ class Sensor(BaseModel):
 
     def _validate_source(self):
         wired = self.channel is not None
-        zigbee_values = (
-            self.zigbee_device_id is not None
-            or self.zigbee_endpoint is not None
-            or self.zigbee_cluster_id is not None
-            or self.zigbee_attribute_id is not None
-            or self.zigbee_field is not None
-        )
-        zigbee = (
-            self.zigbee_device_id is not None
-            and self.zigbee_endpoint is not None
-            and self.zigbee_cluster_id is not None
-            and self.zigbee_attribute_id is not None
-        )
+        zigbee_values = self.zigbee_device_id is not None or self.zigbee_entity_id is not None
+        zigbee = self.zigbee_device_id is not None and self.zigbee_entity_id is not None
         if zigbee_values and not zigbee:
-            raise AssertionError("A Zigbee mapping requires endpoint, cluster, and attribute IDs")
+            raise AssertionError("A Zigbee mapping requires a device and entity ID")
         if wired == zigbee:
             raise AssertionError(
                 "A sensor must use exactly one source: wired channel or Zigbee mapping"
@@ -350,10 +330,7 @@ class Sensor(BaseModel):
                 "monitor_threshold",
                 "silent_alert",
                 "zigbee_device_id",
-                "zigbee_endpoint",
-                "zigbee_cluster_id",
-                "zigbee_attribute_id",
-                "zigbee_field",
+                "zigbee_entity_id",
             ),
             data,
         )
@@ -382,10 +359,7 @@ class Sensor(BaseModel):
                     "description",
                     "channel",
                     "zigbee_device_id",
-                    "zigbee_endpoint",
-                    "zigbee_cluster_id",
-                    "zigbee_attribute_id",
-                    "zigbee_field",
+                    "zigbee_entity_id",
                     "channel_type",
                     "sensor_contact_type",
                     "sensor_eol_count",

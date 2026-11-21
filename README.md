@@ -30,10 +30,11 @@ The system has three services:
 This project is built with Python, Flask, and FastMCP. It provides the main API,
 monitoring services, and MCP integration for the ArPI security system,
 with PostgreSQL-backed persistence and support for MQTT-connected components.
+Zigbee communication uses the standalone ZHA gateway and zha-quirks.
 
 
 ## Prerequisites 🧰
-- Python 3.11
+- Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Task](https://taskfile.dev/installation/)

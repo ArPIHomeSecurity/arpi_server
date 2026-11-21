@@ -14,18 +14,11 @@ from functools import cache
 from random import randint
 
 from sqlalchemy import select
-from zigpy.zcl.clusters.security import ZoneStatus
 
 from monitor.database import create_database_session
 from monitor.output import OUTPUT_NAMES
 from monitor.sensor.detector import wiring_config
 from utils.models import ChannelTypes, Sensor, SensorContactTypes, SensorEOLCount
-from utils.zigbee import (
-    IasField,
-    IAS_ZONE_STATUS_ATTRIBUTE,
-    ZigbeeSignal,
-    decode_zigbee_attribute,
-)
 
 # buffer files between the simulator and the mock adapters
 SIMULATOR_INPUT_FILE = os.environ.get("SIMULATOR_INPUT_FILE", "simulator_input.json")
@@ -254,20 +247,13 @@ def load_zigbee_device_states() -> dict:
                 device.ieee_address,
                 {
                     "name": device.name,
-                    "signal_values": [],
-                    "signal_metadata": (device.device_metadata or {}).get("signals", []),
+                    "entities": deepcopy((device.device_metadata or {}).get("entities", [])),
                 },
             )
-            _set_signal_value(
-                simulated_device,
-                ZigbeeSignal.create(
-                    sensor.zigbee_endpoint,
-                    sensor.zigbee_cluster_id,
-                    sensor.zigbee_attribute_id,
-                    sensor.zigbee_field,
-                ),
-                False,
-            )
+            for entity in simulated_device["entities"]:
+                if entity.get("platform") == "binary_sensor":
+                    entity.setdefault("value", False)
+                    entity.setdefault("attributes", {})
     return data
 
 
@@ -288,55 +274,64 @@ def reset_zigbee_devices():
         os.unlink(SIMULATOR_ZIGBEE_FILE)
 
 
-def _set_signal_value(device, signal: ZigbeeSignal, value):
-    signal_values = device.setdefault("signal_values", [])
-    for record in signal_values:
-        if ZigbeeSignal.from_json(record) == signal:
-            record["value"] = value
-            return
-    signal_values.append({**signal.to_json(), "value": value})
-
-
-def _get_signal_value(device, signal: ZigbeeSignal):
-    for record in device.get("signal_values", []):
-        if ZigbeeSignal.from_json(record) == signal:
-            return record.get("value")
-    return None
-
-
-def set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, field, value):
-    """
-    Update a normalized signal value for a simulated device.
-    """
+def set_zigbee_entity_value(ieee_address: str, entity_id: str, value: bool):
+    """Set a simulated Zigbee entity value."""
     default_data = get_zigbee_devices()
 
-    def merge_signal(base, new):
+    def merge_entity(base, new):
         if not isinstance(base, dict):
             base = deepcopy(default_data)
 
         devices = base.setdefault("devices", {})
         device = devices.setdefault(new["ieee_address"], {})
-        endpoint = new["endpoint"]
-        signal = ZigbeeSignal.create(
-            endpoint, new["cluster_id"], new["attribute_id"], new["field"]
+        entity = next(
+            (
+                entity
+                for entity in device.get("entities", [])
+                if entity.get("entityId") == new["entity_id"]
+            ),
+            None,
         )
-        statuses = device.get("ias_zone_status", {})
-        is_ias_signal = signal in (
-            IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, IasField.ALARM),
-            IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, IasField.TAMPER),
-        )
-        if is_ias_signal and endpoint in statuses:
-            flag = (
-                ZoneStatus.Alarm_1 | ZoneStatus.Alarm_2
-                if signal.field == IasField.ALARM
-                else ZoneStatus.Tamper
+        if entity is None:
+            raise ValueError(
+                f"Unknown Zigbee entity {new['entity_id']} on device {new['ieee_address']}"
             )
-            status = int(statuses[endpoint]) & ~int(flag)
-            if new["value"]:
-                status |= int(ZoneStatus.Alarm_1 if signal.field == IasField.ALARM else flag)
-            _update_ias_status(device, endpoint, status)
-        else:
-            _set_signal_value(device, signal, new["value"])
+        entity["value"] = bool(new["value"])
+        device["last_seen"] = datetime.now().astimezone().isoformat()
+        return base
+
+    protected_update(
+        SIMULATOR_ZIGBEE_FILE,
+        {"ieee_address": str(ieee_address), "entity_id": str(entity_id), "value": bool(value)},
+        default_data,
+        merge_entity,
+    )
+
+
+def set_zigbee_entity_attribute(
+    ieee_address: str, entity_id: str, attribute: str, value: bool
+):
+    """Set an extra state attribute for a simulated entity."""
+    default_data = get_zigbee_devices()
+
+    def merge_attribute(base, new):
+        if not isinstance(base, dict):
+            base = deepcopy(default_data)
+
+        device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
+        entity = next(
+            (
+                entity
+                for entity in device.get("entities", [])
+                if entity.get("entityId") == new["entity_id"]
+            ),
+            None,
+        )
+        if entity is None:
+            raise ValueError(
+                f"Unknown Zigbee entity {new['entity_id']} on device {new['ieee_address']}"
+            )
+        entity.setdefault("attributes", {})[new["attribute"]] = bool(new["value"])
         device["last_seen"] = datetime.now().astimezone().isoformat()
         return base
 
@@ -344,50 +339,12 @@ def set_zigbee_signal(ieee_address, endpoint, cluster_id, attribute_id, field, v
         SIMULATOR_ZIGBEE_FILE,
         {
             "ieee_address": str(ieee_address),
-            "endpoint": str(endpoint),
-            "cluster_id": int(cluster_id),
-            "attribute_id": int(attribute_id),
-            "field": field,
-            "value": value,
+            "entity_id": str(entity_id),
+            "attribute": str(attribute),
+            "value": bool(value),
         },
         default_data,
-        merge_signal,
-    )
-
-
-def _update_ias_status(device, endpoint, status):
-    device.setdefault("ias_zone_status", {})[endpoint] = int(status)
-    decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
-    for field, value in decoded.values:
-        _set_signal_value(device, IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, field), value)
-    device["last_seen"] = datetime.now().astimezone().isoformat()
-
-
-def set_zigbee_trouble(ieee_address, endpoint, enabled):
-    default_data = get_zigbee_devices()
-
-    def merge_trouble(base, new):
-        device = base.setdefault("devices", {}).setdefault(new["ieee_address"], {})
-        endpoint = new["endpoint"]
-        status = device.get("ias_zone_status", {}).get(endpoint)
-        if status is None:
-            status = 0
-            alarm = IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, IasField.ALARM)
-            if _get_signal_value(device, alarm) is True:
-                status |= int(ZoneStatus.Alarm_1)
-            if _get_signal_value(device, alarm._replace(field=IasField.TAMPER)) is True:
-                status |= int(ZoneStatus.Tamper)
-        status = int(status) & ~int(ZoneStatus.Trouble)
-        if new["enabled"]:
-            status |= int(ZoneStatus.Trouble)
-        _update_ias_status(device, endpoint, status)
-        return base
-
-    protected_update(
-        SIMULATOR_ZIGBEE_FILE,
-        {"ieee_address": str(ieee_address), "endpoint": str(endpoint), "enabled": bool(enabled)},
-        default_data,
-        merge_trouble,
+        merge_attribute,
     )
 
 

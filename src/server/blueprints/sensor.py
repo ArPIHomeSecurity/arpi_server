@@ -56,10 +56,7 @@ def create_sensor():
             sensor_eol_count=sensor_data.get("sensorEolCount"),
             sensor_type_id=sensor_data["typeId"],
             zigbee_device_id=sensor_data.get("zigbeeDeviceId"),
-            zigbee_endpoint=sensor_data.get("zigbeeEndpoint"),
-            zigbee_cluster_id=sensor_data.get("zigbeeClusterId"),
-            zigbee_attribute_id=sensor_data.get("zigbeeAttributeId"),
-            zigbee_field=sensor_data.get("zigbeeField"),
+            zigbee_entity_id=sensor_data.get("zigbeeEntityId"),
         )
         return jsonify(new_sensor.serialized), 201
     except ConfigChangesNotAllowed:

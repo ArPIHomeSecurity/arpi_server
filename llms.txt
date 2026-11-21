@@ -17,7 +17,7 @@ Primary files
 - tests/: automated test suite.
 
 Technology
-- Python 3.11+
+- Python 3.12+
 - Flask
 - Flask-SQLAlchemy and Flask-Migrate
 - FastMCP

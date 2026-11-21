@@ -70,10 +70,7 @@ class SensorService(BaseService):
         sensor_contact_type: SensorContactTypes = SensorContactTypes.NO,
         sensor_eol_count: SensorEOLCount = SensorEOLCount.SINGLE,
         zigbee_device_id: int | None = None,
-        zigbee_endpoint: str | None = None,
-        zigbee_cluster_id: int | None = None,
-        zigbee_attribute_id: int | None = None,
-        zigbee_field: str | None = None,
+        zigbee_entity_id: str | None = None,
     ) -> Sensor:
         """
         Create a new sensor in the database.
@@ -101,10 +98,7 @@ class SensorService(BaseService):
                 sensor_contact_type=sensor_contact_type,
                 sensor_eol_count=sensor_eol_count,
                 zigbee_device_id=zigbee_device_id,
-                zigbee_endpoint=zigbee_endpoint,
-                zigbee_cluster_id=zigbee_cluster_id,
-                zigbee_attribute_id=zigbee_attribute_id,
-                zigbee_field=zigbee_field,
+                zigbee_entity_id=zigbee_entity_id,
             )
         except AssertionError as error:
             raise InvalidSensorSource(str(error)) from error
@@ -112,7 +106,7 @@ class SensorService(BaseService):
         if not self.validate_binding(new_sensor):
             if new_sensor.channel is not None:
                 raise ChannelConflictError("Channel conflict with existing sensors.")
-            raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
+            raise ZigbeeBindingConflictError("ZHA entity already bound to another sensor.")
 
         self._db_session.add(new_sensor)
         self._db_session.commit()
@@ -144,7 +138,7 @@ class SensorService(BaseService):
         if not self.validate_binding(sensor):
             if sensor.channel is not None:
                 raise ChannelConflictError("Channel conflict with existing sensors.")
-            raise ZigbeeBindingConflictError("Zigbee signal already bound to another sensor.")
+            raise ZigbeeBindingConflictError("ZHA entity already bound to another sensor.")
 
         self._db_session.commit()
         self._db_session.refresh(sensor)
@@ -180,7 +174,7 @@ class SensorService(BaseService):
 
     def validate_binding(self, sensor: Sensor) -> bool:
         """
-        Validate the sensor's source (wired channel or Zigbee mapping) does not conflict.
+        Validate the sensor's source (wired channel or ZHA entity) does not conflict.
         """
         if sensor.channel is None:
             return self.validate_zigbee_binding(sensor)
@@ -223,16 +217,13 @@ class SensorService(BaseService):
 
     def validate_zigbee_binding(self, sensor: Sensor) -> bool:
         """
-        Validate that the sensor's Zigbee endpoint/attribute/signal is not already bound elsewhere.
+        Validate that the sensor's ZHA entity is not already bound elsewhere.
         """
         duplicate = self._db_session.scalar(
             select(Sensor).where(
                 Sensor.id != sensor.id,
                 Sensor.zigbee_device_id == sensor.zigbee_device_id,
-                Sensor.zigbee_endpoint == sensor.zigbee_endpoint,
-                Sensor.zigbee_cluster_id == sensor.zigbee_cluster_id,
-                Sensor.zigbee_attribute_id == sensor.zigbee_attribute_id,
-                Sensor.zigbee_field == sensor.zigbee_field,
+                Sensor.zigbee_entity_id == sensor.zigbee_entity_id,
                 Sensor.deleted == False,
             )
         )

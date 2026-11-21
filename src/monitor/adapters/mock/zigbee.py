@@ -1,9 +1,8 @@
 """Simulator-backed Zigbee adapter.
 
 The mock follows the same runtime contract as the real Zigbee adapter: it reads
-mutable live state from simulator_zigbee.json, resolves values by IEEE address,
-endpoint, cluster, attribute, and signal field, and exposes normalized readings that the monitor can
-consume without bypassing the normal sensor/alert path.
+mutable live entity state from simulator_zigbee.json and exposes normalized
+readings that the monitor can consume without bypassing the normal sensor path.
 """
 
 import logging
@@ -15,12 +14,10 @@ from monitor.adapters.mock.utils import (
 )
 from utils.constants import LOG_ADZIGBEE
 from utils.zigbee import (
-    IAS_ZONE_STATUS_ATTRIBUTE,
     ZigbeeDevice,
-    ZigbeeReading,
-    ZigbeeSignal,
+    ZigbeeEntity,
+    ZigbeeEntityReading,
     ZigbeeSnapshot,
-    decode_zigbee_attribute,
 )
 
 logger = logging.getLogger(LOG_ADZIGBEE)
@@ -31,7 +28,7 @@ class ZigbeeAdapter:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._cache: dict[tuple[str, ZigbeeSignal], ZigbeeReading] = {}
+        self._cache: dict[tuple[str, str], ZigbeeEntityReading] = {}
         self._running = False
         self._pairing = False
         self._pairing_duration = 0
@@ -53,29 +50,28 @@ class ZigbeeAdapter:
 
     def _refresh_cache(self, devices: dict):
         """Ingest parsed device state while the adapter lock is held."""
+        self._cache = {}
         for ieee_address, device in devices.items():
             ieee_address = str(ieee_address)
             timestamp = device.get("last_seen")
-            for signal in device.get("signal_values", []):
-                raw_value = signal.get("value")
-                if not isinstance(raw_value, bool):
+            for entity in device.get("entities", []):
+                entity_id = entity.get("entityId")
+                if not isinstance(entity_id, str):
                     continue
 
-                reading = ZigbeeReading(
-                    ieee_address, ZigbeeSignal.from_json(signal), raw_value, timestamp
+                value = entity.get("value")
+                if entity.get("platform") == "binary_sensor" and value is None:
+                    value = False
+                reading = ZigbeeEntityReading(
+                    ieee_address=ieee_address,
+                    entity_id=entity_id,
+                    value=value,
+                    device_class=entity.get("deviceClass"),
+                    attributes=entity.get("attributes", {}),
+                    available=entity.get("available", True),
+                    timestamp=timestamp,
                 )
                 self._cache[reading.key] = reading
-
-            for endpoint, status in device.get("ias_zone_status", {}).items():
-                decoded = decode_zigbee_attribute(IAS_ZONE_STATUS_ATTRIBUTE, status)
-                for field, value in decoded.values:
-                    reading = ZigbeeReading(
-                        ieee_address,
-                        IAS_ZONE_STATUS_ATTRIBUTE.signal(endpoint, field),
-                        value,
-                        timestamp,
-                    )
-                    self._cache[reading.key] = reading
 
     def get_joined_devices(self) -> list[ZigbeeDevice]:
         """Return the devices offered for pairing while joining is permitted."""
@@ -109,7 +105,23 @@ class ZigbeeAdapter:
 
     @staticmethod
     def _build_device(address: str, device: dict) -> ZigbeeDevice:
-        metadata = [signal for signal in device.get("signal_metadata", []) if isinstance(signal, dict)]
+        entities = [
+            ZigbeeEntity(
+                entity_id=entity["entityId"],
+                unique_id=entity["uniqueId"],
+                platform=entity["platform"],
+                name=entity.get("name") or entity["entityId"],
+                device_class=entity.get("deviceClass"),
+                value=entity.get("value"),
+                available=entity.get("available", True),
+                cluster=entity.get("cluster"),
+                attribute=entity.get("attribute"),
+                attributes=entity.get("attributes", {}),
+            )
+            for entity in device.get("entities", [])
+            if isinstance(entity, dict)
+            and all(key in entity for key in ("entityId", "uniqueId", "platform"))
+        ]
         return ZigbeeDevice(
             ieee_address=address,
             network_address=device.get("network_address"),
@@ -119,12 +131,7 @@ class ZigbeeAdapter:
             last_seen=device.get("last_seen"),
             battery_level=device.get("battery_level"),
             signal_quality=device.get("signal_quality"),
-            signals=[ZigbeeSignal.from_json(signal) for signal in metadata],
-            zone_types={
-                str(signal["endpoint"]): signal["zoneType"]
-                for signal in metadata
-                if signal.get("zoneType") is not None
-            },
+            entities=entities,
         )
 
     def permit_joining(self, duration_seconds) -> bool:

@@ -28,10 +28,8 @@ from monitor.socket_io import send_zigbee_pairing_state, send_zigbee_state
 from utils.constants import LOG_ZIGBEE, THREAD_ZIGBEE
 from utils.models import ZigbeeDevice as ZigbeeDeviceModel
 from utils.zigbee import (
-    IasField,
     ZigbeeDevice,
-    ZigbeeReading,
-    ZigbeeSignal,
+    ZigbeeEntityReading,
     ZigbeeSnapshot,
 )
 
@@ -50,7 +48,7 @@ class ZigbeeDeviceStore:
     """
 
     _lock = Lock()
-    _sensor_data: ClassVar[dict[tuple[str, ZigbeeSignal], ZigbeeReading]] = {}
+    _sensor_data: ClassVar[dict[tuple[str, str], ZigbeeEntityReading]] = {}
 
     @classmethod
     def update_snapshot(cls, snapshot: ZigbeeSnapshot):
@@ -59,16 +57,20 @@ class ZigbeeDeviceStore:
             cls._sensor_data = new_sensor_data
 
     @classmethod
-    def get_sensor_state(
-        cls, ieee_address, endpoint, cluster_id, attribute_id, field=None
-    ) -> tuple[ZigbeeReading | None, ZigbeeReading | None, ZigbeeReading | None]:
-        address = str(ieee_address)
-        signal = ZigbeeSignal.create(endpoint, cluster_id, attribute_id, field)
+    def get_entity_state(cls, ieee_address: str, entity_id: str) -> ZigbeeEntityReading | None:
         with cls._lock:
-            return (
-                cls._sensor_data.get((address, signal)),
-                cls._sensor_data.get((address, signal._replace(field=IasField.TROUBLE))),
-                cls._sensor_data.get((address, signal._replace(field=IasField.TAMPER))),
+            reading = cls._sensor_data.get((ieee_address, entity_id))
+        return reading if isinstance(reading, ZigbeeEntityReading) else None
+
+    @classmethod
+    def has_entity_status(cls, ieee_address: str, device_class: str) -> bool:
+        with cls._lock:
+            return any(
+                reading.device_class == device_class
+                and reading.available is not False
+                and reading.value is True
+                for (address, _), reading in cls._sensor_data.items()
+                if address == str(ieee_address)
             )
 
     @classmethod
@@ -87,11 +89,10 @@ def extract_attributes(device: ZigbeeDevice, include_identity: bool = False, met
         "battery_level": device.battery_level,
         "signal_quality": device.signal_quality,
     }
-    if device.signals or include_identity or metadata is not None:
-        metadata = {key: value for key, value in (metadata or {}).items() if key != "capabilities"}
+    if device.entities or include_identity or metadata is not None:
         values["metadata"] = {
-            **metadata,
-            "signals": device.signals_json(),
+            **(metadata or {}),
+            "entities": device.entities_json(),
         }
     if include_identity:
         values.update(
