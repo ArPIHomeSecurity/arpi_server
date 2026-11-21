@@ -1,4 +1,4 @@
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 
 # custom logging level for logging sensitive information
 TRACE = 5
@@ -55,9 +55,9 @@ LOGGING_MODULES = [
     (LOG_ADOUTPUT, INFO),
     (LOG_ADGSM, INFO),
     (LOG_ADKEYPAD, INFO),
-    (LOG_ZIGBEE, DEBUG),
-    (LOG_ADZIGBEE, DEBUG),
-    ("zigpy", DEBUG),
+    (LOG_ZIGBEE, INFO),
+    (LOG_ADZIGBEE, INFO),
+    ("zigpy", WARNING),
     (LOG_SECCON, INFO),
     (LOG_SC_CERTBOT, INFO),
     (LOG_SC_DYNDNS, INFO),
