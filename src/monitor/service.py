@@ -1,7 +1,7 @@
 import atexit
 import logging
 import os
-from signal import SIGTERM, Signals, signal
+from signal import SIGINT, SIGTERM, Signals, signal
 from threading import Event
 
 from monitor.background_service import BackgroundService
@@ -14,16 +14,30 @@ stop_event = Event()
 logger = logging.getLogger(LOG_SERVICE)
 
 background_service = None
+shutdown_in_progress = False
 
 
-def signal_term_handler(signal_number, frame):
+def signal_term_handler(signal_number, _frame):
+    global shutdown_in_progress
     logger.debug("Received signal (%s)", Signals(signal_number).name)
-    stop_background_service()
+    if shutdown_in_progress:
+        raise KeyboardInterrupt
+
+    shutdown_in_progress = True
+    try:
+        stop_background_service()
+    finally:
+        shutdown_in_progress = False
+
+    if signal_number == SIGINT:
+        raise KeyboardInterrupt
+    raise SystemExit(0)
 
 
 def start_background_service():
     global background_service
     logger.debug("Starting background service")
+    signal(SIGINT, signal_term_handler)
     signal(SIGTERM, signal_term_handler)
 
     if background_service is not None:

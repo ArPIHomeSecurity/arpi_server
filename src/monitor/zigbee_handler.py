@@ -307,6 +307,8 @@ class ZigbeeHandler(Thread):
     def close(self):
         ZigbeeDeviceStore.clear()
         if self._adapter is not None:
-            with contextlib.suppress(Exception):
+            try:
                 self._adapter.stop()
+            except Exception:
+                logger.exception("Failed to stop the Zigbee adapter")
             self._adapter = None

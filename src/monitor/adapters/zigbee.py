@@ -139,8 +139,10 @@ class ZigbeeAdapter:
             self._loop.run_forever()
         finally:
             self._ready = False
-            self._loop.close()
             self._running = False
+            self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+            self._loop.run_until_complete(self._loop.shutdown_default_executor())
+            self._loop.close()
 
     async def _async_init(self):
         """Initialize ZHA and install its device-quirk provider."""
@@ -173,15 +175,22 @@ class ZigbeeAdapter:
     def stop(self):
         """Shut down the ZHA gateway from another thread."""
         self._ready = False
-        if self._gateway is None or self._loop is None:
-            self._running = False
-            return
+        loop = self._loop
+        thread = self._thread
 
-        if self._loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self._gateway.shutdown(), self._loop)
-            future.result(timeout=10.0)
-            self._loop.call_soon_threadsafe(self._loop.stop)
-        self._running = False
+        try:
+            if self._gateway is not None and loop is not None and loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(self._gateway.shutdown(), loop)
+                future.result(timeout=10.0)
+        finally:
+            if loop is not None and loop.is_running():
+                loop.call_soon_threadsafe(loop.stop)
+            if thread is not None and thread is not threading.current_thread():
+                thread.join(timeout=10.0)
+                if thread.is_alive():
+                    logger.warning("ZHA Zigbee gateway thread did not stop within 10 seconds")
+
+            self._running = False
 
     def _device_joined(self, event):
         ieee_address = str(event.device_info.ieee)
