@@ -35,3 +35,7 @@ Useful variants:
 - task test:all -- -k <test-filter>
 - task test:debug -- -k <test-filter>
 
+# Notes
+
+* When executing commands in the project always use the `uv` command (with .env loaded) or `task` command to ensure the correct environment and dependencies are used.
+* The `uv` command ensures that the Python environment is correctly set up with the necessary dependencies for development and testing.
