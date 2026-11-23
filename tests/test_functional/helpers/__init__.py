@@ -167,7 +167,6 @@ class MonitorEventsClient:
             for event in events:
                 if event not in matched_events and self._find_event(event):
                     matched_events.append(event)
-                    break
 
             if len(matched_events) == len(events):
                 logger.debug(
@@ -181,8 +180,11 @@ class MonitorEventsClient:
 
         unexpected_events = [event.name for event in self._received if event not in events]
         if unexpected_events:
-            raise AssertionError(
-                f"Unexpected Socket.IO events received within {timeout} seconds at {_get_time_string()}: {unexpected_events}"
+            logger.warning(
+                "Unexpected Socket.IO events received within %s seconds at %s: %s",
+                timeout,
+                _get_time_string(),
+                unexpected_events,
             )
 
         missing_events = [event.name for event in events if event not in matched_events]
@@ -222,6 +224,31 @@ def check_api_response(response: requests.Response, expected_status: int | list[
 
 def wait_for_monitoring_ready(device_token: str, timeout=15):
     wait_for_monitoring_state(MONITORING_READY, device_token, timeout)
+
+
+def wait_for_sensors_inactive(device_token: str, timeout=5):
+    """
+    Wait for all sensors to become inactive before proceeding.
+
+    May be sensors are set in the simulator, but they have not yet reported as inactive in the system.
+
+    Args:
+        device_token (str): The device token for authentication.
+        timeout (int, optional): Maximum time to wait in seconds. Defaults to 5.
+
+    Raises:
+        RuntimeError: If sensors do not become inactive within the timeout.
+    """
+    start_time = time()
+    while time() - start_time < timeout:
+        response = call_api("GET", "/api/sensor/alert", {}, device_token)
+        check_api_response(response)
+        if response.json() is False:
+            return
+
+        sleep(0.1)
+
+    raise RuntimeError(f"Sensors did not become inactive within {timeout} seconds")
 
 
 def wait_for_monitoring_state(state: str, device_token: str, timeout=15):

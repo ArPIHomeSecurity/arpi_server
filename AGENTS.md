@@ -27,7 +27,7 @@ Prerequisites: Python 3.12+, uv, Task, Docker.
 
 ## Execute The Tests
 Run all tests:
-uv run pytest -v
+uv run --env-file .env.pytest pytest -v
 
 Useful variants:
 - task test:all

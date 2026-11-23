@@ -24,6 +24,7 @@ from monitor.adapters.mock.utils import (
     set_zigbee_devices,
 )
 from tests.test_functional.data import cleanup_database, clear_database
+from tests.test_functional.helpers import wait_for_sensors_inactive
 from tests.test_functional.helpers.services import server_service
 
 logger = logging.getLogger(__name__)
@@ -183,7 +184,7 @@ def server(database_data):
 
 
 @pytest.fixture(scope="module", name="device_token")
-def register_device():
+def register_device(server):
     # call rest api to register device
     host = os.environ["SERVER_HOST"]
     port = os.environ["SERVER_PORT"]
@@ -218,11 +219,12 @@ def authenticate(device_token):
 
 
 @pytest.fixture(autouse=True)
-def reset_input_states(database_data):
+def reset_input_states(database_data, device_token):
     logger.debug("Resetting input states...")
     num_channels = int(os.environ.get("INPUT_NUMBER", "15"))
     initialize_input_states(num_channels, power_state=1)
     reset_zigbee_devices()
+    wait_for_sensors_inactive(device_token)
     yield
 
 
