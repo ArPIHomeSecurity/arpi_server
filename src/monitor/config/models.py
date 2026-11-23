@@ -307,13 +307,19 @@ class MQTTConfigInternalControl:
     def from_dict(cls, value):
         raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
-    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    hostname: str = field(
+        default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local")
+    )
     port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = "argus_control"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_CONTROL_MQTT_PASSWORD"))
-    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
+    tls_enabled: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true")
+    )
     # only turns off the hostname check, the certificate chain is still verified
-    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
+    tls_insecure: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true")
+    )
     ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
@@ -330,14 +336,20 @@ class MQTTConfigInternalPublish:
     def from_dict(cls, value):
         raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
-    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    hostname: str = field(
+        default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local")
+    )
     port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = "argus"
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
-    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
+    tls_enabled: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true")
+    )
     # the internal broker is reached over a trusted network and is expected to have a
     # self signed certificate, so it is verified but the hostname check is turned off
-    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
+    tls_insecure: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true")
+    )
     ca_certs: str | None = DEFAULT_MQTT_CA_CERT
 
 
@@ -354,12 +366,18 @@ class MQTTConfigExternalPublish:
     def from_dict(cls, value):
         raise NotImplementedError(f"{cls.__name__} conversion not implemented")
 
-    hostname: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local"))
+    hostname: str = field(
+        default_factory=lambda: os.environ.get("ARGUS_MQTT_HOSTNAME", "arpi.local")
+    )
     port: int = field(default_factory=lambda: int(os.environ.get("ARGUS_MQTT_PORT", "8883")))
     username: str = None
     password: str = field(default_factory=lambda: os.environ.get("ARGUS_MQTT_PASSWORD"))
-    tls_enabled: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true"))
-    tls_insecure: bool = field(default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true"))
+    tls_enabled: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_ENABLED", "true") == "true")
+    )
+    tls_insecure: bool = field(
+        default_factory=lambda: bool(os.environ.get("ARGUS_TLS_INSECURE", "true") == "true")
+    )
     # no explicit CA means the system certificate store is used
     ca_certs: str | None = None
 

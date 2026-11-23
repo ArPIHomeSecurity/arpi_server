@@ -178,7 +178,9 @@ class Certbot:
         mqtt_connection = load_config(MQTTConnection)
 
         if mqtt_connection.external:
-            logger.info("Updating external MQTT configuration with hostname %s", dyndns_config.hostname)
+            logger.info(
+                "Updating external MQTT configuration with hostname %s", dyndns_config.hostname
+            )
             mqtt_config = load_config(MQTTConfigExternalPublish)
             mqtt_config.ca_certs = ca_certificate
             save_config(
@@ -187,7 +189,9 @@ class Certbot:
                 asdict(mqtt_config),
             )
         else:
-            logger.info("Updating internal MQTT configuration with hostname %s", dyndns_config.hostname)
+            logger.info(
+                "Updating internal MQTT configuration with hostname %s", dyndns_config.hostname
+            )
             mqtt_config = load_config(MQTTConfigInternalPublish)
             mqtt_config.hostname = dyndns_config.hostname
             mqtt_config.ca_certs = ca_certificate

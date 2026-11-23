@@ -79,11 +79,7 @@ class ZigbeeAdapter:
             return []
 
         devices = get_zigbee_devices().get("devices", {})
-        joining = {
-            str(address)
-            for address, device in devices.items()
-            if device.get("pairing")
-        }
+        joining = {str(address) for address, device in devices.items() if device.get("pairing")}
         snapshot = self._snapshot(devices, include_devices=True)
         return [device for device in snapshot.devices or () if device.ieee_address in joining]
 
@@ -96,10 +92,10 @@ class ZigbeeAdapter:
             self._refresh_cache(devices)
             metadata = (
                 tuple(
-                    self._build_device(str(address), device)
-                    for address, device in devices.items()
+                    self._build_device(str(address), device) for address, device in devices.items()
                 )
-                if include_devices else None
+                if include_devices
+                else None
             )
             return ZigbeeSnapshot(tuple(self._cache.values()), metadata)
 

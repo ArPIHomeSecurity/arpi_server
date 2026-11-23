@@ -67,7 +67,11 @@ def calculate_channel_value(config: ChannelConfig) -> float:
 
     dual = config.wiring_strategy == WiringStrategies.DUAL.value
     two_eol = config.wiring_strategy == WiringStrategies.SINGLE_WITH_2EOL.value
-    if not dual and not two_eol and config.wiring_strategy != WiringStrategies.SINGLE_WITH_EOL.value:
+    if (
+        not dual
+        and not two_eol
+        and config.wiring_strategy != WiringStrategies.SINGLE_WITH_EOL.value
+    ):
         raise ValueError(f"Unknown wiring strategy: {config.wiring_strategy}")
 
     strategy = wiring_config.select_strategy(config.contact_type, dual=dual, two_eol=two_eol)
@@ -308,9 +312,7 @@ def set_zigbee_entity_value(ieee_address: str, entity_id: str, value: bool):
     )
 
 
-def set_zigbee_entity_attribute(
-    ieee_address: str, entity_id: str, attribute: str, value: bool
-):
+def set_zigbee_entity_attribute(ieee_address: str, entity_id: str, attribute: str, value: bool):
     """Set an extra state attribute for a simulated entity."""
     default_data = get_zigbee_devices()
 
@@ -424,7 +426,6 @@ def initialize_input_states(input_number: int, power_state: int = 1) -> None:
     """Initialize mock channels from database wiring with inactive contacts."""
     channel_configs = load_channel_configs(input_number)
     channel_values = [
-        calculate_channel_value(channel_configs[f"CH{i:02d}"])
-        for i in range(1, input_number + 1)
+        calculate_channel_value(channel_configs[f"CH{i:02d}"]) for i in range(1, input_number + 1)
     ]
     set_input_states([*channel_values, power_state])

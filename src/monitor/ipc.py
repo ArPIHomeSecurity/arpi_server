@@ -97,7 +97,6 @@ class IPCServer(Thread):
         _socket.settimeout(60)
         _socket.setblocking(False)
 
-
         try:
             # create parent folder for the socket file if it doesn't exist
             self.prepare_socket()

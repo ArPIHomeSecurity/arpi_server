@@ -116,9 +116,7 @@ def _entity_label(entity):
     cluster = entity.get("cluster")
     attribute = entity.get("attribute")
     label = " / ".join(
-        str(value).replace("_", " ").title()
-        for value in (cluster, attribute)
-        if value
+        str(value).replace("_", " ").title() for value in (cluster, attribute) if value
     )
     return label or entity.get("name") or entity["entityId"]
 
@@ -231,9 +229,7 @@ class ZigbeeDevices(Widget):
                 for entity in entities:
                     current = current_entities.get(entity["entityId"], {})
                     entity["value"] = current.get("value", entity.get("value", False))
-                    entity["attributes"] = current.get(
-                        "attributes", entity.get("attributes", {})
-                    )
+                    entity["attributes"] = current.get("attributes", entity.get("attributes", {}))
                 simulator_device["entities"] = entities
                 for attribute in (
                     "name",
@@ -294,7 +290,9 @@ class ZigbeeDevices(Widget):
                 )
 
             for entity_id, entity in _ias_entities(entities).items():
-                widget_id = f"zigbee-trouble-{generation}-{index}-{len(self.zigbee_trouble_properties)}"
+                widget_id = (
+                    f"zigbee-trouble-{generation}-{index}-{len(self.zigbee_trouble_properties)}"
+                )
                 self.zigbee_trouble_properties[widget_id] = (ieee, entity_id)
                 simulator_entity = entities_by_id.get(entity_id, entity)
                 trouble = simulator_entity.get("attributes", {}).get("trouble", False)
@@ -354,11 +352,7 @@ class ZigbeeDevices(Widget):
             ieee, entity_id = trouble_entry
             device = get_zigbee_devices().get("devices", {}).get(ieee, {})
             entity = next(
-                (
-                    item
-                    for item in device.get("entities", [])
-                    if item.get("entityId") == entity_id
-                ),
+                (item for item in device.get("entities", []) if item.get("entityId") == entity_id),
                 {},
             )
             attributes = entity.get("attributes", {})
@@ -374,11 +368,7 @@ class ZigbeeDevices(Widget):
         device = get_zigbee_devices().get("devices", {}).get(ieee, {})
         # the checkbox also reports the value set while building the widget
         entity = next(
-            (
-                item
-                for item in device.get("entities", [])
-                if item.get("entityId") == entity_id
-            ),
+            (item for item in device.get("entities", []) if item.get("entityId") == entity_id),
             {},
         )
         if bool(entity.get("value", False)) == value:

@@ -152,9 +152,7 @@ class SensorHandler:
         # force reload the sensors from the database
         self._db_session.expire_all()
         self._sensors = self._db_session.scalars(
-            select(Sensor)
-            .where(Sensor.deleted == False)
-            .options(joinedload(Sensor.zigbee_device))
+            select(Sensor).where(Sensor.deleted == False).options(joinedload(Sensor.zigbee_device))
         ).all()
         logger.debug("Sensors reloaded!")
 
@@ -324,23 +322,24 @@ class SensorHandler:
                 )
                 attributes = entity_data.attributes if entity_data is not None else {}
                 if sensor.supports_tamper(BOARD_VERSION):
-                    is_tamper = bool(attributes.get("tamper", False)) or (
-                        entity_data is not None
-                        and entity_data.device_class == "tamper"
-                        and bool(entity_data.value)
-                    ) or (
-                        device is not None
-                        and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "tamper")
+                    is_tamper = (
+                        bool(attributes.get("tamper", False))
+                        or (
+                            entity_data is not None
+                            and entity_data.device_class == "tamper"
+                            and bool(entity_data.value)
+                        )
+                        or (
+                            device is not None
+                            and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "tamper")
+                        )
                     )
                 is_error = (
                     entity_data is None
                     or entity_data.value is None
                     or entity_data.available is False
                     or bool(attributes.get("trouble", False))
-                    or (
-                        entity_data.device_class == "problem"
-                        and bool(entity_data.value)
-                    )
+                    or (entity_data.device_class == "problem" and bool(entity_data.value))
                     or (
                         device is not None
                         and ZigbeeDeviceStore.has_entity_status(device.ieee_address, "problem")
@@ -382,7 +381,7 @@ class SensorHandler:
                         "Sensor %s(%s) (CH%02d) value: %s => alert: %s, error: %s, tamper: %s",
                         sensor.name,
                         sensor.id,
-                        sensor.channel+1,
+                        sensor.channel + 1,
                         float(f"{value:.3f}"),
                         is_alert,
                         is_error,
@@ -394,7 +393,7 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f triggered an alert",
                             sensor.name,
                             sensor.id,
-                            sensor.channel+1,
+                            sensor.channel + 1,
                             value,
                         )
 
@@ -403,7 +402,7 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f encountered an error",
                             sensor.name,
                             sensor.id,
-                            sensor.channel+1,
+                            sensor.channel + 1,
                             value,
                         )
 
@@ -412,10 +411,10 @@ class SensorHandler:
                             "Sensor %s(%s) (CH%02d) value: %.3f tamper detected",
                             sensor.name,
                             sensor.id,
-                            sensor.channel+1,
+                            sensor.channel + 1,
                             value,
                         )
-                    
+
             if is_alert != sensor.alert:
                 sensor.alert = is_alert
                 self._mqtt_client.publish_sensor_state(sensor.id, sensor.name, sensor.alert)

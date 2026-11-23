@@ -5,9 +5,10 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class ZigbeeEntity:
     """
-    Represents a Zigbee entity such as a device or sensor within the Zigbee network, 
+    Represents a Zigbee entity such as a device or sensor within the Zigbee network,
     encapsulating the state of a specific cluster and attribute.
     """
+
     entity_id: str
     unique_id: str
     platform: str

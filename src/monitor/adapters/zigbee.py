@@ -275,7 +275,6 @@ class ZigbeeAdapter:
                 self._entity_unsubscribers[key] = unsubscribe
                 self._readings[key] = self._build_reading(ieee_address, entity)
 
-
     def _entity_updated(self, device: ZhaDevice, entity, _event):
         ieee_address = str(device.ieee)
         reading = self._build_reading(ieee_address, entity)
@@ -351,15 +350,12 @@ class ZigbeeAdapter:
             if device.last_seen is not None
             else None
         )
-        entities = [
-            self._build_entity(entity) for entity in device.platform_entities.values()
-        ]
+        entities = [self._build_entity(entity) for entity in device.platform_entities.values()]
         battery_level = next(
             (
                 min(100, max(0, int(entity.value)))
                 for entity in entities
-                if entity.device_class == "battery"
-                and isinstance(entity.value, (int, float))
+                if entity.device_class == "battery" and isinstance(entity.value, (int, float))
             ),
             None,
         )

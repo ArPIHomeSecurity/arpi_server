@@ -64,7 +64,9 @@ class States:
         Open the storage
         """
         try:
-            with open(os.getenv("STATUS_FILE", "status.json"), "r+", encoding="utf-8") as status_file:
+            with open(
+                os.getenv("STATUS_FILE", "status.json"), "r+", encoding="utf-8"
+            ) as status_file:
                 fcntl.flock(status_file, fcntl.LOCK_EX)
                 cls._data = json.load(status_file) or {}
                 fcntl.flock(status_file, fcntl.LOCK_UN)
@@ -86,7 +88,9 @@ class States:
         Save the current state of the system
         """
         if cls._data is not None:
-            with open(os.getenv("STATUS_FILE", "status.json"), "w", encoding="utf-8") as status_file:
+            with open(
+                os.getenv("STATUS_FILE", "status.json"), "w", encoding="utf-8"
+            ) as status_file:
                 fcntl.flock(status_file, fcntl.LOCK_EX)
                 json.dump(cls._data, status_file, indent=4)
                 fcntl.flock(status_file, fcntl.LOCK_UN)

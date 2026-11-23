@@ -34,6 +34,7 @@ def get_registered_config_sections():
     """
     return [config_class.SECTION_NAME for config_class in registry]
 
+
 def get_registered_config_class(option_name: str, section: str):
     """
     Get the registered config class for a given option name and section.

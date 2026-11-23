@@ -254,7 +254,9 @@ class ZigbeeHandler(Thread):
                             if log_new:
                                 logger.info("Re-paired Zigbee device: %s", device.ieee_address)
                         else:
-                            session.add(ZigbeeDeviceModel(ieee_address=device.ieee_address, **values))
+                            session.add(
+                                ZigbeeDeviceModel(ieee_address=device.ieee_address, **values)
+                            )
                             if log_new:
                                 logger.info("Registered new Zigbee device: %s", device.ieee_address)
                     else:

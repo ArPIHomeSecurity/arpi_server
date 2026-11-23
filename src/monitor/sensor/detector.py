@@ -235,7 +235,7 @@ def detect_error_v3(sensor: Sensor, current_value: float) -> bool:
 
         if sensor.sensor_eol_count == SensorEOLCount.DOUBLE:
             acceptable_values.extend([wiring_config.shortcut, wiring_config.open_circuit])
-    
+
         logger.trace(
             "Detecting error for sensor %s(%s): default=%.3f active=%.3f shortcut=%.3f open=%.3f",
             sensor.name,
