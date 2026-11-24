@@ -26,7 +26,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, backref, declarative_base, mapped_column, relationship
 from sqlalchemy.orm.mapper import validates
 from sqlalchemy.sql.schema import ForeignKey
-from stringcase import camelcase, snakecase
 
 from monitor.config.registry import get_registered_config_names, get_registered_config_sections
 from utils.constants import (
@@ -40,6 +39,7 @@ from utils.constants import (
     ROLE_USER,
 )
 from utils.dictionary import merge_dicts, replace_keys
+from utils.stringcase import camelcase, snakecase
 
 
 def hash_code(access_code):

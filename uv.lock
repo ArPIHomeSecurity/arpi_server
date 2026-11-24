@@ -231,7 +231,6 @@ dependencies = [
     { name = "python-gsmmodem-new" },
     { name = "python-jose" },
     { name = "python-socketio" },
-    { name = "stringcase" },
     { name = "uvicorn" },
     { name = "zha" },
     { name = "zha-quirks" },
@@ -276,7 +275,6 @@ requires-dist = [
     { name = "python-jose", specifier = "~=3.5" },
     { name = "python-socketio", specifier = "~=5.14" },
     { name = "pywiegand", marker = "extra == 'device'", specifier = "==0.5.2" },
-    { name = "stringcase", specifier = "~=1.2.0" },
     { name = "textual", marker = "extra == 'simulator'", specifier = "~=8.2" },
     { name = "textual-dev", marker = "extra == 'simulator'" },
     { name = "uvicorn", specifier = "~=0.42" },
@@ -3005,12 +3003,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/b5/b4/205b0d5241d934e8a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/cb/6a6a47d5b464bd08695d254f3da6e7986cc70c9fa5d778eda57538edfe56/starlette-1.6.0-py3-none-any.whl", hash = "sha256:a86dd39d14bb45f85a3d18525215a9ef0cfd1f192ac793220e72598c90335f0c", size = 75969, upload-time = "2026-08-08T18:27:56.196Z" },
 ]
-
-[[package]]
-name = "stringcase"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f3/1f/1241aa3d66e8dc1612427b17885f5fcd9c9ee3079fc0d28e9a3aeeb36fa3/stringcase-1.2.0.tar.gz", hash = "sha256:48a06980661908efe8d9d34eab2b6c13aefa2163b3ced26972902e3bdfd87008", size = 2958, upload-time = "2017-08-06T01:40:57.021Z" }
 
 [[package]]
 name = "textual"
