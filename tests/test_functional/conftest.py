@@ -43,8 +43,8 @@ def setup_logging():
 def database_host():
     logger.debug("Starting database...")
     DB_HOST = environ["DB_HOST"]
-    subprocess.run(["docker", "volume", "create", "argus-test-database"], check=True)
-
+    subprocess.run(["docker", "rm", "-f", "argus-test-database"], capture_output=True, check=False)
+    subprocess.run(["docker", "volume", "create", "argus-test-database"], capture_output=True, check=True)
     subprocess.run(
         [
             "docker",
@@ -129,8 +129,8 @@ def zigbee_state(database_data):
 def mqtt():
     path = Path(__file__).parents[2]
     config_path = path / "scripts" / "mosquitto" / "mosquitto.dev.conf"
-    subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], check=False)
-    subprocess.run(["docker", "volume", "create", "argus-mqtt-test"], check=True)
+    subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], capture_output=True, check=False)
+    subprocess.run(["docker", "volume", "create", "argus-mqtt-test"], capture_output=True, check=True)
     result = subprocess.run(
         [
             "docker",
@@ -155,6 +155,8 @@ def mqtt():
     if result.returncode != 0:
         logger.error("Failed to start MQTT broker: %s", result.stderr)
         raise RuntimeError("Failed to start MQTT broker")
+    else:
+        logger.debug("MQTT broker started successfully")
 
     try:
         yield
