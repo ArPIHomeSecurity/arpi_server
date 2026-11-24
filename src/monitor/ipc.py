@@ -106,19 +106,29 @@ class IPCServer(Thread):
             logger.error("Failed to bind socket on %s: %s", MONITOR_INPUT_SOCKET, error)
             raise
 
-        try:
-            chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
-            chown(
-                MONITOR_INPUT_SOCKET,
-                getpwnam(environ["USERNAME"]).pw_uid,
-                getgrnam(environ["GROUPNAME"]).gr_gid,
-            )
-            logger.info("Socket permissions fixed")
-        except KeyError as error:
-            logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
-            logger.error("Error: %s", error)
+        self._fix_socket_permissions()
 
         self._sockets = [_socket]
+
+    @staticmethod
+    def _fix_socket_permissions():
+        try:
+            chmod(MONITOR_INPUT_SOCKET, int(environ["PERMISSIONS"], 8))
+            username = environ.get("USERNAME")
+            groupname = environ.get("GROUPNAME")
+            if not username and not groupname:
+                logger.info("Socket permissions fixed; ownership left unchanged")
+                return
+
+            chown(
+                MONITOR_INPUT_SOCKET,
+                getpwnam(username).pw_uid if username else -1,
+                getgrnam(groupname).gr_gid if groupname else -1,
+            )
+            logger.info("Socket permissions fixed")
+        except (KeyError, OSError, ValueError) as error:
+            logger.error("Failed to fix permission and/or owner of %s!", MONITOR_INPUT_SOCKET)
+            logger.error("Error: %s", error)
 
     def prepare_socket(self):
         """
