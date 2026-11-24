@@ -2,7 +2,6 @@ from monitor.adapters.mock.zigbee import ZigbeeAdapter
 from simulator.zigbee import ZigbeeDeviceType, _entities_for_device
 from utils.zigbee import ZigbeeEntity, ZigbeeEntityReading
 
-
 IEEE_ADDRESS = "11:22:33:44:55:66:77:88"
 ENTITY_ID = f"binary_sensor/{IEEE_ADDRESS}-1-1280"
 

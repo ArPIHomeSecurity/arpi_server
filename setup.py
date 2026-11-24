@@ -2,9 +2,9 @@
 
 import os
 import shutil
-from distutils.command.build import build
 from pathlib import Path
 
+from distutils.command.build import build
 from setuptools import setup
 from setuptools.command.build_py import build_py
 from setuptools.command.sdist import sdist

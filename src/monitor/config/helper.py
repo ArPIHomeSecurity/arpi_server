@@ -10,7 +10,7 @@ from typing import TypeVar
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from monitor.database import create_database_session, get_database_session
+from monitor.database import create_database_session
 from utils.models import Option
 
 T = TypeVar("T")

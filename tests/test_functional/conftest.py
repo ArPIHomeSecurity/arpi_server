@@ -44,7 +44,9 @@ def database_host():
     logger.debug("Starting database...")
     DB_HOST = environ["DB_HOST"]
     subprocess.run(["docker", "rm", "-f", "argus-test-database"], capture_output=True, check=False)
-    subprocess.run(["docker", "volume", "create", "argus-test-database"], capture_output=True, check=True)
+    subprocess.run(
+        ["docker", "volume", "create", "argus-test-database"], capture_output=True, check=True
+    )
     subprocess.run(
         [
             "docker",
@@ -130,7 +132,9 @@ def mqtt():
     path = Path(__file__).parents[2]
     config_path = path / "scripts" / "mosquitto" / "mosquitto.dev.conf"
     subprocess.run(["docker", "rm", "-f", "argus-mqtt-test"], capture_output=True, check=False)
-    subprocess.run(["docker", "volume", "create", "argus-mqtt-test"], capture_output=True, check=True)
+    subprocess.run(
+        ["docker", "volume", "create", "argus-mqtt-test"], capture_output=True, check=True
+    )
     result = subprocess.run(
         [
             "docker",

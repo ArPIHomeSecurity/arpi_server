@@ -3,8 +3,6 @@ from threading import Event, Thread
 from time import time
 
 from monitor.adapters.output import get_output_adapter
-from monitor.config.helper import load_config
-from monitor.config.models import SyrenConfig
 from monitor.socket_io import send_syren_state
 from utils.constants import LOG_ALERT, THREAD_ALERT
 

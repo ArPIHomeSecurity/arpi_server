@@ -3,7 +3,6 @@ This module defines the configuration dataclasses for the monitor.
 """
 
 import os
-import re
 from dataclasses import dataclass, field, is_dataclass
 
 from monitor.config.registry import register_config_option

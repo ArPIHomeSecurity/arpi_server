@@ -1,4 +1,4 @@
-from logging import DEBUG, ERROR, INFO, WARNING
+from logging import ERROR, INFO, WARNING
 
 # custom logging level for logging sensitive information
 TRACE = 5
