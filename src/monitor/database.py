@@ -15,9 +15,9 @@ def get_database_session():
     # database connection common to all threads
     db_user = environ.get("DB_USER")
     if db_user:
-        url = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
+        url = f"postgresql+psycopg2://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
     else:
-        url = f"postgresql:///{environ['DB_SCHEMA']}?host={DB_HOST}"
+        url = f"postgresql+psycopg2:///{environ['DB_SCHEMA']}?host={DB_HOST}"
 
     global engine
     logger.debug("Creating new database connection: %s", url)
@@ -36,9 +36,9 @@ def create_database_session():
     # database connection common to all threads
     db_user = environ.get("DB_USER")
     if db_user:
-        url = f"postgresql://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
+        url = f"postgresql+psycopg2://{db_user}@/{environ['DB_SCHEMA']}?host={DB_HOST}"
     else:
-        url = f"postgresql:///{environ['DB_SCHEMA']}?host={DB_HOST}"
+        url = f"postgresql+psycopg2:///{environ['DB_SCHEMA']}?host={DB_HOST}"
 
     global engine
     logger.debug("Creating new database connection: %s", url)
